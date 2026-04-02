@@ -6,8 +6,8 @@ plugins {
 }
 
 android {
-    namespace = "com.example.valet_handheld_pos"
-    compileSdk = flutter.compileSdkVersion
+    namespace = "com.spid.valetmaster"
+    compileSdk = 34
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -20,12 +20,9 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.valet_handheld_pos"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        applicationId = "com.spid.valetmaster"
+        minSdk = 29
+        targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

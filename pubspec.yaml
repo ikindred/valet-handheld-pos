@@ -31,9 +31,66 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+
+  # State Management
+  flutter_bloc: ^8.1.6
+  bloc: ^8.1.4
+  equatable: ^2.0.5
+
+  # Local Storage
+  shared_preferences: ^2.3.1
+
+  # Local Database
+  drift: ^2.18.0
+  drift_flutter: ^0.2.0
+  sqlite3_flutter_libs: ^0.5.24
+
+  # Icons
+  lucide_icons: ^0.257.0
+  flutter_svg: ^2.0.10+1
+
+  # Typography
+  google_fonts: ^6.2.1
+
+  # Navigation
+  go_router: ^14.2.0
+
+  # QR Code
+  mobile_scanner: ^5.1.1
+  qr_flutter: ^4.1.0
+
+  # Bluetooth Printing
+  # `esc_pos_utils` depends on `image ^3`, but `signature` pulls `image ^4`.
+  # Use a fork that avoids the `image` version conflict.
+  flutter_esc_pos_utils_image_3: ^0.1.9
+  flutter_pos_printer_platform_image_3: ^1.0.0
+
+  # Signature Capture
+  signature: ^5.4.1
+
+  # Networking & Sync
+  dio: ^5.4.3
+  connectivity_plus: ^6.0.3
+  internet_connection_checker_plus: ^2.4.0
+
+  # PDF / Export
+  pdf: ^3.11.1
+  printing: ^5.13.1
+  share_plus: ^9.0.0
+
+  # Date & Time
+  intl: ^0.19.0
+
+  # Utilities
+  path: ^1.9.0
+  path_provider: ^2.1.5
+  uuid: ^4.4.0
+  freezed_annotation: ^2.4.1
+  json_annotation: ^4.9.0
+
+  # Permissions
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:
@@ -45,6 +102,12 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+
+  bloc_test: ^9.1.7
+  drift_dev: ^2.18.0
+  build_runner: ^2.4.11
+  freezed: ^2.5.2
+  json_serializable: ^6.8.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

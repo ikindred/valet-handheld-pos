@@ -1,0 +1,37 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "ADB Pair Device",
+            "type": "shell",
+            "command": "echo ${input:pairingCode} | adb pair 192.168.1.207:${input:port}",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "Flutter Clean and Get",
+            "type": "shell",
+            "command": "flutter clean && flutter pub get",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "port",
+            "description": "Enter the pairing port number",
+            "type": "promptString"
+        },
+        {
+            "id": "pairingCode",
+            "description": "Enter the pairing code",
+            "type": "promptString"
+        }
+    ]
+}
