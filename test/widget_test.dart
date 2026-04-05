@@ -10,8 +10,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:valet_handheld_pos/main.dart';
 
 void main() {
-  testWidgets('Boots to login screen', (WidgetTester tester) async {
+  testWidgets('Boots through splash to login screen', (WidgetTester tester) async {
     await tester.pumpWidget(const ValetMasterApp());
+    // Splash auto-navigates after a short delay.
+    await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
 
     expect(find.text('Valet Master'), findsOneWidget);

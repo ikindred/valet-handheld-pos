@@ -34,6 +34,15 @@ final class AuthLoggedOut extends AuthEvent {
   const AuthLoggedOut();
 }
 
+final class AuthCashSessionUpdated extends AuthEvent {
+  const AuthCashSessionUpdated(this.cashSessionStatus);
+
+  final CashSessionStatus cashSessionStatus;
+
+  @override
+  List<Object?> get props => [cashSessionStatus];
+}
+
 sealed class AuthState extends Equatable {
   const AuthState();
 
@@ -70,6 +79,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     on<AuthLoggedOut>((event, emit) {
       emit(const AuthUnauthenticated());
+    });
+
+    on<AuthCashSessionUpdated>((event, emit) {
+      final current = state;
+      if (current is! AuthAuthenticated) return;
+      emit(AuthAuthenticated(cashSessionStatus: event.cashSessionStatus));
     });
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../../core/ui/app_background.dart';
 import '../state/auth_bloc.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -29,21 +30,11 @@ class _LoginScreenState extends State<LoginScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFFFFAF0),
-              Color(0xFFF1F5FF),
-            ],
-          ),
-        ),
-        alignment: Alignment.center,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: Card(
+      body: AppBackground(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Card(
             elevation: 12,
             shadowColor: Colors.black.withValues(alpha: 0.10),
             shape: RoundedRectangleBorder(
@@ -154,6 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
               ),
+            ),
             ),
           ),
         ),

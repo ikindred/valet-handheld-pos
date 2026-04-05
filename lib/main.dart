@@ -16,12 +16,18 @@ class ValetMasterApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final router = createAppRouter();
     return MaterialApp(
       title: 'Valet Master',
       theme: appTheme(),
       debugShowCheckedModeBanner: false,
-      home: AppProviders(child: Router.withConfig(config: router)),
+      home: AppProviders(
+        child: Builder(
+          builder: (context) {
+            final router = createAppRouter(context);
+            return Router.withConfig(config: router);
+          },
+        ),
+      ),
     );
   }
 }
