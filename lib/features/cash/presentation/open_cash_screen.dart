@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/ui/app_text_field.dart';
 import '../../auth/state/auth_bloc.dart';
 import 'widgets/cash_figma_text_styles.dart';
 import 'widgets/cash_widgets.dart';
@@ -237,30 +238,12 @@ class _ReadOnlyField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: CashFigmaStyles.fieldLabel()),
-        const SizedBox(height: 6),
-        Container(
-          height: 40,
-          alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: const Color(0xFFE7E8EB)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0C000000),
-                blurRadius: 1,
-                offset: Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Text(value, style: CashFigmaStyles.fieldValue()),
-        ),
-      ],
+    return LabeledAppTextField(
+      label: label,
+      child: AppReadOnlyField(
+        minHeight: 40,
+        child: Text(value, style: CashFigmaStyles.fieldValue()),
+      ),
     );
   }
 }
@@ -326,16 +309,12 @@ class _NotesCard extends StatelessWidget {
         children: [
           Text('NOTES (OPTIONAL)', style: CashFigmaStyles.notesSectionLabel()),
           const SizedBox(height: 8),
-          TextField(
+          AppTextField(
             controller: controller,
             maxLines: 4,
+            minHeight: 88,
+            hint: 'e.g. received balance from supervisor. . .',
             style: CashFigmaStyles.notesInput(),
-            decoration: InputDecoration(
-              hintText: 'e.g. received balance from supervisor. . .',
-              hintStyle: CashFigmaStyles.notesHint(),
-              filled: true,
-              fillColor: const Color(0xFFF8F9FB),
-            ),
           ),
         ],
       ),

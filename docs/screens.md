@@ -8,16 +8,14 @@ Open Cash
 https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=61-423&m=dev
 
 Close Cash
-https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=62-495&m=dev -->
+https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=62-495&m=dev
 
 Dashboard
-https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-453&m=dev
+https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-453&m=dev -->
 
 ---
 
-Check In - Customer and Valet Details
-
-1. https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-1467&m=dev
+Check In - Customer and Valet Details 1. https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-1467&m=dev
 
 Check In - Vehicle Details 2. https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-1719&m=dev
 

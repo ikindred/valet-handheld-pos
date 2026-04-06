@@ -3,7 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/app_text_field.dart';
 import '../../auth/state/auth_bloc.dart';
+import 'widgets/cash_figma_text_styles.dart';
 import 'widgets/cash_widgets.dart';
 
 class CloseCashScreen extends StatefulWidget {
@@ -402,14 +404,12 @@ class _ClosingNotesCard extends StatelessWidget {
         children: [
           Text('CLOSING NOTES', style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppColors.textSecondary)),
           const SizedBox(height: 8),
-          TextField(
+          AppTextField(
             controller: controller,
             maxLines: 4,
-            decoration: const InputDecoration(
-              hintText: 'Any incidents, discrepancies, or notes for the next shift…',
-              filled: true,
-              fillColor: Color(0xFFF8F9FB),
-            ),
+            minHeight: 88,
+            hint: 'Any incidents, discrepancies, or notes for the next shift…',
+            style: CashFigmaStyles.notesInput(),
           ),
         ],
       ),

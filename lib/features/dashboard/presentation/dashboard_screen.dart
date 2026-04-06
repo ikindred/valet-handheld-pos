@@ -165,7 +165,7 @@ class _ActionRow extends StatelessWidget {
         ),
         child: const Icon(Icons.add_rounded, color: Colors.white, size: 32),
       ),
-      onTap: () => context.push('/check-in'),
+      onTap: () => context.push('/check-in/step-1'),
     );
 
     final checkOut = DashboardActionTile(
