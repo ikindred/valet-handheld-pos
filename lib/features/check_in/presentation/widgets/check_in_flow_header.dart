@@ -44,9 +44,7 @@ class CheckInFlowHeader extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 24),
         decoration: BoxDecoration(
           color: _headerSurface,
-          border: Border(
-            bottom: BorderSide(width: 1, color: hairline),
-          ),
+          border: Border(bottom: BorderSide(width: 1, color: hairline)),
         ),
         alignment: Alignment.centerLeft,
         child: Row(

@@ -15,9 +15,9 @@ https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-453
 
 ---
 
-Check In - Customer and Valet Details 1. https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-1467&m=dev
+<!-- Check In - Customer and Valet Details 1. https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-1467&m=dev
 
-Check In - Vehicle Details 2. https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-1719&m=dev
+Check In - Vehicle Details 2. https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-1719&m=dev -->
 
 Check In - Vehicle Condition 3. https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-2040&m=dev
 
