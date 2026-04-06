@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/ui/app_background.dart';
 
@@ -30,6 +31,20 @@ class _SplashScreenState extends State<SplashScreen> {
     super.dispose();
   }
 
+  TextStyle _poppins(
+    double size,
+    FontWeight w,
+    Color color, {
+    double height = 1.0,
+  }) {
+    return GoogleFonts.poppins(
+      fontSize: size,
+      fontWeight: w,
+      color: color,
+      height: height,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -40,19 +55,12 @@ class _SplashScreenState extends State<SplashScreen> {
             children: [
               Text(
                 'Valet Master',
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      color: const Color(0xFFF68D00),
-                      fontWeight: FontWeight.w700,
-                    ),
+                style: _poppins(40, FontWeight.w700, const Color(0xFFF68D00)),
               ),
               const SizedBox(height: 10),
               Text(
                 'SMART PARKING TECHNOLOGIES',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: const Color(0xFFafafaf),
-                      letterSpacing: 1.2,
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: _poppins(20, FontWeight.w500, const Color(0xFFAEAEAE)),
               ),
             ],
           ),
@@ -61,4 +69,3 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 }
-

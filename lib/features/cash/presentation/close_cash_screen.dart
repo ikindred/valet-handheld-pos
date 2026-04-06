@@ -46,7 +46,7 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
 
   String get _displayAmount {
     final parsed = double.tryParse(_amountText.replaceAll(',', '')) ?? 0;
-    return '₱${parsed.toStringAsFixed(2)}';
+    return '₱ ${parsed.toStringAsFixed(2)}';
   }
 
   @override
@@ -64,31 +64,43 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
       backgroundColor: const Color(0xFFF4F5F7),
       body: Row(
         children: [
-          const CashLeftRail(title: 'Close Cash', subtitle: subtitle, online: online),
+          const CashLeftRail(),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-              child: Row(
+            child: SafeArea(
+              left: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const CashPageHeader(
+                    title: 'Close Cash',
+                    subtitle: subtitle,
+                    online: online,
+                  ),
+                  const SizedBox(height: 22),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                         Text('OVERVIEW', style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppColors.textSecondary, letterSpacing: 1.2)),
                         const SizedBox(height: 12),
                         Row(
                           children: const [
                             Expanded(child: _StatCard(title: 'TRANSACTIONS', big: '15', sub: 'This shift')),
                             SizedBox(width: 12),
-                            Expanded(child: _StatCard(title: 'TOTAL SALES', big: '₱1,890.00', sub: 'Cash collected', accent: _StatAccent.success)),
+                            Expanded(child: _StatCard(title: 'TOTAL SALES', big: '₱ 1,890.00', sub: 'Cash collected', accent: _StatAccent.success)),
                           ],
                         ),
                         const SizedBox(height: 12),
                         Row(
                           children: const [
-                            Expanded(child: _StatCard(title: 'OPENING BALANCE', big: '₱2,000.00', sub: 'Start shift')),
+                            Expanded(child: _StatCard(title: 'OPENING BALANCE', big: '₱ 2,000.00', sub: 'Start shift')),
                             SizedBox(width: 12),
-                            Expanded(child: _StatCard(title: 'EXPECTED CASH', big: '₱3,890.00', sub: 'Balance + sales', accent: _StatAccent.warning)),
+                            Expanded(child: _StatCard(title: 'EXPECTED CASH', big: '₱ 3,890.00', sub: 'Balance + sales', accent: _StatAccent.warning)),
                           ],
                         ),
                         const SizedBox(height: 22),
@@ -97,45 +109,54 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
                         CashAmountBox(text: _displayAmount),
                         const SizedBox(height: 12),
                         CashKeypad(onKey: _tapKey),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 18),
-                  SizedBox(
-                    width: 380,
-                    child: Column(
-                      children: [
-                        _TransactionBreakdownCard(totalSales: totalSales),
-                        const SizedBox(height: 16),
-                        _CashReconciliationCard(opening: opening, totalSales: totalSales, expected: expected, actual: actual, variance: variance),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 18),
-                  SizedBox(
-                    width: 360,
-                    child: Column(
-                      children: [
-                        _RemittanceCard(amount: totalSales),
-                        const SizedBox(height: 16),
-                        const _RemittanceBreakdownCard(flat: 1800.00, succeeding: 90.00),
-                        const SizedBox(height: 16),
-                        _ClosingNotesCard(controller: _notesCtrl),
-                        const Spacer(),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 54,
-                          child: FilledButton(
-                            onPressed: () {
-                              // TODO: Submit close cash + remittance to backend + local DB.
-                              context.read<AuthBloc>().add(const AuthCashSessionUpdated(CashSessionStatus.closed));
-                              context.read<AuthBloc>().add(const AuthLoggedOut());
-                              context.go('/login');
-                            },
-                            child: const Text('Close Cash & End Shift'),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 18),
+                          SizedBox(
+                            width: 380,
+                            child: Column(
+                              children: [
+                                _TransactionBreakdownCard(totalSales: totalSales),
+                                const SizedBox(height: 16),
+                                _CashReconciliationCard(
+                                    opening: opening,
+                                    totalSales: totalSales,
+                                    expected: expected,
+                                    actual: actual,
+                                    variance: variance),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 18),
+                          SizedBox(
+                            width: 360,
+                            child: Column(
+                              children: [
+                                _RemittanceCard(amount: totalSales),
+                                const SizedBox(height: 16),
+                                const _RemittanceBreakdownCard(flat: 1800.00, succeeding: 90.00),
+                                const SizedBox(height: 16),
+                                _ClosingNotesCard(controller: _notesCtrl),
+                                const Spacer(),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 54,
+                                  child: FilledButton(
+                                    onPressed: () {
+                                      // TODO: Submit close cash + remittance to backend + local DB.
+                                      context.read<AuthBloc>().add(const AuthCashSessionUpdated(CashSessionStatus.closed));
+                                      context.read<AuthBloc>().add(const AuthLoggedOut());
+                                      context.go('/login');
+                                    },
+                                    child: const Text('Close Cash & End Shift'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -214,15 +235,15 @@ class _TransactionBreakdownCard extends StatelessWidget {
         children: [
           Text('TRANSACTION BREAKDOWN', style: Theme.of(context).textTheme.labelLarge?.copyWith(letterSpacing: 0.8)),
           const SizedBox(height: 10),
-          row('Flat rate - 12 cars × ₱150.00', '₱1,800.00'),
+          row('Flat rate - 12 cars × ₱ 150.00', '₱ 1,800.00'),
           const Divider(height: 1),
-          row('Succeeding Hours', '₱90.00'),
+          row('Succeeding Hours', '₱ 90.00'),
           const Divider(height: 1),
           row('Overnight Fee (1)', '—'),
           const Divider(height: 1),
           row('Lost Ticket Fee (0)', '—'),
           const Divider(height: 1),
-          row('Total Sales', '₱${totalSales.toStringAsFixed(2)}', color: AppColors.success),
+          row('Total Sales', '₱ ${totalSales.toStringAsFixed(2)}', color: AppColors.success),
         ],
       ),
     );
@@ -269,15 +290,15 @@ class _CashReconciliationCard extends StatelessWidget {
         children: [
           Text('CASH RECONCILIATION', style: Theme.of(context).textTheme.labelLarge?.copyWith(letterSpacing: 0.8)),
           const SizedBox(height: 10),
-          row('Opening Balance', '₱${opening.toStringAsFixed(2)}'),
+          row('Opening Balance', '₱ ${opening.toStringAsFixed(2)}'),
           const Divider(height: 1),
-          row('Total Sales', '+ ₱${totalSales.toStringAsFixed(2)}', color: AppColors.success),
+          row('Total Sales', '+ ₱ ${totalSales.toStringAsFixed(2)}', color: AppColors.success),
           const Divider(height: 1),
-          row('Expected Total', '₱${expected.toStringAsFixed(2)}', fw: FontWeight.w700),
+          row('Expected Total', '₱ ${expected.toStringAsFixed(2)}', fw: FontWeight.w700),
           const Divider(height: 1),
-          row('Actual Cash on Hand', '₱${actual.toStringAsFixed(2)}'),
+          row('Actual Cash on Hand', '₱ ${actual.toStringAsFixed(2)}'),
           const Divider(height: 1),
-          row('Variance', '₱${variance.toStringAsFixed(2)}', color: varianceColor, fw: FontWeight.w700),
+          row('Variance', '₱ ${variance.toStringAsFixed(2)}', color: varianceColor, fw: FontWeight.w700),
           const SizedBox(height: 14),
           Container(
             height: 40,
@@ -313,12 +334,12 @@ class _RemittanceCard extends StatelessWidget {
           Text('SALES TO REMIT TO SUPERVISOR', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary, letterSpacing: 0.6)),
           const SizedBox(height: 10),
           Text(
-            '₱${amount.toStringAsFixed(2)}',
+            '₱ ${amount.toStringAsFixed(2)}',
             style: Theme.of(context).textTheme.displaySmall?.copyWith(color: const Color(0xFFF68D00), fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 6),
           Text(
-            'Balance (₱2,000.00) stays in drawer for next shift',
+            'Balance (₱ 2,000.00) stays in drawer for next shift',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
             textAlign: TextAlign.center,
           ),
@@ -357,9 +378,9 @@ class _RemittanceBreakdownCard extends StatelessWidget {
         children: [
           Text('REMITTANCE BREAKDOWN', style: Theme.of(context).textTheme.labelLarge?.copyWith(letterSpacing: 0.8)),
           const SizedBox(height: 10),
-          row('Flat rate collected', '₱${flat.toStringAsFixed(2)}'),
+          row('Flat rate collected', '₱ ${flat.toStringAsFixed(2)}'),
           const Divider(height: 1),
-          row('Succeeding hours collected', '₱${succeeding.toStringAsFixed(2)}'),
+          row('Succeeding hours collected', '₱ ${succeeding.toStringAsFixed(2)}'),
         ],
       ),
     );

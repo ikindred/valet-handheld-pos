@@ -1,4 +1,4 @@
-package com.example.valet_handheld_pos
+package com.spid.valetmaster
 
 import io.flutter.embedding.android.FlutterActivity
 

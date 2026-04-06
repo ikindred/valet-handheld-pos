@@ -6,18 +6,18 @@
     "configurations": [
     
         {
-            "name": "operator_mobile_app",
+            "name": "flutter_app",
             "request": "launch",
             "type": "dart"
         },
         {
-            "name": "operator_mobile_app (profile mode)",
+            "name": "flutter_app (profile mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "profile"
         },
         {
-            "name": "operator_mobile_app (release mode)",
+            "name": "flutter_app (release mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "release"

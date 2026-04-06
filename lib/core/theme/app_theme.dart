@@ -11,8 +11,12 @@ class AppColors {
   static const error = Color(0xFFD64045);
   static const success = Color(0xFF2E7D52);
   static const warning = Color(0xFFF0A500);
-  static const textPrimary = Color(0xFF1A1616);
-  static const textSecondary = Color(0xFF7A7070);
+  /// Figma grey / grey-900 — primary body and labels on light surfaces.
+  static const textPrimary = Color(0xFF0A1B39);
+  /// Figma grey / grey-500 — section caps, helper text, muted labels.
+  static const textSecondary = Color(0xFF6C7688);
+  /// Muted line under page titles (e.g. date · branch).
+  static const textSubtitleMuted = Color.fromRGBO(10, 27, 57, 0.6);
   static const divider = Color(0xFFE2DEDE);
   static const white = Color(0xFFFFFFFF);
 }
@@ -40,6 +44,8 @@ ThemeData appTheme() {
     dividerColor: AppColors.divider,
   );
 
+  // Poppins omits U+20B1 (₱); fallbacks supply the peso glyph on Android/iOS.
+  const pesoFallback = <String>['Noto Sans', 'Roboto'];
   final textTheme = GoogleFonts.poppinsTextTheme(base.textTheme).copyWith(
     displayLarge: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.w700),
     headlineMedium: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.w600),
@@ -49,6 +55,8 @@ ThemeData appTheme() {
     bodyMedium: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w400),
     labelLarge: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
     labelSmall: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w400),
+  ).apply(
+    fontFamilyFallback: pesoFallback,
   );
 
   return base.copyWith(

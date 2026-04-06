@@ -7,7 +7,8 @@ plugins {
 
 android {
     namespace = "com.spid.valetmaster"
-    compileSdk = 34
+    // Match highest plugin requirement (path_provider_android / shared_preferences_android).
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

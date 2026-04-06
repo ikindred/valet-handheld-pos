@@ -1,9 +1,37 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import 'cash_figma_text_styles.dart';
 
+/// Narrow left strip: logo only (matches [Figma Open Cash](https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=61-423) rail).
 class CashLeftRail extends StatelessWidget {
-  const CashLeftRail({
+  const CashLeftRail({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 96,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFAFA),
+        border: Border(
+          right: BorderSide(color: Colors.black.withValues(alpha: 0.13)),
+        ),
+      ),
+      child: const SafeArea(
+        left: false,
+        right: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(10, 20, 10, 20),
+          child: Column(children: [_LogoMark(), Spacer()]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Title strip: `#FAFAFA`, **bottom border only** (1px `black @ 0.13`), height 96.
+class CashPageHeader extends StatelessWidget {
+  const CashPageHeader({
     super.key,
     required this.title,
     required this.subtitle,
@@ -16,38 +44,42 @@ class CashLeftRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 96,
-      decoration: BoxDecoration(
-        color: const Color(0xFFFAFAFA),
-        border: Border(right: BorderSide(color: Colors.black.withValues(alpha: 0.13))),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 10),
-        child: Column(
+    return SizedBox(
+      height: 96,
+      width: double.infinity,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFAFAFA),
+          border: Border(
+            bottom: BorderSide(
+              width: 1,
+              color: Colors.black.withValues(alpha: 0.13),
+            ),
+          ),
+        ),
+        alignment: Alignment.centerLeft,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(height: 8),
-            const _LogoMark(),
-            const SizedBox(height: 16),
-            _OnlinePill(online: online),
-            const Spacer(),
-            RotatedBox(
-              quarterTurns: 3,
+            Expanded(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(title.toUpperCase(), style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 6),
+                  Text(title.toUpperCase(), style: CashFigmaStyles.pageTitle()),
+                  const SizedBox(height: 4),
                   Text(
                     subtitle.toUpperCase(),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: const Color.fromRGBO(10, 27, 57, 0.6),
-                          letterSpacing: 0.6,
-                        ),
+                    style: CashFigmaStyles.pageSubtitle(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(width: 16),
+            _OnlinePill(online: online),
           ],
         ),
       ),
@@ -73,12 +105,14 @@ class CashAmountBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: accent),
       ),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              color: accent,
-              fontWeight: FontWeight.w700,
-            ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerRight,
+        child: Text(
+          text,
+          maxLines: 1,
+          style: CashFigmaStyles.openingAmountInline().copyWith(color: accent),
+        ),
       ),
     );
   }
@@ -131,8 +165,15 @@ class _LogoMark extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.black.withValues(alpha: 0.13)),
       ),
-      alignment: Alignment.center,
-      child: const Text('S', style: TextStyle(fontWeight: FontWeight.w700)),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Image.asset(
+          'assets/images/app_logo.png',
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+        ),
+      ),
     );
   }
 }
@@ -157,9 +198,16 @@ class _OnlinePill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
           const SizedBox(width: 8),
-          Text(online ? 'Online' : 'Offline', style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+          Text(
+            online ? 'Online' : 'Offline',
+            style: CashFigmaStyles.onlinePill().copyWith(color: color),
+          ),
         ],
       ),
     );
@@ -200,11 +248,14 @@ class _KeyButton extends StatelessWidget {
           backgroundColor: bg,
           foregroundColor: fg,
           side: BorderSide(color: border),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
-        child: Text(label, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: fg)),
+        child: isDelete
+            ? Icon(Icons.backspace_outlined, color: fg, size: 22)
+            : Text(label, style: CashFigmaStyles.keypadDigit(color: fg)),
       ),
     );
   }
 }
-

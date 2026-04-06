@@ -1,4 +1,4 @@
-Splash
+<!-- Splash
 https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=174-303&m=dev
 
 Login
@@ -8,7 +8,7 @@ Open Cash
 https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=61-423&m=dev
 
 Close Cash
-https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=62-495&m=dev
+https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=62-495&m=dev -->
 
 Dashboard
 https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-453&m=dev
