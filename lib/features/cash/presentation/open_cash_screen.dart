@@ -164,51 +164,54 @@ class _OpenCashScreenState extends State<OpenCashScreen> {
                             flex: 2,
                             child: ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 420),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _SummaryCard(
-                                    title: 'TOTAL OPENING BALANCE',
-                                    bigValue: _displayAmount,
-                                    subtitle: 'Counted & Verified by staff',
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _NotesCard(controller: _notesCtrl),
-                                  const SizedBox(height: 16),
-                                  _ShiftSummaryCard(
-                                    staff: 'Carlos Mendoza',
-                                    date: 'March 25, 2026',
-                                    time: '07:00 AM',
-                                  ),
-                                  const Spacer(),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: 54,
-                                    child: FilledButton(
-                                      style: FilledButton.styleFrom(
-                                        textStyle:
-                                            CashFigmaStyles.filledActionLabel(),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            10,
+                              child: TextFieldTapRegion(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    _SummaryCard(
+                                      title: 'TOTAL OPENING BALANCE',
+                                      bigValue: _displayAmount,
+                                      subtitle: 'Counted & Verified by staff',
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _NotesCard(controller: _notesCtrl),
+                                    const SizedBox(height: 16),
+                                    _ShiftSummaryCard(
+                                      staff: 'Carlos Mendoza',
+                                      date: 'March 25, 2026',
+                                      time: '07:00 AM',
+                                    ),
+                                    const Spacer(),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      height: 54,
+                                      child: FilledButton(
+                                        style: FilledButton.styleFrom(
+                                          textStyle:
+                                              CashFigmaStyles.filledActionLabel(),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      onPressed: () {
-                                        // TODO: Persist open cash to backend + local DB, then mark cash session open.
-                                        context.read<AuthBloc>().add(
-                                          const AuthCashSessionUpdated(
-                                            CashSessionStatus.open,
-                                          ),
-                                        );
-                                        context.go('/dashboard');
-                                      },
-                                      child: const Text(
-                                        'Open Cash and Start Shift',
+                                        onPressed: () {
+                                          // TODO: Persist open cash to backend + local DB, then mark cash session open.
+                                          context.read<AuthBloc>().add(
+                                            const AuthCashSessionUpdated(
+                                              CashSessionStatus.open,
+                                            ),
+                                          );
+                                          context.go('/dashboard');
+                                        },
+                                        child: const Text(
+                                          'Open Cash and Start Shift',
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),

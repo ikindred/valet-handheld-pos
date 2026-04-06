@@ -129,197 +129,201 @@ class _LoginScreenState extends State<LoginScreen> {
                   horizontal: 48,
                   vertical: 50,
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Valet Master',
-                      style: _poppins(
-                        35,
-                        FontWeight.w700,
-                        _LoginTokens.titleOrange,
+                child: TextFieldTapRegion(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Valet Master',
+                        style: _poppins(
+                          35,
+                          FontWeight.w700,
+                          _LoginTokens.titleOrange,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'SMART PARKING TECHNOLOGIES',
-                      style: _poppins(
-                        12,
-                        FontWeight.w500,
-                        _LoginTokens.subtitleGrey,
+                      const SizedBox(height: 6),
+                      Text(
+                        'SMART PARKING TECHNOLOGIES',
+                        style: _poppins(
+                          12,
+                          FontWeight.w500,
+                          _LoginTokens.subtitleGrey,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 40),
-                    _LabeledField(
-                      label: 'Email Address',
-                      labelStyle: _poppins(
-                        14,
-                        FontWeight.w500,
-                        _LoginTokens.labelNavy,
-                        height: 1.5,
-                      ),
-                      child: _FieldShadow(
-                        child: TextField(
-                          controller: _emailCtrl,
-                          focusNode: _emailFocus,
-                          keyboardType: TextInputType.emailAddress,
-                          style: _poppins(
-                            14,
-                            FontWeight.w400,
-                            _LoginTokens.labelNavy,
-                            height: 1.5,
-                          ),
-                          decoration: _fieldDecoration(
-                            focused: _emailFocus.hasFocus,
-                            hint: 'Enter Email Address',
-                            prefix: const Padding(
-                              padding: EdgeInsets.only(left: 4),
-                              child: Icon(
-                                LucideIcons.user,
-                                size: 14,
-                                color: _LoginTokens.hintGrey300,
+                      const SizedBox(height: 40),
+                      _LabeledField(
+                        label: 'Email Address',
+                        labelStyle: _poppins(
+                          14,
+                          FontWeight.w500,
+                          _LoginTokens.labelNavy,
+                          height: 1.5,
+                        ),
+                        child: _FieldShadow(
+                          child: TextField(
+                            controller: _emailCtrl,
+                            focusNode: _emailFocus,
+                            keyboardType: TextInputType.emailAddress,
+                            style: _poppins(
+                              14,
+                              FontWeight.w400,
+                              _LoginTokens.labelNavy,
+                              height: 1.5,
+                            ),
+                            decoration: _fieldDecoration(
+                              focused: _emailFocus.hasFocus,
+                              hint: 'Enter Email Address',
+                              prefix: const Padding(
+                                padding: EdgeInsets.only(left: 4),
+                                child: Icon(
+                                  LucideIcons.user,
+                                  size: 14,
+                                  color: _LoginTokens.hintGrey300,
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    _LabeledField(
-                      label: 'Password',
-                      labelStyle: _poppins(
-                        14,
-                        FontWeight.w500,
-                        _LoginTokens.labelNavy,
-                        height: 1.5,
-                      ),
-                      child: _FieldShadow(
-                        child: TextField(
-                          controller: _passwordCtrl,
-                          focusNode: _passwordFocus,
-                          obscureText: _obscure,
-                          style: _poppins(
-                            14,
-                            FontWeight.w400,
-                            _LoginTokens.labelNavy,
-                            height: 1.5,
-                          ),
-                          decoration: _fieldDecoration(
-                            focused: _passwordFocus.hasFocus,
-                            hint: '************',
-                            prefix: const Padding(
-                              padding: EdgeInsets.only(left: 4),
-                              child: Icon(
-                                LucideIcons.lock,
-                                size: 14,
-                                color: _LoginTokens.hintGrey300,
-                              ),
+                      const SizedBox(height: 16),
+                      _LabeledField(
+                        label: 'Password',
+                        labelStyle: _poppins(
+                          14,
+                          FontWeight.w500,
+                          _LoginTokens.labelNavy,
+                          height: 1.5,
+                        ),
+                        child: _FieldShadow(
+                          child: TextField(
+                            controller: _passwordCtrl,
+                            focusNode: _passwordFocus,
+                            obscureText: _obscure,
+                            style: _poppins(
+                              14,
+                              FontWeight.w400,
+                              _LoginTokens.labelNavy,
+                              height: 1.5,
                             ),
-                            suffix: IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 36,
-                                minHeight: 36,
+                            decoration: _fieldDecoration(
+                              focused: _passwordFocus.hasFocus,
+                              hint: '************',
+                              prefix: const Padding(
+                                padding: EdgeInsets.only(left: 4),
+                                child: Icon(
+                                  LucideIcons.lock,
+                                  size: 14,
+                                  color: _LoginTokens.hintGrey300,
+                                ),
                               ),
-                              onPressed: () =>
-                                  setState(() => _obscure = !_obscure),
-                              icon: Icon(
-                                _obscure ? LucideIcons.eyeOff : LucideIcons.eye,
-                                size: 14,
-                                color: _LoginTokens.hintGrey300,
+                              suffix: IconButton(
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
+                                ),
+                                onPressed: () =>
+                                    setState(() => _obscure = !_obscure),
+                                icon: Icon(
+                                  _obscure
+                                      ? LucideIcons.eyeOff
+                                      : LucideIcons.eye,
+                                  size: 14,
+                                  color: _LoginTokens.hintGrey300,
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 40),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 38,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _LoginTokens.titleOrange,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
+                      const SizedBox(height: 40),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 38,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _LoginTokens.titleOrange,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                           ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
-                        onPressed: () async {
-                          // TODO: Login API must return cash session status:
-                          // - open  => proceed to dashboard
-                          // - closed => force open cash before dashboard
-                          final cashStatus = CashSessionStatus.closed;
-                          context.read<AuthBloc>().add(
-                            AuthLoggedIn(cashSessionStatus: cashStatus),
-                          );
+                          onPressed: () async {
+                            // TODO: Login API must return cash session status:
+                            // - open  => proceed to dashboard
+                            // - closed => force open cash before dashboard
+                            final cashStatus = CashSessionStatus.closed;
+                            context.read<AuthBloc>().add(
+                              AuthLoggedIn(cashSessionStatus: cashStatus),
+                            );
 
-                          if (!context.mounted) return;
+                            if (!context.mounted) return;
 
-                          if (cashStatus == CashSessionStatus.closed) {
-                            context.go('/cash/open');
-                          } else {
-                            context.go('/dashboard');
-                          }
-                        },
-                        child: Text(
-                          'Login',
-                          style: _poppins(
-                            14,
-                            FontWeight.w500,
-                            Colors.white,
-                            height: 1.5,
+                            if (cashStatus == CashSessionStatus.closed) {
+                              context.go('/cash/open');
+                            } else {
+                              context.go('/dashboard');
+                            }
+                          },
+                          child: Text(
+                            'Login',
+                            style: _poppins(
+                              14,
+                              FontWeight.w500,
+                              Colors.white,
+                              height: 1.5,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 38,
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: _LoginTokens.offlineBg,
-                          foregroundColor: _LoginTokens.titleOrange,
-                          side: const BorderSide(
-                            color: _LoginTokens.titleOrange,
-                            width: 1,
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 38,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: _LoginTokens.offlineBg,
+                            foregroundColor: _LoginTokens.titleOrange,
+                            side: const BorderSide(
+                              color: _LoginTokens.titleOrange,
+                              width: 1,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
-                        onPressed: () {},
-                        child: Text(
-                          'Offline Mode',
-                          style: _poppins(
-                            14,
-                            FontWeight.w500,
-                            _LoginTokens.titleOrange,
-                            height: 1.5,
+                          onPressed: () {},
+                          child: Text(
+                            'Offline Mode',
+                            style: _poppins(
+                              14,
+                              FontWeight.w500,
+                              _LoginTokens.titleOrange,
+                              height: 1.5,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 30),
-                    Text(
-                      'JAZZ MALL : AREA — VALET ATTENDANT',
-                      textAlign: TextAlign.center,
-                      style: _poppins(
-                        10,
-                        FontWeight.w500,
-                        _LoginTokens.footerGrey,
+                      const SizedBox(height: 30),
+                      Text(
+                        'JAZZ MALL : AREA — VALET ATTENDANT',
+                        textAlign: TextAlign.center,
+                        style: _poppins(
+                          10,
+                          FontWeight.w500,
+                          _LoginTokens.footerGrey,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
