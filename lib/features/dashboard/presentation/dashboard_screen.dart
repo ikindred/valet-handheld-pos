@@ -123,11 +123,19 @@ class _HeaderRow extends StatelessWidget {
                     child: Text(
                       'View rate',
                       textAlign: TextAlign.center,
+                      // Poppins’ line box adds asymmetric ascent/descent; this
+                      // trims extra space so the label looks vertically centered.
+                      textHeightBehavior: const TextHeightBehavior(
+                        applyHeightToFirstAscent: false,
+                        applyHeightToLastDescent: false,
+                      ),
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
                         height: 1.0,
+                      ).copyWith(
+                        leadingDistribution: TextLeadingDistribution.even,
                       ),
                     ),
                   ),

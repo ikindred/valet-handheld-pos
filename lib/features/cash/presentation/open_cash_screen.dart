@@ -99,59 +99,61 @@ class _OpenCashScreenState extends State<OpenCashScreen> {
                         children: [
                           Expanded(
                             flex: 3,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'SHIFT INFORMATION',
-                                  style: CashFigmaStyles.sectionCaps(),
-                                ),
-                                const SizedBox(height: 14),
-                                Row(
-                                  children: const [
-                                    Expanded(
-                                      child: _ReadOnlyField(
-                                        label: 'CASHIER / STAFF',
-                                        value: 'Carlos Mendoza',
+                            child: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'SHIFT INFORMATION',
+                                    style: CashFigmaStyles.sectionCaps(),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Row(
+                                    children: const [
+                                      Expanded(
+                                        child: _ReadOnlyField(
+                                          label: 'CASHIER / STAFF',
+                                          value: 'Carlos Mendoza',
+                                        ),
                                       ),
-                                    ),
-                                    SizedBox(width: 16),
-                                    Expanded(
-                                      child: _ReadOnlyField(
-                                        label: 'SHIFT DATE',
-                                        value: 'March 25, 2026',
+                                      SizedBox(width: 16),
+                                      Expanded(
+                                        child: _ReadOnlyField(
+                                          label: 'SHIFT DATE',
+                                          value: 'March 25, 2026',
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: const [
-                                    Expanded(
-                                      child: _ReadOnlyField(
-                                        label: 'BRANCH',
-                                        value: 'Jazz Mall',
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: const [
+                                      Expanded(
+                                        child: _ReadOnlyField(
+                                          label: 'BRANCH',
+                                          value: 'Jazz Mall',
+                                        ),
                                       ),
-                                    ),
-                                    SizedBox(width: 16),
-                                    Expanded(
-                                      child: _ReadOnlyField(
-                                        label: 'AREA',
-                                        value: 'Jazz Mall',
+                                      SizedBox(width: 16),
+                                      Expanded(
+                                        child: _ReadOnlyField(
+                                          label: 'AREA',
+                                          value: 'Jazz Mall',
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 22),
-                                Text(
-                                  'OPENING BALANCE',
-                                  style: CashFigmaStyles.sectionCaps(),
-                                ),
-                                const SizedBox(height: 10),
-                                CashAmountBox(text: _displayAmount),
-                                const SizedBox(height: 12),
-                                CashKeypad(onKey: _tapKey),
-                              ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 22),
+                                  Text(
+                                    'OPENING BALANCE',
+                                    style: CashFigmaStyles.sectionCaps(),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  CashAmountBox(text: _displayAmount),
+                                  const SizedBox(height: 12),
+                                  CashKeypad(onKey: _tapKey),
+                                ],
+                              ),
                             ),
                           ),
                           Padding(
@@ -170,20 +172,31 @@ class _OpenCashScreenState extends State<OpenCashScreen> {
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
-                                    _SummaryCard(
-                                      title: 'TOTAL OPENING BALANCE',
-                                      bigValue: _displayAmount,
-                                      subtitle: 'Counted & Verified by staff',
+                                    Expanded(
+                                      child: SingleChildScrollView(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            _SummaryCard(
+                                              title: 'TOTAL OPENING BALANCE',
+                                              bigValue: _displayAmount,
+                                              subtitle:
+                                                  'Counted & Verified by staff',
+                                            ),
+                                            const SizedBox(height: 16),
+                                            _NotesCard(controller: _notesCtrl),
+                                            const SizedBox(height: 16),
+                                            _ShiftSummaryCard(
+                                              staff: 'Carlos Mendoza',
+                                              date: 'March 25, 2026',
+                                              time: '07:00 AM',
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                     const SizedBox(height: 16),
-                                    _NotesCard(controller: _notesCtrl),
-                                    const SizedBox(height: 16),
-                                    _ShiftSummaryCard(
-                                      staff: 'Carlos Mendoza',
-                                      date: 'March 25, 2026',
-                                      time: '07:00 AM',
-                                    ),
-                                    const Spacer(),
                                     SizedBox(
                                       width: double.infinity,
                                       height: 54,
