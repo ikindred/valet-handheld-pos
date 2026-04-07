@@ -1,6 +1,8 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 
+import '../../../core/session/standard_parking_rates.dart';
+
 sealed class AuthEvent extends Equatable {
   const AuthEvent();
 
@@ -18,12 +20,15 @@ enum CashSessionStatus {
 }
 
 final class AuthLoggedIn extends AuthEvent {
-  const AuthLoggedIn({required this.cashSessionStatus});
+  const AuthLoggedIn({required this.cashSessionStatus, this.standardRates});
 
   final CashSessionStatus cashSessionStatus;
 
+  /// From login / setup API (`standard_rates`); optional until backend is wired.
+  final StandardParkingRates? standardRates;
+
   @override
-  List<Object?> get props => [cashSessionStatus];
+  List<Object?> get props => [cashSessionStatus, standardRates];
 }
 
 final class AuthLogoutRequested extends AuthEvent {
@@ -55,12 +60,14 @@ final class AuthUnknown extends AuthState {
 }
 
 final class AuthAuthenticated extends AuthState {
-  const AuthAuthenticated({required this.cashSessionStatus});
+  const AuthAuthenticated({required this.cashSessionStatus, this.standardRates});
 
   final CashSessionStatus cashSessionStatus;
 
+  final StandardParkingRates? standardRates;
+
   @override
-  List<Object?> get props => [cashSessionStatus];
+  List<Object?> get props => [cashSessionStatus, standardRates];
 }
 
 final class AuthUnauthenticated extends AuthState {
@@ -74,7 +81,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     });
 
     on<AuthLoggedIn>((event, emit) {
-      emit(AuthAuthenticated(cashSessionStatus: event.cashSessionStatus));
+      emit(
+        AuthAuthenticated(
+          cashSessionStatus: event.cashSessionStatus,
+          standardRates: event.standardRates,
+        ),
+      );
     });
 
     on<AuthLoggedOut>((event, emit) {
@@ -84,7 +96,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthCashSessionUpdated>((event, emit) {
       final current = state;
       if (current is! AuthAuthenticated) return;
-      emit(AuthAuthenticated(cashSessionStatus: event.cashSessionStatus));
+      emit(
+        AuthAuthenticated(
+          cashSessionStatus: event.cashSessionStatus,
+          standardRates: current.standardRates,
+        ),
+      );
     });
   }
 }

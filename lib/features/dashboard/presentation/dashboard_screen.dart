@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/session/standard_parking_rates.dart';
+import '../../auth/state/auth_bloc.dart';
+import 'dashboard_standard_rates_sheet.dart';
 import 'widgets/dashboard_widgets.dart';
 
 /// Home after [OpenCashScreen] — layout from Figma
@@ -71,17 +76,65 @@ class _HeaderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(greeting, style: DashboardStyles.greeting()),
               const SizedBox(height: 3),
               Text(subtitle, style: DashboardStyles.headerSubtitle()),
             ],
           ),
+        ),
+        BlocBuilder<AuthBloc, AuthState>(
+          buildWhen: (prev, next) {
+            StandardParkingRates? rates(AuthState s) =>
+                s is AuthAuthenticated ? s.standardRates : null;
+            return rates(prev) != rates(next);
+          },
+          builder: (context, state) {
+            final rates = state is AuthAuthenticated
+                ? state.standardRates
+                : null;
+            if (rates == null) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: SizedBox(
+                height: 44,
+                child: FilledButton(
+                  onPressed: () =>
+                      showStandardRatesSheet(context, rates: rates),
+                  style: FilledButton.styleFrom(
+                    alignment: Alignment.center,
+                    backgroundColor: DashboardStyles.orange,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'View rate',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        height: 1.0,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
         ),
         const DashboardOnlinePill(),
       ],

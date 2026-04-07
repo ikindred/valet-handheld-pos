@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../../core/session/standard_parking_rates.dart';
 import '../../../core/ui/app_background.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../state/auth_bloc.dart';
@@ -175,9 +176,23 @@ class _LoginScreenState extends State<LoginScreen> {
                             // TODO: Login API must return cash session status:
                             // - open  => proceed to dashboard
                             // - closed => force open cash before dashboard
+                            // TODO: Parse `standard_rates` from the real login response body.
+                            final loginResponseStub = <String, dynamic>{
+                              'standard_rates': {
+                                'flat_rate': 150,
+                                'succeeding_hour': 30,
+                                'overnight_fee': 200,
+                                'lost_ticket_fee': 200,
+                              },
+                            };
+                            final standardRates =
+                                StandardParkingRates.fromLoginResponseJson(loginResponseStub);
                             final cashStatus = CashSessionStatus.closed;
                             context.read<AuthBloc>().add(
-                              AuthLoggedIn(cashSessionStatus: cashStatus),
+                              AuthLoggedIn(
+                                cashSessionStatus: cashStatus,
+                                standardRates: standardRates,
+                              ),
                             );
 
                             if (!context.mounted) return;
