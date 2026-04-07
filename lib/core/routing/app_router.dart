@@ -8,8 +8,6 @@ import '../../features/check_in/presentation/check_in_customer_valet_screen.dart
 import '../../features/check_in/presentation/check_in_review_print_screen.dart';
 import '../../features/check_in/presentation/check_in_shell.dart';
 import '../../features/check_in/presentation/check_in_vehicle_condition_screen.dart';
-import '../../features/check_in/presentation/check_in_vehicle_condition_signature_screen.dart';
-import '../../features/check_in/presentation/check_in_vehicle_condition_signed_screen.dart';
 import '../../features/check_in/presentation/check_in_vehicle_details_screen.dart';
 import '../../features/check_out/presentation/check_out_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
@@ -69,17 +67,15 @@ GoRouter createAppRouter(BuildContext context) {
               ),
               GoRoute(
                 path: 'step-4',
-                builder: (context, state) =>
-                    const CheckInVehicleConditionSignatureScreen(),
+                redirect: (context, state) => '/check-in/step-3',
               ),
               GoRoute(
                 path: 'step-5',
-                builder: (context, state) =>
-                    const CheckInVehicleConditionSignedScreen(),
+                builder: (context, state) => const CheckInReviewPrintScreen(),
               ),
               GoRoute(
                 path: 'step-6',
-                builder: (context, state) => const CheckInReviewPrintScreen(),
+                redirect: (context, state) => '/check-in/step-5',
               ),
             ],
           ),

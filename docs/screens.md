@@ -21,6 +21,8 @@ Check In - Vehicle Details 2. https://www.figma.com/design/70RU38Zhijrag1kwt33uM
 
 Check In - Vehicle Condition 3. https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-2040&m=dev
 
+- Zone mapping (diagram tap → label): [vehicle_condition_zones.md](vehicle_condition_zones.md)
+
 Check In - Vehicle Condition - Signature 4. https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=32-582&m=dev
 
 Check In - Vehicle Condition - Signed 5. https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=32-719&m=dev

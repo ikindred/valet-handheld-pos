@@ -12,7 +12,7 @@ class CheckInFlowHeader extends StatelessWidget {
   const CheckInFlowHeader({
     super.key,
     required this.stepIndex,
-    this.totalSteps = 6,
+    this.totalSteps = 4,
   });
 
   /// 0-based (step-1 → 0).
@@ -23,8 +23,6 @@ class CheckInFlowHeader extends StatelessWidget {
     'CUSTOMER AND VALET DETAILS',
     'VEHICLE DETAILS',
     'VEHICLE CONDITION',
-    'SIGNATURE',
-    'SIGNED',
     'REVIEW AND PRINT',
   ];
 

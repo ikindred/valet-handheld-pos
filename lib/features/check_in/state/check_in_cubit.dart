@@ -1,8 +1,11 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:uuid/uuid.dart';
 
 import '../domain/ticket_number_generator.dart';
 import '../domain/vehicle_body_type.dart';
+import '../domain/vehicle_damage.dart';
+import '../domain/vehicle_damage_zones.dart';
 
 enum ValetServiceType { standardValet, selfPark }
 
@@ -25,6 +28,9 @@ class CheckInState extends Equatable {
     this.parkingSlot = '',
     this.selectedBelongings = const [],
     this.otherBelongings = '',
+    this.selectedDamageType = DamageType.dent,
+    this.vehicleDamageEntries = const [],
+    this.hasCustomerSignature = false,
   });
 
   final String ticketNumber;
@@ -48,6 +54,15 @@ class CheckInState extends Equatable {
   final List<String> selectedBelongings;
   final String otherBelongings;
 
+  /// Active damage type for the next tap on the vehicle diagram.
+  final DamageType selectedDamageType;
+
+  /// Logged damage markers (normalized coordinates on the car bitmap).
+  final List<VehicleDamageEntry> vehicleDamageEntries;
+
+  /// True after the customer completes the signature step (step 4).
+  final bool hasCustomerSignature;
+
   CheckInState copyWith({
     String? ticketNumber,
     String? customerFullName,
@@ -66,6 +81,9 @@ class CheckInState extends Equatable {
     String? parkingSlot,
     List<String>? selectedBelongings,
     String? otherBelongings,
+    DamageType? selectedDamageType,
+    List<VehicleDamageEntry>? vehicleDamageEntries,
+    bool? hasCustomerSignature,
   }) {
     return CheckInState(
       ticketNumber: ticketNumber ?? this.ticketNumber,
@@ -85,6 +103,9 @@ class CheckInState extends Equatable {
       parkingSlot: parkingSlot ?? this.parkingSlot,
       selectedBelongings: selectedBelongings ?? this.selectedBelongings,
       otherBelongings: otherBelongings ?? this.otherBelongings,
+      selectedDamageType: selectedDamageType ?? this.selectedDamageType,
+      vehicleDamageEntries: vehicleDamageEntries ?? this.vehicleDamageEntries,
+      hasCustomerSignature: hasCustomerSignature ?? this.hasCustomerSignature,
     );
   }
 
@@ -109,12 +130,17 @@ class CheckInState extends Equatable {
       parkingSlot,
       b.join('|'),
       otherBelongings,
+      selectedDamageType,
+      vehicleDamageEntries,
+      hasCustomerSignature,
     ];
   }
 }
 
 class CheckInCubit extends Cubit<CheckInState> {
   CheckInCubit() : super(const CheckInState());
+
+  static const _uuid = Uuid();
 
   /// Ensures a ticket number exists for this check-in session (idempotent).
   void ensureTicket() {
@@ -172,5 +198,47 @@ class CheckInCubit extends Cubit<CheckInState> {
         otherBelongings: otherBelongings,
       ),
     );
+  }
+
+  void selectDamageType(DamageType type) {
+    emit(state.copyWith(selectedDamageType: type));
+  }
+
+  /// Adds a damage entry at normalized coordinates \[0, 1\] using [CheckInState.selectedDamageType].
+  void addDamageAt(double normalizedX, double normalizedY) {
+    final type = state.selectedDamageType;
+    final zone = lookupVehicleZoneLabel(normalizedX, normalizedY);
+    final entry = VehicleDamageEntry(
+      id: _uuid.v4(),
+      normalizedX: normalizedX,
+      normalizedY: normalizedY,
+      type: type,
+      zoneLabel: zone,
+    );
+    emit(
+      state.copyWith(
+        vehicleDamageEntries: [...state.vehicleDamageEntries, entry],
+      ),
+    );
+  }
+
+  void removeDamage(String id) {
+    emit(
+      state.copyWith(
+        vehicleDamageEntries: [
+          for (final e in state.vehicleDamageEntries)
+            if (e.id != id) e,
+        ],
+      ),
+    );
+  }
+
+  /// Removes all logged damage markers for this check-in session.
+  void clearLoggedDamage() {
+    emit(state.copyWith(vehicleDamageEntries: const []));
+  }
+
+  void setCustomerSignatureCaptured(bool value) {
+    emit(state.copyWith(hasCustomerSignature: value));
   }
 }
