@@ -1,10 +1,17 @@
-import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/ui/app_background.dart';
+import '../../../core/platform/device_info_payload.dart';
+import '../../../core/services/device_id_service.dart';
+import '../../../core/storage/offline_mode_prefs.dart';
+import '../../../data/repositories/auth_repository.dart';
+import '../../auth/auth_session_sync.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -14,21 +21,98 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  Timer? _timer;
+  bool _started = false;
 
   @override
-  void initState() {
-    super.initState();
-    _timer = Timer(const Duration(milliseconds: 800), () {
-      if (!mounted) return;
-      context.go('/login');
-    });
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_started) {
+      _started = true;
+      _bootstrap();
+    }
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
+  Future<void> _bootstrap() async {
+    final repo = context.read<AuthRepository>();
+    final prefs = await SharedPreferences.getInstance();
+    try {
+      final deviceId = await DeviceIdService.getOrCreate();
+      final deviceInfo = await buildDeviceInfoPayload();
+
+      bool online = false;
+      try {
+        online = await InternetConnection()
+            .hasInternetAccess
+            .timeout(const Duration(seconds: 4), onTimeout: () => false);
+      } catch (_) {
+        online = false;
+      }
+      if (online) {
+        await repo.registerDevice(
+          deviceId: deviceId,
+          deviceInfo: deviceInfo,
+          prefs: prefs,
+        );
+      }
+      await repo.seedDevDeviceSiteIfNeeded(deviceId);
+
+      final session = await repo.getActiveSession();
+      if (session == null) {
+        await OfflineModePrefs.write(prefs, !online);
+        if (mounted) context.go('/login');
+        return;
+      }
+
+      Future<void> restoreLocalSession() async {
+        await OfflineModePrefs.write(prefs, true);
+        final email = await repo.emailForOfflineAccountId(session.userId);
+        if (!mounted) return;
+        await syncAuthBlocAndNavigate(
+          context,
+          repo: repo,
+          localUserId: session.userId,
+          email: email,
+          standardRates: null,
+        );
+      }
+
+      // Offline sessions never have a bearer token — do not treat as logged out.
+      if (session.isOfflineSession) {
+        await restoreLocalSession();
+        return;
+      }
+
+      if (online) {
+        if (session.authToken == null || session.authToken!.isEmpty) {
+          await repo.logoutOnly(deviceId: deviceId);
+          if (mounted) context.go('/login');
+          return;
+        }
+        try {
+          final rates = await repo.revalidateActiveSession(deviceId: deviceId);
+          await OfflineModePrefs.write(prefs, false);
+          final email = await repo.emailForOfflineAccountId(session.userId);
+          if (!mounted) return;
+          await syncAuthBlocAndNavigate(
+            context,
+            repo: repo,
+            localUserId: session.userId,
+            email: email,
+            standardRates: rates,
+          );
+        } catch (_) {
+          await repo.logoutOnly(deviceId: deviceId);
+          if (mounted) context.go('/login');
+        }
+        return;
+      }
+
+      // Online-originated session but no network: resume from local DB (shift / cash state).
+      await restoreLocalSession();
+    } catch (_) {
+      await OfflineModePrefs.write(prefs, false);
+      if (mounted) context.go('/login');
+    }
   }
 
   TextStyle _poppins(
@@ -48,7 +132,16 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: AppBackground(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: const [
+              Color(0xFFFFFAF0),
+              Color(0xFFF1F5FF),
+            ],
+            transform: GradientRotation(105 * math.pi / 180),
+          ),
+        ),
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -60,7 +153,7 @@ class _SplashScreenState extends State<SplashScreen> {
               const SizedBox(height: 10),
               Text(
                 'SMART PARKING TECHNOLOGIES',
-                style: _poppins(20, FontWeight.w500, const Color(0xFFAEAEAE)),
+                style: _poppins(20, FontWeight.w500, const Color(0xFFAFAFAF)),
               ),
             ],
           ),

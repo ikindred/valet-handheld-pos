@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/session/standard_parking_rates.dart';
+import '../../../core/services/device_id_service.dart';
+import '../../../core/storage/offline_mode_prefs.dart';
 import '../../../core/ui/app_background.dart';
 import '../../../core/ui/app_text_field.dart';
-import '../state/auth_bloc.dart';
+import '../../../data/repositories/auth_repository.dart';
+import '../auth_session_sync.dart';
 
 /// Figma node `30:401` — Valet Parking login (dev mode colors; Poppins).
 abstract final class _LoginTokens {
@@ -31,6 +34,20 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
   bool _obscure = true;
+  bool _loading = false;
+  String? _error;
+
+  Future<({bool canLogin, String footerLine})>? _loginGateFuture;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loginGateFuture ??= () {
+      final repo = context.read<AuthRepository>();
+      return SharedPreferences.getInstance()
+          .then((prefs) => repo.loginGateFooter(prefs));
+    }();
+  }
 
   @override
   void dispose() {
@@ -53,6 +70,112 @@ class _LoginScreenState extends State<LoginScreen> {
       color: color,
       height: height,
     );
+  }
+
+  Future<void> _onlineLogin() async {
+    setState(() {
+      _error = null;
+      _loading = true;
+    });
+    final online = await InternetConnection().hasInternetAccess;
+    if (!mounted) return;
+    if (!online) {
+      setState(() {
+        _error = 'You need an internet connection for online login.';
+        _loading = false;
+      });
+      return;
+    }
+    final repo = context.read<AuthRepository>();
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    final deviceId = await DeviceIdService.getOrCreate();
+    try {
+      final rates = await repo.loginOnline(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+        deviceId: deviceId,
+      );
+      await OfflineModePrefs.write(prefs, false);
+      final session = await repo.getActiveSession();
+      if (session == null || !mounted) return;
+      await syncAuthBlocAndNavigate(
+        context,
+        repo: repo,
+        localUserId: session.userId,
+        email: _emailCtrl.text.trim(),
+        standardRates: rates,
+      );
+    } on StateError catch (e) {
+      if (!mounted) return;
+      if (e.message == 'DEVICE_NOT_ASSIGNED') {
+        setState(() {
+          _error =
+              'This device is not yet assigned to a branch and area.';
+          _loading = false;
+        });
+        return;
+      }
+      setState(() {
+        _error = 'Login failed. Check your credentials and try again.';
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = 'Login failed. Check your credentials and try again.';
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _offlineLogin() async {
+    setState(() {
+      _error = null;
+      _loading = true;
+    });
+    final repo = context.read<AuthRepository>();
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    try {
+      await repo.loginOffline(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      );
+      await OfflineModePrefs.write(prefs, true);
+      final session = await repo.getActiveSession();
+      if (session == null || !mounted) return;
+      await syncAuthBlocAndNavigate(
+        context,
+        repo: repo,
+        localUserId: session.userId,
+        email: _emailCtrl.text.trim(),
+        standardRates: null,
+      );
+    } on StateError catch (e) {
+      if (!mounted) return;
+      setState(() {
+        if (e.message == 'DEVICE_NOT_ASSIGNED') {
+          _error =
+              'This device is not yet assigned to a branch and area.';
+        } else if (e.message == 'OFFLINE_ACCOUNT_MISSING') {
+          _error = 'Sign in online at least once before using offline mode.';
+        } else if (e.message == 'BAD_PASSWORD') {
+          _error = 'Incorrect password.';
+        } else {
+          _error = 'Offline login failed.';
+        }
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = 'Offline login failed.';
+          _loading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -156,105 +279,125 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          _error!,
+                          style: _poppins(
+                            12,
+                            FontWeight.w500,
+                            Colors.red.shade700,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 40),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 38,
-                        child: FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: _LoginTokens.titleOrange,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
-                          onPressed: () async {
-                            // TODO: Login API must return cash session status:
-                            // - open  => proceed to dashboard
-                            // - closed => force open cash before dashboard
-                            // TODO: Parse `standard_rates` from the real login response body.
-                            final loginResponseStub = <String, dynamic>{
-                              'standard_rates': {
-                                'flat_rate': 150,
-                                'succeeding_hour': 30,
-                                'overnight_fee': 200,
-                                'lost_ticket_fee': 200,
-                              },
-                            };
-                            final standardRates =
-                                StandardParkingRates.fromLoginResponseJson(loginResponseStub);
-                            final cashStatus = CashSessionStatus.closed;
-                            context.read<AuthBloc>().add(
-                              AuthLoggedIn(
-                                cashSessionStatus: cashStatus,
-                                standardRates: standardRates,
+                      FutureBuilder<({bool canLogin, String footerLine})>(
+                        future: _loginGateFuture,
+                        builder: (context, snap) {
+                          final done =
+                              snap.connectionState == ConnectionState.done;
+                          final canLogin = snap.data?.canLogin ?? false;
+                          final loginEnabled = done && canLogin && !_loading;
+                          final footer = snap.data?.footerLine ??
+                              (done
+                                  ? 'This device is not yet assigned to a branch and area.'
+                                  : 'Loading site…');
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: double.infinity,
+                                height: 38,
+                                child: FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: _LoginTokens.titleOrange,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                  ),
+                                  onPressed: loginEnabled ? _onlineLogin : null,
+                                  child: _loading
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : Text(
+                                          'Login',
+                                          style: _poppins(
+                                            14,
+                                            FontWeight.w500,
+                                            Colors.white,
+                                            height: 1.5,
+                                          ),
+                                        ),
+                                ),
                               ),
-                            );
-
-                            if (!context.mounted) return;
-
-                            if (cashStatus == CashSessionStatus.closed) {
-                              context.go('/cash/open');
-                            } else {
-                              context.go('/dashboard');
-                            }
-                          },
-                          child: Text(
-                            'Login',
-                            style: _poppins(
-                              14,
-                              FontWeight.w500,
-                              Colors.white,
-                              height: 1.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 38,
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: _LoginTokens.offlineBg,
-                            foregroundColor: _LoginTokens.titleOrange,
-                            side: const BorderSide(
-                              color: _LoginTokens.titleOrange,
-                              width: 1,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
-                          onPressed: () {},
-                          child: Text(
-                            'Offline Mode',
-                            style: _poppins(
-                              14,
-                              FontWeight.w500,
-                              _LoginTokens.titleOrange,
-                              height: 1.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 30),
-                      Text(
-                        'JAZZ MALL : AREA — VALET ATTENDANT',
-                        textAlign: TextAlign.center,
-                        style: _poppins(
-                          10,
-                          FontWeight.w500,
-                          _LoginTokens.footerGrey,
-                        ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Online login checks the server. Local / dev accounts (e.g. seeded offline) — use Offline Mode.',
+                                textAlign: TextAlign.center,
+                                style: _poppins(
+                                  10,
+                                  FontWeight.w400,
+                                  _LoginTokens.footerGrey,
+                                  height: 1.35,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 38,
+                                child: OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    backgroundColor: _LoginTokens.offlineBg,
+                                    foregroundColor: _LoginTokens.titleOrange,
+                                    side: const BorderSide(
+                                      color: _LoginTokens.titleOrange,
+                                      width: 1,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                  ),
+                                  onPressed:
+                                      loginEnabled ? _offlineLogin : null,
+                                  child: Text(
+                                    'Offline Mode',
+                                    style: _poppins(
+                                      14,
+                                      FontWeight.w500,
+                                      _LoginTokens.titleOrange,
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 30),
+                              Text(
+                                footer,
+                                textAlign: TextAlign.center,
+                                style: _poppins(
+                                  10,
+                                  FontWeight.w500,
+                                  _LoginTokens.footerGrey,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),

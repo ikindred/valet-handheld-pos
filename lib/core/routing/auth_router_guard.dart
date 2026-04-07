@@ -11,23 +11,25 @@ class AuthRouterGuard {
 
   String? redirect(BuildContext _, GoRouterState state) {
     final auth = context.read<AuthBloc>().state;
-    final loc = state.uri.toString();
+    final loc = state.uri.path;
 
-    final isLogin = loc == '/login' || loc == '/splash';
+    final isPublic =
+        loc == '/splash' || loc == '/login' || loc == '/offline-login';
     final isCashOpen = loc.startsWith('/cash/open');
     final isCashClose = loc.startsWith('/cash/close');
 
     if (auth is AuthUnauthenticated) {
-      return isLogin ? null : '/login';
+      return isPublic ? null : '/login';
     }
 
     if (auth is AuthAuthenticated) {
-      if (isLogin) {
-        return auth.cashSessionStatus == CashSessionStatus.closed ? '/cash/open' : '/dashboard';
+      if (loc == '/splash' || loc == '/login' || loc == '/offline-login') {
+        return auth.cashSessionStatus == CashSessionStatus.closed
+            ? '/cash/open'
+            : '/dashboard';
       }
 
       if (auth.cashSessionStatus == CashSessionStatus.closed) {
-        // Allow closing cash even when closed? In practice, close cash implies ending shift.
         if (isCashOpen || isCashClose) return null;
         return '/cash/open';
       }
@@ -36,4 +38,3 @@ class AuthRouterGuard {
     return null;
   }
 }
-

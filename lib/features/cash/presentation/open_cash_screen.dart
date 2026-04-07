@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/config/app_config.dart';
+import '../../../core/storage/offline_mode_prefs.dart';
 import '../../../core/ui/app_text_field.dart';
+import '../../../data/repositories/auth_repository.dart';
 import '../../auth/state/auth_bloc.dart';
 import 'widgets/cash_figma_text_styles.dart';
 import 'widgets/cash_widgets.dart';
@@ -17,15 +23,54 @@ class OpenCashScreen extends StatefulWidget {
 
 class _OpenCashScreenState extends State<OpenCashScreen> {
   final _notesCtrl = TextEditingController();
+  final _branchCtrl = TextEditingController();
+  final _areaCtrl = TextEditingController();
 
   /// Whole peso digits only (no decimal point). "0" means zero pesos.
   String _digits = '0';
 
+  String? _staffName;
+  bool _online = true;
+
   static final _pesoFmt = NumberFormat.currency(symbol: '₱ ', decimalDigits: 2);
+  static final _longDate = DateFormat('EEEE, MMMM d, y');
+  static final _shiftDate = DateFormat('yyyy-MM-dd');
+
+  void _onBranchAreaChanged() {
+    setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _branchCtrl.addListener(_onBranchAreaChanged);
+    _areaCtrl.addListener(_onBranchAreaChanged);
+    SchedulerBinding.instance.addPostFrameCallback((_) => _loadContext());
+  }
+
+  Future<void> _loadContext() async {
+    final repo = context.read<AuthRepository>();
+    final prefs = await SharedPreferences.getInstance();
+    final session = await repo.getActiveSession();
+    if (session == null || !mounted) return;
+    final acct = await repo.offlineAccountById(session.userId);
+    if (!mounted) return;
+    final site = await repo.branchAndAreaFromDb();
+    _branchCtrl.text = site.branch;
+    _areaCtrl.text = site.area;
+    setState(() {
+      _online = !OfflineModePrefs.read(prefs);
+      _staffName = acct?.fullName ?? acct?.email ?? '—';
+    });
+  }
 
   @override
   void dispose() {
+    _branchCtrl.removeListener(_onBranchAreaChanged);
+    _areaCtrl.removeListener(_onBranchAreaChanged);
     _notesCtrl.dispose();
+    _branchCtrl.dispose();
+    _areaCtrl.dispose();
     super.dispose();
   }
 
@@ -72,7 +117,14 @@ class _OpenCashScreenState extends State<OpenCashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final nowLabel = 'Tuesday, March 25, 2026 · Jazz Mall';
+    final now = DateTime.now();
+    final nowLabel = _longDate.format(now);
+    // Same branch/area as the form fields (prefs + edits); header stays in sync.
+    final b = _branchCtrl.text.trim();
+    final a = _areaCtrl.text.trim();
+    final headerSub = (b.isNotEmpty && a.isNotEmpty)
+        ? '$nowLabel · $b : $a'
+        : '$nowLabel · ${AppConfig.defaultDeviceBranch} : ${AppConfig.defaultDeviceArea}';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F7),
@@ -87,8 +139,8 @@ class _OpenCashScreenState extends State<OpenCashScreen> {
                 children: [
                   CashPageHeader(
                     title: 'Open Cash',
-                    subtitle: nowLabel,
-                    online: true,
+                    subtitle: headerSub,
+                    online: _online,
                   ),
                   const SizedBox(height: 22),
                   Expanded(
@@ -109,36 +161,46 @@ class _OpenCashScreenState extends State<OpenCashScreen> {
                                   ),
                                   const SizedBox(height: 14),
                                   Row(
-                                    children: const [
+                                    children: [
                                       Expanded(
                                         child: _ReadOnlyField(
                                           label: 'CASHIER / STAFF',
-                                          value: 'Carlos Mendoza',
+                                          value: _staffName ?? '—',
                                         ),
                                       ),
-                                      SizedBox(width: 16),
+                                      const SizedBox(width: 16),
                                       Expanded(
                                         child: _ReadOnlyField(
                                           label: 'SHIFT DATE',
-                                          value: 'March 25, 2026',
+                                          value: _longDate.format(now),
                                         ),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 12),
                                   Row(
-                                    children: const [
+                                    children: [
                                       Expanded(
-                                        child: _ReadOnlyField(
+                                        child: LabeledAppTextField(
                                           label: 'BRANCH',
-                                          value: 'Jazz Mall',
+                                          child: AppTextField(
+                                            controller: _branchCtrl,
+                                            minHeight: 40,
+                                            hint: 'Branch name',
+                                            style: CashFigmaStyles.fieldValue(),
+                                          ),
                                         ),
                                       ),
-                                      SizedBox(width: 16),
+                                      const SizedBox(width: 16),
                                       Expanded(
-                                        child: _ReadOnlyField(
+                                        child: LabeledAppTextField(
                                           label: 'AREA',
-                                          value: 'Jazz Mall',
+                                          child: AppTextField(
+                                            controller: _areaCtrl,
+                                            minHeight: 40,
+                                            hint: 'Area',
+                                            style: CashFigmaStyles.fieldValue(),
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -188,9 +250,9 @@ class _OpenCashScreenState extends State<OpenCashScreen> {
                                             _NotesCard(controller: _notesCtrl),
                                             const SizedBox(height: 16),
                                             _ShiftSummaryCard(
-                                              staff: 'Carlos Mendoza',
-                                              date: 'March 25, 2026',
-                                              time: '07:00 AM',
+                                              staff: _staffName ?? '—',
+                                              date: _longDate.format(now),
+                                              time: DateFormat.jm().format(now),
                                             ),
                                           ],
                                         ),
@@ -210,13 +272,38 @@ class _OpenCashScreenState extends State<OpenCashScreen> {
                                             ),
                                           ),
                                         ),
-                                        onPressed: () {
-                                          // TODO: Persist open cash to backend + local DB, then mark cash session open.
-                                          context.read<AuthBloc>().add(
-                                            const AuthCashSessionUpdated(
-                                              CashSessionStatus.open,
-                                            ),
+                                        onPressed: () async {
+                                          final auth = context
+                                              .read<AuthBloc>()
+                                              .state;
+                                          if (auth is! AuthAuthenticated) return;
+                                          final userIdStr = auth.userId;
+                                          if (userIdStr == null) return;
+                                          final localUserId = int.tryParse(userIdStr);
+                                          if (localUserId == null) return;
+                                          final repo =
+                                              context.read<AuthRepository>();
+                                          final session =
+                                              await repo.getActiveSession();
+                                          if (session == null) return;
+                                          final pesos = int.tryParse(_digits) ?? 0;
+                                          final notes = _notesCtrl.text.trim();
+                                          await repo.recordOpenCash(
+                                            localUserId: localUserId,
+                                            sessionId: session.id,
+                                            openingFloat: pesos.toDouble(),
+                                            branch: _branchCtrl.text.trim(),
+                                            area: _areaCtrl.text.trim(),
+                                            shiftDate: _shiftDate.format(now),
+                                            openingNotes:
+                                                notes.isEmpty ? null : notes,
                                           );
+                                          if (!context.mounted) return;
+                                          context.read<AuthBloc>().add(
+                                                const AuthCashSessionUpdated(
+                                                  CashSessionStatus.open,
+                                                ),
+                                              );
                                           context.go('/dashboard');
                                         },
                                         child: const Text(

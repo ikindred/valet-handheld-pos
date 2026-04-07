@@ -1,8 +1,15 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/storage/offline_mode_prefs.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../auth/presentation/logout_flow.dart';
 
 /// Typography aligned with Figma dashboard ([Valet Parking](https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-453)).
 abstract final class DashboardStyles {
@@ -192,6 +199,13 @@ class DashboardLeftRail extends StatelessWidget {
                 onTap: () => context.go('/settings'),
                 accentSelection: false,
               ),
+              const SizedBox(height: 16),
+              _RailIcon(
+                selected: false,
+                icon: Icons.logout_rounded,
+                onTap: () => showLogoutFlow(context),
+                accentSelection: false,
+              ),
               const Spacer(),
             ],
           ),
@@ -242,15 +256,88 @@ class _RailIcon extends StatelessWidget {
   }
 }
 
-class DashboardOnlinePill extends StatelessWidget {
-  const DashboardOnlinePill({super.key, this.online = true});
+/// Live connectivity + [OfflineModePrefs]; rebuilds when network changes or app resumes.
+class DashboardStatusPillLive extends StatefulWidget {
+  const DashboardStatusPillLive({super.key});
 
-  final bool online;
+  @override
+  State<DashboardStatusPillLive> createState() => _DashboardStatusPillLiveState();
+}
+
+class _DashboardStatusPillLiveState extends State<DashboardStatusPillLive>
+    with WidgetsBindingObserver {
+  bool _offlineMode = false;
+  bool _hasInternet = false;
+  StreamSubscription<List<ConnectivityResult>>? _connSub;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _connSub = Connectivity().onConnectivityChanged.listen((_) {
+      unawaited(_refresh());
+    });
+    unawaited(_refresh());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _connSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refresh());
+    }
+  }
+
+  Future<void> _refresh() async {
+    final prefs = await SharedPreferences.getInstance();
+    final offlineMode = OfflineModePrefs.read(prefs);
+    var hasInternet = false;
+    try {
+      hasInternet = await InternetConnection()
+          .hasInternetAccess
+          .timeout(const Duration(seconds: 4), onTimeout: () => false);
+    } catch (_) {
+      hasInternet = false;
+    }
+    if (!mounted) return;
+    setState(() {
+      _offlineMode = offlineMode;
+      _hasInternet = hasInternet;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final color = online ? DashboardStyles.green : AppColors.warning;
-    final bg = online ? const Color(0xFFF4FBF7) : const Color(0xFFFFF7EC);
+    return DashboardStatusPill(
+      offlineMode: _offlineMode,
+      hasInternet: _hasInternet,
+    );
+  }
+}
+
+/// Status from [offlineMode] prefs (offline vs online workflow) and live internet.
+class DashboardStatusPill extends StatelessWidget {
+  const DashboardStatusPill({
+    super.key,
+    required this.offlineMode,
+    required this.hasInternet,
+  });
+
+  /// [OfflineModePrefs] — user is in offline-first workflow (e.g. offline login).
+  final bool offlineMode;
+
+  /// Result of [InternetConnection] / connectivity check.
+  final bool hasInternet;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color, bg) = _presentation();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -269,7 +356,7 @@ class DashboardOnlinePill extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            online ? 'Online' : 'Offline',
+            label,
             style: GoogleFonts.poppins(
               fontSize: 15,
               fontWeight: FontWeight.w500,
@@ -278,6 +365,35 @@ class DashboardOnlinePill extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  (String, Color, Color) _presentation() {
+    if (offlineMode) {
+      if (hasInternet) {
+        return (
+          'Offline mode',
+          AppColors.textSecondary,
+          const Color(0xFFF3F4F6),
+        );
+      }
+      return (
+        'Offline · No connection',
+        AppColors.warning,
+        const Color(0xFFFFF7EC),
+      );
+    }
+    if (hasInternet) {
+      return (
+        'Online',
+        DashboardStyles.green,
+        const Color(0xFFF4FBF7),
+      );
+    }
+    return (
+      'No connection',
+      AppColors.warning,
+      const Color(0xFFFFF7EC),
     );
   }
 }

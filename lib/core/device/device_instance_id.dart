@@ -1,20 +1,8 @@
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
+import '../services/device_id_service.dart';
 
-/// Stable per-install id (not a hardware device id). Used for local ticket
-/// entropy and future analytics.
+/// Stable id persisted under [PrefsKeys.deviceId] (same as [DeviceIdService]).
 ///
-/// **Note:** True hardware device identifiers are restricted on iOS/Android;
-/// this is a random id persisted in [SharedPreferences].
+/// Used for ticket entropy and analytics.
 abstract final class DeviceInstanceId {
-  static const _key = 'device_instance_id_v1';
-
-  static Future<String> getOrCreate() async {
-    final prefs = await SharedPreferences.getInstance();
-    final existing = prefs.getString(_key);
-    if (existing != null && existing.isNotEmpty) return existing;
-    final id = const Uuid().v4();
-    await prefs.setString(_key, id);
-    return id;
-  }
+  static Future<String> getOrCreate() => DeviceIdService.getOrCreate();
 }

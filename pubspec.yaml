@@ -37,9 +37,13 @@ dependencies:
   flutter_bloc: ^8.1.6
   bloc: ^8.1.4
   equatable: ^2.0.5
+  provider: ^6.1.2
 
   # Local Storage
   shared_preferences: ^2.3.1
+  device_info_plus: ^10.1.2
+  # Stable ANDROID_ID (hashed in app) — device/register payload still uses device_info_plus for model/os.
+  android_id: ^0.3.6
 
   # Local Database
   drift: ^2.18.0
@@ -77,16 +81,20 @@ dependencies:
   # PDF / Export
   pdf: ^3.11.1
   printing: ^5.13.1
-  share_plus: ^9.0.0
+  share_plus: ^12.0.2
 
   # Date & Time
   intl: ^0.19.0
 
+  # Environment
+  flutter_dotenv: ^5.1.0
+
   # Utilities
-  crypto: ^3.0.6
+  bcrypt: ^1.1.3
+  crypto: ^3.0.3
   path: ^1.9.0
   path_provider: ^2.1.5
-  uuid: ^4.4.0
+  uuid: ^4.3.3
   freezed_annotation: ^2.4.1
   json_annotation: ^4.9.0
 
@@ -122,6 +130,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - .env
     - assets/images/app_logo.png
     - assets/images/vehicle_condition_car_top.png
 

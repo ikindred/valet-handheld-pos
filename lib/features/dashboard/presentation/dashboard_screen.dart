@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/session/standard_parking_rates.dart';
+import '../../../data/repositories/auth_repository.dart';
 import '../../auth/state/auth_bloc.dart';
 import 'dashboard_standard_rates_sheet.dart';
 import 'widgets/dashboard_widgets.dart';
@@ -14,7 +18,7 @@ import 'widgets/dashboard_widgets.dart';
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
-  static String _greetingWord() {
+  static String greetingWord() {
     final h = DateTime.now().hour;
     if (h < 12) return 'Good morning';
     if (h < 17) return 'Good afternoon';
@@ -23,10 +27,6 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateLabel = DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now());
-    const branch = 'Jazz Mall';
-    const firstName = 'Carlo';
-
     return Scaffold(
       backgroundColor: DashboardStyles.bg,
       body: Row(
@@ -44,10 +44,7 @@ class DashboardScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _HeaderRow(
-                          greeting: '${_greetingWord()}, $firstName',
-                          subtitle: '$dateLabel · $branch',
-                        ),
+                        const _DashboardHeaderRow(),
                         const SizedBox(height: 28),
                         _StatsRow(wide: wide),
                         const SizedBox(height: 20),
@@ -67,8 +64,81 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
+String _firstNameFromFullName(String fullName) {
+  final t = fullName.trim();
+  if (t.isEmpty) return '';
+  return t.split(RegExp(r'\s+')).first;
+}
+
+class _DashboardHeaderRow extends StatefulWidget {
+  const _DashboardHeaderRow();
+
+  @override
+  State<_DashboardHeaderRow> createState() => _DashboardHeaderRowState();
+}
+
+class _DashboardHeaderRowState extends State<_DashboardHeaderRow> {
+  String _firstName = '';
+  String _siteSubtitle = '';
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_refresh());
+  }
+
+  Future<void> _refresh() async {
+    final auth = context.read<AuthBloc>().state;
+    final repo = context.read<AuthRepository>();
+    var firstName = '';
+    final prefs = await SharedPreferences.getInstance();
+    final dateLabel = DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now());
+    var siteLine = await repo.dateAndSiteLine(prefs, dateLabel);
+    if (auth is AuthAuthenticated && auth.userId != null) {
+      final id = int.tryParse(auth.userId!);
+      if (id != null) {
+        final acct = await repo.offlineAccountById(id);
+        if (!mounted) return;
+        if (acct != null) {
+          firstName = _firstNameFromFullName(acct.fullName);
+        }
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _firstName = firstName;
+      _siteSubtitle = siteLine;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dateLabel = DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now());
+    final namePart = _firstName.isEmpty ? '…' : _firstName;
+    final sub = _siteSubtitle.isEmpty
+        ? '$dateLabel · — : —'
+        : _siteSubtitle;
+
+    return BlocListener<AuthBloc, AuthState>(
+      listenWhen: (prev, next) =>
+          prev is AuthAuthenticated != next is AuthAuthenticated ||
+          (prev is AuthAuthenticated &&
+              next is AuthAuthenticated &&
+              prev.userId != next.userId),
+      listener: (context, state) => unawaited(_refresh()),
+      child: _HeaderRow(
+        greeting: '${DashboardScreen.greetingWord()}, $namePart',
+        subtitle: sub,
+      ),
+    );
+  }
+}
+
 class _HeaderRow extends StatelessWidget {
-  const _HeaderRow({required this.greeting, required this.subtitle});
+  const _HeaderRow({
+    required this.greeting,
+    required this.subtitle,
+  });
 
   final String greeting;
   final String subtitle;
@@ -144,7 +214,7 @@ class _HeaderRow extends StatelessWidget {
             );
           },
         ),
-        const DashboardOnlinePill(),
+        const DashboardStatusPillLive(),
       ],
     );
   }

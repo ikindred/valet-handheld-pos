@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../auth/presentation/logout_flow.dart';
 import 'cash_figma_text_styles.dart';
 
 /// Narrow left strip: logo only (matches [Figma Open Cash](https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=61-423) rail).
@@ -17,12 +18,25 @@ class CashLeftRail extends StatelessWidget {
           right: BorderSide(color: Colors.black.withValues(alpha: 0.13)),
         ),
       ),
-      child: const SafeArea(
+      child: SafeArea(
         left: false,
         right: false,
         child: Padding(
-          padding: EdgeInsets.fromLTRB(10, 20, 10, 20),
-          child: Column(children: [_LogoMark(), Spacer()]),
+          padding: const EdgeInsets.fromLTRB(10, 20, 10, 20),
+          child: Column(
+            children: [
+              const _LogoMark(),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Logout',
+                onPressed: () => showLogoutFlow(context),
+                icon: Icon(
+                  Icons.logout_rounded,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

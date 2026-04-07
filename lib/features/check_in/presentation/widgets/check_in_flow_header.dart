@@ -83,7 +83,7 @@ class CheckInFlowHeader extends StatelessWidget {
               },
             ),
             const SizedBox(width: 16),
-            const DashboardOnlinePill(),
+            const DashboardStatusPillLive(),
           ],
         ),
       ),
