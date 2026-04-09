@@ -2740,13 +2740,30 @@ class $ValetTransactionsTable extends ValetTransactions
       requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
-  static const VerificationMeta _shiftIdMeta =
-      const VerificationMeta('shiftId');
+  static const VerificationMeta _localUuidMeta =
+      const VerificationMeta('localUuid');
   @override
-  late final GeneratedColumn<int> shiftId = GeneratedColumn<int>(
-      'shift_id', aliasedName, false,
+  late final GeneratedColumn<String> localUuid = GeneratedColumn<String>(
+      'local_uuid', aliasedName, true,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
+  static const VerificationMeta _checkinShiftIdMeta =
+      const VerificationMeta('checkinShiftId');
+  @override
+  late final GeneratedColumn<int> checkinShiftId = GeneratedColumn<int>(
+      'checkin_shift_id', aliasedName, false,
       type: DriftSqlType.int,
       requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES shifts (id)'));
+  static const VerificationMeta _checkoutShiftIdMeta =
+      const VerificationMeta('checkoutShiftId');
+  @override
+  late final GeneratedColumn<int> checkoutShiftId = GeneratedColumn<int>(
+      'checkout_shift_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('REFERENCES shifts (id)'));
   static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
@@ -2777,6 +2794,18 @@ class $ValetTransactionsTable extends ValetTransactions
   late final GeneratedColumn<String> vehicleBrand = GeneratedColumn<String>(
       'vehicle_brand', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _vehicleModelMeta =
+      const VerificationMeta('vehicleModel');
+  @override
+  late final GeneratedColumn<String> vehicleModel = GeneratedColumn<String>(
+      'vehicle_model', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _vehicleYearMeta =
+      const VerificationMeta('vehicleYear');
+  @override
+  late final GeneratedColumn<String> vehicleYear = GeneratedColumn<String>(
+      'vehicle_year', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _vehicleColorMeta =
       const VerificationMeta('vehicleColor');
   @override
@@ -2794,12 +2823,114 @@ class $ValetTransactionsTable extends ValetTransactions
   late final GeneratedColumn<String> slot = GeneratedColumn<String>(
       'slot', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _parkingLevelMeta =
+      const VerificationMeta('parkingLevel');
+  @override
+  late final GeneratedColumn<String> parkingLevel = GeneratedColumn<String>(
+      'parking_level', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _parkingSlotMeta =
+      const VerificationMeta('parkingSlot');
+  @override
+  late final GeneratedColumn<String> parkingSlot = GeneratedColumn<String>(
+      'parking_slot', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _belongingsJsonMeta =
+      const VerificationMeta('belongingsJson');
+  @override
+  late final GeneratedColumn<String> belongingsJson = GeneratedColumn<String>(
+      'belongings_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _otherBelongingsMeta =
+      const VerificationMeta('otherBelongings');
+  @override
+  late final GeneratedColumn<String> otherBelongings = GeneratedColumn<String>(
+      'other_belongings', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _signaturePngMeta =
+      const VerificationMeta('signaturePng');
+  @override
+  late final GeneratedColumn<String> signaturePng = GeneratedColumn<String>(
+      'signature_png', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _signatureCapturedAtMeta =
+      const VerificationMeta('signatureCapturedAt');
+  @override
+  late final GeneratedColumn<int> signatureCapturedAt = GeneratedColumn<int>(
+      'signature_captured_at', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _customerFullNameMeta =
+      const VerificationMeta('customerFullName');
+  @override
+  late final GeneratedColumn<String> customerFullName = GeneratedColumn<String>(
+      'customer_full_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _customerMobileMeta =
       const VerificationMeta('customerMobile');
   @override
   late final GeneratedColumn<String> customerMobile = GeneratedColumn<String>(
       'customer_mobile', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _assignedValetDriverMeta =
+      const VerificationMeta('assignedValetDriver');
+  @override
+  late final GeneratedColumn<String> assignedValetDriver =
+      GeneratedColumn<String>('assigned_valet_driver', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _specialInstructionsMeta =
+      const VerificationMeta('specialInstructions');
+  @override
+  late final GeneratedColumn<String> specialInstructions =
+      GeneratedColumn<String>('special_instructions', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _valetServiceTypeMeta =
+      const VerificationMeta('valetServiceType');
+  @override
+  late final GeneratedColumn<String> valetServiceType = GeneratedColumn<String>(
+      'valet_service_type', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _vehicleDamageJsonMeta =
+      const VerificationMeta('vehicleDamageJson');
+  @override
+  late final GeneratedColumn<String> vehicleDamageJson =
+      GeneratedColumn<String>('vehicle_damage_json', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _branchSnapshotMeta =
+      const VerificationMeta('branchSnapshot');
+  @override
+  late final GeneratedColumn<String> branchSnapshot = GeneratedColumn<String>(
+      'branch_snapshot', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _areaSnapshotMeta =
+      const VerificationMeta('areaSnapshot');
+  @override
+  late final GeneratedColumn<String> areaSnapshot = GeneratedColumn<String>(
+      'area_snapshot', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _deviceIdSnapshotMeta =
+      const VerificationMeta('deviceIdSnapshot');
+  @override
+  late final GeneratedColumn<String> deviceIdSnapshot = GeneratedColumn<String>(
+      'device_id_snapshot', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _serverTicketIdMeta =
+      const VerificationMeta('serverTicketId');
+  @override
+  late final GeneratedColumn<String> serverTicketId = GeneratedColumn<String>(
+      'server_ticket_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _lastModifiedAtMeta =
+      const VerificationMeta('lastModifiedAt');
+  @override
+  late final GeneratedColumn<int> lastModifiedAt = GeneratedColumn<int>(
+      'last_modified_at', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _localCreatedAtMeta =
+      const VerificationMeta('localCreatedAt');
+  @override
+  late final GeneratedColumn<int> localCreatedAt = GeneratedColumn<int>(
+      'local_created_at', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
   static const VerificationMeta _timeInMeta = const VerificationMeta('timeIn');
   @override
   late final GeneratedColumn<int> timeIn = GeneratedColumn<int>(
@@ -2875,15 +3006,36 @@ class $ValetTransactionsTable extends ValetTransactions
   @override
   List<GeneratedColumn> get $columns => [
         id,
-        shiftId,
+        localUuid,
+        checkinShiftId,
+        checkoutShiftId,
         userId,
         ticketNumber,
         plateNumber,
         vehicleBrand,
+        vehicleModel,
+        vehicleYear,
         vehicleColor,
         vehicleType,
         slot,
+        parkingLevel,
+        parkingSlot,
+        belongingsJson,
+        otherBelongings,
+        signaturePng,
+        signatureCapturedAt,
+        customerFullName,
         customerMobile,
+        assignedValetDriver,
+        specialInstructions,
+        valetServiceType,
+        vehicleDamageJson,
+        branchSnapshot,
+        areaSnapshot,
+        deviceIdSnapshot,
+        serverTicketId,
+        lastModifiedAt,
+        localCreatedAt,
         timeIn,
         timeOut,
         durationMinutes,
@@ -2910,11 +3062,23 @@ class $ValetTransactionsTable extends ValetTransactions
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     }
-    if (data.containsKey('shift_id')) {
-      context.handle(_shiftIdMeta,
-          shiftId.isAcceptableOrUnknown(data['shift_id']!, _shiftIdMeta));
+    if (data.containsKey('local_uuid')) {
+      context.handle(_localUuidMeta,
+          localUuid.isAcceptableOrUnknown(data['local_uuid']!, _localUuidMeta));
+    }
+    if (data.containsKey('checkin_shift_id')) {
+      context.handle(
+          _checkinShiftIdMeta,
+          checkinShiftId.isAcceptableOrUnknown(
+              data['checkin_shift_id']!, _checkinShiftIdMeta));
     } else if (isInserting) {
-      context.missing(_shiftIdMeta);
+      context.missing(_checkinShiftIdMeta);
+    }
+    if (data.containsKey('checkout_shift_id')) {
+      context.handle(
+          _checkoutShiftIdMeta,
+          checkoutShiftId.isAcceptableOrUnknown(
+              data['checkout_shift_id']!, _checkoutShiftIdMeta));
     }
     if (data.containsKey('user_id')) {
       context.handle(_userIdMeta,
@@ -2944,6 +3108,18 @@ class $ValetTransactionsTable extends ValetTransactions
           vehicleBrand.isAcceptableOrUnknown(
               data['vehicle_brand']!, _vehicleBrandMeta));
     }
+    if (data.containsKey('vehicle_model')) {
+      context.handle(
+          _vehicleModelMeta,
+          vehicleModel.isAcceptableOrUnknown(
+              data['vehicle_model']!, _vehicleModelMeta));
+    }
+    if (data.containsKey('vehicle_year')) {
+      context.handle(
+          _vehicleYearMeta,
+          vehicleYear.isAcceptableOrUnknown(
+              data['vehicle_year']!, _vehicleYearMeta));
+    }
     if (data.containsKey('vehicle_color')) {
       context.handle(
           _vehicleColorMeta,
@@ -2960,11 +3136,113 @@ class $ValetTransactionsTable extends ValetTransactions
       context.handle(
           _slotMeta, slot.isAcceptableOrUnknown(data['slot']!, _slotMeta));
     }
+    if (data.containsKey('parking_level')) {
+      context.handle(
+          _parkingLevelMeta,
+          parkingLevel.isAcceptableOrUnknown(
+              data['parking_level']!, _parkingLevelMeta));
+    }
+    if (data.containsKey('parking_slot')) {
+      context.handle(
+          _parkingSlotMeta,
+          parkingSlot.isAcceptableOrUnknown(
+              data['parking_slot']!, _parkingSlotMeta));
+    }
+    if (data.containsKey('belongings_json')) {
+      context.handle(
+          _belongingsJsonMeta,
+          belongingsJson.isAcceptableOrUnknown(
+              data['belongings_json']!, _belongingsJsonMeta));
+    }
+    if (data.containsKey('other_belongings')) {
+      context.handle(
+          _otherBelongingsMeta,
+          otherBelongings.isAcceptableOrUnknown(
+              data['other_belongings']!, _otherBelongingsMeta));
+    }
+    if (data.containsKey('signature_png')) {
+      context.handle(
+          _signaturePngMeta,
+          signaturePng.isAcceptableOrUnknown(
+              data['signature_png']!, _signaturePngMeta));
+    }
+    if (data.containsKey('signature_captured_at')) {
+      context.handle(
+          _signatureCapturedAtMeta,
+          signatureCapturedAt.isAcceptableOrUnknown(
+              data['signature_captured_at']!, _signatureCapturedAtMeta));
+    }
+    if (data.containsKey('customer_full_name')) {
+      context.handle(
+          _customerFullNameMeta,
+          customerFullName.isAcceptableOrUnknown(
+              data['customer_full_name']!, _customerFullNameMeta));
+    }
     if (data.containsKey('customer_mobile')) {
       context.handle(
           _customerMobileMeta,
           customerMobile.isAcceptableOrUnknown(
               data['customer_mobile']!, _customerMobileMeta));
+    }
+    if (data.containsKey('assigned_valet_driver')) {
+      context.handle(
+          _assignedValetDriverMeta,
+          assignedValetDriver.isAcceptableOrUnknown(
+              data['assigned_valet_driver']!, _assignedValetDriverMeta));
+    }
+    if (data.containsKey('special_instructions')) {
+      context.handle(
+          _specialInstructionsMeta,
+          specialInstructions.isAcceptableOrUnknown(
+              data['special_instructions']!, _specialInstructionsMeta));
+    }
+    if (data.containsKey('valet_service_type')) {
+      context.handle(
+          _valetServiceTypeMeta,
+          valetServiceType.isAcceptableOrUnknown(
+              data['valet_service_type']!, _valetServiceTypeMeta));
+    }
+    if (data.containsKey('vehicle_damage_json')) {
+      context.handle(
+          _vehicleDamageJsonMeta,
+          vehicleDamageJson.isAcceptableOrUnknown(
+              data['vehicle_damage_json']!, _vehicleDamageJsonMeta));
+    }
+    if (data.containsKey('branch_snapshot')) {
+      context.handle(
+          _branchSnapshotMeta,
+          branchSnapshot.isAcceptableOrUnknown(
+              data['branch_snapshot']!, _branchSnapshotMeta));
+    }
+    if (data.containsKey('area_snapshot')) {
+      context.handle(
+          _areaSnapshotMeta,
+          areaSnapshot.isAcceptableOrUnknown(
+              data['area_snapshot']!, _areaSnapshotMeta));
+    }
+    if (data.containsKey('device_id_snapshot')) {
+      context.handle(
+          _deviceIdSnapshotMeta,
+          deviceIdSnapshot.isAcceptableOrUnknown(
+              data['device_id_snapshot']!, _deviceIdSnapshotMeta));
+    }
+    if (data.containsKey('server_ticket_id')) {
+      context.handle(
+          _serverTicketIdMeta,
+          serverTicketId.isAcceptableOrUnknown(
+              data['server_ticket_id']!, _serverTicketIdMeta));
+    }
+    if (data.containsKey('last_modified_at')) {
+      context.handle(
+          _lastModifiedAtMeta,
+          lastModifiedAt.isAcceptableOrUnknown(
+              data['last_modified_at']!, _lastModifiedAtMeta));
+    }
+    if (data.containsKey('local_created_at')) {
+      context.handle(
+          _localCreatedAtMeta,
+          localCreatedAt.isAcceptableOrUnknown(
+              data['local_created_at']!, _localCreatedAtMeta));
     }
     if (data.containsKey('time_in')) {
       context.handle(_timeInMeta,
@@ -3039,8 +3317,12 @@ class $ValetTransactionsTable extends ValetTransactions
     return ValetTransaction(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
-      shiftId: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}shift_id'])!,
+      localUuid: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}local_uuid']),
+      checkinShiftId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}checkin_shift_id'])!,
+      checkoutShiftId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}checkout_shift_id']),
       userId: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}user_id'])!,
       ticketNumber: attachedDatabase.typeMapping
@@ -3049,14 +3331,52 @@ class $ValetTransactionsTable extends ValetTransactions
           .read(DriftSqlType.string, data['${effectivePrefix}plate_number'])!,
       vehicleBrand: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}vehicle_brand']),
+      vehicleModel: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}vehicle_model']),
+      vehicleYear: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}vehicle_year']),
       vehicleColor: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}vehicle_color']),
       vehicleType: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}vehicle_type']),
       slot: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}slot']),
+      parkingLevel: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}parking_level']),
+      parkingSlot: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}parking_slot']),
+      belongingsJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}belongings_json']),
+      otherBelongings: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}other_belongings']),
+      signaturePng: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}signature_png']),
+      signatureCapturedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}signature_captured_at']),
+      customerFullName: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}customer_full_name']),
       customerMobile: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}customer_mobile']),
+      assignedValetDriver: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}assigned_valet_driver']),
+      specialInstructions: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}special_instructions']),
+      valetServiceType: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}valet_service_type']),
+      vehicleDamageJson: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}vehicle_damage_json']),
+      branchSnapshot: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}branch_snapshot']),
+      areaSnapshot: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}area_snapshot']),
+      deviceIdSnapshot: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}device_id_snapshot']),
+      serverTicketId: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}server_ticket_id']),
+      lastModifiedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}last_modified_at']),
+      localCreatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}local_created_at']),
       timeIn: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}time_in'])!,
       timeOut: attachedDatabase.typeMapping
@@ -3093,15 +3413,45 @@ class $ValetTransactionsTable extends ValetTransactions
 class ValetTransaction extends DataClass
     implements Insertable<ValetTransaction> {
   final int id;
-  final int shiftId;
+
+  /// Client UUID for idempotent sync; backfilled on upgrade for legacy rows.
+  final String? localUuid;
+
+  /// Shift that was open when the vehicle was checked in (immutable).
+  final int checkinShiftId;
+
+  /// Shift responsible for checkout: set when adopting from a prior cashier's
+  /// open tickets, or on actual checkout. Null until assigned.
+  final int? checkoutShiftId;
   final int userId;
   final String ticketNumber;
   final String plateNumber;
   final String? vehicleBrand;
+  final String? vehicleModel;
+  final String? vehicleYear;
   final String? vehicleColor;
   final String? vehicleType;
   final String? slot;
+  final String? parkingLevel;
+  final String? parkingSlot;
+  final String? belongingsJson;
+  final String? otherBelongings;
+
+  /// Base64-encoded PNG (same bytes as before; stored as TEXT instead of BLOB).
+  final String? signaturePng;
+  final int? signatureCapturedAt;
+  final String? customerFullName;
   final String? customerMobile;
+  final String? assignedValetDriver;
+  final String? specialInstructions;
+  final String? valetServiceType;
+  final String? vehicleDamageJson;
+  final String? branchSnapshot;
+  final String? areaSnapshot;
+  final String? deviceIdSnapshot;
+  final String? serverTicketId;
+  final int? lastModifiedAt;
+  final int? localCreatedAt;
   final int timeIn;
   final int? timeOut;
   final int? durationMinutes;
@@ -3116,15 +3466,36 @@ class ValetTransaction extends DataClass
   final int? syncedAt;
   const ValetTransaction(
       {required this.id,
-      required this.shiftId,
+      this.localUuid,
+      required this.checkinShiftId,
+      this.checkoutShiftId,
       required this.userId,
       required this.ticketNumber,
       required this.plateNumber,
       this.vehicleBrand,
+      this.vehicleModel,
+      this.vehicleYear,
       this.vehicleColor,
       this.vehicleType,
       this.slot,
+      this.parkingLevel,
+      this.parkingSlot,
+      this.belongingsJson,
+      this.otherBelongings,
+      this.signaturePng,
+      this.signatureCapturedAt,
+      this.customerFullName,
       this.customerMobile,
+      this.assignedValetDriver,
+      this.specialInstructions,
+      this.valetServiceType,
+      this.vehicleDamageJson,
+      this.branchSnapshot,
+      this.areaSnapshot,
+      this.deviceIdSnapshot,
+      this.serverTicketId,
+      this.lastModifiedAt,
+      this.localCreatedAt,
       required this.timeIn,
       this.timeOut,
       this.durationMinutes,
@@ -3141,12 +3512,24 @@ class ValetTransaction extends DataClass
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
-    map['shift_id'] = Variable<int>(shiftId);
+    if (!nullToAbsent || localUuid != null) {
+      map['local_uuid'] = Variable<String>(localUuid);
+    }
+    map['checkin_shift_id'] = Variable<int>(checkinShiftId);
+    if (!nullToAbsent || checkoutShiftId != null) {
+      map['checkout_shift_id'] = Variable<int>(checkoutShiftId);
+    }
     map['user_id'] = Variable<int>(userId);
     map['ticket_number'] = Variable<String>(ticketNumber);
     map['plate_number'] = Variable<String>(plateNumber);
     if (!nullToAbsent || vehicleBrand != null) {
       map['vehicle_brand'] = Variable<String>(vehicleBrand);
+    }
+    if (!nullToAbsent || vehicleModel != null) {
+      map['vehicle_model'] = Variable<String>(vehicleModel);
+    }
+    if (!nullToAbsent || vehicleYear != null) {
+      map['vehicle_year'] = Variable<String>(vehicleYear);
     }
     if (!nullToAbsent || vehicleColor != null) {
       map['vehicle_color'] = Variable<String>(vehicleColor);
@@ -3157,8 +3540,59 @@ class ValetTransaction extends DataClass
     if (!nullToAbsent || slot != null) {
       map['slot'] = Variable<String>(slot);
     }
+    if (!nullToAbsent || parkingLevel != null) {
+      map['parking_level'] = Variable<String>(parkingLevel);
+    }
+    if (!nullToAbsent || parkingSlot != null) {
+      map['parking_slot'] = Variable<String>(parkingSlot);
+    }
+    if (!nullToAbsent || belongingsJson != null) {
+      map['belongings_json'] = Variable<String>(belongingsJson);
+    }
+    if (!nullToAbsent || otherBelongings != null) {
+      map['other_belongings'] = Variable<String>(otherBelongings);
+    }
+    if (!nullToAbsent || signaturePng != null) {
+      map['signature_png'] = Variable<String>(signaturePng);
+    }
+    if (!nullToAbsent || signatureCapturedAt != null) {
+      map['signature_captured_at'] = Variable<int>(signatureCapturedAt);
+    }
+    if (!nullToAbsent || customerFullName != null) {
+      map['customer_full_name'] = Variable<String>(customerFullName);
+    }
     if (!nullToAbsent || customerMobile != null) {
       map['customer_mobile'] = Variable<String>(customerMobile);
+    }
+    if (!nullToAbsent || assignedValetDriver != null) {
+      map['assigned_valet_driver'] = Variable<String>(assignedValetDriver);
+    }
+    if (!nullToAbsent || specialInstructions != null) {
+      map['special_instructions'] = Variable<String>(specialInstructions);
+    }
+    if (!nullToAbsent || valetServiceType != null) {
+      map['valet_service_type'] = Variable<String>(valetServiceType);
+    }
+    if (!nullToAbsent || vehicleDamageJson != null) {
+      map['vehicle_damage_json'] = Variable<String>(vehicleDamageJson);
+    }
+    if (!nullToAbsent || branchSnapshot != null) {
+      map['branch_snapshot'] = Variable<String>(branchSnapshot);
+    }
+    if (!nullToAbsent || areaSnapshot != null) {
+      map['area_snapshot'] = Variable<String>(areaSnapshot);
+    }
+    if (!nullToAbsent || deviceIdSnapshot != null) {
+      map['device_id_snapshot'] = Variable<String>(deviceIdSnapshot);
+    }
+    if (!nullToAbsent || serverTicketId != null) {
+      map['server_ticket_id'] = Variable<String>(serverTicketId);
+    }
+    if (!nullToAbsent || lastModifiedAt != null) {
+      map['last_modified_at'] = Variable<int>(lastModifiedAt);
+    }
+    if (!nullToAbsent || localCreatedAt != null) {
+      map['local_created_at'] = Variable<int>(localCreatedAt);
     }
     map['time_in'] = Variable<int>(timeIn);
     if (!nullToAbsent || timeOut != null) {
@@ -3198,13 +3632,25 @@ class ValetTransaction extends DataClass
   ValetTransactionsCompanion toCompanion(bool nullToAbsent) {
     return ValetTransactionsCompanion(
       id: Value(id),
-      shiftId: Value(shiftId),
+      localUuid: localUuid == null && nullToAbsent
+          ? const Value.absent()
+          : Value(localUuid),
+      checkinShiftId: Value(checkinShiftId),
+      checkoutShiftId: checkoutShiftId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(checkoutShiftId),
       userId: Value(userId),
       ticketNumber: Value(ticketNumber),
       plateNumber: Value(plateNumber),
       vehicleBrand: vehicleBrand == null && nullToAbsent
           ? const Value.absent()
           : Value(vehicleBrand),
+      vehicleModel: vehicleModel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(vehicleModel),
+      vehicleYear: vehicleYear == null && nullToAbsent
+          ? const Value.absent()
+          : Value(vehicleYear),
       vehicleColor: vehicleColor == null && nullToAbsent
           ? const Value.absent()
           : Value(vehicleColor),
@@ -3212,9 +3658,60 @@ class ValetTransaction extends DataClass
           ? const Value.absent()
           : Value(vehicleType),
       slot: slot == null && nullToAbsent ? const Value.absent() : Value(slot),
+      parkingLevel: parkingLevel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parkingLevel),
+      parkingSlot: parkingSlot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parkingSlot),
+      belongingsJson: belongingsJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(belongingsJson),
+      otherBelongings: otherBelongings == null && nullToAbsent
+          ? const Value.absent()
+          : Value(otherBelongings),
+      signaturePng: signaturePng == null && nullToAbsent
+          ? const Value.absent()
+          : Value(signaturePng),
+      signatureCapturedAt: signatureCapturedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(signatureCapturedAt),
+      customerFullName: customerFullName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customerFullName),
       customerMobile: customerMobile == null && nullToAbsent
           ? const Value.absent()
           : Value(customerMobile),
+      assignedValetDriver: assignedValetDriver == null && nullToAbsent
+          ? const Value.absent()
+          : Value(assignedValetDriver),
+      specialInstructions: specialInstructions == null && nullToAbsent
+          ? const Value.absent()
+          : Value(specialInstructions),
+      valetServiceType: valetServiceType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(valetServiceType),
+      vehicleDamageJson: vehicleDamageJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(vehicleDamageJson),
+      branchSnapshot: branchSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(branchSnapshot),
+      areaSnapshot: areaSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(areaSnapshot),
+      deviceIdSnapshot: deviceIdSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceIdSnapshot),
+      serverTicketId: serverTicketId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverTicketId),
+      lastModifiedAt: lastModifiedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastModifiedAt),
+      localCreatedAt: localCreatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(localCreatedAt),
       timeIn: Value(timeIn),
       timeOut: timeOut == null && nullToAbsent
           ? const Value.absent()
@@ -3255,15 +3752,40 @@ class ValetTransaction extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return ValetTransaction(
       id: serializer.fromJson<int>(json['id']),
-      shiftId: serializer.fromJson<int>(json['shiftId']),
+      localUuid: serializer.fromJson<String?>(json['localUuid']),
+      checkinShiftId: serializer.fromJson<int>(json['checkinShiftId']),
+      checkoutShiftId: serializer.fromJson<int?>(json['checkoutShiftId']),
       userId: serializer.fromJson<int>(json['userId']),
       ticketNumber: serializer.fromJson<String>(json['ticketNumber']),
       plateNumber: serializer.fromJson<String>(json['plateNumber']),
       vehicleBrand: serializer.fromJson<String?>(json['vehicleBrand']),
+      vehicleModel: serializer.fromJson<String?>(json['vehicleModel']),
+      vehicleYear: serializer.fromJson<String?>(json['vehicleYear']),
       vehicleColor: serializer.fromJson<String?>(json['vehicleColor']),
       vehicleType: serializer.fromJson<String?>(json['vehicleType']),
       slot: serializer.fromJson<String?>(json['slot']),
+      parkingLevel: serializer.fromJson<String?>(json['parkingLevel']),
+      parkingSlot: serializer.fromJson<String?>(json['parkingSlot']),
+      belongingsJson: serializer.fromJson<String?>(json['belongingsJson']),
+      otherBelongings: serializer.fromJson<String?>(json['otherBelongings']),
+      signaturePng: serializer.fromJson<String?>(json['signaturePng']),
+      signatureCapturedAt:
+          serializer.fromJson<int?>(json['signatureCapturedAt']),
+      customerFullName: serializer.fromJson<String?>(json['customerFullName']),
       customerMobile: serializer.fromJson<String?>(json['customerMobile']),
+      assignedValetDriver:
+          serializer.fromJson<String?>(json['assignedValetDriver']),
+      specialInstructions:
+          serializer.fromJson<String?>(json['specialInstructions']),
+      valetServiceType: serializer.fromJson<String?>(json['valetServiceType']),
+      vehicleDamageJson:
+          serializer.fromJson<String?>(json['vehicleDamageJson']),
+      branchSnapshot: serializer.fromJson<String?>(json['branchSnapshot']),
+      areaSnapshot: serializer.fromJson<String?>(json['areaSnapshot']),
+      deviceIdSnapshot: serializer.fromJson<String?>(json['deviceIdSnapshot']),
+      serverTicketId: serializer.fromJson<String?>(json['serverTicketId']),
+      lastModifiedAt: serializer.fromJson<int?>(json['lastModifiedAt']),
+      localCreatedAt: serializer.fromJson<int?>(json['localCreatedAt']),
       timeIn: serializer.fromJson<int>(json['timeIn']),
       timeOut: serializer.fromJson<int?>(json['timeOut']),
       durationMinutes: serializer.fromJson<int?>(json['durationMinutes']),
@@ -3283,15 +3805,36 @@ class ValetTransaction extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
-      'shiftId': serializer.toJson<int>(shiftId),
+      'localUuid': serializer.toJson<String?>(localUuid),
+      'checkinShiftId': serializer.toJson<int>(checkinShiftId),
+      'checkoutShiftId': serializer.toJson<int?>(checkoutShiftId),
       'userId': serializer.toJson<int>(userId),
       'ticketNumber': serializer.toJson<String>(ticketNumber),
       'plateNumber': serializer.toJson<String>(plateNumber),
       'vehicleBrand': serializer.toJson<String?>(vehicleBrand),
+      'vehicleModel': serializer.toJson<String?>(vehicleModel),
+      'vehicleYear': serializer.toJson<String?>(vehicleYear),
       'vehicleColor': serializer.toJson<String?>(vehicleColor),
       'vehicleType': serializer.toJson<String?>(vehicleType),
       'slot': serializer.toJson<String?>(slot),
+      'parkingLevel': serializer.toJson<String?>(parkingLevel),
+      'parkingSlot': serializer.toJson<String?>(parkingSlot),
+      'belongingsJson': serializer.toJson<String?>(belongingsJson),
+      'otherBelongings': serializer.toJson<String?>(otherBelongings),
+      'signaturePng': serializer.toJson<String?>(signaturePng),
+      'signatureCapturedAt': serializer.toJson<int?>(signatureCapturedAt),
+      'customerFullName': serializer.toJson<String?>(customerFullName),
       'customerMobile': serializer.toJson<String?>(customerMobile),
+      'assignedValetDriver': serializer.toJson<String?>(assignedValetDriver),
+      'specialInstructions': serializer.toJson<String?>(specialInstructions),
+      'valetServiceType': serializer.toJson<String?>(valetServiceType),
+      'vehicleDamageJson': serializer.toJson<String?>(vehicleDamageJson),
+      'branchSnapshot': serializer.toJson<String?>(branchSnapshot),
+      'areaSnapshot': serializer.toJson<String?>(areaSnapshot),
+      'deviceIdSnapshot': serializer.toJson<String?>(deviceIdSnapshot),
+      'serverTicketId': serializer.toJson<String?>(serverTicketId),
+      'lastModifiedAt': serializer.toJson<int?>(lastModifiedAt),
+      'localCreatedAt': serializer.toJson<int?>(localCreatedAt),
       'timeIn': serializer.toJson<int>(timeIn),
       'timeOut': serializer.toJson<int?>(timeOut),
       'durationMinutes': serializer.toJson<int?>(durationMinutes),
@@ -3309,15 +3852,36 @@ class ValetTransaction extends DataClass
 
   ValetTransaction copyWith(
           {int? id,
-          int? shiftId,
+          Value<String?> localUuid = const Value.absent(),
+          int? checkinShiftId,
+          Value<int?> checkoutShiftId = const Value.absent(),
           int? userId,
           String? ticketNumber,
           String? plateNumber,
           Value<String?> vehicleBrand = const Value.absent(),
+          Value<String?> vehicleModel = const Value.absent(),
+          Value<String?> vehicleYear = const Value.absent(),
           Value<String?> vehicleColor = const Value.absent(),
           Value<String?> vehicleType = const Value.absent(),
           Value<String?> slot = const Value.absent(),
+          Value<String?> parkingLevel = const Value.absent(),
+          Value<String?> parkingSlot = const Value.absent(),
+          Value<String?> belongingsJson = const Value.absent(),
+          Value<String?> otherBelongings = const Value.absent(),
+          Value<String?> signaturePng = const Value.absent(),
+          Value<int?> signatureCapturedAt = const Value.absent(),
+          Value<String?> customerFullName = const Value.absent(),
           Value<String?> customerMobile = const Value.absent(),
+          Value<String?> assignedValetDriver = const Value.absent(),
+          Value<String?> specialInstructions = const Value.absent(),
+          Value<String?> valetServiceType = const Value.absent(),
+          Value<String?> vehicleDamageJson = const Value.absent(),
+          Value<String?> branchSnapshot = const Value.absent(),
+          Value<String?> areaSnapshot = const Value.absent(),
+          Value<String?> deviceIdSnapshot = const Value.absent(),
+          Value<String?> serverTicketId = const Value.absent(),
+          Value<int?> lastModifiedAt = const Value.absent(),
+          Value<int?> localCreatedAt = const Value.absent(),
           int? timeIn,
           Value<int?> timeOut = const Value.absent(),
           Value<int?> durationMinutes = const Value.absent(),
@@ -3332,18 +3896,66 @@ class ValetTransaction extends DataClass
           Value<int?> syncedAt = const Value.absent()}) =>
       ValetTransaction(
         id: id ?? this.id,
-        shiftId: shiftId ?? this.shiftId,
+        localUuid: localUuid.present ? localUuid.value : this.localUuid,
+        checkinShiftId: checkinShiftId ?? this.checkinShiftId,
+        checkoutShiftId: checkoutShiftId.present
+            ? checkoutShiftId.value
+            : this.checkoutShiftId,
         userId: userId ?? this.userId,
         ticketNumber: ticketNumber ?? this.ticketNumber,
         plateNumber: plateNumber ?? this.plateNumber,
         vehicleBrand:
             vehicleBrand.present ? vehicleBrand.value : this.vehicleBrand,
+        vehicleModel:
+            vehicleModel.present ? vehicleModel.value : this.vehicleModel,
+        vehicleYear: vehicleYear.present ? vehicleYear.value : this.vehicleYear,
         vehicleColor:
             vehicleColor.present ? vehicleColor.value : this.vehicleColor,
         vehicleType: vehicleType.present ? vehicleType.value : this.vehicleType,
         slot: slot.present ? slot.value : this.slot,
+        parkingLevel:
+            parkingLevel.present ? parkingLevel.value : this.parkingLevel,
+        parkingSlot: parkingSlot.present ? parkingSlot.value : this.parkingSlot,
+        belongingsJson:
+            belongingsJson.present ? belongingsJson.value : this.belongingsJson,
+        otherBelongings: otherBelongings.present
+            ? otherBelongings.value
+            : this.otherBelongings,
+        signaturePng:
+            signaturePng.present ? signaturePng.value : this.signaturePng,
+        signatureCapturedAt: signatureCapturedAt.present
+            ? signatureCapturedAt.value
+            : this.signatureCapturedAt,
+        customerFullName: customerFullName.present
+            ? customerFullName.value
+            : this.customerFullName,
         customerMobile:
             customerMobile.present ? customerMobile.value : this.customerMobile,
+        assignedValetDriver: assignedValetDriver.present
+            ? assignedValetDriver.value
+            : this.assignedValetDriver,
+        specialInstructions: specialInstructions.present
+            ? specialInstructions.value
+            : this.specialInstructions,
+        valetServiceType: valetServiceType.present
+            ? valetServiceType.value
+            : this.valetServiceType,
+        vehicleDamageJson: vehicleDamageJson.present
+            ? vehicleDamageJson.value
+            : this.vehicleDamageJson,
+        branchSnapshot:
+            branchSnapshot.present ? branchSnapshot.value : this.branchSnapshot,
+        areaSnapshot:
+            areaSnapshot.present ? areaSnapshot.value : this.areaSnapshot,
+        deviceIdSnapshot: deviceIdSnapshot.present
+            ? deviceIdSnapshot.value
+            : this.deviceIdSnapshot,
+        serverTicketId:
+            serverTicketId.present ? serverTicketId.value : this.serverTicketId,
+        lastModifiedAt:
+            lastModifiedAt.present ? lastModifiedAt.value : this.lastModifiedAt,
+        localCreatedAt:
+            localCreatedAt.present ? localCreatedAt.value : this.localCreatedAt,
         timeIn: timeIn ?? this.timeIn,
         timeOut: timeOut.present ? timeOut.value : this.timeOut,
         durationMinutes: durationMinutes.present
@@ -3367,7 +3979,13 @@ class ValetTransaction extends DataClass
   ValetTransaction copyWithCompanion(ValetTransactionsCompanion data) {
     return ValetTransaction(
       id: data.id.present ? data.id.value : this.id,
-      shiftId: data.shiftId.present ? data.shiftId.value : this.shiftId,
+      localUuid: data.localUuid.present ? data.localUuid.value : this.localUuid,
+      checkinShiftId: data.checkinShiftId.present
+          ? data.checkinShiftId.value
+          : this.checkinShiftId,
+      checkoutShiftId: data.checkoutShiftId.present
+          ? data.checkoutShiftId.value
+          : this.checkoutShiftId,
       userId: data.userId.present ? data.userId.value : this.userId,
       ticketNumber: data.ticketNumber.present
           ? data.ticketNumber.value
@@ -3377,15 +3995,70 @@ class ValetTransaction extends DataClass
       vehicleBrand: data.vehicleBrand.present
           ? data.vehicleBrand.value
           : this.vehicleBrand,
+      vehicleModel: data.vehicleModel.present
+          ? data.vehicleModel.value
+          : this.vehicleModel,
+      vehicleYear:
+          data.vehicleYear.present ? data.vehicleYear.value : this.vehicleYear,
       vehicleColor: data.vehicleColor.present
           ? data.vehicleColor.value
           : this.vehicleColor,
       vehicleType:
           data.vehicleType.present ? data.vehicleType.value : this.vehicleType,
       slot: data.slot.present ? data.slot.value : this.slot,
+      parkingLevel: data.parkingLevel.present
+          ? data.parkingLevel.value
+          : this.parkingLevel,
+      parkingSlot:
+          data.parkingSlot.present ? data.parkingSlot.value : this.parkingSlot,
+      belongingsJson: data.belongingsJson.present
+          ? data.belongingsJson.value
+          : this.belongingsJson,
+      otherBelongings: data.otherBelongings.present
+          ? data.otherBelongings.value
+          : this.otherBelongings,
+      signaturePng: data.signaturePng.present
+          ? data.signaturePng.value
+          : this.signaturePng,
+      signatureCapturedAt: data.signatureCapturedAt.present
+          ? data.signatureCapturedAt.value
+          : this.signatureCapturedAt,
+      customerFullName: data.customerFullName.present
+          ? data.customerFullName.value
+          : this.customerFullName,
       customerMobile: data.customerMobile.present
           ? data.customerMobile.value
           : this.customerMobile,
+      assignedValetDriver: data.assignedValetDriver.present
+          ? data.assignedValetDriver.value
+          : this.assignedValetDriver,
+      specialInstructions: data.specialInstructions.present
+          ? data.specialInstructions.value
+          : this.specialInstructions,
+      valetServiceType: data.valetServiceType.present
+          ? data.valetServiceType.value
+          : this.valetServiceType,
+      vehicleDamageJson: data.vehicleDamageJson.present
+          ? data.vehicleDamageJson.value
+          : this.vehicleDamageJson,
+      branchSnapshot: data.branchSnapshot.present
+          ? data.branchSnapshot.value
+          : this.branchSnapshot,
+      areaSnapshot: data.areaSnapshot.present
+          ? data.areaSnapshot.value
+          : this.areaSnapshot,
+      deviceIdSnapshot: data.deviceIdSnapshot.present
+          ? data.deviceIdSnapshot.value
+          : this.deviceIdSnapshot,
+      serverTicketId: data.serverTicketId.present
+          ? data.serverTicketId.value
+          : this.serverTicketId,
+      lastModifiedAt: data.lastModifiedAt.present
+          ? data.lastModifiedAt.value
+          : this.lastModifiedAt,
+      localCreatedAt: data.localCreatedAt.present
+          ? data.localCreatedAt.value
+          : this.localCreatedAt,
       timeIn: data.timeIn.present ? data.timeIn.value : this.timeIn,
       timeOut: data.timeOut.present ? data.timeOut.value : this.timeOut,
       durationMinutes: data.durationMinutes.present
@@ -3417,15 +4090,36 @@ class ValetTransaction extends DataClass
   String toString() {
     return (StringBuffer('ValetTransaction(')
           ..write('id: $id, ')
-          ..write('shiftId: $shiftId, ')
+          ..write('localUuid: $localUuid, ')
+          ..write('checkinShiftId: $checkinShiftId, ')
+          ..write('checkoutShiftId: $checkoutShiftId, ')
           ..write('userId: $userId, ')
           ..write('ticketNumber: $ticketNumber, ')
           ..write('plateNumber: $plateNumber, ')
           ..write('vehicleBrand: $vehicleBrand, ')
+          ..write('vehicleModel: $vehicleModel, ')
+          ..write('vehicleYear: $vehicleYear, ')
           ..write('vehicleColor: $vehicleColor, ')
           ..write('vehicleType: $vehicleType, ')
           ..write('slot: $slot, ')
+          ..write('parkingLevel: $parkingLevel, ')
+          ..write('parkingSlot: $parkingSlot, ')
+          ..write('belongingsJson: $belongingsJson, ')
+          ..write('otherBelongings: $otherBelongings, ')
+          ..write('signaturePng: $signaturePng, ')
+          ..write('signatureCapturedAt: $signatureCapturedAt, ')
+          ..write('customerFullName: $customerFullName, ')
           ..write('customerMobile: $customerMobile, ')
+          ..write('assignedValetDriver: $assignedValetDriver, ')
+          ..write('specialInstructions: $specialInstructions, ')
+          ..write('valetServiceType: $valetServiceType, ')
+          ..write('vehicleDamageJson: $vehicleDamageJson, ')
+          ..write('branchSnapshot: $branchSnapshot, ')
+          ..write('areaSnapshot: $areaSnapshot, ')
+          ..write('deviceIdSnapshot: $deviceIdSnapshot, ')
+          ..write('serverTicketId: $serverTicketId, ')
+          ..write('lastModifiedAt: $lastModifiedAt, ')
+          ..write('localCreatedAt: $localCreatedAt, ')
           ..write('timeIn: $timeIn, ')
           ..write('timeOut: $timeOut, ')
           ..write('durationMinutes: $durationMinutes, ')
@@ -3445,15 +4139,36 @@ class ValetTransaction extends DataClass
   @override
   int get hashCode => Object.hashAll([
         id,
-        shiftId,
+        localUuid,
+        checkinShiftId,
+        checkoutShiftId,
         userId,
         ticketNumber,
         plateNumber,
         vehicleBrand,
+        vehicleModel,
+        vehicleYear,
         vehicleColor,
         vehicleType,
         slot,
+        parkingLevel,
+        parkingSlot,
+        belongingsJson,
+        otherBelongings,
+        signaturePng,
+        signatureCapturedAt,
+        customerFullName,
         customerMobile,
+        assignedValetDriver,
+        specialInstructions,
+        valetServiceType,
+        vehicleDamageJson,
+        branchSnapshot,
+        areaSnapshot,
+        deviceIdSnapshot,
+        serverTicketId,
+        lastModifiedAt,
+        localCreatedAt,
         timeIn,
         timeOut,
         durationMinutes,
@@ -3472,15 +4187,36 @@ class ValetTransaction extends DataClass
       identical(this, other) ||
       (other is ValetTransaction &&
           other.id == this.id &&
-          other.shiftId == this.shiftId &&
+          other.localUuid == this.localUuid &&
+          other.checkinShiftId == this.checkinShiftId &&
+          other.checkoutShiftId == this.checkoutShiftId &&
           other.userId == this.userId &&
           other.ticketNumber == this.ticketNumber &&
           other.plateNumber == this.plateNumber &&
           other.vehicleBrand == this.vehicleBrand &&
+          other.vehicleModel == this.vehicleModel &&
+          other.vehicleYear == this.vehicleYear &&
           other.vehicleColor == this.vehicleColor &&
           other.vehicleType == this.vehicleType &&
           other.slot == this.slot &&
+          other.parkingLevel == this.parkingLevel &&
+          other.parkingSlot == this.parkingSlot &&
+          other.belongingsJson == this.belongingsJson &&
+          other.otherBelongings == this.otherBelongings &&
+          other.signaturePng == this.signaturePng &&
+          other.signatureCapturedAt == this.signatureCapturedAt &&
+          other.customerFullName == this.customerFullName &&
           other.customerMobile == this.customerMobile &&
+          other.assignedValetDriver == this.assignedValetDriver &&
+          other.specialInstructions == this.specialInstructions &&
+          other.valetServiceType == this.valetServiceType &&
+          other.vehicleDamageJson == this.vehicleDamageJson &&
+          other.branchSnapshot == this.branchSnapshot &&
+          other.areaSnapshot == this.areaSnapshot &&
+          other.deviceIdSnapshot == this.deviceIdSnapshot &&
+          other.serverTicketId == this.serverTicketId &&
+          other.lastModifiedAt == this.lastModifiedAt &&
+          other.localCreatedAt == this.localCreatedAt &&
           other.timeIn == this.timeIn &&
           other.timeOut == this.timeOut &&
           other.durationMinutes == this.durationMinutes &&
@@ -3497,15 +4233,36 @@ class ValetTransaction extends DataClass
 
 class ValetTransactionsCompanion extends UpdateCompanion<ValetTransaction> {
   final Value<int> id;
-  final Value<int> shiftId;
+  final Value<String?> localUuid;
+  final Value<int> checkinShiftId;
+  final Value<int?> checkoutShiftId;
   final Value<int> userId;
   final Value<String> ticketNumber;
   final Value<String> plateNumber;
   final Value<String?> vehicleBrand;
+  final Value<String?> vehicleModel;
+  final Value<String?> vehicleYear;
   final Value<String?> vehicleColor;
   final Value<String?> vehicleType;
   final Value<String?> slot;
+  final Value<String?> parkingLevel;
+  final Value<String?> parkingSlot;
+  final Value<String?> belongingsJson;
+  final Value<String?> otherBelongings;
+  final Value<String?> signaturePng;
+  final Value<int?> signatureCapturedAt;
+  final Value<String?> customerFullName;
   final Value<String?> customerMobile;
+  final Value<String?> assignedValetDriver;
+  final Value<String?> specialInstructions;
+  final Value<String?> valetServiceType;
+  final Value<String?> vehicleDamageJson;
+  final Value<String?> branchSnapshot;
+  final Value<String?> areaSnapshot;
+  final Value<String?> deviceIdSnapshot;
+  final Value<String?> serverTicketId;
+  final Value<int?> lastModifiedAt;
+  final Value<int?> localCreatedAt;
   final Value<int> timeIn;
   final Value<int?> timeOut;
   final Value<int?> durationMinutes;
@@ -3520,15 +4277,36 @@ class ValetTransactionsCompanion extends UpdateCompanion<ValetTransaction> {
   final Value<int?> syncedAt;
   const ValetTransactionsCompanion({
     this.id = const Value.absent(),
-    this.shiftId = const Value.absent(),
+    this.localUuid = const Value.absent(),
+    this.checkinShiftId = const Value.absent(),
+    this.checkoutShiftId = const Value.absent(),
     this.userId = const Value.absent(),
     this.ticketNumber = const Value.absent(),
     this.plateNumber = const Value.absent(),
     this.vehicleBrand = const Value.absent(),
+    this.vehicleModel = const Value.absent(),
+    this.vehicleYear = const Value.absent(),
     this.vehicleColor = const Value.absent(),
     this.vehicleType = const Value.absent(),
     this.slot = const Value.absent(),
+    this.parkingLevel = const Value.absent(),
+    this.parkingSlot = const Value.absent(),
+    this.belongingsJson = const Value.absent(),
+    this.otherBelongings = const Value.absent(),
+    this.signaturePng = const Value.absent(),
+    this.signatureCapturedAt = const Value.absent(),
+    this.customerFullName = const Value.absent(),
     this.customerMobile = const Value.absent(),
+    this.assignedValetDriver = const Value.absent(),
+    this.specialInstructions = const Value.absent(),
+    this.valetServiceType = const Value.absent(),
+    this.vehicleDamageJson = const Value.absent(),
+    this.branchSnapshot = const Value.absent(),
+    this.areaSnapshot = const Value.absent(),
+    this.deviceIdSnapshot = const Value.absent(),
+    this.serverTicketId = const Value.absent(),
+    this.lastModifiedAt = const Value.absent(),
+    this.localCreatedAt = const Value.absent(),
     this.timeIn = const Value.absent(),
     this.timeOut = const Value.absent(),
     this.durationMinutes = const Value.absent(),
@@ -3544,15 +4322,36 @@ class ValetTransactionsCompanion extends UpdateCompanion<ValetTransaction> {
   });
   ValetTransactionsCompanion.insert({
     this.id = const Value.absent(),
-    required int shiftId,
+    this.localUuid = const Value.absent(),
+    required int checkinShiftId,
+    this.checkoutShiftId = const Value.absent(),
     required int userId,
     required String ticketNumber,
     required String plateNumber,
     this.vehicleBrand = const Value.absent(),
+    this.vehicleModel = const Value.absent(),
+    this.vehicleYear = const Value.absent(),
     this.vehicleColor = const Value.absent(),
     this.vehicleType = const Value.absent(),
     this.slot = const Value.absent(),
+    this.parkingLevel = const Value.absent(),
+    this.parkingSlot = const Value.absent(),
+    this.belongingsJson = const Value.absent(),
+    this.otherBelongings = const Value.absent(),
+    this.signaturePng = const Value.absent(),
+    this.signatureCapturedAt = const Value.absent(),
+    this.customerFullName = const Value.absent(),
     this.customerMobile = const Value.absent(),
+    this.assignedValetDriver = const Value.absent(),
+    this.specialInstructions = const Value.absent(),
+    this.valetServiceType = const Value.absent(),
+    this.vehicleDamageJson = const Value.absent(),
+    this.branchSnapshot = const Value.absent(),
+    this.areaSnapshot = const Value.absent(),
+    this.deviceIdSnapshot = const Value.absent(),
+    this.serverTicketId = const Value.absent(),
+    this.lastModifiedAt = const Value.absent(),
+    this.localCreatedAt = const Value.absent(),
     required int timeIn,
     this.timeOut = const Value.absent(),
     this.durationMinutes = const Value.absent(),
@@ -3565,22 +4364,43 @@ class ValetTransactionsCompanion extends UpdateCompanion<ValetTransaction> {
     this.changeAmount = const Value.absent(),
     this.status = const Value.absent(),
     this.syncedAt = const Value.absent(),
-  })  : shiftId = Value(shiftId),
+  })  : checkinShiftId = Value(checkinShiftId),
         userId = Value(userId),
         ticketNumber = Value(ticketNumber),
         plateNumber = Value(plateNumber),
         timeIn = Value(timeIn);
   static Insertable<ValetTransaction> custom({
     Expression<int>? id,
-    Expression<int>? shiftId,
+    Expression<String>? localUuid,
+    Expression<int>? checkinShiftId,
+    Expression<int>? checkoutShiftId,
     Expression<int>? userId,
     Expression<String>? ticketNumber,
     Expression<String>? plateNumber,
     Expression<String>? vehicleBrand,
+    Expression<String>? vehicleModel,
+    Expression<String>? vehicleYear,
     Expression<String>? vehicleColor,
     Expression<String>? vehicleType,
     Expression<String>? slot,
+    Expression<String>? parkingLevel,
+    Expression<String>? parkingSlot,
+    Expression<String>? belongingsJson,
+    Expression<String>? otherBelongings,
+    Expression<String>? signaturePng,
+    Expression<int>? signatureCapturedAt,
+    Expression<String>? customerFullName,
     Expression<String>? customerMobile,
+    Expression<String>? assignedValetDriver,
+    Expression<String>? specialInstructions,
+    Expression<String>? valetServiceType,
+    Expression<String>? vehicleDamageJson,
+    Expression<String>? branchSnapshot,
+    Expression<String>? areaSnapshot,
+    Expression<String>? deviceIdSnapshot,
+    Expression<String>? serverTicketId,
+    Expression<int>? lastModifiedAt,
+    Expression<int>? localCreatedAt,
     Expression<int>? timeIn,
     Expression<int>? timeOut,
     Expression<int>? durationMinutes,
@@ -3596,15 +4416,39 @@ class ValetTransactionsCompanion extends UpdateCompanion<ValetTransaction> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
-      if (shiftId != null) 'shift_id': shiftId,
+      if (localUuid != null) 'local_uuid': localUuid,
+      if (checkinShiftId != null) 'checkin_shift_id': checkinShiftId,
+      if (checkoutShiftId != null) 'checkout_shift_id': checkoutShiftId,
       if (userId != null) 'user_id': userId,
       if (ticketNumber != null) 'ticket_number': ticketNumber,
       if (plateNumber != null) 'plate_number': plateNumber,
       if (vehicleBrand != null) 'vehicle_brand': vehicleBrand,
+      if (vehicleModel != null) 'vehicle_model': vehicleModel,
+      if (vehicleYear != null) 'vehicle_year': vehicleYear,
       if (vehicleColor != null) 'vehicle_color': vehicleColor,
       if (vehicleType != null) 'vehicle_type': vehicleType,
       if (slot != null) 'slot': slot,
+      if (parkingLevel != null) 'parking_level': parkingLevel,
+      if (parkingSlot != null) 'parking_slot': parkingSlot,
+      if (belongingsJson != null) 'belongings_json': belongingsJson,
+      if (otherBelongings != null) 'other_belongings': otherBelongings,
+      if (signaturePng != null) 'signature_png': signaturePng,
+      if (signatureCapturedAt != null)
+        'signature_captured_at': signatureCapturedAt,
+      if (customerFullName != null) 'customer_full_name': customerFullName,
       if (customerMobile != null) 'customer_mobile': customerMobile,
+      if (assignedValetDriver != null)
+        'assigned_valet_driver': assignedValetDriver,
+      if (specialInstructions != null)
+        'special_instructions': specialInstructions,
+      if (valetServiceType != null) 'valet_service_type': valetServiceType,
+      if (vehicleDamageJson != null) 'vehicle_damage_json': vehicleDamageJson,
+      if (branchSnapshot != null) 'branch_snapshot': branchSnapshot,
+      if (areaSnapshot != null) 'area_snapshot': areaSnapshot,
+      if (deviceIdSnapshot != null) 'device_id_snapshot': deviceIdSnapshot,
+      if (serverTicketId != null) 'server_ticket_id': serverTicketId,
+      if (lastModifiedAt != null) 'last_modified_at': lastModifiedAt,
+      if (localCreatedAt != null) 'local_created_at': localCreatedAt,
       if (timeIn != null) 'time_in': timeIn,
       if (timeOut != null) 'time_out': timeOut,
       if (durationMinutes != null) 'duration_minutes': durationMinutes,
@@ -3622,15 +4466,36 @@ class ValetTransactionsCompanion extends UpdateCompanion<ValetTransaction> {
 
   ValetTransactionsCompanion copyWith(
       {Value<int>? id,
-      Value<int>? shiftId,
+      Value<String?>? localUuid,
+      Value<int>? checkinShiftId,
+      Value<int?>? checkoutShiftId,
       Value<int>? userId,
       Value<String>? ticketNumber,
       Value<String>? plateNumber,
       Value<String?>? vehicleBrand,
+      Value<String?>? vehicleModel,
+      Value<String?>? vehicleYear,
       Value<String?>? vehicleColor,
       Value<String?>? vehicleType,
       Value<String?>? slot,
+      Value<String?>? parkingLevel,
+      Value<String?>? parkingSlot,
+      Value<String?>? belongingsJson,
+      Value<String?>? otherBelongings,
+      Value<String?>? signaturePng,
+      Value<int?>? signatureCapturedAt,
+      Value<String?>? customerFullName,
       Value<String?>? customerMobile,
+      Value<String?>? assignedValetDriver,
+      Value<String?>? specialInstructions,
+      Value<String?>? valetServiceType,
+      Value<String?>? vehicleDamageJson,
+      Value<String?>? branchSnapshot,
+      Value<String?>? areaSnapshot,
+      Value<String?>? deviceIdSnapshot,
+      Value<String?>? serverTicketId,
+      Value<int?>? lastModifiedAt,
+      Value<int?>? localCreatedAt,
       Value<int>? timeIn,
       Value<int?>? timeOut,
       Value<int?>? durationMinutes,
@@ -3645,15 +4510,36 @@ class ValetTransactionsCompanion extends UpdateCompanion<ValetTransaction> {
       Value<int?>? syncedAt}) {
     return ValetTransactionsCompanion(
       id: id ?? this.id,
-      shiftId: shiftId ?? this.shiftId,
+      localUuid: localUuid ?? this.localUuid,
+      checkinShiftId: checkinShiftId ?? this.checkinShiftId,
+      checkoutShiftId: checkoutShiftId ?? this.checkoutShiftId,
       userId: userId ?? this.userId,
       ticketNumber: ticketNumber ?? this.ticketNumber,
       plateNumber: plateNumber ?? this.plateNumber,
       vehicleBrand: vehicleBrand ?? this.vehicleBrand,
+      vehicleModel: vehicleModel ?? this.vehicleModel,
+      vehicleYear: vehicleYear ?? this.vehicleYear,
       vehicleColor: vehicleColor ?? this.vehicleColor,
       vehicleType: vehicleType ?? this.vehicleType,
       slot: slot ?? this.slot,
+      parkingLevel: parkingLevel ?? this.parkingLevel,
+      parkingSlot: parkingSlot ?? this.parkingSlot,
+      belongingsJson: belongingsJson ?? this.belongingsJson,
+      otherBelongings: otherBelongings ?? this.otherBelongings,
+      signaturePng: signaturePng ?? this.signaturePng,
+      signatureCapturedAt: signatureCapturedAt ?? this.signatureCapturedAt,
+      customerFullName: customerFullName ?? this.customerFullName,
       customerMobile: customerMobile ?? this.customerMobile,
+      assignedValetDriver: assignedValetDriver ?? this.assignedValetDriver,
+      specialInstructions: specialInstructions ?? this.specialInstructions,
+      valetServiceType: valetServiceType ?? this.valetServiceType,
+      vehicleDamageJson: vehicleDamageJson ?? this.vehicleDamageJson,
+      branchSnapshot: branchSnapshot ?? this.branchSnapshot,
+      areaSnapshot: areaSnapshot ?? this.areaSnapshot,
+      deviceIdSnapshot: deviceIdSnapshot ?? this.deviceIdSnapshot,
+      serverTicketId: serverTicketId ?? this.serverTicketId,
+      lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
+      localCreatedAt: localCreatedAt ?? this.localCreatedAt,
       timeIn: timeIn ?? this.timeIn,
       timeOut: timeOut ?? this.timeOut,
       durationMinutes: durationMinutes ?? this.durationMinutes,
@@ -3675,8 +4561,14 @@ class ValetTransactionsCompanion extends UpdateCompanion<ValetTransaction> {
     if (id.present) {
       map['id'] = Variable<int>(id.value);
     }
-    if (shiftId.present) {
-      map['shift_id'] = Variable<int>(shiftId.value);
+    if (localUuid.present) {
+      map['local_uuid'] = Variable<String>(localUuid.value);
+    }
+    if (checkinShiftId.present) {
+      map['checkin_shift_id'] = Variable<int>(checkinShiftId.value);
+    }
+    if (checkoutShiftId.present) {
+      map['checkout_shift_id'] = Variable<int>(checkoutShiftId.value);
     }
     if (userId.present) {
       map['user_id'] = Variable<int>(userId.value);
@@ -3690,6 +4582,12 @@ class ValetTransactionsCompanion extends UpdateCompanion<ValetTransaction> {
     if (vehicleBrand.present) {
       map['vehicle_brand'] = Variable<String>(vehicleBrand.value);
     }
+    if (vehicleModel.present) {
+      map['vehicle_model'] = Variable<String>(vehicleModel.value);
+    }
+    if (vehicleYear.present) {
+      map['vehicle_year'] = Variable<String>(vehicleYear.value);
+    }
     if (vehicleColor.present) {
       map['vehicle_color'] = Variable<String>(vehicleColor.value);
     }
@@ -3699,8 +4597,60 @@ class ValetTransactionsCompanion extends UpdateCompanion<ValetTransaction> {
     if (slot.present) {
       map['slot'] = Variable<String>(slot.value);
     }
+    if (parkingLevel.present) {
+      map['parking_level'] = Variable<String>(parkingLevel.value);
+    }
+    if (parkingSlot.present) {
+      map['parking_slot'] = Variable<String>(parkingSlot.value);
+    }
+    if (belongingsJson.present) {
+      map['belongings_json'] = Variable<String>(belongingsJson.value);
+    }
+    if (otherBelongings.present) {
+      map['other_belongings'] = Variable<String>(otherBelongings.value);
+    }
+    if (signaturePng.present) {
+      map['signature_png'] = Variable<String>(signaturePng.value);
+    }
+    if (signatureCapturedAt.present) {
+      map['signature_captured_at'] = Variable<int>(signatureCapturedAt.value);
+    }
+    if (customerFullName.present) {
+      map['customer_full_name'] = Variable<String>(customerFullName.value);
+    }
     if (customerMobile.present) {
       map['customer_mobile'] = Variable<String>(customerMobile.value);
+    }
+    if (assignedValetDriver.present) {
+      map['assigned_valet_driver'] =
+          Variable<String>(assignedValetDriver.value);
+    }
+    if (specialInstructions.present) {
+      map['special_instructions'] = Variable<String>(specialInstructions.value);
+    }
+    if (valetServiceType.present) {
+      map['valet_service_type'] = Variable<String>(valetServiceType.value);
+    }
+    if (vehicleDamageJson.present) {
+      map['vehicle_damage_json'] = Variable<String>(vehicleDamageJson.value);
+    }
+    if (branchSnapshot.present) {
+      map['branch_snapshot'] = Variable<String>(branchSnapshot.value);
+    }
+    if (areaSnapshot.present) {
+      map['area_snapshot'] = Variable<String>(areaSnapshot.value);
+    }
+    if (deviceIdSnapshot.present) {
+      map['device_id_snapshot'] = Variable<String>(deviceIdSnapshot.value);
+    }
+    if (serverTicketId.present) {
+      map['server_ticket_id'] = Variable<String>(serverTicketId.value);
+    }
+    if (lastModifiedAt.present) {
+      map['last_modified_at'] = Variable<int>(lastModifiedAt.value);
+    }
+    if (localCreatedAt.present) {
+      map['local_created_at'] = Variable<int>(localCreatedAt.value);
     }
     if (timeIn.present) {
       map['time_in'] = Variable<int>(timeIn.value);
@@ -3745,15 +4695,36 @@ class ValetTransactionsCompanion extends UpdateCompanion<ValetTransaction> {
   String toString() {
     return (StringBuffer('ValetTransactionsCompanion(')
           ..write('id: $id, ')
-          ..write('shiftId: $shiftId, ')
+          ..write('localUuid: $localUuid, ')
+          ..write('checkinShiftId: $checkinShiftId, ')
+          ..write('checkoutShiftId: $checkoutShiftId, ')
           ..write('userId: $userId, ')
           ..write('ticketNumber: $ticketNumber, ')
           ..write('plateNumber: $plateNumber, ')
           ..write('vehicleBrand: $vehicleBrand, ')
+          ..write('vehicleModel: $vehicleModel, ')
+          ..write('vehicleYear: $vehicleYear, ')
           ..write('vehicleColor: $vehicleColor, ')
           ..write('vehicleType: $vehicleType, ')
           ..write('slot: $slot, ')
+          ..write('parkingLevel: $parkingLevel, ')
+          ..write('parkingSlot: $parkingSlot, ')
+          ..write('belongingsJson: $belongingsJson, ')
+          ..write('otherBelongings: $otherBelongings, ')
+          ..write('signaturePng: $signaturePng, ')
+          ..write('signatureCapturedAt: $signatureCapturedAt, ')
+          ..write('customerFullName: $customerFullName, ')
           ..write('customerMobile: $customerMobile, ')
+          ..write('assignedValetDriver: $assignedValetDriver, ')
+          ..write('specialInstructions: $specialInstructions, ')
+          ..write('valetServiceType: $valetServiceType, ')
+          ..write('vehicleDamageJson: $vehicleDamageJson, ')
+          ..write('branchSnapshot: $branchSnapshot, ')
+          ..write('areaSnapshot: $areaSnapshot, ')
+          ..write('deviceIdSnapshot: $deviceIdSnapshot, ')
+          ..write('serverTicketId: $serverTicketId, ')
+          ..write('lastModifiedAt: $lastModifiedAt, ')
+          ..write('localCreatedAt: $localCreatedAt, ')
           ..write('timeIn: $timeIn, ')
           ..write('timeOut: $timeOut, ')
           ..write('durationMinutes: $durationMinutes, ')
@@ -5060,14 +6031,31 @@ class $$ShiftsTableFilterComposer
     return f(composer);
   }
 
-  ComposableFilter valetTransactionsRefs(
+  ComposableFilter valet_tx_checkin_shift_ref(
       ComposableFilter Function($$ValetTransactionsTableFilterComposer f) f) {
     final $$ValetTransactionsTableFilterComposer composer =
         $state.composerBuilder(
             composer: this,
             getCurrentColumn: (t) => t.id,
             referencedTable: $state.db.valetTransactions,
-            getReferencedColumn: (t) => t.shiftId,
+            getReferencedColumn: (t) => t.checkinShiftId,
+            builder: (joinBuilder, parentComposers) =>
+                $$ValetTransactionsTableFilterComposer(ComposerState(
+                    $state.db,
+                    $state.db.valetTransactions,
+                    joinBuilder,
+                    parentComposers)));
+    return f(composer);
+  }
+
+  ComposableFilter valet_tx_checkout_shift_ref(
+      ComposableFilter Function($$ValetTransactionsTableFilterComposer f) f) {
+    final $$ValetTransactionsTableFilterComposer composer =
+        $state.composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $state.db.valetTransactions,
+            getReferencedColumn: (t) => t.checkoutShiftId,
             builder: (joinBuilder, parentComposers) =>
                 $$ValetTransactionsTableFilterComposer(ComposerState(
                     $state.db,
@@ -5469,15 +6457,36 @@ class $$ShiftClosingDenominationsTableOrderingComposer
 typedef $$ValetTransactionsTableCreateCompanionBuilder
     = ValetTransactionsCompanion Function({
   Value<int> id,
-  required int shiftId,
+  Value<String?> localUuid,
+  required int checkinShiftId,
+  Value<int?> checkoutShiftId,
   required int userId,
   required String ticketNumber,
   required String plateNumber,
   Value<String?> vehicleBrand,
+  Value<String?> vehicleModel,
+  Value<String?> vehicleYear,
   Value<String?> vehicleColor,
   Value<String?> vehicleType,
   Value<String?> slot,
+  Value<String?> parkingLevel,
+  Value<String?> parkingSlot,
+  Value<String?> belongingsJson,
+  Value<String?> otherBelongings,
+  Value<String?> signaturePng,
+  Value<int?> signatureCapturedAt,
+  Value<String?> customerFullName,
   Value<String?> customerMobile,
+  Value<String?> assignedValetDriver,
+  Value<String?> specialInstructions,
+  Value<String?> valetServiceType,
+  Value<String?> vehicleDamageJson,
+  Value<String?> branchSnapshot,
+  Value<String?> areaSnapshot,
+  Value<String?> deviceIdSnapshot,
+  Value<String?> serverTicketId,
+  Value<int?> lastModifiedAt,
+  Value<int?> localCreatedAt,
   required int timeIn,
   Value<int?> timeOut,
   Value<int?> durationMinutes,
@@ -5494,15 +6503,36 @@ typedef $$ValetTransactionsTableCreateCompanionBuilder
 typedef $$ValetTransactionsTableUpdateCompanionBuilder
     = ValetTransactionsCompanion Function({
   Value<int> id,
-  Value<int> shiftId,
+  Value<String?> localUuid,
+  Value<int> checkinShiftId,
+  Value<int?> checkoutShiftId,
   Value<int> userId,
   Value<String> ticketNumber,
   Value<String> plateNumber,
   Value<String?> vehicleBrand,
+  Value<String?> vehicleModel,
+  Value<String?> vehicleYear,
   Value<String?> vehicleColor,
   Value<String?> vehicleType,
   Value<String?> slot,
+  Value<String?> parkingLevel,
+  Value<String?> parkingSlot,
+  Value<String?> belongingsJson,
+  Value<String?> otherBelongings,
+  Value<String?> signaturePng,
+  Value<int?> signatureCapturedAt,
+  Value<String?> customerFullName,
   Value<String?> customerMobile,
+  Value<String?> assignedValetDriver,
+  Value<String?> specialInstructions,
+  Value<String?> valetServiceType,
+  Value<String?> vehicleDamageJson,
+  Value<String?> branchSnapshot,
+  Value<String?> areaSnapshot,
+  Value<String?> deviceIdSnapshot,
+  Value<String?> serverTicketId,
+  Value<int?> lastModifiedAt,
+  Value<int?> localCreatedAt,
   Value<int> timeIn,
   Value<int?> timeOut,
   Value<int?> durationMinutes,
@@ -5536,15 +6566,36 @@ class $$ValetTransactionsTableTableManager extends RootTableManager<
               ComposerState(db, table)),
           updateCompanionCallback: ({
             Value<int> id = const Value.absent(),
-            Value<int> shiftId = const Value.absent(),
+            Value<String?> localUuid = const Value.absent(),
+            Value<int> checkinShiftId = const Value.absent(),
+            Value<int?> checkoutShiftId = const Value.absent(),
             Value<int> userId = const Value.absent(),
             Value<String> ticketNumber = const Value.absent(),
             Value<String> plateNumber = const Value.absent(),
             Value<String?> vehicleBrand = const Value.absent(),
+            Value<String?> vehicleModel = const Value.absent(),
+            Value<String?> vehicleYear = const Value.absent(),
             Value<String?> vehicleColor = const Value.absent(),
             Value<String?> vehicleType = const Value.absent(),
             Value<String?> slot = const Value.absent(),
+            Value<String?> parkingLevel = const Value.absent(),
+            Value<String?> parkingSlot = const Value.absent(),
+            Value<String?> belongingsJson = const Value.absent(),
+            Value<String?> otherBelongings = const Value.absent(),
+            Value<String?> signaturePng = const Value.absent(),
+            Value<int?> signatureCapturedAt = const Value.absent(),
+            Value<String?> customerFullName = const Value.absent(),
             Value<String?> customerMobile = const Value.absent(),
+            Value<String?> assignedValetDriver = const Value.absent(),
+            Value<String?> specialInstructions = const Value.absent(),
+            Value<String?> valetServiceType = const Value.absent(),
+            Value<String?> vehicleDamageJson = const Value.absent(),
+            Value<String?> branchSnapshot = const Value.absent(),
+            Value<String?> areaSnapshot = const Value.absent(),
+            Value<String?> deviceIdSnapshot = const Value.absent(),
+            Value<String?> serverTicketId = const Value.absent(),
+            Value<int?> lastModifiedAt = const Value.absent(),
+            Value<int?> localCreatedAt = const Value.absent(),
             Value<int> timeIn = const Value.absent(),
             Value<int?> timeOut = const Value.absent(),
             Value<int?> durationMinutes = const Value.absent(),
@@ -5560,15 +6611,36 @@ class $$ValetTransactionsTableTableManager extends RootTableManager<
           }) =>
               ValetTransactionsCompanion(
             id: id,
-            shiftId: shiftId,
+            localUuid: localUuid,
+            checkinShiftId: checkinShiftId,
+            checkoutShiftId: checkoutShiftId,
             userId: userId,
             ticketNumber: ticketNumber,
             plateNumber: plateNumber,
             vehicleBrand: vehicleBrand,
+            vehicleModel: vehicleModel,
+            vehicleYear: vehicleYear,
             vehicleColor: vehicleColor,
             vehicleType: vehicleType,
             slot: slot,
+            parkingLevel: parkingLevel,
+            parkingSlot: parkingSlot,
+            belongingsJson: belongingsJson,
+            otherBelongings: otherBelongings,
+            signaturePng: signaturePng,
+            signatureCapturedAt: signatureCapturedAt,
+            customerFullName: customerFullName,
             customerMobile: customerMobile,
+            assignedValetDriver: assignedValetDriver,
+            specialInstructions: specialInstructions,
+            valetServiceType: valetServiceType,
+            vehicleDamageJson: vehicleDamageJson,
+            branchSnapshot: branchSnapshot,
+            areaSnapshot: areaSnapshot,
+            deviceIdSnapshot: deviceIdSnapshot,
+            serverTicketId: serverTicketId,
+            lastModifiedAt: lastModifiedAt,
+            localCreatedAt: localCreatedAt,
             timeIn: timeIn,
             timeOut: timeOut,
             durationMinutes: durationMinutes,
@@ -5584,15 +6656,36 @@ class $$ValetTransactionsTableTableManager extends RootTableManager<
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
-            required int shiftId,
+            Value<String?> localUuid = const Value.absent(),
+            required int checkinShiftId,
+            Value<int?> checkoutShiftId = const Value.absent(),
             required int userId,
             required String ticketNumber,
             required String plateNumber,
             Value<String?> vehicleBrand = const Value.absent(),
+            Value<String?> vehicleModel = const Value.absent(),
+            Value<String?> vehicleYear = const Value.absent(),
             Value<String?> vehicleColor = const Value.absent(),
             Value<String?> vehicleType = const Value.absent(),
             Value<String?> slot = const Value.absent(),
+            Value<String?> parkingLevel = const Value.absent(),
+            Value<String?> parkingSlot = const Value.absent(),
+            Value<String?> belongingsJson = const Value.absent(),
+            Value<String?> otherBelongings = const Value.absent(),
+            Value<String?> signaturePng = const Value.absent(),
+            Value<int?> signatureCapturedAt = const Value.absent(),
+            Value<String?> customerFullName = const Value.absent(),
             Value<String?> customerMobile = const Value.absent(),
+            Value<String?> assignedValetDriver = const Value.absent(),
+            Value<String?> specialInstructions = const Value.absent(),
+            Value<String?> valetServiceType = const Value.absent(),
+            Value<String?> vehicleDamageJson = const Value.absent(),
+            Value<String?> branchSnapshot = const Value.absent(),
+            Value<String?> areaSnapshot = const Value.absent(),
+            Value<String?> deviceIdSnapshot = const Value.absent(),
+            Value<String?> serverTicketId = const Value.absent(),
+            Value<int?> lastModifiedAt = const Value.absent(),
+            Value<int?> localCreatedAt = const Value.absent(),
             required int timeIn,
             Value<int?> timeOut = const Value.absent(),
             Value<int?> durationMinutes = const Value.absent(),
@@ -5608,15 +6701,36 @@ class $$ValetTransactionsTableTableManager extends RootTableManager<
           }) =>
               ValetTransactionsCompanion.insert(
             id: id,
-            shiftId: shiftId,
+            localUuid: localUuid,
+            checkinShiftId: checkinShiftId,
+            checkoutShiftId: checkoutShiftId,
             userId: userId,
             ticketNumber: ticketNumber,
             plateNumber: plateNumber,
             vehicleBrand: vehicleBrand,
+            vehicleModel: vehicleModel,
+            vehicleYear: vehicleYear,
             vehicleColor: vehicleColor,
             vehicleType: vehicleType,
             slot: slot,
+            parkingLevel: parkingLevel,
+            parkingSlot: parkingSlot,
+            belongingsJson: belongingsJson,
+            otherBelongings: otherBelongings,
+            signaturePng: signaturePng,
+            signatureCapturedAt: signatureCapturedAt,
+            customerFullName: customerFullName,
             customerMobile: customerMobile,
+            assignedValetDriver: assignedValetDriver,
+            specialInstructions: specialInstructions,
+            valetServiceType: valetServiceType,
+            vehicleDamageJson: vehicleDamageJson,
+            branchSnapshot: branchSnapshot,
+            areaSnapshot: areaSnapshot,
+            deviceIdSnapshot: deviceIdSnapshot,
+            serverTicketId: serverTicketId,
+            lastModifiedAt: lastModifiedAt,
+            localCreatedAt: localCreatedAt,
             timeIn: timeIn,
             timeOut: timeOut,
             durationMinutes: durationMinutes,
@@ -5641,6 +6755,11 @@ class $$ValetTransactionsTableFilterComposer
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
+  ColumnFilters<String> get localUuid => $state.composableBuilder(
+      column: $state.table.localUuid,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
   ColumnFilters<String> get ticketNumber => $state.composableBuilder(
       column: $state.table.ticketNumber,
       builder: (column, joinBuilders) =>
@@ -5653,6 +6772,16 @@ class $$ValetTransactionsTableFilterComposer
 
   ColumnFilters<String> get vehicleBrand => $state.composableBuilder(
       column: $state.table.vehicleBrand,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get vehicleModel => $state.composableBuilder(
+      column: $state.table.vehicleModel,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get vehicleYear => $state.composableBuilder(
+      column: $state.table.vehicleYear,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -5671,8 +6800,93 @@ class $$ValetTransactionsTableFilterComposer
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
+  ColumnFilters<String> get parkingLevel => $state.composableBuilder(
+      column: $state.table.parkingLevel,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get parkingSlot => $state.composableBuilder(
+      column: $state.table.parkingSlot,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get belongingsJson => $state.composableBuilder(
+      column: $state.table.belongingsJson,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get otherBelongings => $state.composableBuilder(
+      column: $state.table.otherBelongings,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get signaturePng => $state.composableBuilder(
+      column: $state.table.signaturePng,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<int> get signatureCapturedAt => $state.composableBuilder(
+      column: $state.table.signatureCapturedAt,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get customerFullName => $state.composableBuilder(
+      column: $state.table.customerFullName,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
   ColumnFilters<String> get customerMobile => $state.composableBuilder(
       column: $state.table.customerMobile,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get assignedValetDriver => $state.composableBuilder(
+      column: $state.table.assignedValetDriver,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get specialInstructions => $state.composableBuilder(
+      column: $state.table.specialInstructions,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get valetServiceType => $state.composableBuilder(
+      column: $state.table.valetServiceType,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get vehicleDamageJson => $state.composableBuilder(
+      column: $state.table.vehicleDamageJson,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get branchSnapshot => $state.composableBuilder(
+      column: $state.table.branchSnapshot,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get areaSnapshot => $state.composableBuilder(
+      column: $state.table.areaSnapshot,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get deviceIdSnapshot => $state.composableBuilder(
+      column: $state.table.deviceIdSnapshot,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get serverTicketId => $state.composableBuilder(
+      column: $state.table.serverTicketId,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<int> get lastModifiedAt => $state.composableBuilder(
+      column: $state.table.lastModifiedAt,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<int> get localCreatedAt => $state.composableBuilder(
+      column: $state.table.localCreatedAt,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -5736,10 +6950,22 @@ class $$ValetTransactionsTableFilterComposer
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  $$ShiftsTableFilterComposer get shiftId {
+  $$ShiftsTableFilterComposer get checkinShiftId {
     final $$ShiftsTableFilterComposer composer = $state.composerBuilder(
         composer: this,
-        getCurrentColumn: (t) => t.shiftId,
+        getCurrentColumn: (t) => t.checkinShiftId,
+        referencedTable: $state.db.shifts,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder, parentComposers) => $$ShiftsTableFilterComposer(
+            ComposerState(
+                $state.db, $state.db.shifts, joinBuilder, parentComposers)));
+    return composer;
+  }
+
+  $$ShiftsTableFilterComposer get checkoutShiftId {
+    final $$ShiftsTableFilterComposer composer = $state.composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.checkoutShiftId,
         referencedTable: $state.db.shifts,
         getReferencedColumn: (t) => t.id,
         builder: (joinBuilder, parentComposers) => $$ShiftsTableFilterComposer(
@@ -5770,6 +6996,11 @@ class $$ValetTransactionsTableOrderingComposer
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
+  ColumnOrderings<String> get localUuid => $state.composableBuilder(
+      column: $state.table.localUuid,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
   ColumnOrderings<String> get ticketNumber => $state.composableBuilder(
       column: $state.table.ticketNumber,
       builder: (column, joinBuilders) =>
@@ -5782,6 +7013,16 @@ class $$ValetTransactionsTableOrderingComposer
 
   ColumnOrderings<String> get vehicleBrand => $state.composableBuilder(
       column: $state.table.vehicleBrand,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get vehicleModel => $state.composableBuilder(
+      column: $state.table.vehicleModel,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get vehicleYear => $state.composableBuilder(
+      column: $state.table.vehicleYear,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
@@ -5800,8 +7041,93 @@ class $$ValetTransactionsTableOrderingComposer
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
+  ColumnOrderings<String> get parkingLevel => $state.composableBuilder(
+      column: $state.table.parkingLevel,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get parkingSlot => $state.composableBuilder(
+      column: $state.table.parkingSlot,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get belongingsJson => $state.composableBuilder(
+      column: $state.table.belongingsJson,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get otherBelongings => $state.composableBuilder(
+      column: $state.table.otherBelongings,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get signaturePng => $state.composableBuilder(
+      column: $state.table.signaturePng,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<int> get signatureCapturedAt => $state.composableBuilder(
+      column: $state.table.signatureCapturedAt,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get customerFullName => $state.composableBuilder(
+      column: $state.table.customerFullName,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
   ColumnOrderings<String> get customerMobile => $state.composableBuilder(
       column: $state.table.customerMobile,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get assignedValetDriver => $state.composableBuilder(
+      column: $state.table.assignedValetDriver,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get specialInstructions => $state.composableBuilder(
+      column: $state.table.specialInstructions,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get valetServiceType => $state.composableBuilder(
+      column: $state.table.valetServiceType,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get vehicleDamageJson => $state.composableBuilder(
+      column: $state.table.vehicleDamageJson,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get branchSnapshot => $state.composableBuilder(
+      column: $state.table.branchSnapshot,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get areaSnapshot => $state.composableBuilder(
+      column: $state.table.areaSnapshot,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get deviceIdSnapshot => $state.composableBuilder(
+      column: $state.table.deviceIdSnapshot,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get serverTicketId => $state.composableBuilder(
+      column: $state.table.serverTicketId,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<int> get lastModifiedAt => $state.composableBuilder(
+      column: $state.table.lastModifiedAt,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<int> get localCreatedAt => $state.composableBuilder(
+      column: $state.table.localCreatedAt,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
@@ -5865,10 +7191,22 @@ class $$ValetTransactionsTableOrderingComposer
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  $$ShiftsTableOrderingComposer get shiftId {
+  $$ShiftsTableOrderingComposer get checkinShiftId {
     final $$ShiftsTableOrderingComposer composer = $state.composerBuilder(
         composer: this,
-        getCurrentColumn: (t) => t.shiftId,
+        getCurrentColumn: (t) => t.checkinShiftId,
+        referencedTable: $state.db.shifts,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder, parentComposers) =>
+            $$ShiftsTableOrderingComposer(ComposerState(
+                $state.db, $state.db.shifts, joinBuilder, parentComposers)));
+    return composer;
+  }
+
+  $$ShiftsTableOrderingComposer get checkoutShiftId {
+    final $$ShiftsTableOrderingComposer composer = $state.composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.checkoutShiftId,
         referencedTable: $state.db.shifts,
         getReferencedColumn: (t) => t.id,
         builder: (joinBuilder, parentComposers) =>

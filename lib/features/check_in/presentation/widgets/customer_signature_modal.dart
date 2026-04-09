@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -76,7 +77,9 @@ class _CustomerSignatureDialogState extends State<_CustomerSignatureDialog> {
       return;
     }
 
-    context.read<CheckInCubit>().setCustomerSignatureCaptured(true);
+    context
+        .read<CheckInCubit>()
+        .setCustomerSignatureCaptured(Uint8List.fromList(bytes));
     Navigator.of(context).pop();
   }
 

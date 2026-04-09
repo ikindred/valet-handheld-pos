@@ -7,9 +7,9 @@ import '../../data/local/db/app_database.dart';
 import '../../data/remote/auth_api.dart';
 import '../../data/remote/dio_client.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../../data/repositories/transactions_repository.dart';
 import '../routing/router_refresh_notifier.dart';
 import '../../features/auth/state/auth_bloc.dart';
-import '../../features/cash/state/cash_cubit.dart';
 import '../../features/check_in/state/check_in_cubit.dart';
 import '../../features/check_out/state/check_out_cubit.dart';
 import '../../features/dashboard/state/dashboard_cubit.dart';
@@ -37,12 +37,14 @@ class AppProviders extends StatelessWidget {
             c.read<RouterRefreshNotifier>(),
           ),
         ),
+        Provider<TransactionsRepository>(
+          create: (c) => TransactionsRepository(c.read<AppDatabase>()),
+        ),
         BlocProvider(create: (_) => AuthBloc()..add(const AuthStarted())),
         BlocProvider(create: (_) => SyncBloc()),
         BlocProvider(create: (_) => DashboardCubit()),
         BlocProvider(create: (_) => CheckInCubit()),
         BlocProvider(create: (_) => CheckOutCubit()),
-        BlocProvider(create: (_) => CashCubit()),
         BlocProvider(create: (_) => ReportsCubit()),
         BlocProvider(create: (_) => SettingsCubit()),
       ],

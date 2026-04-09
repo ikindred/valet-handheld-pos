@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
+import 'core/logging/valet_log.dart';
 import 'core/platform/orientation_lock.dart';
 import 'core/routing/app_router.dart';
 import 'core/routing/router_refresh_notifier.dart';
@@ -15,6 +16,7 @@ Future<void> main() async {
   // Dark status bar *icons* on light surfaces (fixes light-on-light contrast).
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
   await lockLandscape();
+  ValetLog.d('main', 'bootstrap complete, running app');
   runApp(const ValetMasterApp());
 }
 

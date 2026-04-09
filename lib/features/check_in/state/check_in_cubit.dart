@@ -1,6 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:uuid/uuid.dart';
+
+import '../../../core/time/unix_timestamp.dart';
 
 import '../domain/ticket_number_generator.dart';
 import '../domain/vehicle_body_type.dart';
@@ -31,6 +35,8 @@ class CheckInState extends Equatable {
     this.selectedDamageType = DamageType.dent,
     this.vehicleDamageEntries = const [],
     this.hasCustomerSignature = false,
+    this.signaturePng,
+    this.signatureCapturedAt,
   });
 
   final String ticketNumber;
@@ -63,6 +69,12 @@ class CheckInState extends Equatable {
   /// True after the customer completes the signature step (step 4).
   final bool hasCustomerSignature;
 
+  /// PNG bytes from the signature pad (for local DB / sync).
+  final Uint8List? signaturePng;
+
+  /// Unix seconds when [signaturePng] was captured.
+  final int? signatureCapturedAt;
+
   CheckInState copyWith({
     String? ticketNumber,
     String? customerFullName,
@@ -84,6 +96,8 @@ class CheckInState extends Equatable {
     DamageType? selectedDamageType,
     List<VehicleDamageEntry>? vehicleDamageEntries,
     bool? hasCustomerSignature,
+    Uint8List? signaturePng,
+    int? signatureCapturedAt,
   }) {
     return CheckInState(
       ticketNumber: ticketNumber ?? this.ticketNumber,
@@ -106,6 +120,9 @@ class CheckInState extends Equatable {
       selectedDamageType: selectedDamageType ?? this.selectedDamageType,
       vehicleDamageEntries: vehicleDamageEntries ?? this.vehicleDamageEntries,
       hasCustomerSignature: hasCustomerSignature ?? this.hasCustomerSignature,
+      signaturePng: signaturePng ?? this.signaturePng,
+      signatureCapturedAt:
+          signatureCapturedAt ?? this.signatureCapturedAt,
     );
   }
 
@@ -133,6 +150,8 @@ class CheckInState extends Equatable {
       selectedDamageType,
       vehicleDamageEntries,
       hasCustomerSignature,
+      signaturePng,
+      signatureCapturedAt,
     ];
   }
 }
@@ -238,7 +257,13 @@ class CheckInCubit extends Cubit<CheckInState> {
     emit(state.copyWith(vehicleDamageEntries: const []));
   }
 
-  void setCustomerSignatureCaptured(bool value) {
-    emit(state.copyWith(hasCustomerSignature: value));
+  void setCustomerSignatureCaptured(Uint8List pngBytes) {
+    emit(
+      state.copyWith(
+        hasCustomerSignature: true,
+        signaturePng: pngBytes,
+        signatureCapturedAt: unixNowSeconds(),
+      ),
+    );
   }
 }

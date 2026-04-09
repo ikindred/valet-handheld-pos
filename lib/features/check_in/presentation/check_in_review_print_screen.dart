@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,10 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../../core/logging/valet_log.dart';
+import '../../../core/services/device_id_service.dart';
+import '../../../data/repositories/auth_repository.dart';
+import '../../../data/repositories/transactions_repository.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../domain/vehicle_body_type.dart';
 import '../domain/vehicle_damage.dart';
@@ -14,21 +20,104 @@ import 'widgets/check_in_step_body.dart';
 
 /// Step 4 — Review and print
 /// ([Figma](https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=32-861)).
-class CheckInReviewPrintScreen extends StatelessWidget {
+class CheckInReviewPrintScreen extends StatefulWidget {
   const CheckInReviewPrintScreen({super.key});
 
-  static const _wideBreakpoint = 960.0;
+  @override
+  State<CheckInReviewPrintScreen> createState() =>
+      _CheckInReviewPrintScreenState();
+}
+
+class _CheckInReviewPrintScreenState extends State<CheckInReviewPrintScreen> {
+  bool _saving = false;
+
+  static const double _wideBreakpoint = 960.0;
+
+  Future<void> _commitAndLeave() async {
+    if (!mounted || _saving) return;
+    setState(() => _saving = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      ValetLog.d('check_in/review_print/_commitAndLeave', 'start save');
+      final auth = context.read<AuthRepository>();
+      final txRepo = context.read<TransactionsRepository>();
+      final cubit = context.read<CheckInCubit>();
+      final state = cubit.state;
+
+      final session = await auth.getActiveSession();
+      if (session == null) {
+        ValetLog.d(
+          'check_in/review_print/_commitAndLeave',
+          'aborted: no active session',
+        );
+        messenger.showSnackBar(
+          const SnackBar(content: Text('No active session. Sign in again.')),
+        );
+        return;
+      }
+      final shift = await auth.getOpenShiftForUser(session.userId);
+      if (shift == null) {
+        ValetLog.d(
+          'check_in/review_print/_commitAndLeave',
+          'aborted: no open shift',
+        );
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Open a cash shift before saving a ticket.'),
+          ),
+        );
+        return;
+      }
+
+      final site = await auth.branchAndAreaFromDb();
+      final deviceId = await DeviceIdService.getOrCreate();
+
+      await txRepo.insertOfflineCheckIn(
+        state: state,
+        checkinShiftId: shift.id,
+        userId: session.userId,
+        branchSnapshot: site.branch,
+        areaSnapshot: site.area,
+        deviceIdSnapshot: deviceId,
+      );
+      ValetLog.d(
+        'check_in/review_print/_commitAndLeave',
+        'inserted offline check-in, flushing sync queue',
+      );
+      await auth.flushPendingSyncQueue();
+
+      if (!mounted) return;
+      cubit.resetSession();
+      if (!mounted) return;
+      ValetLog.d(
+        'check_in/review_print/_commitAndLeave',
+        'success, navigating to dashboard',
+      );
+      context.go('/dashboard');
+    } catch (e, st) {
+      ValetLog.e(
+        'check_in/review_print/_commitAndLeave',
+        'save failed',
+        e,
+        st,
+      );
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Could not save ticket: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return CheckInStepBody(
       showBack: true,
-      onBack: () => context.go('/check-in/step-3'),
-      primaryLabel: 'Done',
-      onPrimary: () {
-        context.read<CheckInCubit>().resetSession();
-        context.go('/dashboard');
-      },
+      onBack: _saving ? () {} : () => context.go('/check-in/step-3'),
+      primaryLabel: _saving ? 'Saving…' : 'Done',
+      onPrimary: () => unawaited(_commitAndLeave()),
       child: BlocBuilder<CheckInCubit, CheckInState>(
         builder: (context, state) {
           return LayoutBuilder(

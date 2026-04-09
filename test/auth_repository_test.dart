@@ -88,6 +88,11 @@ void main() {
       await repo.confirmCloseCash(
         localUserId: session.userId,
         closingFloat: 100,
+        totalSales: 0,
+        expectedCash: 100,
+        variance: 0,
+        remittance: 100,
+        transactionsCount: 0,
       );
 
       final openAfter = await (db.select(db.shifts)
@@ -101,7 +106,9 @@ void main() {
       expect(closed.isOpen, false);
       expect(closed.expectedCash, 100.0);
       expect(closed.variance, 0.0);
-      expect(closed.remittance, 0.0);
+      expect(closed.remittance, 100.0);
+      expect(closed.totalSales, 0.0);
+      expect(closed.transactionsCount, 0);
     });
 
     test('loginOffline fails when no offline account', () async {

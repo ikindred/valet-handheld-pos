@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:valet_handheld_pos/features/check_in/domain/vehicle_damage.dart';
@@ -29,7 +31,7 @@ void main() {
     test('setCustomerSignatureCaptured and resetSession', () {
       final cubit = CheckInCubit();
       expect(cubit.state.hasCustomerSignature, isFalse);
-      cubit.setCustomerSignatureCaptured(true);
+      cubit.setCustomerSignatureCaptured(Uint8List.fromList([1, 2, 3]));
       expect(cubit.state.hasCustomerSignature, isTrue);
       cubit.resetSession();
       expect(cubit.state.hasCustomerSignature, isFalse);

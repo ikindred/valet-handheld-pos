@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/logging/valet_log.dart';
 import '../../core/services/device_id_service.dart';
 import '../../core/storage/device_site_prefs.dart';
 import '../../core/routing/router_refresh_notifier.dart';
@@ -267,6 +268,7 @@ class AuthRepository {
     required String password,
     required String deviceId,
   }) async {
+    ValetLog.d('AuthRepository.loginOnline', 'begin');
     await requireDeviceSiteAssigned();
     final res = await _api.login(
       email: email,
@@ -305,6 +307,10 @@ class AuthRepository {
 
     await _flushSyncQueueForActiveSession();
     _refresh.notifyAuthChanged();
+    ValetLog.d(
+      'AuthRepository.loginOnline',
+      'success localUserId=$accountId',
+    );
     return res.standardRates;
   }
 
@@ -340,6 +346,10 @@ class AuthRepository {
     });
 
     _refresh.notifyAuthChanged();
+    ValetLog.d(
+      'AuthRepository.loginOffline',
+      'success localUserId=${row.id}',
+    );
     return null;
   }
 
@@ -418,7 +428,8 @@ class AuthRepository {
     _refresh.notifyAuthChanged();
   }
 
-  Future<void> recordOpenCash({
+  /// Creates an open shift row and enqueues `shift_open`. Returns the new [Shift.id].
+  Future<int> recordOpenCash({
     required int localUserId,
     required int sessionId,
     required double openingFloat,
@@ -430,8 +441,8 @@ class AuthRepository {
     final date =
         shiftDate ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
     final now = unixNowSeconds();
-    await _db.transaction(() async {
-      final shiftId = await _db.into(_db.shifts).insert(
+    final shiftId = await _db.transaction<int>(() async {
+      final id = await _db.into(_db.shifts).insert(
             ShiftsCompanion.insert(
               userId: localUserId,
               sessionId: sessionId,
@@ -445,7 +456,7 @@ class AuthRepository {
             ),
           );
       final row = await (_db.select(_db.shifts)
-            ..where((s) => s.id.equals(shiftId)))
+            ..where((s) => s.id.equals(id)))
           .getSingle();
       final payload = jsonEncode({
         'shift': _shiftToJson(row),
@@ -454,18 +465,116 @@ class AuthRepository {
       await _db.into(_db.syncQueue).insert(
             SyncQueueCompanion.insert(
               type: 'shift_open',
-              entityId: shiftId,
+              entityId: id,
               payload: payload,
               createdAt: now,
             ),
           );
+      return id;
     });
     await _flushSyncQueueForActiveSession();
     _refresh.notifyAuthChanged();
+    return shiftId;
+  }
+
+  /// Still-checked-in tickets attributed to this shift (for close-cash warning).
+  Future<List<ValetTransaction>> queryOpenTransactionsForShiftClose(
+    int shiftId,
+  ) {
+    return (_db.select(_db.valetTransactions)
+          ..where(
+            (t) =>
+                t.checkinShiftId.equals(shiftId) &
+                t.timeOut.isNull() &
+                t.status.equals('active'),
+          )
+          ..orderBy([(t) => OrderingTerm.asc(t.timeIn)]))
+        .get();
+  }
+
+  /// Open active tickets from prior shifts that need adopting by [newShiftId].
+  Future<List<ValetTransaction>> queryInheritedOpenTransactions(
+    int newShiftId,
+  ) {
+    return (_db.select(_db.valetTransactions)
+          ..where(
+            (t) =>
+                t.timeOut.isNull() &
+                t.status.equals('active') &
+                t.checkoutShiftId.isNull() &
+                t.checkinShiftId.equals(newShiftId).not(),
+          )
+          ..orderBy([(t) => OrderingTerm.asc(t.timeIn)]))
+        .get();
+  }
+
+  /// Sum of [ValetTransactions.totalFee] for sales credited to [checkoutShiftId].
+  Future<double> sumSalesForCheckoutShift(int checkoutShiftId) async {
+    final row = await _db.customSelect(
+      '''
+SELECT COALESCE(SUM(total_fee), 0) AS s FROM transactions
+WHERE checkout_shift_id = ?
+  AND (status = ? OR time_out IS NOT NULL)
+''',
+      variables: [
+        Variable<int>(checkoutShiftId),
+        Variable.withString('completed'),
+      ],
+    ).getSingle();
+    return (row.data['s'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  /// Count of completed checkouts for [checkoutShiftId] (same filter as [sumSalesForCheckoutShift]).
+  Future<int> countCompletedForCheckoutShift(int checkoutShiftId) async {
+    final row = await _db.customSelect(
+      '''
+SELECT COUNT(*) AS c FROM transactions
+WHERE checkout_shift_id = ?
+  AND (status = ? OR time_out IS NOT NULL)
+''',
+      variables: [
+        Variable<int>(checkoutShiftId),
+        Variable.withString('completed'),
+      ],
+    ).getSingle();
+    return (row.data['c'] as int?) ?? (row.data['c'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Sets [checkoutShiftId] on inherited open rows and enqueues `transaction_shift_transfer`.
+  Future<void> adoptInheritedTransactionsForShift(int newShiftId) async {
+    final rows = await queryInheritedOpenTransactions(newShiftId);
+    if (rows.isEmpty) return;
+    final now = unixNowSeconds();
+    await _db.transaction(() async {
+      for (final row in rows) {
+        await (_db.update(_db.valetTransactions)
+              ..where((t) => t.id.equals(row.id)))
+            .write(
+          ValetTransactionsCompanion(
+            checkoutShiftId: Value(newShiftId),
+          ),
+        );
+        await _db.into(_db.syncQueue).insert(
+              SyncQueueCompanion.insert(
+                type: 'transaction_shift_transfer',
+                entityId: row.id,
+                payload: jsonEncode({
+                  'transaction_id': row.id,
+                  'from_shift_id': row.checkinShiftId,
+                  'to_shift_id': newShiftId,
+                  'adopted_at': now,
+                }),
+                createdAt: now,
+              ),
+            );
+      }
+    });
+    await _flushSyncQueueForActiveSession();
   }
 
   /// Logout only: end session, clear token; optional remote logout (non-blocking).
   Future<void> logoutOnly({String? deviceId}) async {
+    ValetLog.d('AuthRepository.logoutOnly', 'begin');
     final session = await getActiveSession();
     if (session == null) return;
     final token = session.authToken;
@@ -488,6 +597,11 @@ class AuthRepository {
     required int localUserId,
     required double closingFloat,
     String? closingNotes,
+    required double totalSales,
+    required double expectedCash,
+    required double variance,
+    required double remittance,
+    required int transactionsCount,
   }) async {
     final session = await getActiveSession();
     if (session == null || session.userId != localUserId) return;
@@ -496,11 +610,6 @@ class AuthRepository {
     final shift = await getOpenShiftForUser(localUserId);
     if (shift == null) return;
 
-    final opening = shift.openingFloat;
-    final totalSales = shift.totalSales;
-    final expected = opening + totalSales;
-    final variance = closingFloat - expected;
-    final remittance = totalSales;
     final now = unixNowSeconds();
 
     await _db.transaction(() async {
@@ -510,9 +619,11 @@ class AuthRepository {
           isOpen: const Value(false),
           closingFloat: Value(closingFloat),
           closingNotes: Value(closingNotes),
-          expectedCash: Value(expected),
+          totalSales: Value(totalSales),
+          expectedCash: Value(expectedCash),
           variance: Value(variance),
           remittance: Value(remittance),
+          transactionsCount: Value(transactionsCount),
           closedAt: Value(now),
         ),
       );
@@ -617,11 +728,21 @@ class AuthRepository {
     await _flushSyncQueue(token: token);
   }
 
+  /// Public hook after local writes (e.g. offline check-in) to push [SyncQueue] when online.
+  Future<void> flushPendingSyncQueue() async {
+    ValetLog.d('AuthRepository.flushPendingSyncQueue', 'invoked');
+    await _flushSyncQueueForActiveSession();
+  }
+
   Future<void> _flushSyncQueue({required String token}) async {
     final pending = await (_db.select(_db.syncQueue)
           ..where((q) => q.syncedAt.isNull())
           ..orderBy([(q) => OrderingTerm.asc(q.createdAt)]))
         .get();
+    ValetLog.d(
+      'AuthRepository._flushSyncQueue',
+      'pending=${pending.length}',
+    );
     if (pending.isEmpty) return;
 
     pending.sort((a, b) {
@@ -631,6 +752,10 @@ class AuthRepository {
     });
 
     if (AppConfig.useStubApi) {
+      ValetLog.d(
+        'AuthRepository._flushSyncQueue',
+        'stub API: marking ${pending.length} rows synced locally',
+      );
       await _applySyncSuccessLocal(pending);
       return;
     }
@@ -646,6 +771,10 @@ class AuthRepository {
 
     try {
       final response = await _api.syncFlush(token: token, records: records);
+      ValetLog.d(
+        'AuthRepository._flushSyncQueue',
+        'syncFlush ok, resultCount=${response.results.length}',
+      );
       final now = unixNowSeconds();
       for (var i = 0; i < response.results.length && i < pending.length; i++) {
         final r = response.results[i];
@@ -664,7 +793,8 @@ class AuthRepository {
           );
         }
       }
-    } catch (e) {
+    } catch (e, st) {
+      ValetLog.e('AuthRepository._flushSyncQueue', 'syncFlush failed', e, st);
       final err = e.toString();
       for (final row in pending) {
         await (_db.update(_db.syncQueue)..where((q) => q.id.equals(row.id)))
@@ -695,6 +825,7 @@ class AuthRepository {
             .write(ShiftsCompanion(syncedAt: Value(ts)));
         break;
       case 'transaction':
+      case 'transaction_shift_transfer':
         await (_db.update(_db.valetTransactions)
               ..where((t) => t.id.equals(entityId)))
             .write(ValetTransactionsCompanion(syncedAt: Value(ts)));
@@ -709,6 +840,7 @@ class AuthRepository {
       case 'shift_open':
         return 0;
       case 'transaction':
+      case 'transaction_shift_transfer':
         return 1;
       case 'shift_close':
         return 2;

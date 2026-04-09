@@ -183,6 +183,9 @@ class AppTextField extends StatefulWidget {
     this.style,
     this.prefixIcon,
     this.suffixIcon,
+    this.autofocus = false,
+    this.onSubmitted,
+    this.onChanged,
   });
 
   final TextEditingController controller;
@@ -195,6 +198,9 @@ class AppTextField extends StatefulWidget {
   final TextStyle? style;
   final Widget? prefixIcon;
   final Widget? suffixIcon;
+  final bool autofocus;
+  final ValueChanged<String>? onSubmitted;
+  final ValueChanged<String>? onChanged;
 
   static TextStyle defaultValueStyle() => GoogleFonts.poppins(
         fontSize: 14,
@@ -243,6 +249,9 @@ class _AppTextFieldState extends State<AppTextField> {
         keyboardType: widget.keyboardType,
         obscureText: widget.obscureText,
         maxLines: widget.maxLines,
+        autofocus: widget.autofocus,
+        onSubmitted: widget.onSubmitted,
+        onChanged: widget.onChanged,
         style: widget.style ?? AppTextField.defaultValueStyle(),
         decoration: appTextFieldDecoration(
           hint: widget.hint,

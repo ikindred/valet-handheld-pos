@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,8 +10,11 @@ import '../../../core/storage/offline_mode_prefs.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../auth/state/auth_bloc.dart';
+import '../cubits/open_cash_cubit.dart';
+import '../cubits/open_cash_state.dart';
 import 'widgets/cash_figma_text_styles.dart';
 import 'widgets/cash_widgets.dart';
+import '../widgets/inherited_transactions_modal.dart';
 
 class OpenCashScreen extends StatefulWidget {
   const OpenCashScreen({super.key});
@@ -96,7 +98,6 @@ class _OpenCashScreenState extends State<OpenCashScreen> {
         _appendDigits('0');
         return;
       }
-      // 1–9
       if (_digits == '0') {
         _digits = key;
       } else {
@@ -115,216 +116,264 @@ class _OpenCashScreenState extends State<OpenCashScreen> {
     return _pesoFmt.format(n);
   }
 
+  Future<void> _submit(OpenCashCubit cubit) async {
+    final auth = context.read<AuthBloc>().state;
+    if (auth is! AuthAuthenticated) return;
+    final userIdStr = auth.userId;
+    if (userIdStr == null) return;
+    final localUserId = int.tryParse(userIdStr);
+    if (localUserId == null) return;
+    final repo = context.read<AuthRepository>();
+    final session = await repo.getActiveSession();
+    if (session == null) return;
+    final now = DateTime.now();
+    final pesos = int.tryParse(_digits) ?? 0;
+    final notes = _notesCtrl.text.trim();
+    await cubit.openShift(
+      localUserId: localUserId,
+      sessionId: session.id,
+      openingFloat: pesos.toDouble(),
+      branch: _branchCtrl.text.trim(),
+      area: _areaCtrl.text.trim(),
+      shiftDate: _shiftDate.format(now),
+      openingNotes: notes.isEmpty ? null : notes,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final nowLabel = _longDate.format(now);
-    // Same branch/area as the form fields (prefs + edits); header stays in sync.
     final b = _branchCtrl.text.trim();
     final a = _areaCtrl.text.trim();
     final headerSub = (b.isNotEmpty && a.isNotEmpty)
         ? '$nowLabel · $b : $a'
         : '$nowLabel · ${AppConfig.defaultDeviceBranch} : ${AppConfig.defaultDeviceArea}';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F5F7),
-      body: Row(
-        children: [
-          const CashLeftRail(),
-          Expanded(
-            child: SafeArea(
-              left: false,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  CashPageHeader(
-                    title: 'Open Cash',
-                    subtitle: headerSub,
-                    online: _online,
-                  ),
-                  const SizedBox(height: 22),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: SingleChildScrollView(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'SHIFT INFORMATION',
-                                    style: CashFigmaStyles.sectionCaps(),
-                                  ),
-                                  const SizedBox(height: 14),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _ReadOnlyField(
-                                          label: 'CASHIER / STAFF',
-                                          value: _staffName ?? '—',
+    return BlocProvider(
+      create: (_) => OpenCashCubit(context.read<AuthRepository>()),
+      child: BlocConsumer<OpenCashCubit, OpenCashState>(
+        listener: (context, state) {
+          if (state is OpenCashHasInheritedTransactions) {
+            context.read<AuthBloc>().add(
+                  const AuthCashSessionUpdated(CashSessionStatus.open),
+                );
+            InheritedTransactionsModal.show(
+              context,
+              inheritedTransactions: state.inheritedTransactions,
+              onAcknowledge: () async {
+                Navigator.of(context).pop();
+                await context.read<OpenCashCubit>().adoptInheritedTransactions();
+              },
+            );
+          }
+          if (state is OpenCashReady) {
+            context.read<AuthBloc>().add(
+                  const AuthCashSessionUpdated(CashSessionStatus.open),
+                );
+            context.go('/dashboard');
+          }
+          if (state is OpenCashError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message)),
+            );
+          }
+        },
+        builder: (context, state) {
+          final busy = state is OpenCashLoading;
+          return Scaffold(
+            backgroundColor: const Color(0xFFF4F5F7),
+            body: Row(
+              children: [
+                const CashLeftRail(),
+                Expanded(
+                  child: SafeArea(
+                    left: false,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        CashPageHeader(
+                          title: 'Open Cash',
+                          subtitle: headerSub,
+                          online: _online,
+                        ),
+                        const SizedBox(height: 22),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: SingleChildScrollView(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'SHIFT INFORMATION',
+                                          style: CashFigmaStyles.sectionCaps(),
                                         ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: _ReadOnlyField(
-                                          label: 'SHIFT DATE',
-                                          value: _longDate.format(now),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: LabeledAppTextField(
-                                          label: 'BRANCH',
-                                          child: AppTextField(
-                                            controller: _branchCtrl,
-                                            minHeight: 40,
-                                            hint: 'Branch name',
-                                            style: CashFigmaStyles.fieldValue(),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: LabeledAppTextField(
-                                          label: 'AREA',
-                                          child: AppTextField(
-                                            controller: _areaCtrl,
-                                            minHeight: 40,
-                                            hint: 'Area',
-                                            style: CashFigmaStyles.fieldValue(),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 22),
-                                  Text(
-                                    'OPENING BALANCE',
-                                    style: CashFigmaStyles.sectionCaps(),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  CashAmountBox(text: _displayAmount),
-                                  const SizedBox(height: 12),
-                                  CashKeypad(onKey: _tapKey),
-                                ],
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Container(
-                              width: 1,
-                              color: Colors.black.withValues(alpha: 0.13),
-                            ),
-                          ),
-                          Flexible(
-                            flex: 2,
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 420),
-                              child: TextFieldTapRegion(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    Expanded(
-                                      child: SingleChildScrollView(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.stretch,
+                                        const SizedBox(height: 14),
+                                        Row(
                                           children: [
-                                            _SummaryCard(
-                                              title: 'TOTAL OPENING BALANCE',
-                                              bigValue: _displayAmount,
-                                              subtitle:
-                                                  'Counted & Verified by staff',
+                                            Expanded(
+                                              child: _ReadOnlyField(
+                                                label: 'CASHIER / STAFF',
+                                                value: _staffName ?? '—',
+                                              ),
                                             ),
-                                            const SizedBox(height: 16),
-                                            _NotesCard(controller: _notesCtrl),
-                                            const SizedBox(height: 16),
-                                            _ShiftSummaryCard(
-                                              staff: _staffName ?? '—',
-                                              date: _longDate.format(now),
-                                              time: DateFormat.jm().format(now),
+                                            const SizedBox(width: 16),
+                                            Expanded(
+                                              child: _ReadOnlyField(
+                                                label: 'SHIFT DATE',
+                                                value: _longDate.format(now),
+                                              ),
                                             ),
                                           ],
                                         ),
-                                      ),
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: LabeledAppTextField(
+                                                label: 'BRANCH',
+                                                child: AppTextField(
+                                                  controller: _branchCtrl,
+                                                  minHeight: 40,
+                                                  hint: 'Branch name',
+                                                  style: CashFigmaStyles
+                                                      .fieldValue(),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 16),
+                                            Expanded(
+                                              child: LabeledAppTextField(
+                                                label: 'AREA',
+                                                child: AppTextField(
+                                                  controller: _areaCtrl,
+                                                  minHeight: 40,
+                                                  hint: 'Area',
+                                                  style: CashFigmaStyles
+                                                      .fieldValue(),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 22),
+                                        Text(
+                                          'OPENING BALANCE',
+                                          style: CashFigmaStyles.sectionCaps(),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        CashAmountBox(text: _displayAmount),
+                                        const SizedBox(height: 12),
+                                        CashKeypad(onKey: busy ? (_) {} : _tapKey),
+                                      ],
                                     ),
-                                    const SizedBox(height: 16),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      height: 54,
-                                      child: FilledButton(
-                                        style: FilledButton.styleFrom(
-                                          textStyle:
-                                              CashFigmaStyles.filledActionLabel(),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              10,
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                  child: Container(
+                                    width: 1,
+                                    color: Colors.black.withValues(alpha: 0.13),
+                                  ),
+                                ),
+                                Flexible(
+                                  flex: 2,
+                                  child: ConstrainedBox(
+                                    constraints:
+                                        const BoxConstraints(maxWidth: 420),
+                                    child: TextFieldTapRegion(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Expanded(
+                                            child: SingleChildScrollView(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.stretch,
+                                                children: [
+                                                  _SummaryCard(
+                                                    title:
+                                                        'TOTAL OPENING BALANCE',
+                                                    bigValue: _displayAmount,
+                                                    subtitle:
+                                                        'Counted & Verified by staff',
+                                                  ),
+                                                  const SizedBox(height: 16),
+                                                  _NotesCard(
+                                                    controller: _notesCtrl,
+                                                  ),
+                                                  const SizedBox(height: 16),
+                                                  _ShiftSummaryCard(
+                                                    staff: _staffName ?? '—',
+                                                    date: _longDate.format(now),
+                                                    time: DateFormat.jm()
+                                                        .format(now),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                        onPressed: () async {
-                                          final auth = context
-                                              .read<AuthBloc>()
-                                              .state;
-                                          if (auth is! AuthAuthenticated) return;
-                                          final userIdStr = auth.userId;
-                                          if (userIdStr == null) return;
-                                          final localUserId = int.tryParse(userIdStr);
-                                          if (localUserId == null) return;
-                                          final repo =
-                                              context.read<AuthRepository>();
-                                          final session =
-                                              await repo.getActiveSession();
-                                          if (session == null) return;
-                                          final pesos = int.tryParse(_digits) ?? 0;
-                                          final notes = _notesCtrl.text.trim();
-                                          await repo.recordOpenCash(
-                                            localUserId: localUserId,
-                                            sessionId: session.id,
-                                            openingFloat: pesos.toDouble(),
-                                            branch: _branchCtrl.text.trim(),
-                                            area: _areaCtrl.text.trim(),
-                                            shiftDate: _shiftDate.format(now),
-                                            openingNotes:
-                                                notes.isEmpty ? null : notes,
-                                          );
-                                          if (!context.mounted) return;
-                                          context.read<AuthBloc>().add(
-                                                const AuthCashSessionUpdated(
-                                                  CashSessionStatus.open,
+                                          const SizedBox(height: 16),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            height: 54,
+                                            child: FilledButton(
+                                              style: FilledButton.styleFrom(
+                                                textStyle: CashFigmaStyles
+                                                    .filledActionLabel(),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
                                                 ),
-                                              );
-                                          context.go('/dashboard');
-                                        },
-                                        child: const Text(
-                                          'Open Cash and Start Shift',
-                                        ),
+                                              ),
+                                              onPressed: busy
+                                                  ? null
+                                                  : () => _submit(
+                                                        context
+                                                            .read<
+                                                                OpenCashCubit>(),
+                                                      ),
+                                              child: busy
+                                                  ? const SizedBox(
+                                                      height: 22,
+                                                      width: 22,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                      ),
+                                                    )
+                                                  : const Text(
+                                                      'Open Cash and Start Shift',
+                                                    ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
