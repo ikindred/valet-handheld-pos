@@ -9,16 +9,15 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/logging/valet_log.dart';
-import '../../../core/services/device_id_service.dart';
 import '../../../data/repositories/auth_repository.dart';
-import '../../../data/repositories/transactions_repository.dart';
+import '../../sync/state/sync_cubit.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../domain/vehicle_body_type.dart';
 import '../domain/vehicle_damage.dart';
 import '../state/check_in_cubit.dart';
 import 'widgets/check_in_step_body.dart';
 
-/// Step 4 — Review and print
+/// Step 5 — Review (confirm saves ticket, then `/check-in/print`).
 /// ([Figma](https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=32-861)).
 class CheckInReviewPrintScreen extends StatefulWidget {
   const CheckInReviewPrintScreen({super.key});
@@ -38,64 +37,38 @@ class _CheckInReviewPrintScreenState extends State<CheckInReviewPrintScreen> {
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      ValetLog.d('check_in/review_print/_commitAndLeave', 'start save');
+      ValetLog.info(
+        'check_in/review_print/_commitAndLeave',
+        'start valet ticket save',
+      );
       final auth = context.read<AuthRepository>();
-      final txRepo = context.read<TransactionsRepository>();
       final cubit = context.read<CheckInCubit>();
-      final state = cubit.state;
+      final sync = context.read<SyncCubit>();
 
       final session = await auth.getActiveSession();
       if (session == null) {
-        ValetLog.d(
-          'check_in/review_print/_commitAndLeave',
-          'aborted: no active session',
-        );
         messenger.showSnackBar(
           const SnackBar(content: Text('No active session. Sign in again.')),
         );
         return;
       }
-      final shift = await auth.getOpenShiftForUser(session.userId);
-      if (shift == null) {
-        ValetLog.d(
-          'check_in/review_print/_commitAndLeave',
-          'aborted: no open shift',
-        );
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Open a cash shift before saving a ticket.'),
-          ),
-        );
+
+      final err = await cubit.submitValetTicket();
+      if (err != null) {
+        messenger.showSnackBar(SnackBar(content: Text(err)));
         return;
       }
 
-      final site = await auth.branchAndAreaFromDb();
-      final deviceId = await DeviceIdService.getOrCreate();
-
-      await txRepo.insertOfflineCheckIn(
-        state: state,
-        checkinShiftId: shift.id,
-        userId: session.userId,
-        branchSnapshot: site.branch,
-        areaSnapshot: site.area,
-        deviceIdSnapshot: deviceId,
-      );
-      ValetLog.d(
-        'check_in/review_print/_commitAndLeave',
-        'inserted offline check-in, flushing sync queue',
-      );
-      await auth.flushPendingSyncQueue();
-
       if (!mounted) return;
-      cubit.resetSession();
+      await sync.flush();
       if (!mounted) return;
-      ValetLog.d(
+      ValetLog.info(
         'check_in/review_print/_commitAndLeave',
-        'success, navigating to dashboard',
+        'success, navigating to print',
       );
-      context.go('/dashboard');
+      context.go('/check-in/print');
     } catch (e, st) {
-      ValetLog.e(
+      ValetLog.error(
         'check_in/review_print/_commitAndLeave',
         'save failed',
         e,
@@ -115,8 +88,8 @@ class _CheckInReviewPrintScreenState extends State<CheckInReviewPrintScreen> {
   Widget build(BuildContext context) {
     return CheckInStepBody(
       showBack: true,
-      onBack: _saving ? () {} : () => context.go('/check-in/step-3'),
-      primaryLabel: _saving ? 'Saving…' : 'Done',
+      onBack: _saving ? () {} : () => context.go('/check-in/step-4'),
+      primaryLabel: _saving ? 'Saving…' : 'Confirm',
       onPrimary: () => unawaited(_commitAndLeave()),
       child: BlocBuilder<CheckInCubit, CheckInState>(
         builder: (context, state) {
@@ -510,7 +483,13 @@ class _QrCard extends StatelessWidget {
             width: 254,
             height: 254,
             child: state.ticketNumber.trim().isEmpty
-                ? Center(child: Text('No ticket', style: _ReviewTokens.label()))
+                ? Center(
+                    child: Text(
+                      'QR appears after you confirm',
+                      textAlign: TextAlign.center,
+                      style: _ReviewTokens.label(),
+                    ),
+                  )
                 : QrImageView(
                     data: state.ticketNumber.trim(),
                     version: QrVersions.auto,
@@ -572,7 +551,10 @@ class _VehicleCard extends StatelessWidget {
           const SizedBox(height: 14),
           _ReviewRow(label: 'Vehicle', value: _vehicleLine(state)),
           const SizedBox(height: 14),
-          _ReviewRow(label: 'Type', value: state.vehicleBodyType.label),
+          _ReviewRow(
+            label: 'Type',
+            value: state.vehicleBodyType.label,
+          ),
           const SizedBox(height: 14),
           _ReviewRow(label: 'Slot', value: _slotLine(state)),
           const SizedBox(height: 14),

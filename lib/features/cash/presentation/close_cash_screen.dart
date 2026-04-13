@@ -5,11 +5,14 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/formatting/peso_currency.dart';
 import '../../../core/storage/offline_mode_prefs.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/shift_service.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../../auth/state/auth_bloc.dart';
+import '../../sync/state/sync_cubit.dart';
 import '../cubits/close_cash_cubit.dart';
 import '../cubits/close_cash_state.dart';
 import 'widgets/cash_figma_text_styles.dart';
@@ -110,7 +113,8 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
     }
   }
 
-  String _displayPeso(double v) => '₱ ${v.toStringAsFixed(2)}';
+  String _displayPeso(double v) =>
+      '${PesoCurrency.symbol} ${v.toStringAsFixed(2)}';
 
   CloseCashLoaded? _resolveLoaded(CloseCashState state, CloseCashCubit cubit) {
     if (state is CloseCashLoaded) return state;
@@ -134,9 +138,13 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
     return BlocProvider(
       key: ValueKey<int>(uid),
       create: (_) =>
-          CloseCashCubit(context.read<AuthRepository>())..loadShift(uid),
+          CloseCashCubit(
+            context.read<AuthRepository>(),
+            context.read<ShiftService>(),
+            context.read<SyncCubit>(),
+          )..loadShift(uid),
       child: BlocConsumer<CloseCashCubit, CloseCashState>(
-        listener: (context, state) {
+        listener: (context, state) async {
           if (state is CloseCashLoading) {
             _amountSyncedFromCubit = false;
           }
@@ -149,7 +157,12 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
             }
           }
           if (state is CloseCashSuccess) {
-            context.read<AuthBloc>().add(const AuthLoggedOut());
+            final authBloc = context.read<AuthBloc>();
+            if (authBloc.state is! AuthUnauthenticated) {
+              authBloc.add(const AuthLoggedOut());
+              await authBloc.stream.firstWhere((s) => s is AuthUnauthenticated);
+            }
+            if (!context.mounted) return;
             context.go('/login');
           }
           if (state is CloseCashError) {
@@ -260,7 +273,7 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
                                               child: _StatCard(
                                                 title: 'TOTAL SALES',
                                                 big:
-                                                    '₱ ${totalSales.toStringAsFixed(2)}',
+                                                    '${PesoCurrency.symbol} ${totalSales.toStringAsFixed(2)}',
                                                 sub: 'Cash collected',
                                                 accent: _StatAccent.success,
                                               ),
@@ -274,7 +287,7 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
                                               child: _StatCard(
                                                 title: 'OPENING BALANCE',
                                                 big:
-                                                    '₱ ${opening.toStringAsFixed(2)}',
+                                                    '${PesoCurrency.symbol} ${opening.toStringAsFixed(2)}',
                                                 sub: 'Start shift',
                                               ),
                                             ),
@@ -283,7 +296,7 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
                                               child: _StatCard(
                                                 title: 'EXPECTED CASH',
                                                 big:
-                                                    '₱ ${expected.toStringAsFixed(2)}',
+                                                    '${PesoCurrency.symbol} ${expected.toStringAsFixed(2)}',
                                                 sub: 'Opening + sales',
                                                 accent: _StatAccent.warning,
                                               ),
@@ -520,9 +533,11 @@ class _CashReconciliationCard extends StatelessWidget {
     if (balanced) {
       bannerText = 'Cash balanced — no variance';
     } else if (over) {
-      bannerText = 'Over by ₱${variance.abs().toStringAsFixed(2)}';
+      bannerText =
+          'Over by ${PesoCurrency.symbol}${variance.abs().toStringAsFixed(2)}';
     } else {
-      bannerText = 'Short by ₱${variance.abs().toStringAsFixed(2)}';
+      bannerText =
+          'Short by ${PesoCurrency.symbol}${variance.abs().toStringAsFixed(2)}';
     }
 
     return Container(
@@ -542,25 +557,27 @@ class _CashReconciliationCard extends StatelessWidget {
                 ),
           ),
           const SizedBox(height: 10),
-          row('Opening Balance', '₱ ${opening.toStringAsFixed(2)}'),
+          row('Opening Balance',
+              '${PesoCurrency.symbol} ${opening.toStringAsFixed(2)}'),
           const Divider(height: 1),
           row(
             'Total Sales',
-            '+ ₱ ${totalSales.toStringAsFixed(2)}',
+            '+ ${PesoCurrency.symbol} ${totalSales.toStringAsFixed(2)}',
             color: varianceGreen,
           ),
           const Divider(height: 1),
           row(
             'Expected Total',
-            '₱ ${expected.toStringAsFixed(2)}',
+            '${PesoCurrency.symbol} ${expected.toStringAsFixed(2)}',
             fw: FontWeight.w700,
           ),
           const Divider(height: 1),
-          row('Actual Cash on Hand', '₱ ${actual.toStringAsFixed(2)}'),
+          row('Actual Cash on Hand',
+              '${PesoCurrency.symbol} ${actual.toStringAsFixed(2)}'),
           const Divider(height: 1),
           row(
             'Variance',
-            '₱ ${variance.toStringAsFixed(2)}',
+            '${PesoCurrency.symbol} ${variance.toStringAsFixed(2)}',
             color: balanced ? varianceGreen : (over ? orange : varianceRed),
             fw: FontWeight.w700,
           ),
@@ -644,7 +661,7 @@ class _RemittanceCard extends StatelessWidget {
               fit: BoxFit.scaleDown,
               alignment: Alignment.center,
               child: Text(
-                '₱ ${amount.toStringAsFixed(2)}',
+                '${PesoCurrency.symbol} ${amount.toStringAsFixed(2)}',
                 style: Theme.of(context).textTheme.displaySmall?.copyWith(
                       color: accent,
                       fontWeight: FontWeight.w700,

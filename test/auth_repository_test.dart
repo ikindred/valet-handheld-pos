@@ -8,11 +8,13 @@ import 'package:valet_handheld_pos/core/storage/prefs_keys.dart';
 import 'package:valet_handheld_pos/data/local/db/app_database.dart';
 import 'package:valet_handheld_pos/data/remote/auth_api.dart';
 import 'package:valet_handheld_pos/data/repositories/auth_repository.dart';
+import 'package:valet_handheld_pos/data/services/shift_service.dart';
 
 void main() {
   group('AuthRepository', () {
     late AppDatabase db;
     late AuthRepository repo;
+    late ShiftService shifts;
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({
@@ -30,7 +32,8 @@ void main() {
           );
       final api = AuthApi(Dio());
       final refresh = RouterRefreshNotifier();
-      repo = AuthRepository(db, api, refresh);
+      shifts = ShiftService(db, Dio(), onShiftMutated: refresh.notifyAuthChanged);
+      repo = AuthRepository(db, api, refresh, shifts);
     });
 
     tearDown(() async {
@@ -67,7 +70,7 @@ void main() {
       expect(rows.single.authToken, isNull);
     });
 
-    test('confirmCloseCash closes shift with reconciliation and session', () async {
+    test('confirmCloseCash ends session; shift is closed via ShiftService', () async {
       await repo.loginOnline(
         email: 'c@test.com',
         password: 'secret',
@@ -80,10 +83,11 @@ void main() {
         sessionId: session.id,
         openingFloat: 100,
       );
-      final openBefore = await (db.select(db.shifts)
-            ..where((sh) => sh.isOpen.equals(true)))
-          .get();
-      expect(openBefore, isNotEmpty);
+      final uid = await shifts.shiftUserIdForLocalAccount(session.userId);
+      final openBefore = await shifts.getActiveShift(uid);
+      expect(openBefore, isNotNull);
+
+      await shifts.closeActiveShiftForLocalUser(session.userId, 100);
 
       await repo.confirmCloseCash(
         localUserId: session.userId,
@@ -95,20 +99,13 @@ void main() {
         transactionsCount: 0,
       );
 
-      final openAfter = await (db.select(db.shifts)
-            ..where((sh) => sh.isOpen.equals(true)))
-          .get();
-      expect(openAfter, isEmpty);
+      expect(await shifts.getActiveShift(uid), isNull);
       expect(await repo.getActiveSession(), isNull);
 
-      final shifts = await db.select(db.shifts).get();
-      final closed = shifts.single;
-      expect(closed.isOpen, false);
-      expect(closed.expectedCash, 100.0);
-      expect(closed.variance, 0.0);
-      expect(closed.remittance, 100.0);
-      expect(closed.totalSales, 0.0);
-      expect(closed.transactionsCount, 0);
+      final shiftRows = await db.select(db.shifts).get();
+      expect(shiftRows, isNotEmpty);
+      expect(shiftRows.single.status, 'closed');
+      expect(shiftRows.single.closingCash, closeTo(100.0, 0.001));
     });
 
     test('loginOffline fails when no offline account', () async {

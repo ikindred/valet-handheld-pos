@@ -28,13 +28,13 @@ abstract final class DashboardStyles {
 
   static const List<String> _pesoFallback = ['Noto Sans', 'Roboto'];
 
-  static TextStyle greeting() => GoogleFonts.inter(
+  static TextStyle greeting() => GoogleFonts.poppins(
     fontSize: 25,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
   );
 
-  static TextStyle headerSubtitle() => GoogleFonts.inter(
+  static TextStyle headerSubtitle() => GoogleFonts.poppins(
     fontSize: 15,
     fontWeight: FontWeight.w400,
     color: AppColors.textPrimary,
@@ -190,6 +190,13 @@ class DashboardLeftRail extends StatelessWidget {
                 selected: path == '/reports',
                 icon: Icons.bar_chart_rounded,
                 onTap: () => context.go('/reports'),
+                accentSelection: false,
+              ),
+              const SizedBox(height: 16),
+              _RailIcon(
+                selected: path == '/cash/activity',
+                icon: Icons.payments_rounded,
+                onTap: () => context.go('/cash/activity'),
                 accentSelection: false,
               ),
               const SizedBox(height: 16),
@@ -417,6 +424,7 @@ class DashboardStatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: DashboardStyles.cardDecoration(),
       child: Column(
@@ -525,12 +533,14 @@ class DashboardTransactionRow extends StatelessWidget {
     required this.line1,
     required this.line2,
     required this.status,
+    this.onTap,
   });
 
   final String plate;
   final String line1;
   final String line2;
   final TransactionStatusKind status;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -564,53 +574,66 @@ class DashboardTransactionRow extends StatelessWidget {
       ),
     );
 
+    Widget body(BoxConstraints constraints) {
+      final wide = constraints.maxWidth >= 640;
+      if (!wide) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [plateBadge, const Spacer(), statusPill],
+            ),
+            const SizedBox(height: 8),
+            Text(line1, style: lineStyle),
+            Text(line2, style: lineStyle),
+          ],
+        );
+      }
+
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          plateBadge,
+          const SizedBox(width: 30),
+          Expanded(
+            flex: 3,
+            child: Text(
+              line1,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: lineStyle,
+            ),
+          ),
+          const SizedBox(width: 30),
+          Expanded(
+            flex: 3,
+            child: Text(
+              line2,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: lineStyle,
+            ),
+          ),
+          const SizedBox(width: 16),
+          statusPill,
+        ],
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 14),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 640;
-          if (!wide) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [plateBadge, const Spacer(), statusPill],
-                ),
-                const SizedBox(height: 8),
-                Text(line1, style: lineStyle),
-                Text(line2, style: lineStyle),
-              ],
-            );
-          }
-
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              plateBadge,
-              const SizedBox(width: 30),
-              Expanded(
-                flex: 3,
-                child: Text(
-                  line1,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: lineStyle,
-                ),
-              ),
-              const SizedBox(width: 30),
-              Expanded(
-                flex: 3,
-                child: Text(
-                  line2,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: lineStyle,
-                ),
-              ),
-              const SizedBox(width: 16),
-              statusPill,
-            ],
+          final child = body(constraints);
+          if (onTap == null) return child;
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(8),
+              child: child,
+            ),
           );
         },
       ),

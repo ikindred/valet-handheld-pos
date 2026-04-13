@@ -16,11 +16,17 @@ class VehicleConditionDiagram extends StatelessWidget {
   const VehicleConditionDiagram({
     super.key,
     required this.entries,
-    required this.onImageTap,
+    this.onImageTap,
+    this.checkoutMarkerIds,
+    this.fadeNonCheckoutMarkers = false,
   });
 
   final List<VehicleDamageEntry> entries;
-  final void Function(double nx, double ny) onImageTap;
+  final void Function(double nx, double ny)? onImageTap;
+
+  /// When [fadeNonCheckoutMarkers] is true, markers whose ids are not in this set use a neutral style.
+  final Set<String>? checkoutMarkerIds;
+  final bool fadeNonCheckoutMarkers;
 
   static Rect _destRectForContain(Size imageSize, Size box) {
     final scale = math.min(
@@ -42,28 +48,6 @@ class VehicleConditionDiagram extends StatelessWidget {
     return (nx, ny);
   }
 
-  static Color _markerColor(DamageType t) {
-    switch (t) {
-      case DamageType.crack:
-        return const Color(0xFF0068D3);
-      case DamageType.scratch:
-        return const Color(0xFFF68D00);
-      case DamageType.dent:
-        return const Color(0xFFEC2231);
-    }
-  }
-
-  static Color _markerFill(DamageType t) {
-    switch (t) {
-      case DamageType.crack:
-        return const Color(0xFFECEEFF);
-      case DamageType.scratch:
-        return const Color(0xFFFFF4EC);
-      case DamageType.dent:
-        return const Color(0xFFFFECEC);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -74,38 +58,45 @@ class VehicleConditionDiagram extends StatelessWidget {
         );
         final dest = _destRectForContain(kVehicleConditionImageSize, box);
 
+        final stack = Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: dest.left,
+              top: dest.top,
+              width: dest.width,
+              height: dest.height,
+              child: Image.asset(
+                kVehicleConditionCarAsset,
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.medium,
+              ),
+            ),
+            for (final e in entries)
+              Positioned(
+                left: dest.left + e.normalizedX * dest.width - 13,
+                top: dest.top + e.normalizedY * dest.height - 13,
+                child: _DamageMarker(
+                  type: e.type,
+                  muted: fadeNonCheckoutMarkers &&
+                      (checkoutMarkerIds == null ||
+                          !checkoutMarkerIds!.contains(e.id)),
+                ),
+              ),
+          ],
+        );
+
+        if (onImageTap == null) {
+          return stack;
+        }
+
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTapDown: (d) {
             final n = _localToNormalized(d.localPosition, dest);
-            if (n != null) onImageTap(n.$1, n.$2);
+            if (n != null) onImageTap!(n.$1, n.$2);
           },
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                left: dest.left,
-                top: dest.top,
-                width: dest.width,
-                height: dest.height,
-                child: Image.asset(
-                  kVehicleConditionCarAsset,
-                  fit: BoxFit.fill,
-                  filterQuality: FilterQuality.medium,
-                ),
-              ),
-              for (final e in entries)
-                Positioned(
-                  left: dest.left + e.normalizedX * dest.width - 13,
-                  top: dest.top + e.normalizedY * dest.height - 13,
-                  child: _DamageMarker(
-                    type: e.type,
-                    fill: _markerFill(e.type),
-                    border: _markerColor(e.type),
-                  ),
-                ),
-            ],
-          ),
+          child: stack,
         );
       },
     );
@@ -115,16 +106,17 @@ class VehicleConditionDiagram extends StatelessWidget {
 class _DamageMarker extends StatelessWidget {
   const _DamageMarker({
     required this.type,
-    required this.fill,
-    required this.border,
+    required this.muted,
   });
 
   final DamageType type;
-  final Color fill;
-  final Color border;
+  final bool muted;
 
   @override
   Widget build(BuildContext context) {
+    final border = muted ? const Color(0xFF6C7688) : _diagramMarkerColor(type);
+    final fill = muted ? const Color(0xFFEFEFEF) : _diagramMarkerFill(type);
+
     return Container(
       width: 26,
       height: 26,
@@ -143,5 +135,27 @@ class _DamageMarker extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+Color _diagramMarkerColor(DamageType t) {
+  switch (t) {
+    case DamageType.crack:
+      return const Color(0xFF0068D3);
+    case DamageType.scratch:
+      return const Color(0xFFF68D00);
+    case DamageType.dent:
+      return const Color(0xFFEC2231);
+  }
+}
+
+Color _diagramMarkerFill(DamageType t) {
+  switch (t) {
+    case DamageType.crack:
+      return const Color(0xFFECEEFF);
+    case DamageType.scratch:
+      return const Color(0xFFFFF4EC);
+    case DamageType.dent:
+      return const Color(0xFFFFECEC);
   }
 }

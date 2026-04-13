@@ -63,7 +63,7 @@ class OpenTransactionsWarningModal extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Open Transactions',
+                          'Open tickets',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
@@ -72,8 +72,8 @@ class OpenTransactionsWarningModal extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'There are $n vehicle(s) still checked in under your shift. '
-                          'These will be transferred to the next cashier\'s shift automatically.',
+                          'There are $n open ticket(s) in this shift. '
+                          'They can be transferred when the next cashier opens shift (legacy flow).',
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.35,

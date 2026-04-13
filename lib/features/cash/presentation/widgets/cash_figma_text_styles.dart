@@ -27,8 +27,8 @@ abstract final class CashFigmaStyles {
         color: AppColors.textPrimary,
       );
 
-  /// Date · branch — Inter 15 w400, #0A1B39 @ 60%
-  static TextStyle pageSubtitle() => GoogleFonts.inter(
+  /// Date · branch — Poppins 15 w400, #0A1B39 @ 60% (Inter not bundled offline).
+  static TextStyle pageSubtitle() => GoogleFonts.poppins(
         fontSize: 15,
         fontWeight: FontWeight.w400,
         color: const Color(0x990A1B39),
@@ -113,12 +113,15 @@ abstract final class CashFigmaStyles {
         color: AppColors.textPrimary,
       );
 
-  /// Shift summary row — Poppins 12 w500 (label + value)
-  static TextStyle shiftSummaryRow({required bool isLabel}) => GoogleFonts.poppins(
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-        color: isLabel ? AppColors.textSecondary : AppColors.textPrimary,
-      );
+  /// Shift summary row — Poppins 12 w500 (label + value). Values may include peso (U+20B1).
+  static TextStyle shiftSummaryRow({required bool isLabel}) {
+    final base = GoogleFonts.poppins(
+      fontSize: 12,
+      fontWeight: FontWeight.w500,
+      color: isLabel ? AppColors.textSecondary : AppColors.textPrimary,
+    );
+    return isLabel ? base : _withPesoFallback(base);
+  }
 
   /// Primary CTA — Poppins 15 w500 (use on orange button; color from theme)
   static TextStyle filledActionLabel() => GoogleFonts.poppins(

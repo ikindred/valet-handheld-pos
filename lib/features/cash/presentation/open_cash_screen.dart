@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -6,9 +8,12 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/formatting/peso_currency.dart';
+import '../../../core/logging/valet_log.dart';
 import '../../../core/storage/offline_mode_prefs.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/branch_config_service.dart';
 import '../../auth/state/auth_bloc.dart';
 import '../cubits/open_cash_cubit.dart';
 import '../cubits/open_cash_state.dart';
@@ -16,14 +21,73 @@ import 'widgets/cash_figma_text_styles.dart';
 import 'widgets/cash_widgets.dart';
 import '../widgets/inherited_transactions_modal.dart';
 
-class OpenCashScreen extends StatefulWidget {
+/// [BlocProvider] lives here so keypad [setState] does not recreate [OpenCashCubit]
+/// (which would drop [OpenCashReady] before [BlocListener] runs).
+class OpenCashScreen extends StatelessWidget {
   const OpenCashScreen({super.key});
 
   @override
-  State<OpenCashScreen> createState() => _OpenCashScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => OpenCashCubit(context.read<AuthRepository>()),
+      child: BlocConsumer<OpenCashCubit, OpenCashState>(
+        listener: (context, state) async {
+          if (state is OpenCashHasInheritedTransactions) {
+            context.read<AuthBloc>().add(
+                  const AuthCashSessionUpdated(CashSessionStatus.open),
+                );
+            InheritedTransactionsModal.show(
+              context,
+              inheritedTransactions: state.inheritedTransactions,
+              onAcknowledge: () async {
+                Navigator.of(context).pop();
+                await context.read<OpenCashCubit>().adoptInheritedTickets();
+              },
+            );
+          }
+          if (state is OpenCashReady) {
+            ValetLog.debug(
+              'OpenCashScreen',
+              'BlocListener saw OpenCashReady → AuthCashSessionUpdated + go /dashboard',
+            );
+            final authBloc = context.read<AuthBloc>();
+            final current = authBloc.state;
+            if (current is! AuthAuthenticated ||
+                current.cashSessionStatus != CashSessionStatus.open) {
+              authBloc.add(const AuthCashSessionUpdated(CashSessionStatus.open));
+              await authBloc.stream.firstWhere(
+                (s) =>
+                    s is AuthAuthenticated &&
+                    s.cashSessionStatus == CashSessionStatus.open,
+              );
+            }
+            if (!context.mounted) return;
+            context.go('/dashboard');
+          }
+          if (state is OpenCashError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message)),
+            );
+          }
+        },
+        builder: (context, state) {
+          return _OpenCashView(busy: state is OpenCashLoading);
+        },
+      ),
+    );
+  }
 }
 
-class _OpenCashScreenState extends State<OpenCashScreen> {
+class _OpenCashView extends StatefulWidget {
+  const _OpenCashView({required this.busy});
+
+  final bool busy;
+
+  @override
+  State<_OpenCashView> createState() => _OpenCashViewState();
+}
+
+class _OpenCashViewState extends State<_OpenCashView> {
   final _notesCtrl = TextEditingController();
   final _branchCtrl = TextEditingController();
   final _areaCtrl = TextEditingController();
@@ -34,7 +98,8 @@ class _OpenCashScreenState extends State<OpenCashScreen> {
   String? _staffName;
   bool _online = true;
 
-  static final _pesoFmt = NumberFormat.currency(symbol: '₱ ', decimalDigits: 2);
+  static final _pesoFmt =
+      PesoCurrency.currency(decimalDigits: 2, spaceAfter: true);
   static final _longDate = DateFormat('EEEE, MMMM d, y');
   static final _shiftDate = DateFormat('yyyy-MM-dd');
 
@@ -64,6 +129,9 @@ class _OpenCashScreenState extends State<OpenCashScreen> {
       _online = !OfflineModePrefs.read(prefs);
       _staffName = acct?.fullName ?? acct?.email ?? '—';
     });
+    if (mounted) {
+      unawaited(context.read<BranchConfigService>().syncFromServerForDeviceBranch());
+    }
   }
 
   @override
@@ -150,38 +218,8 @@ class _OpenCashScreenState extends State<OpenCashScreen> {
         ? '$nowLabel · $b : $a'
         : '$nowLabel · ${AppConfig.defaultDeviceBranch} : ${AppConfig.defaultDeviceArea}';
 
-    return BlocProvider(
-      create: (_) => OpenCashCubit(context.read<AuthRepository>()),
-      child: BlocConsumer<OpenCashCubit, OpenCashState>(
-        listener: (context, state) {
-          if (state is OpenCashHasInheritedTransactions) {
-            context.read<AuthBloc>().add(
-                  const AuthCashSessionUpdated(CashSessionStatus.open),
-                );
-            InheritedTransactionsModal.show(
-              context,
-              inheritedTransactions: state.inheritedTransactions,
-              onAcknowledge: () async {
-                Navigator.of(context).pop();
-                await context.read<OpenCashCubit>().adoptInheritedTransactions();
-              },
-            );
-          }
-          if (state is OpenCashReady) {
-            context.read<AuthBloc>().add(
-                  const AuthCashSessionUpdated(CashSessionStatus.open),
-                );
-            context.go('/dashboard');
-          }
-          if (state is OpenCashError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
-            );
-          }
-        },
-        builder: (context, state) {
-          final busy = state is OpenCashLoading;
-          return Scaffold(
+    final busy = widget.busy;
+    return Scaffold(
             backgroundColor: const Color(0xFFF4F5F7),
             body: Row(
               children: [
@@ -271,7 +309,9 @@ class _OpenCashScreenState extends State<OpenCashScreen> {
                                         const SizedBox(height: 10),
                                         CashAmountBox(text: _displayAmount),
                                         const SizedBox(height: 12),
-                                        CashKeypad(onKey: busy ? (_) {} : _tapKey),
+                                        CashKeypad(
+                                          onKey: busy ? (_) {} : _tapKey,
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -373,9 +413,6 @@ class _OpenCashScreenState extends State<OpenCashScreen> {
               ],
             ),
           );
-        },
-      ),
-    );
   }
 }
 

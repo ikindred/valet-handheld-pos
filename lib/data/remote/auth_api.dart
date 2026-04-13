@@ -129,34 +129,6 @@ class AuthApi {
       );
     } catch (_) {}
   }
-
-  /// POST [AppConfig.syncFlush]
-  Future<SyncFlushResponse> syncFlush({
-    required String token,
-    required List<Map<String, dynamic>> records,
-  }) async {
-    if (AppConfig.useStubApi) {
-      return SyncFlushResponse(
-        results: [
-          for (var i = 0; i < records.length; i++)
-            SyncFlushResult(
-              type: records[i]['type'] as String? ?? '',
-              entityId: 0,
-              success: true,
-              error: null,
-            ),
-        ],
-      );
-    }
-    final res = await _dio.post<Map<String, dynamic>>(
-      AppConfig.syncFlush,
-      data: {'records': records},
-      options: Options(
-        headers: {'Authorization': 'Bearer $token'},
-      ),
-    );
-    return SyncFlushResponse.fromJson(res.data ?? {});
-  }
 }
 
 class DeviceRegisterResult {
@@ -298,48 +270,4 @@ class RevalidateResponse {
   final bool valid;
   final bool isOpenCash;
   final StandardParkingRates? standardRates;
-}
-
-class SyncFlushResponse {
-  SyncFlushResponse({required this.results});
-
-  factory SyncFlushResponse.fromJson(Map<String, dynamic> json) {
-    final raw = json['results'];
-    final list = <SyncFlushResult>[];
-    if (raw is List) {
-      for (final item in raw) {
-        if (item is Map<String, dynamic>) {
-          list.add(SyncFlushResult.fromJson(item));
-        }
-      }
-    }
-    return SyncFlushResponse(results: list);
-  }
-
-  final List<SyncFlushResult> results;
-}
-
-class SyncFlushResult {
-  SyncFlushResult({
-    required this.type,
-    required this.entityId,
-    required this.success,
-    this.error,
-  });
-
-  factory SyncFlushResult.fromJson(Map<String, dynamic> json) {
-    return SyncFlushResult(
-      type: (json['type'] ?? '').toString(),
-      entityId: _parseUserId(json['entity_id'] ?? json['entityId']),
-      success: json['success'] == true ||
-          (json['success'] != null &&
-              json['success'].toString().toLowerCase() == 'true'),
-      error: json['error']?.toString(),
-    );
-  }
-
-  final String type;
-  final int entityId;
-  final bool success;
-  final String? error;
 }

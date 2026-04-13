@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:bloc/bloc.dart';
@@ -5,8 +7,10 @@ import 'package:equatable/equatable.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/time/unix_timestamp.dart';
-
-import '../domain/ticket_number_generator.dart';
+import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/shift_service.dart';
+import '../../../data/services/ticket_service.dart';
+import '../domain/check_in_form_data.dart';
 import '../domain/vehicle_body_type.dart';
 import '../domain/vehicle_damage.dart';
 import '../domain/vehicle_damage_zones.dart';
@@ -53,6 +57,7 @@ class CheckInState extends Equatable {
   final String vehicleColor;
   final String vehicleYear;
   final VehicleBodyType vehicleBodyType;
+
   final String parkingLevel;
   final String parkingSlot;
 
@@ -157,17 +162,125 @@ class CheckInState extends Equatable {
 }
 
 class CheckInCubit extends Cubit<CheckInState> {
-  CheckInCubit() : super(const CheckInState());
+  CheckInCubit({
+    TicketService? ticketService,
+    AuthRepository? authRepository,
+    ShiftService? shiftService,
+  })  : _ticketService = ticketService,
+        _authRepository = authRepository,
+        _shiftService = shiftService,
+        super(const CheckInState());
 
   static const _uuid = Uuid();
 
-  /// Ensures a ticket number exists for this check-in session (idempotent).
-  void ensureTicket() {
-    if (state.ticketNumber.isNotEmpty) return;
-    emit(state.copyWith(ticketNumber: TicketNumberGenerator.generateLocal()));
+  final TicketService? _ticketService;
+  final AuthRepository? _authRepository;
+  final ShiftService? _shiftService;
+
+  /// Reserves a sequential ticket id via a draft `tickets` row (see [TicketService.createDraftTicket]).
+  /// Call when the check-in shell opens. Safe to call repeatedly while [CheckInState.ticketNumber] is empty.
+  Future<void> ensureDraftTicketReserved() async {
+    final ts = _ticketService;
+    final auth = _authRepository;
+    final shiftSvc = _shiftService;
+    if (ts == null || auth == null || shiftSvc == null) return;
+    if (state.ticketNumber.trim().isNotEmpty) return;
+    final session = await auth.getActiveSession();
+    if (session == null) return;
+    final userId = await shiftSvc.shiftUserIdForLocalAccount(session.userId);
+    final shift = await shiftSvc.getActiveShift(userId);
+    if (shift == null) return;
+    final site = await auth.branchAndAreaFromDb();
+    try {
+      final id = await ts.createDraftTicket(
+        shiftId: shift.id,
+        userId: userId,
+        branchId: site.branch,
+      );
+      emit(state.copyWith(ticketNumber: id));
+    } catch (_) {
+      // Leave empty; header shows … until a draft can be created (e.g. shift opened).
+    }
   }
 
+  /// Persists `valet_tickets` + sync queue. Returns null on success, else error text.
+  Future<String?> submitValetTicket() async {
+    final ts = _ticketService;
+    final auth = _authRepository;
+    final shiftSvc = _shiftService;
+    if (ts == null || auth == null || shiftSvc == null) {
+      return 'Check-in services are not configured.';
+    }
+    final session = await auth.getActiveSession();
+    if (session == null) return 'No active session.';
+    final userId = await shiftSvc.shiftUserIdForLocalAccount(session.userId);
+    final shift = await shiftSvc.getActiveShift(userId);
+    if (shift == null) return 'Open a cash shift before check-in.';
+    final site = await auth.branchAndAreaFromDb();
+    final data = _buildFormData();
+    if (!data.isComplete) {
+      return 'Complete plate, brand, color, and cellphone.';
+    }
+    try {
+      final existingId = state.ticketNumber.trim();
+      if (existingId.isNotEmpty) {
+        final row = await ts.ticketById(existingId);
+        if (row != null && row.status == 'draft') {
+          final ticket = await ts.finalizeDraftTicket(
+            ticketId: existingId,
+            data: data,
+            shiftId: shift.id,
+            userId: userId,
+            branchId: site.branch,
+          );
+          emit(state.copyWith(ticketNumber: ticket.id));
+          return null;
+        }
+      }
+      final ticket = await ts.createTicket(
+        data: data,
+        shiftId: shift.id,
+        userId: userId,
+        branchId: site.branch,
+      );
+      emit(state.copyWith(ticketNumber: ticket.id));
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  CheckInFormData _buildFormData() {
+    final belongings = List<String>.from(state.selectedBelongings);
+    final other = state.otherBelongings.trim();
+    if (other.isNotEmpty) belongings.add('Other: $other');
+    return CheckInFormData(
+      plateNumber: state.plateNumber.trim(),
+      vehicleBrand: '${state.vehicleBrandMake} ${state.vehicleModel}'.trim(),
+      vehicleColor: state.vehicleColor.trim(),
+      vehicleType: '',
+      cellphoneNumber: state.contactNumber.trim(),
+      damageMarkersJson: _damageMarkersJson(state.vehicleDamageEntries),
+      personalBelongingsJson: jsonEncode(belongings),
+    );
+  }
+
+  static String _damageMarkersJson(List<VehicleDamageEntry> entries) =>
+      jsonEncode([
+        for (final e in entries)
+          {
+            'zone': e.zoneLabel ?? '',
+            'type': e.type.name,
+            'x': e.normalizedX,
+            'y': e.normalizedY,
+          },
+      ]);
+
   void resetSession() {
+    final id = state.ticketNumber.trim();
+    if (id.isNotEmpty) {
+      unawaited(_ticketService?.deleteDraftTicket(id) ?? Future.value());
+    }
     emit(const CheckInState());
   }
 

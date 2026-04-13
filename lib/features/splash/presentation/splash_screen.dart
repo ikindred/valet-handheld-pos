@@ -37,7 +37,7 @@ class _SplashScreenState extends State<SplashScreen> {
     final repo = context.read<AuthRepository>();
     final prefs = await SharedPreferences.getInstance();
     try {
-      ValetLog.d('splash/_bootstrap', 'start');
+      ValetLog.debug('splash/_bootstrap', 'start');
       final deviceId = await DeviceIdService.getOrCreate();
       final deviceInfo = await buildDeviceInfoPayload();
 
@@ -49,7 +49,7 @@ class _SplashScreenState extends State<SplashScreen> {
       } catch (_) {
         online = false;
       }
-      ValetLog.d('splash/_bootstrap', 'online=$online');
+      ValetLog.debug('splash/_bootstrap', 'online=$online');
       if (online) {
         await repo.registerDevice(
           deviceId: deviceId,
@@ -61,7 +61,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
       final session = await repo.getActiveSession();
       if (session == null) {
-        ValetLog.d('splash/_bootstrap', 'no session, navigating to login');
+        ValetLog.debug('splash/_bootstrap', 'no session, navigating to login');
         await OfflineModePrefs.write(prefs, !online);
         if (mounted) context.go('/login');
         return;
@@ -82,7 +82,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
       // Offline sessions never have a bearer token — do not treat as logged out.
       if (session.isOfflineSession) {
-        ValetLog.d(
+        ValetLog.debug(
           'splash/_bootstrap',
           'offline session, restoring local state',
         );
@@ -109,7 +109,7 @@ class _SplashScreenState extends State<SplashScreen> {
             standardRates: rates,
           );
         } catch (e, st) {
-          ValetLog.e(
+          ValetLog.error(
             'splash/_bootstrap',
             'revalidate failed, logging out',
             e,
@@ -122,13 +122,13 @@ class _SplashScreenState extends State<SplashScreen> {
       }
 
       // Online-originated session but no network: resume from local DB (shift / cash state).
-      ValetLog.d(
+      ValetLog.debug(
         'splash/_bootstrap',
         'offline path, restoring local session',
       );
       await restoreLocalSession();
     } catch (e, st) {
-      ValetLog.e('splash/_bootstrap', 'bootstrap error', e, st);
+      ValetLog.error('splash/_bootstrap', 'bootstrap error', e, st);
       await OfflineModePrefs.write(prefs, false);
       if (mounted) context.go('/login');
     }

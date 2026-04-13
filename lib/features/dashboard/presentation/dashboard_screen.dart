@@ -3,19 +3,22 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/session/standard_parking_rates.dart';
+import '../../../core/formatting/peso_currency.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/branch_config_service.dart';
+import '../../../data/services/rate_service.dart';
+import '../../../shared/widgets/rates_bottom_sheet.dart';
 import '../../auth/state/auth_bloc.dart';
-import 'dashboard_standard_rates_sheet.dart';
+import '../../check_in/state/check_in_cubit.dart';
+import '../state/dashboard_cubit.dart';
 import 'widgets/dashboard_widgets.dart';
 
 /// Home after [OpenCashScreen] — layout from Figma
 /// [Valet Parking / Dashboard](https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-453).
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
   static String greetingWord() {
@@ -26,39 +29,73 @@ class DashboardScreen extends StatelessWidget {
   }
 
   @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(context.read<BranchConfigService>().syncFromServerForDeviceBranch());
+      unawaited(context.read<DashboardCubit>().refresh());
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: DashboardStyles.bg,
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const DashboardLeftRail(),
-          Expanded(
-            child: SafeArea(
-              left: false,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final wide = constraints.maxWidth >= 720;
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const _DashboardHeaderRow(),
-                        const SizedBox(height: 28),
-                        _StatsRow(wide: wide),
-                        const SizedBox(height: 20),
-                        _ActionRow(wide: wide),
-                        const SizedBox(height: 24),
-                        const _RecentTransactionsCard(),
-                      ],
-                    ),
-                  );
-                },
+    return BlocListener<AuthBloc, AuthState>(
+      listenWhen: (prev, next) {
+        if (prev is AuthAuthenticated && next is AuthAuthenticated) {
+          return prev.cashSessionStatus != next.cashSessionStatus ||
+              prev.userId != next.userId;
+        }
+        return prev.runtimeType != next.runtimeType;
+      },
+      listener: (context, _) {
+        final c = context.read<DashboardCubit>();
+        if (c.state is! DashboardInitial) {
+          unawaited(c.refresh());
+        }
+      },
+      child: Scaffold(
+        backgroundColor: DashboardStyles.bg,
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const DashboardLeftRail(),
+            Expanded(
+              child: SafeArea(
+                left: false,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final wide = constraints.maxWidth >= 720;
+                    return BlocBuilder<DashboardCubit, DashboardState>(
+                      builder: (context, dash) {
+                        return SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const _DashboardHeaderRow(),
+                              const SizedBox(height: 28),
+                              _StatsRow(wide: wide, dashboard: dash),
+                              const SizedBox(height: 20),
+                              _ActionRow(wide: wide),
+                              const SizedBox(height: 24),
+                              _RecentTransactionsCard(dashboard: dash),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -159,60 +196,24 @@ class _HeaderRow extends StatelessWidget {
             ],
           ),
         ),
-        BlocBuilder<AuthBloc, AuthState>(
-          buildWhen: (prev, next) {
-            StandardParkingRates? rates(AuthState s) =>
-                s is AuthAuthenticated ? s.standardRates : null;
-            return rates(prev) != rates(next);
-          },
-          builder: (context, state) {
-            final rates = state is AuthAuthenticated
-                ? state.standardRates
-                : null;
-            if (rates == null) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: SizedBox(
-                height: 44,
-                child: FilledButton(
-                  onPressed: () =>
-                      showStandardRatesSheet(context, rates: rates),
-                  style: FilledButton.styleFrom(
-                    alignment: Alignment.center,
-                    backgroundColor: DashboardStyles.orange,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 18),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'View rate',
-                      textAlign: TextAlign.center,
-                      // Poppins’ line box adds asymmetric ascent/descent; this
-                      // trims extra space so the label looks vertically centered.
-                      textHeightBehavior: const TextHeightBehavior(
-                        applyHeightToFirstAscent: false,
-                        applyHeightToLastDescent: false,
-                      ),
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        height: 1.0,
-                      ).copyWith(
-                        leadingDistribution: TextLeadingDistribution.even,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: RatesOutlinePill(
+            onPressed: () async {
+              final auth = context.read<AuthRepository>();
+              final rateService = context.read<RateService>();
+              final site = await auth.branchAndAreaFromDb();
+              final bid = site.branch.trim().isEmpty ? '_' : site.branch.trim();
+              final name = branchRatesSubtitle(site);
+              if (!context.mounted) return;
+              await showBranchRatesBottomSheet(
+                context,
+                rateService: rateService,
+                branchId: bid,
+                branchName: name,
+              );
+            },
+          ),
         ),
         const DashboardStatusPillLive(),
       ],
@@ -221,46 +222,68 @@ class _HeaderRow extends StatelessWidget {
 }
 
 class _StatsRow extends StatelessWidget {
-  const _StatsRow({required this.wide});
+  const _StatsRow({required this.wide, required this.dashboard});
 
   final bool wide;
+  final DashboardState dashboard;
 
   @override
   Widget build(BuildContext context) {
+    if (dashboard is DashboardLoading || dashboard is DashboardInitial) {
+      return const SizedBox(
+        height: 160,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (dashboard is DashboardError) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          (dashboard as DashboardError).message,
+          style: DashboardStyles.statHint(),
+        ),
+      );
+    }
+    final d = dashboard as DashboardReady;
+    final peso = PesoCurrency.currency(decimalDigits: 0);
+    final delta = d.checkInsLastHour > 0 ? '+${d.checkInsLastHour} this hour' : null;
     final cards = [
       DashboardStatCard(
         title: 'Vehicles In',
-        valueText: '24',
-        deltaText: '+3 this hour',
+        valueText: '${d.vehiclesIn}',
+        deltaText: delta,
         valueColor: DashboardStyles.orange,
       ),
-      const DashboardStatCard(
+      DashboardStatCard(
         title: 'Checked Out',
-        valueText: '18',
-        subtitle: 'Today',
+        valueText: '${d.checkedOut}',
+        subtitle: 'This shift',
       ),
-      const DashboardStatCard(
+      DashboardStatCard(
         title: 'Active Slots',
-        valueText: '6',
-        subtitle: 'of 30 Slots',
+        valueText: '${d.activeSlotsUsed}',
+        subtitle: 'of ${d.activeSlotsTotal} Slots',
       ),
-      const DashboardStatCard(
+      DashboardStatCard(
         title: "Today's Revenue",
-        valueText: '₱ 3,420',
-        subtitle: '18 Transactions',
+        valueText: peso.format(d.todayRevenue),
+        subtitle: '${d.revenueCheckoutCount} Transactions',
         valueColor: DashboardStyles.green,
       ),
     ];
 
     if (wide) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (var i = 0; i < cards.length; i++) ...[
-            Expanded(child: cards[i]),
-            if (i < cards.length - 1) const SizedBox(width: 16),
+      // Finite row height under unbounded scroll constraints so stretch is valid.
+      return IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < cards.length; i++) ...[
+              Expanded(child: cards[i]),
+              if (i < cards.length - 1) const SizedBox(width: 16),
+            ],
           ],
-        ],
+        ),
       );
     }
 
@@ -296,7 +319,10 @@ class _ActionRow extends StatelessWidget {
         ),
         child: const Icon(Icons.add_rounded, color: Colors.white, size: 32),
       ),
-      onTap: () => context.push('/check-in/step-1'),
+      onTap: () {
+        context.read<CheckInCubit>().resetSession();
+        context.push('/check-in/step-1');
+      },
     );
 
     final checkOut = DashboardActionTile(
@@ -338,38 +364,23 @@ class _ActionRow extends StatelessWidget {
 }
 
 class _RecentTransactionsCard extends StatelessWidget {
-  const _RecentTransactionsCard();
+  const _RecentTransactionsCard({required this.dashboard});
+
+  final DashboardState dashboard;
 
   static const _dividerColor = Color(0x21000000);
 
+  static TransactionStatusKind _mapStatus(DashboardRecentStatus s) =>
+      s == DashboardRecentStatus.parked
+          ? TransactionStatusKind.parked
+          : TransactionStatusKind.checkedOut;
+
   @override
   Widget build(BuildContext context) {
-    const rows = <(String, String, String, TransactionStatusKind)>[
-      (
-        'ABC 1234',
-        'Toyota Vios · White',
-        'In at 09:32 AM — Slot B-04',
-        TransactionStatusKind.parked,
-      ),
-      (
-        'XYZ 5678',
-        'Honda City · Silver',
-        'In at 09:15 AM — Slot A-11',
-        TransactionStatusKind.parked,
-      ),
-      (
-        'DEF 9012',
-        'Mitsubishi Montero · Black',
-        'Out at 08:58 AM — ₱180.00',
-        TransactionStatusKind.checkedOut,
-      ),
-      (
-        'DEF 9012',
-        'Mitsubishi Montero · Black',
-        'In at 05:15 AM — Slot A-16',
-        TransactionStatusKind.parked,
-      ),
-    ];
+    final rows = switch (dashboard) {
+      DashboardReady(:final recent) => recent,
+      _ => const <DashboardRecentTx>[],
+    };
 
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
@@ -380,16 +391,31 @@ class _RecentTransactionsCard extends StatelessWidget {
           Text('RECENT TRANSACTION', style: DashboardStyles.sectionTitle()),
           const SizedBox(height: 16),
           const Divider(height: 1, color: _dividerColor),
-          for (var i = 0; i < rows.length; i++) ...[
-            DashboardTransactionRow(
-              plate: rows[i].$1,
-              line1: rows[i].$2,
-              line2: rows[i].$3,
-              status: rows[i].$4,
-            ),
-            if (i < rows.length - 1)
-              const Divider(height: 1, color: _dividerColor),
-          ],
+          if (rows.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Text(
+                dashboard is DashboardLoading
+                    ? 'Loading…'
+                    : 'No recent transactions for this shift.',
+                style: DashboardStyles.statHint(),
+                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            for (var i = 0; i < rows.length; i++) ...[
+              DashboardTransactionRow(
+                plate: rows[i].plate,
+                line1: rows[i].line1,
+                line2: rows[i].line2,
+                status: _mapStatus(rows[i].status),
+                onTap: () => context.push(
+                  '/dashboard/ticket/${Uri.encodeComponent(rows[i].ticketId)}',
+                ),
+              ),
+              if (i < rows.length - 1)
+                const Divider(height: 1, color: _dividerColor),
+            ],
         ],
       ),
     );

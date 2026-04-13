@@ -63,9 +63,35 @@ class AppConfig {
   static String get shiftCurrent =>
       baseUrl + (_env('API_SHIFT_CURRENT') ?? '/api/v1/shifts/current');
 
+  /// REST collection for shifts (POST create, PATCH update).
+  static String get shiftsRest =>
+      baseUrl + (_env('API_SHIFTS_REST') ?? '/api/v1/shifts');
+
+  static String shiftById(String shiftId) {
+    final enc = Uri.encodeComponent(shiftId);
+    final t = (_env('API_SHIFT_BY_ID') ?? '').trim();
+    if (t.isNotEmpty) {
+      return baseUrl + t.replaceAll('{id}', enc);
+    }
+    return '$baseUrl/api/v1/shifts/$enc';
+  }
+
   // ── TICKETS ───────────────────────────────
   static String get ticketCreate =>
       baseUrl + (_env('API_TICKET_CREATE') ?? '/api/v1/tickets');
+
+  /// REST collection for tickets (POST create, PATCH update by id).
+  static String get ticketsRest =>
+      baseUrl + (_env('API_TICKETS_REST') ?? '/api/v1/tickets');
+
+  static String ticketById(String ticketId) {
+    final enc = Uri.encodeComponent(ticketId);
+    final t = (_env('API_TICKET_BY_ID') ?? '').trim();
+    if (t.isNotEmpty) {
+      return baseUrl + t.replaceAll('{id}', enc);
+    }
+    return '$baseUrl/api/v1/tickets/$enc';
+  }
 
   static String get ticketScan =>
       baseUrl + (_env('API_TICKET_SCAN') ?? '/api/v1/tickets/scan');
@@ -89,12 +115,27 @@ class AppConfig {
   static String get config =>
       baseUrl + (_env('API_CONFIG') ?? '/api/v1/config');
 
+  /// GET branch-level key/value settings (overnight window, mall hours, …).
+  /// [branchId] is URL-encoded as a single path segment.
+  static String branchConfigUrl(String branchId) {
+    final encoded = Uri.encodeComponent(branchId.trim());
+    final template = (_env('API_BRANCH_CONFIG') ?? '').trim();
+    if (template.isNotEmpty) {
+      return baseUrl + template.replaceAll('{branch_id}', encoded);
+    }
+    return '$baseUrl/api/v1/branches/$encoded/config';
+  }
+
   // ── REPORTS ───────────────────────────────
   static String get reportsSales =>
       baseUrl + (_env('API_REPORTS_SALES') ?? '/api/v1/reports/sales');
 
   static String get reportsShifts =>
       baseUrl + (_env('API_REPORTS_SHIFTS') ?? '/api/v1/reports/shifts');
+
+  /// GET historical transactions (Tier 2 background sync).
+  static String get transactionsList =>
+      baseUrl + (_env('API_TRANSACTIONS') ?? '/api/v1/transactions');
 
   // ── SYNC ──────────────────────────────────
   static String get syncFlush =>

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'core/logging/valet_log.dart';
@@ -12,11 +13,14 @@ import 'core/di/app_providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Offline / captive portals: do not hit fonts.gstatic.com at runtime; load
+  // bundled files under [google_fonts/] (see pubspec assets).
+  GoogleFonts.config.allowRuntimeFetching = false;
   await dotenv.load(fileName: '.env');
   // Dark status bar *icons* on light surfaces (fixes light-on-light contrast).
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
   await lockLandscape();
-  ValetLog.d('main', 'bootstrap complete, running app');
+  ValetLog.debug('main', 'bootstrap complete, running app');
   runApp(const ValetMasterApp());
 }
 

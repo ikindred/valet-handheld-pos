@@ -3,8 +3,8 @@ import 'dart:convert';
 
 import 'package:bcrypt/bcrypt.dart';
 import 'package:drift/drift.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/logging/valet_log.dart';
@@ -15,10 +15,12 @@ import '../../core/session/standard_parking_rates.dart';
 import '../../core/time/unix_timestamp.dart';
 import '../local/db/app_database.dart';
 import '../remote/auth_api.dart';
+import '../services/shift_service.dart';
+import '../services/ticket_sync_payload.dart';
 
 /// Local persistence rules (Drift ↔ SQL intent):
 ///
-/// **Open cash for a user** — `SELECT * FROM shifts WHERE user_id = ? AND is_open = 1 LIMIT 1`
+/// **Open cash for a user** — unified `shifts` open row
 /// → [shiftRouteForLocalUser], [_syncShiftFromFlag], [recordOpenCash].
 ///
 /// **Active session (this device)** — `SELECT * FROM sessions WHERE is_active = 1 LIMIT 1`
@@ -41,11 +43,15 @@ class AuthRepository {
     this._db,
     this._api,
     this._refresh,
+    this._shifts,
   );
 
   final AppDatabase _db;
   final AuthApi _api;
   final RouterRefreshNotifier _refresh;
+  final ShiftService _shifts;
+
+  static const _uuid = Uuid();
 
   /// `SELECT * FROM sessions WHERE is_active = 1 LIMIT 1`
   Future<Session?> getActiveSession() {
@@ -55,13 +61,10 @@ class AuthRepository {
         .getSingleOrNull();
   }
 
-  /// `SELECT * FROM shifts WHERE user_id = ? AND is_open = 1 LIMIT 1`
+  /// Open `shifts` row for server-linked user id string.
   Future<String> shiftRouteForLocalUser(int localUserId) async {
-    final open = await (_db.select(_db.shifts)
-          ..where((sh) =>
-              sh.userId.equals(localUserId) & sh.isOpen.equals(true))
-          ..limit(1))
-        .getSingleOrNull();
+    final uid = await _shifts.shiftUserIdForLocalAccount(localUserId);
+    final open = await _shifts.getActiveShift(uid);
     return open != null ? '/dashboard' : '/cash/open';
   }
 
@@ -85,14 +88,9 @@ class AuthRepository {
   }
 
   /// Open shift for user, if any.
-  Future<Shift?> getOpenShiftForUser(int localUserId) {
-    return (_db.select(_db.shifts)
-          ..where(
-            (sh) =>
-                sh.userId.equals(localUserId) & sh.isOpen.equals(true),
-          )
-          ..limit(1))
-        .getSingleOrNull();
+  Future<Shift?> getOpenShiftForUser(int localUserId) async {
+    final uid = await _shifts.shiftUserIdForLocalAccount(localUserId);
+    return _shifts.getActiveShift(uid);
   }
 
   /// POST device/register; persists [DeviceRegisterResult.branch] / [area] when present.
@@ -268,7 +266,7 @@ class AuthRepository {
     required String password,
     required String deviceId,
   }) async {
-    ValetLog.d('AuthRepository.loginOnline', 'begin');
+    ValetLog.debug('AuthRepository.loginOnline', 'begin');
     await requireDeviceSiteAssigned();
     final res = await _api.login(
       email: email,
@@ -305,9 +303,8 @@ class AuthRepository {
       );
     });
 
-    await _flushSyncQueueForActiveSession();
     _refresh.notifyAuthChanged();
-    ValetLog.d(
+    ValetLog.debug(
       'AuthRepository.loginOnline',
       'success localUserId=$accountId',
     );
@@ -346,7 +343,7 @@ class AuthRepository {
     });
 
     _refresh.notifyAuthChanged();
-    ValetLog.d(
+    ValetLog.debug(
       'AuthRepository.loginOffline',
       'success localUserId=${row.id}',
     );
@@ -402,7 +399,6 @@ class AuthRepository {
       }
     });
 
-    await _flushSyncQueueForActiveSession();
     _refresh.notifyAuthChanged();
     return res.standardRates;
   }
@@ -428,8 +424,8 @@ class AuthRepository {
     _refresh.notifyAuthChanged();
   }
 
-  /// Creates an open shift row and enqueues `shift_open`. Returns the new [Shift.id].
-  Future<int> recordOpenCash({
+  /// Opens a cash shift via [ShiftService] (UUID id). [sessionId] is unused (kept for call sites).
+  Future<String> recordOpenCash({
     required int localUserId,
     required int sessionId,
     required double openingFloat,
@@ -438,143 +434,100 @@ class AuthRepository {
     String? shiftDate,
     String? openingNotes,
   }) async {
-    final date =
-        shiftDate ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final now = unixNowSeconds();
-    final shiftId = await _db.transaction<int>(() async {
-      final id = await _db.into(_db.shifts).insert(
-            ShiftsCompanion.insert(
-              userId: localUserId,
-              sessionId: sessionId,
-              branch: branch,
-              area: area,
-              shiftDate: date,
-              isOpen: const Value(true),
-              openingFloat: Value(openingFloat),
-              openingNotes: Value(openingNotes),
-              openedAt: now,
-            ),
-          );
-      final row = await (_db.select(_db.shifts)
-            ..where((s) => s.id.equals(id)))
-          .getSingle();
-      final payload = jsonEncode({
-        'shift': _shiftToJson(row),
-        'opening_denominations': <Map<String, dynamic>>[],
-      });
-      await _db.into(_db.syncQueue).insert(
-            SyncQueueCompanion.insert(
-              type: 'shift_open',
-              entityId: id,
-              payload: payload,
-              createdAt: now,
-            ),
-          );
-      return id;
-    });
-    await _flushSyncQueueForActiveSession();
+    final uid = await _shifts.shiftUserIdForLocalAccount(localUserId);
+    final site = await branchAndAreaFromDb();
+    final bid = branch.trim().isNotEmpty ? branch.trim() : site.branch.trim();
+    final shift = await _shifts.createShift(
+      userId: uid,
+      branchId: bid.isEmpty ? '_' : bid,
+      openingFloat: openingFloat,
+    );
     _refresh.notifyAuthChanged();
-    return shiftId;
+    return shift.id;
   }
 
-  /// Still-checked-in tickets attributed to this shift (for close-cash warning).
-  Future<List<ValetTransaction>> queryOpenTransactionsForShiftClose(
-    int shiftId,
-  ) {
-    return (_db.select(_db.valetTransactions)
+  /// Active tickets on this shift (close-cash warning).
+  Future<List<Ticket>> queryOpenTicketsForShiftClose(String shiftId) {
+    return (_db.select(_db.tickets)
           ..where(
-            (t) =>
-                t.checkinShiftId.equals(shiftId) &
-                t.timeOut.isNull() &
-                t.status.equals('active'),
+            (t) => t.shiftId.equals(shiftId) & t.status.equals('active'),
           )
-          ..orderBy([(t) => OrderingTerm.asc(t.timeIn)]))
+          ..orderBy([(t) => OrderingTerm.asc(t.checkInAt)]))
         .get();
   }
 
-  /// Open active tickets from prior shifts that need adopting by [newShiftId].
-  Future<List<ValetTransaction>> queryInheritedOpenTransactions(
-    int newShiftId,
-  ) {
-    return (_db.select(_db.valetTransactions)
+  /// Active tickets from other shifts to optionally adopt into [newShiftId].
+  Future<List<Ticket>> queryInheritedOpenTickets(String newShiftId) {
+    return (_db.select(_db.tickets)
           ..where(
             (t) =>
-                t.timeOut.isNull() &
-                t.status.equals('active') &
-                t.checkoutShiftId.isNull() &
-                t.checkinShiftId.equals(newShiftId).not(),
+                t.status.equals('active') & t.shiftId.equals(newShiftId).not(),
           )
-          ..orderBy([(t) => OrderingTerm.asc(t.timeIn)]))
+          ..orderBy([(t) => OrderingTerm.asc(t.checkInAt)]))
         .get();
   }
 
-  /// Sum of [ValetTransactions.totalFee] for sales credited to [checkoutShiftId].
-  Future<double> sumSalesForCheckoutShift(int checkoutShiftId) async {
+  /// Sum of completed ticket fees for [shiftId].
+  Future<double> sumSalesForCheckoutShift(String shiftId) async {
     final row = await _db.customSelect(
       '''
-SELECT COALESCE(SUM(total_fee), 0) AS s FROM transactions
-WHERE checkout_shift_id = ?
-  AND (status = ? OR time_out IS NOT NULL)
+SELECT COALESCE(SUM(fee), 0) AS s FROM tickets
+WHERE shift_id = ? AND status = 'completed'
 ''',
-      variables: [
-        Variable<int>(checkoutShiftId),
-        Variable.withString('completed'),
-      ],
+      variables: [Variable<String>(shiftId)],
+      readsFrom: {_db.tickets},
     ).getSingle();
     return (row.data['s'] as num?)?.toDouble() ?? 0.0;
   }
 
-  /// Count of completed checkouts for [checkoutShiftId] (same filter as [sumSalesForCheckoutShift]).
-  Future<int> countCompletedForCheckoutShift(int checkoutShiftId) async {
+  /// Completed checkouts on [shiftId].
+  Future<int> countCompletedForCheckoutShift(String shiftId) async {
     final row = await _db.customSelect(
       '''
-SELECT COUNT(*) AS c FROM transactions
-WHERE checkout_shift_id = ?
-  AND (status = ? OR time_out IS NOT NULL)
+SELECT COUNT(*) AS c FROM tickets
+WHERE shift_id = ? AND status = 'completed'
 ''',
-      variables: [
-        Variable<int>(checkoutShiftId),
-        Variable.withString('completed'),
-      ],
+      variables: [Variable<String>(shiftId)],
+      readsFrom: {_db.tickets},
     ).getSingle();
-    return (row.data['c'] as int?) ?? (row.data['c'] as num?)?.toInt() ?? 0;
+    return (row.data['c'] as num?)?.toInt() ?? 0;
   }
 
-  /// Sets [checkoutShiftId] on inherited open rows and enqueues `transaction_shift_transfer`.
-  Future<void> adoptInheritedTransactionsForShift(int newShiftId) async {
-    final rows = await queryInheritedOpenTransactions(newShiftId);
+  /// Reassigns inherited active tickets to [newShiftId] and enqueues outbound sync.
+  Future<void> adoptInheritedTicketsForShift(String newShiftId) async {
+    final rows = await queryInheritedOpenTickets(newShiftId);
     if (rows.isEmpty) return;
-    final now = unixNowSeconds();
+    final now = DateTime.now().toIso8601String();
     await _db.transaction(() async {
       for (final row in rows) {
-        await (_db.update(_db.valetTransactions)
-              ..where((t) => t.id.equals(row.id)))
+        await (_db.update(_db.tickets)..where((t) => t.id.equals(row.id)))
             .write(
-          ValetTransactionsCompanion(
-            checkoutShiftId: Value(newShiftId),
+          TicketsCompanion(
+            shiftId: Value(newShiftId),
+            syncStatus: const Value('pending'),
           ),
         );
+        final updated = await (_db.select(_db.tickets)
+              ..where((t) => t.id.equals(row.id)))
+            .getSingle();
         await _db.into(_db.syncQueue).insert(
               SyncQueueCompanion.insert(
-                type: 'transaction_shift_transfer',
-                entityId: row.id,
-                payload: jsonEncode({
-                  'transaction_id': row.id,
-                  'from_shift_id': row.checkinShiftId,
-                  'to_shift_id': newShiftId,
-                  'adopted_at': now,
-                }),
+                id: _uuid.v4(),
+                operation: 'update',
+                queueTableName: 'tickets',
+                recordId: updated.id,
+                payload: jsonEncode(ticketSyncPayload(updated)),
+                syncStatus: 'pending',
                 createdAt: now,
               ),
             );
       }
     });
-    await _flushSyncQueueForActiveSession();
   }
 
   /// Logout only: end session, clear token; optional remote logout (non-blocking).
   Future<void> logoutOnly({String? deviceId}) async {
-    ValetLog.d('AuthRepository.logoutOnly', 'begin');
+    ValetLog.debug('AuthRepository.logoutOnly', 'begin');
     final session = await getActiveSession();
     if (session == null) return;
     final token = session.authToken;
@@ -592,7 +545,9 @@ WHERE checkout_shift_id = ?
     _refresh.notifyAuthChanged();
   }
 
-  /// Close cash + logout: persist reconciliation, enqueue sync, flush while token valid, then end session.
+  /// Close cash + logout: [ShiftService] has already closed the shift row; flush queue then end session.
+  ///
+  /// [closingFloat], [closingNotes], and sales fields are accepted for UI parity but not persisted here.
   Future<void> confirmCloseCash({
     required int localUserId,
     required double closingFloat,
@@ -605,48 +560,6 @@ WHERE checkout_shift_id = ?
   }) async {
     final session = await getActiveSession();
     if (session == null || session.userId != localUserId) return;
-    final token = session.authToken;
-
-    final shift = await getOpenShiftForUser(localUserId);
-    if (shift == null) return;
-
-    final now = unixNowSeconds();
-
-    await _db.transaction(() async {
-      await (_db.update(_db.shifts)..where((s) => s.id.equals(shift.id)))
-          .write(
-        ShiftsCompanion(
-          isOpen: const Value(false),
-          closingFloat: Value(closingFloat),
-          closingNotes: Value(closingNotes),
-          totalSales: Value(totalSales),
-          expectedCash: Value(expectedCash),
-          variance: Value(variance),
-          remittance: Value(remittance),
-          transactionsCount: Value(transactionsCount),
-          closedAt: Value(now),
-        ),
-      );
-      final updated = await (_db.select(_db.shifts)
-            ..where((s) => s.id.equals(shift.id)))
-          .getSingle();
-      final payload = jsonEncode({
-        'shift': _shiftToJson(updated),
-        'closing_denominations': <Map<String, dynamic>>[],
-      });
-      await _db.into(_db.syncQueue).insert(
-            SyncQueueCompanion.insert(
-              type: 'shift_close',
-              entityId: shift.id,
-              payload: payload,
-              createdAt: now,
-            ),
-          );
-    });
-
-    if (token != null && token.isNotEmpty) {
-      await _flushSyncQueue(token: token);
-    }
 
     await (_db.update(_db.sessions)..where((s) => s.id.equals(session.id)))
         .write(
@@ -677,199 +590,22 @@ WHERE checkout_shift_id = ?
     required bool isOpenCash,
   }) async {
     if (isOpenCash) {
-      final existing = await (_db.select(_db.shifts)
-            ..where(
-              (sh) =>
-                  sh.userId.equals(localUserId) & sh.isOpen.equals(true),
-            )
-            ..limit(1))
-          .getSingleOrNull();
-      if (existing != null) {
-        await (_db.update(_db.shifts)..where((sh) => sh.id.equals(existing.id)))
-            .write(
-          ShiftsCompanion(sessionId: Value(sessionId)),
+      final uid = await _shifts.shiftUserIdForLocalAccount(localUserId);
+      final open = await _shifts.getActiveShift(uid);
+      if (open != null) return;
+      final site = await branchAndAreaFromDb();
+      final bid = site.branch.trim().isEmpty ? '_' : site.branch.trim();
+      try {
+        await _shifts.createShift(
+          userId: uid,
+          branchId: bid,
+          openingFloat: 0,
         );
-      } else {
-        final date =
-            DateFormat('yyyy-MM-dd').format(DateTime.now());
-        await _db.into(_db.shifts).insert(
-              ShiftsCompanion.insert(
-                userId: localUserId,
-                sessionId: sessionId,
-                branch: '',
-                area: '',
-                shiftDate: date,
-                isOpen: const Value(true),
-                openingFloat: const Value(0.0),
-                openedAt: unixNowSeconds(),
-              ),
-            );
+      } on StateError catch (_) {
+        // Race: shift opened concurrently.
       }
     } else {
-      await (_db.update(_db.shifts)
-            ..where(
-              (sh) =>
-                  sh.userId.equals(localUserId) & sh.isOpen.equals(true),
-            ))
-          .write(
-        ShiftsCompanion(
-          isOpen: const Value(false),
-          closedAt: Value(unixNowSeconds()),
-        ),
-      );
+      await _shifts.closeActiveShiftForLocalUser(localUserId, 0);
     }
-  }
-
-  Future<void> _flushSyncQueueForActiveSession() async {
-    final session = await getActiveSession();
-    if (session == null) return;
-    final token = session.authToken;
-    if (token == null || token.isEmpty) return;
-    await _flushSyncQueue(token: token);
-  }
-
-  /// Public hook after local writes (e.g. offline check-in) to push [SyncQueue] when online.
-  Future<void> flushPendingSyncQueue() async {
-    ValetLog.d('AuthRepository.flushPendingSyncQueue', 'invoked');
-    await _flushSyncQueueForActiveSession();
-  }
-
-  Future<void> _flushSyncQueue({required String token}) async {
-    final pending = await (_db.select(_db.syncQueue)
-          ..where((q) => q.syncedAt.isNull())
-          ..orderBy([(q) => OrderingTerm.asc(q.createdAt)]))
-        .get();
-    ValetLog.d(
-      'AuthRepository._flushSyncQueue',
-      'pending=${pending.length}',
-    );
-    if (pending.isEmpty) return;
-
-    pending.sort((a, b) {
-      final c = _syncTypeOrder(a.type).compareTo(_syncTypeOrder(b.type));
-      if (c != 0) return c;
-      return a.createdAt.compareTo(b.createdAt);
-    });
-
-    if (AppConfig.useStubApi) {
-      ValetLog.d(
-        'AuthRepository._flushSyncQueue',
-        'stub API: marking ${pending.length} rows synced locally',
-      );
-      await _applySyncSuccessLocal(pending);
-      return;
-    }
-
-    final records = pending
-        .map(
-          (e) => <String, dynamic>{
-            'type': e.type,
-            'payload': jsonDecode(e.payload) as Object,
-          },
-        )
-        .toList();
-
-    try {
-      final response = await _api.syncFlush(token: token, records: records);
-      ValetLog.d(
-        'AuthRepository._flushSyncQueue',
-        'syncFlush ok, resultCount=${response.results.length}',
-      );
-      final now = unixNowSeconds();
-      for (var i = 0; i < response.results.length && i < pending.length; i++) {
-        final r = response.results[i];
-        final row = pending[i];
-        if (r.success) {
-          await (_db.update(_db.syncQueue)..where((q) => q.id.equals(row.id)))
-              .write(SyncQueueCompanion(syncedAt: Value(now)));
-          await _markEntitySyncedAt(row.type, row.entityId, now);
-        } else {
-          await (_db.update(_db.syncQueue)..where((q) => q.id.equals(row.id)))
-              .write(
-            SyncQueueCompanion(
-              retryCount: Value(row.retryCount + 1),
-              lastError: Value(r.error ?? 'sync failed'),
-            ),
-          );
-        }
-      }
-    } catch (e, st) {
-      ValetLog.e('AuthRepository._flushSyncQueue', 'syncFlush failed', e, st);
-      final err = e.toString();
-      for (final row in pending) {
-        await (_db.update(_db.syncQueue)..where((q) => q.id.equals(row.id)))
-            .write(
-          SyncQueueCompanion(
-            retryCount: Value(row.retryCount + 1),
-            lastError: Value(err),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _applySyncSuccessLocal(List<SyncQueueData> pending) async {
-    final now = unixNowSeconds();
-    for (final row in pending) {
-      await (_db.update(_db.syncQueue)..where((q) => q.id.equals(row.id)))
-          .write(SyncQueueCompanion(syncedAt: Value(now)));
-      await _markEntitySyncedAt(row.type, row.entityId, now);
-    }
-  }
-
-  Future<void> _markEntitySyncedAt(String type, int entityId, int ts) async {
-    switch (type) {
-      case 'shift_open':
-      case 'shift_close':
-        await (_db.update(_db.shifts)..where((s) => s.id.equals(entityId)))
-            .write(ShiftsCompanion(syncedAt: Value(ts)));
-        break;
-      case 'transaction':
-      case 'transaction_shift_transfer':
-        await (_db.update(_db.valetTransactions)
-              ..where((t) => t.id.equals(entityId)))
-            .write(ValetTransactionsCompanion(syncedAt: Value(ts)));
-        break;
-      default:
-        break;
-    }
-  }
-
-  int _syncTypeOrder(String t) {
-    switch (t) {
-      case 'shift_open':
-        return 0;
-      case 'transaction':
-      case 'transaction_shift_transfer':
-        return 1;
-      case 'shift_close':
-        return 2;
-      default:
-        return 99;
-    }
-  }
-
-  Map<String, dynamic> _shiftToJson(Shift s) {
-    return {
-      'id': s.id,
-      'session_id': s.sessionId,
-      'user_id': s.userId,
-      'branch': s.branch,
-      'area': s.area,
-      'shift_date': s.shiftDate,
-      'is_open': s.isOpen,
-      'opening_float': s.openingFloat,
-      'opening_notes': s.openingNotes,
-      'closing_float': s.closingFloat,
-      'closing_notes': s.closingNotes,
-      'total_sales': s.totalSales,
-      'expected_cash': s.expectedCash,
-      'variance': s.variance,
-      'remittance': s.remittance,
-      'transactions_count': s.transactionsCount,
-      'opened_at': s.openedAt,
-      'closed_at': s.closedAt,
-      'synced_at': s.syncedAt,
-    };
   }
 }

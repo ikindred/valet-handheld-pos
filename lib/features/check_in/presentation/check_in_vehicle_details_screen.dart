@@ -38,7 +38,6 @@ class _CheckInVehicleDetailsScreenState
   late final TextEditingController _brandCtrl;
   late final TextEditingController _colorCtrl;
   late final TextEditingController _yearCtrl;
-  late final TextEditingController _otherBelongingsCtrl;
 
   @override
   void initState() {
@@ -49,7 +48,6 @@ class _CheckInVehicleDetailsScreenState
     _brandCtrl = TextEditingController(text: s.vehicleBrandMake);
     _colorCtrl = TextEditingController(text: s.vehicleColor);
     _yearCtrl = TextEditingController(text: s.vehicleYear);
-    _otherBelongingsCtrl = TextEditingController(text: s.otherBelongings);
   }
 
   @override
@@ -59,18 +57,24 @@ class _CheckInVehicleDetailsScreenState
     _brandCtrl.dispose();
     _colorCtrl.dispose();
     _yearCtrl.dispose();
-    _otherBelongingsCtrl.dispose();
     super.dispose();
   }
 
   void _onNext() {
-    context.read<CheckInCubit>().updateVehicleStep(
+    final cubit = context.read<CheckInCubit>();
+    final s = cubit.state;
+    if (s.contactNumber.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add cellphone on step 1 before continuing.')),
+      );
+      return;
+    }
+    cubit.updateVehicleStep(
       plateNumber: _plateCtrl.text.trim(),
       vehicleModel: _modelCtrl.text.trim(),
       vehicleBrandMake: _brandCtrl.text.trim(),
       vehicleColor: _colorCtrl.text.trim(),
       vehicleYear: _yearCtrl.text.trim(),
-      otherBelongings: _otherBelongingsCtrl.text.trim(),
     );
     context.go('/check-in/step-3');
   }
@@ -79,13 +83,6 @@ class _CheckInVehicleDetailsScreenState
     context.read<CheckInCubit>().resetSession();
     context.go('/dashboard');
   }
-
-  static final _vehicleTypeLabelStyle = GoogleFonts.poppins(
-    fontSize: 14,
-    fontWeight: FontWeight.w500,
-    height: 1.5,
-    color: AppColors.textPrimary,
-  );
 
   static final _helperStyle = GoogleFonts.poppins(
     fontSize: 12,
@@ -221,35 +218,17 @@ class _CheckInVehicleDetailsScreenState
         _modelYearRow(),
         const SizedBox(height: 16),
         _brandColorRow(),
-        const SizedBox(height: 20),
-        Text('VEHICLE TYPE', style: _vehicleTypeLabelStyle),
-        const SizedBox(height: 8),
-        const CheckInVehicleBodyTypeGrid(),
       ],
     );
   }
 
-  Widget _columnParkingBelongings() {
+  Widget _columnParkingOnly() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const CheckInSectionTitle(text: 'PARKING & BELONGINGS'),
+        const CheckInSectionTitle(text: 'PARKING'),
         const SizedBox(height: 12),
         _parkingDropdowns(),
-        const SizedBox(height: 20),
-        Text('BELONGINGS', style: _vehicleTypeLabelStyle),
-        const SizedBox(height: 8),
-        const CheckInBelongingsGrid(),
-        const SizedBox(height: 16),
-        CheckInFormField(
-          label: 'OTHER BELONGINGS (OPTIONAL)',
-          child: CheckInTextField(
-            controller: _otherBelongingsCtrl,
-            maxLines: 3,
-            minHeight: 72,
-            hint: 'Describe any other items…',
-          ),
-        ),
       ],
     );
   }
@@ -260,7 +239,7 @@ class _CheckInVehicleDetailsScreenState
       children: [
         _columnVehicleId(),
         const SizedBox(height: 24),
-        _columnParkingBelongings(),
+        _columnParkingOnly(),
       ],
     );
   }
@@ -296,7 +275,7 @@ class _CheckInVehicleDetailsScreenState
                           thickness: 1,
                           color: Colors.black.withValues(alpha: 0.13),
                         ),
-                        Expanded(child: _columnParkingBelongings()),
+                        Expanded(child: _columnParkingOnly()),
                       ],
                     );
                   },

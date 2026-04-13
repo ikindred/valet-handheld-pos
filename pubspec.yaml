@@ -100,6 +100,7 @@ dependencies:
 
   # Permissions
   permission_handler: ^11.3.1
+  logger: ^2.7.0
 
 dev_dependencies:
   flutter_test:
@@ -133,6 +134,9 @@ flutter:
     - .env
     - assets/images/app_logo.png
     - assets/images/vehicle_condition_car_top.png
+    # Bundled Google Fonts (Poppins) — used when [GoogleFonts.config.allowRuntimeFetching] is false
+    # so tablets without fonts.gstatic.com DNS still render typography.
+    - google_fonts/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -140,22 +144,11 @@ flutter:
   # For details regarding adding assets from package dependencies, see
   # https://flutter.dev/to/asset-from-package
 
-  # To add custom fonts to your application, add a fonts section here,
-  # in this "flutter" section. Each entry in this list should have a
-  # "family" key with the font family name, and a "fonts" key with a
-  # list giving the asset and other descriptors for the font. For
-  # example:
-  # fonts:
-  #   - family: Schyler
-  #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf
-  #       - asset: fonts/Schyler-Italic.ttf
-  #         style: italic
-  #   - family: Trajan Pro
-  #     fonts:
-  #       - asset: fonts/TrajanPro.ttf
-  #       - asset: fonts/TrajanPro_Bold.ttf
-  #         weight: 700
-  #
-  # For details regarding fonts from package dependencies,
-  # see https://flutter.dev/to/font-from-package
+  # Noto Sans: bundled for U+20B1 (₱) — Poppins omits the peso glyph. Resolved
+  # via [TextStyle.fontFamilyFallback] on theme and cash/checkout screens.
+  fonts:
+    - family: Noto Sans
+      fonts:
+        - asset: google_fonts/NotoSans-Regular.ttf
+        - asset: google_fonts/NotoSans-Bold.ttf
+          weight: 700

@@ -3,7 +3,7 @@ import '../../../data/local/db/app_database.dart';
 /// Lightweight row for cash modals (not a full domain model).
 class OpenTransaction {
   const OpenTransaction({
-    required this.transactionId,
+    required this.ticketId,
     required this.ticketNumber,
     required this.plateNumber,
     required this.vehicleBrand,
@@ -12,7 +12,7 @@ class OpenTransaction {
     required this.timeIn,
   });
 
-  final int transactionId;
+  final String ticketId;
   final String ticketNumber;
   final String plateNumber;
   final String? vehicleBrand;
@@ -20,15 +20,16 @@ class OpenTransaction {
   final String? vehicleColor;
   final DateTime timeIn;
 
-  factory OpenTransaction.fromRow(ValetTransaction t) {
+  factory OpenTransaction.fromTicket(Ticket t) {
+    final parsed = DateTime.tryParse(t.checkInAt);
     return OpenTransaction(
-      transactionId: t.id,
-      ticketNumber: t.ticketNumber,
+      ticketId: t.id,
+      ticketNumber: t.id,
       plateNumber: t.plateNumber,
       vehicleBrand: t.vehicleBrand,
-      vehicleModel: t.vehicleModel,
+      vehicleModel: null,
       vehicleColor: t.vehicleColor,
-      timeIn: DateTime.fromMillisecondsSinceEpoch(t.timeIn * 1000, isUtc: true),
+      timeIn: parsed ?? DateTime.fromMillisecondsSinceEpoch(0),
     );
   }
 

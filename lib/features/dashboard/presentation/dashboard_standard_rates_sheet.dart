@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/formatting/peso_currency.dart';
 import '../../../core/session/standard_parking_rates.dart';
 import '../../../core/theme/app_theme.dart';
 import 'widgets/dashboard_widgets.dart';
@@ -48,7 +49,7 @@ class _StandardRatesDialog extends StatelessWidget {
               children: [
                 Text(
                   'Standard Rates',
-                  style: GoogleFonts.inter(
+                  style: GoogleFonts.poppins(
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -57,7 +58,7 @@ class _StandardRatesDialog extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   'Applies to all areas unless overridden',
-                  style: GoogleFonts.inter(
+                  style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
                     color: DashboardStyles.grey500,
@@ -173,7 +174,7 @@ class _RateRow extends StatelessWidget {
               border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
             ),
             child: Text(
-              '₱ $amountPesos',
+              '${PesoCurrency.symbol} $amountPesos',
               textAlign: TextAlign.right,
               style: GoogleFonts.poppins(
                 fontSize: 15,

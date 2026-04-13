@@ -1224,154 +1224,73 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
   $ShiftsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
       'id', aliasedName, false,
-      hasAutoIncrement: true,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
-  static const VerificationMeta _sessionIdMeta =
-      const VerificationMeta('sessionId');
-  @override
-  late final GeneratedColumn<int> sessionId = GeneratedColumn<int>(
-      'session_id', aliasedName, false,
-      type: DriftSqlType.int,
-      requiredDuringInsert: true,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('REFERENCES sessions (id)'));
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
   @override
-  late final GeneratedColumn<int> userId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
       'user_id', aliasedName, false,
-      type: DriftSqlType.int,
-      requiredDuringInsert: true,
-      defaultConstraints: GeneratedColumn.constraintIsAlways(
-          'REFERENCES offline_accounts (id)'));
-  static const VerificationMeta _branchMeta = const VerificationMeta('branch');
-  @override
-  late final GeneratedColumn<String> branch = GeneratedColumn<String>(
-      'branch', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _areaMeta = const VerificationMeta('area');
+  static const VerificationMeta _branchIdMeta =
+      const VerificationMeta('branchId');
   @override
-  late final GeneratedColumn<String> area = GeneratedColumn<String>(
-      'area', aliasedName, false,
+  late final GeneratedColumn<String> branchId = GeneratedColumn<String>(
+      'branch_id', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _shiftDateMeta =
-      const VerificationMeta('shiftDate');
+  static const VerificationMeta _openedAtMeta =
+      const VerificationMeta('openedAt');
   @override
-  late final GeneratedColumn<String> shiftDate = GeneratedColumn<String>(
-      'shift_date', aliasedName, false,
+  late final GeneratedColumn<String> openedAt = GeneratedColumn<String>(
+      'opened_at', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _isOpenMeta = const VerificationMeta('isOpen');
+  static const VerificationMeta _closedAtMeta =
+      const VerificationMeta('closedAt');
   @override
-  late final GeneratedColumn<bool> isOpen = GeneratedColumn<bool>(
-      'is_open', aliasedName, false,
-      type: DriftSqlType.bool,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('CHECK ("is_open" IN (0, 1))'),
-      defaultValue: const Constant(true));
+  late final GeneratedColumn<String> closedAt = GeneratedColumn<String>(
+      'closed_at', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _openingFloatMeta =
       const VerificationMeta('openingFloat');
   @override
   late final GeneratedColumn<double> openingFloat = GeneratedColumn<double>(
       'opening_float', aliasedName, false,
-      type: DriftSqlType.double,
-      requiredDuringInsert: false,
-      defaultValue: const Constant(0.0));
-  static const VerificationMeta _openingNotesMeta =
-      const VerificationMeta('openingNotes');
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _closingCashMeta =
+      const VerificationMeta('closingCash');
   @override
-  late final GeneratedColumn<String> openingNotes = GeneratedColumn<String>(
-      'opening_notes', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _closingFloatMeta =
-      const VerificationMeta('closingFloat');
-  @override
-  late final GeneratedColumn<double> closingFloat = GeneratedColumn<double>(
-      'closing_float', aliasedName, true,
+  late final GeneratedColumn<double> closingCash = GeneratedColumn<double>(
+      'closing_cash', aliasedName, true,
       type: DriftSqlType.double, requiredDuringInsert: false);
-  static const VerificationMeta _closingNotesMeta =
-      const VerificationMeta('closingNotes');
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
   @override
-  late final GeneratedColumn<String> closingNotes = GeneratedColumn<String>(
-      'closing_notes', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _totalSalesMeta =
-      const VerificationMeta('totalSales');
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+      'status', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _syncStatusMeta =
+      const VerificationMeta('syncStatus');
   @override
-  late final GeneratedColumn<double> totalSales = GeneratedColumn<double>(
-      'total_sales', aliasedName, false,
-      type: DriftSqlType.double,
-      requiredDuringInsert: false,
-      defaultValue: const Constant(0.0));
-  static const VerificationMeta _expectedCashMeta =
-      const VerificationMeta('expectedCash');
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+      'sync_status', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
   @override
-  late final GeneratedColumn<double> expectedCash = GeneratedColumn<double>(
-      'expected_cash', aliasedName, true,
-      type: DriftSqlType.double, requiredDuringInsert: false);
-  static const VerificationMeta _varianceMeta =
-      const VerificationMeta('variance');
-  @override
-  late final GeneratedColumn<double> variance = GeneratedColumn<double>(
-      'variance', aliasedName, true,
-      type: DriftSqlType.double, requiredDuringInsert: false);
-  static const VerificationMeta _remittanceMeta =
-      const VerificationMeta('remittance');
-  @override
-  late final GeneratedColumn<double> remittance = GeneratedColumn<double>(
-      'remittance', aliasedName, true,
-      type: DriftSqlType.double, requiredDuringInsert: false);
-  static const VerificationMeta _transactionsCountMeta =
-      const VerificationMeta('transactionsCount');
-  @override
-  late final GeneratedColumn<int> transactionsCount = GeneratedColumn<int>(
-      'transactions_count', aliasedName, false,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultValue: const Constant(0));
-  static const VerificationMeta _openedAtMeta =
-      const VerificationMeta('openedAt');
-  @override
-  late final GeneratedColumn<int> openedAt = GeneratedColumn<int>(
-      'opened_at', aliasedName, false,
-      type: DriftSqlType.int, requiredDuringInsert: true);
-  static const VerificationMeta _closedAtMeta =
-      const VerificationMeta('closedAt');
-  @override
-  late final GeneratedColumn<int> closedAt = GeneratedColumn<int>(
-      'closed_at', aliasedName, true,
-      type: DriftSqlType.int, requiredDuringInsert: false);
-  static const VerificationMeta _syncedAtMeta =
-      const VerificationMeta('syncedAt');
-  @override
-  late final GeneratedColumn<int> syncedAt = GeneratedColumn<int>(
-      'synced_at', aliasedName, true,
-      type: DriftSqlType.int, requiredDuringInsert: false);
+  late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   @override
   List<GeneratedColumn> get $columns => [
         id,
-        sessionId,
         userId,
-        branch,
-        area,
-        shiftDate,
-        isOpen,
-        openingFloat,
-        openingNotes,
-        closingFloat,
-        closingNotes,
-        totalSales,
-        expectedCash,
-        variance,
-        remittance,
-        transactionsCount,
+        branchId,
         openedAt,
         closedAt,
-        syncedAt
+        openingFloat,
+        closingCash,
+        status,
+        syncStatus,
+        createdAt
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1385,12 +1304,8 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    }
-    if (data.containsKey('session_id')) {
-      context.handle(_sessionIdMeta,
-          sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta));
     } else if (isInserting) {
-      context.missing(_sessionIdMeta);
+      context.missing(_idMeta);
     }
     if (data.containsKey('user_id')) {
       context.handle(_userIdMeta,
@@ -1398,79 +1313,11 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
     } else if (isInserting) {
       context.missing(_userIdMeta);
     }
-    if (data.containsKey('branch')) {
-      context.handle(_branchMeta,
-          branch.isAcceptableOrUnknown(data['branch']!, _branchMeta));
+    if (data.containsKey('branch_id')) {
+      context.handle(_branchIdMeta,
+          branchId.isAcceptableOrUnknown(data['branch_id']!, _branchIdMeta));
     } else if (isInserting) {
-      context.missing(_branchMeta);
-    }
-    if (data.containsKey('area')) {
-      context.handle(
-          _areaMeta, area.isAcceptableOrUnknown(data['area']!, _areaMeta));
-    } else if (isInserting) {
-      context.missing(_areaMeta);
-    }
-    if (data.containsKey('shift_date')) {
-      context.handle(_shiftDateMeta,
-          shiftDate.isAcceptableOrUnknown(data['shift_date']!, _shiftDateMeta));
-    } else if (isInserting) {
-      context.missing(_shiftDateMeta);
-    }
-    if (data.containsKey('is_open')) {
-      context.handle(_isOpenMeta,
-          isOpen.isAcceptableOrUnknown(data['is_open']!, _isOpenMeta));
-    }
-    if (data.containsKey('opening_float')) {
-      context.handle(
-          _openingFloatMeta,
-          openingFloat.isAcceptableOrUnknown(
-              data['opening_float']!, _openingFloatMeta));
-    }
-    if (data.containsKey('opening_notes')) {
-      context.handle(
-          _openingNotesMeta,
-          openingNotes.isAcceptableOrUnknown(
-              data['opening_notes']!, _openingNotesMeta));
-    }
-    if (data.containsKey('closing_float')) {
-      context.handle(
-          _closingFloatMeta,
-          closingFloat.isAcceptableOrUnknown(
-              data['closing_float']!, _closingFloatMeta));
-    }
-    if (data.containsKey('closing_notes')) {
-      context.handle(
-          _closingNotesMeta,
-          closingNotes.isAcceptableOrUnknown(
-              data['closing_notes']!, _closingNotesMeta));
-    }
-    if (data.containsKey('total_sales')) {
-      context.handle(
-          _totalSalesMeta,
-          totalSales.isAcceptableOrUnknown(
-              data['total_sales']!, _totalSalesMeta));
-    }
-    if (data.containsKey('expected_cash')) {
-      context.handle(
-          _expectedCashMeta,
-          expectedCash.isAcceptableOrUnknown(
-              data['expected_cash']!, _expectedCashMeta));
-    }
-    if (data.containsKey('variance')) {
-      context.handle(_varianceMeta,
-          variance.isAcceptableOrUnknown(data['variance']!, _varianceMeta));
-    }
-    if (data.containsKey('remittance')) {
-      context.handle(
-          _remittanceMeta,
-          remittance.isAcceptableOrUnknown(
-              data['remittance']!, _remittanceMeta));
-    }
-    if (data.containsKey('transactions_count')) {
-      context.handle(
-          _transactionsCountMeta,
-          transactionsCount.isAcceptableOrUnknown(
-              data['transactions_count']!, _transactionsCountMeta));
+      context.missing(_branchIdMeta);
     }
     if (data.containsKey('opened_at')) {
       context.handle(_openedAtMeta,
@@ -1482,9 +1329,39 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
       context.handle(_closedAtMeta,
           closedAt.isAcceptableOrUnknown(data['closed_at']!, _closedAtMeta));
     }
-    if (data.containsKey('synced_at')) {
-      context.handle(_syncedAtMeta,
-          syncedAt.isAcceptableOrUnknown(data['synced_at']!, _syncedAtMeta));
+    if (data.containsKey('opening_float')) {
+      context.handle(
+          _openingFloatMeta,
+          openingFloat.isAcceptableOrUnknown(
+              data['opening_float']!, _openingFloatMeta));
+    } else if (isInserting) {
+      context.missing(_openingFloatMeta);
+    }
+    if (data.containsKey('closing_cash')) {
+      context.handle(
+          _closingCashMeta,
+          closingCash.isAcceptableOrUnknown(
+              data['closing_cash']!, _closingCashMeta));
+    }
+    if (data.containsKey('status')) {
+      context.handle(_statusMeta,
+          status.isAcceptableOrUnknown(data['status']!, _statusMeta));
+    } else if (isInserting) {
+      context.missing(_statusMeta);
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+          _syncStatusMeta,
+          syncStatus.isAcceptableOrUnknown(
+              data['sync_status']!, _syncStatusMeta));
+    } else if (isInserting) {
+      context.missing(_syncStatusMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
     }
     return context;
   }
@@ -1496,43 +1373,25 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Shift(
       id: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
-      sessionId: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}session_id'])!,
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
       userId: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}user_id'])!,
-      branch: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}branch'])!,
-      area: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}area'])!,
-      shiftDate: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}shift_date'])!,
-      isOpen: attachedDatabase.typeMapping
-          .read(DriftSqlType.bool, data['${effectivePrefix}is_open'])!,
+          .read(DriftSqlType.string, data['${effectivePrefix}user_id'])!,
+      branchId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}branch_id'])!,
+      openedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}opened_at'])!,
+      closedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}closed_at']),
       openingFloat: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}opening_float'])!,
-      openingNotes: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}opening_notes']),
-      closingFloat: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}closing_float']),
-      closingNotes: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}closing_notes']),
-      totalSales: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}total_sales'])!,
-      expectedCash: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}expected_cash']),
-      variance: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}variance']),
-      remittance: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}remittance']),
-      transactionsCount: attachedDatabase.typeMapping.read(
-          DriftSqlType.int, data['${effectivePrefix}transactions_count'])!,
-      openedAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}opened_at'])!,
-      closedAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}closed_at']),
-      syncedAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}synced_at']),
+      closingCash: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}closing_cash']),
+      status: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
+      syncStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}created_at'])!,
     );
   }
 
@@ -1543,125 +1402,75 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
 }
 
 class Shift extends DataClass implements Insertable<Shift> {
-  final int id;
-  final int sessionId;
-  final int userId;
-  final String branch;
-  final String area;
+  final String id;
 
-  /// YYYY-MM-DD
-  final String shiftDate;
-  final bool isOpen;
+  /// [OfflineAccounts.serverUserId] as string.
+  final String userId;
+  final String branchId;
+
+  /// ISO8601, Asia/Manila.
+  final String openedAt;
+
+  /// ISO8601, nullable when shift is open.
+  final String? closedAt;
   final double openingFloat;
-  final String? openingNotes;
-  final double? closingFloat;
-  final String? closingNotes;
-  final double totalSales;
-  final double? expectedCash;
-  final double? variance;
-  final double? remittance;
-  final int transactionsCount;
-  final int openedAt;
-  final int? closedAt;
-  final int? syncedAt;
+  final double? closingCash;
+
+  /// `open` | `closed`
+  final String status;
+
+  /// `pending` | `synced`
+  final String syncStatus;
+
+  /// ISO8601 row creation time.
+  final String createdAt;
   const Shift(
       {required this.id,
-      required this.sessionId,
       required this.userId,
-      required this.branch,
-      required this.area,
-      required this.shiftDate,
-      required this.isOpen,
-      required this.openingFloat,
-      this.openingNotes,
-      this.closingFloat,
-      this.closingNotes,
-      required this.totalSales,
-      this.expectedCash,
-      this.variance,
-      this.remittance,
-      required this.transactionsCount,
+      required this.branchId,
       required this.openedAt,
       this.closedAt,
-      this.syncedAt});
+      required this.openingFloat,
+      this.closingCash,
+      required this.status,
+      required this.syncStatus,
+      required this.createdAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
-    map['session_id'] = Variable<int>(sessionId);
-    map['user_id'] = Variable<int>(userId);
-    map['branch'] = Variable<String>(branch);
-    map['area'] = Variable<String>(area);
-    map['shift_date'] = Variable<String>(shiftDate);
-    map['is_open'] = Variable<bool>(isOpen);
-    map['opening_float'] = Variable<double>(openingFloat);
-    if (!nullToAbsent || openingNotes != null) {
-      map['opening_notes'] = Variable<String>(openingNotes);
-    }
-    if (!nullToAbsent || closingFloat != null) {
-      map['closing_float'] = Variable<double>(closingFloat);
-    }
-    if (!nullToAbsent || closingNotes != null) {
-      map['closing_notes'] = Variable<String>(closingNotes);
-    }
-    map['total_sales'] = Variable<double>(totalSales);
-    if (!nullToAbsent || expectedCash != null) {
-      map['expected_cash'] = Variable<double>(expectedCash);
-    }
-    if (!nullToAbsent || variance != null) {
-      map['variance'] = Variable<double>(variance);
-    }
-    if (!nullToAbsent || remittance != null) {
-      map['remittance'] = Variable<double>(remittance);
-    }
-    map['transactions_count'] = Variable<int>(transactionsCount);
-    map['opened_at'] = Variable<int>(openedAt);
+    map['id'] = Variable<String>(id);
+    map['user_id'] = Variable<String>(userId);
+    map['branch_id'] = Variable<String>(branchId);
+    map['opened_at'] = Variable<String>(openedAt);
     if (!nullToAbsent || closedAt != null) {
-      map['closed_at'] = Variable<int>(closedAt);
+      map['closed_at'] = Variable<String>(closedAt);
     }
-    if (!nullToAbsent || syncedAt != null) {
-      map['synced_at'] = Variable<int>(syncedAt);
+    map['opening_float'] = Variable<double>(openingFloat);
+    if (!nullToAbsent || closingCash != null) {
+      map['closing_cash'] = Variable<double>(closingCash);
     }
+    map['status'] = Variable<String>(status);
+    map['sync_status'] = Variable<String>(syncStatus);
+    map['created_at'] = Variable<String>(createdAt);
     return map;
   }
 
   ShiftsCompanion toCompanion(bool nullToAbsent) {
     return ShiftsCompanion(
       id: Value(id),
-      sessionId: Value(sessionId),
       userId: Value(userId),
-      branch: Value(branch),
-      area: Value(area),
-      shiftDate: Value(shiftDate),
-      isOpen: Value(isOpen),
-      openingFloat: Value(openingFloat),
-      openingNotes: openingNotes == null && nullToAbsent
-          ? const Value.absent()
-          : Value(openingNotes),
-      closingFloat: closingFloat == null && nullToAbsent
-          ? const Value.absent()
-          : Value(closingFloat),
-      closingNotes: closingNotes == null && nullToAbsent
-          ? const Value.absent()
-          : Value(closingNotes),
-      totalSales: Value(totalSales),
-      expectedCash: expectedCash == null && nullToAbsent
-          ? const Value.absent()
-          : Value(expectedCash),
-      variance: variance == null && nullToAbsent
-          ? const Value.absent()
-          : Value(variance),
-      remittance: remittance == null && nullToAbsent
-          ? const Value.absent()
-          : Value(remittance),
-      transactionsCount: Value(transactionsCount),
+      branchId: Value(branchId),
       openedAt: Value(openedAt),
       closedAt: closedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(closedAt),
-      syncedAt: syncedAt == null && nullToAbsent
+      openingFloat: Value(openingFloat),
+      closingCash: closingCash == null && nullToAbsent
           ? const Value.absent()
-          : Value(syncedAt),
+          : Value(closingCash),
+      status: Value(status),
+      syncStatus: Value(syncStatus),
+      createdAt: Value(createdAt),
     );
   }
 
@@ -1669,133 +1478,74 @@ class Shift extends DataClass implements Insertable<Shift> {
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Shift(
-      id: serializer.fromJson<int>(json['id']),
-      sessionId: serializer.fromJson<int>(json['sessionId']),
-      userId: serializer.fromJson<int>(json['userId']),
-      branch: serializer.fromJson<String>(json['branch']),
-      area: serializer.fromJson<String>(json['area']),
-      shiftDate: serializer.fromJson<String>(json['shiftDate']),
-      isOpen: serializer.fromJson<bool>(json['isOpen']),
+      id: serializer.fromJson<String>(json['id']),
+      userId: serializer.fromJson<String>(json['userId']),
+      branchId: serializer.fromJson<String>(json['branchId']),
+      openedAt: serializer.fromJson<String>(json['openedAt']),
+      closedAt: serializer.fromJson<String?>(json['closedAt']),
       openingFloat: serializer.fromJson<double>(json['openingFloat']),
-      openingNotes: serializer.fromJson<String?>(json['openingNotes']),
-      closingFloat: serializer.fromJson<double?>(json['closingFloat']),
-      closingNotes: serializer.fromJson<String?>(json['closingNotes']),
-      totalSales: serializer.fromJson<double>(json['totalSales']),
-      expectedCash: serializer.fromJson<double?>(json['expectedCash']),
-      variance: serializer.fromJson<double?>(json['variance']),
-      remittance: serializer.fromJson<double?>(json['remittance']),
-      transactionsCount: serializer.fromJson<int>(json['transactionsCount']),
-      openedAt: serializer.fromJson<int>(json['openedAt']),
-      closedAt: serializer.fromJson<int?>(json['closedAt']),
-      syncedAt: serializer.fromJson<int?>(json['syncedAt']),
+      closingCash: serializer.fromJson<double?>(json['closingCash']),
+      status: serializer.fromJson<String>(json['status']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      createdAt: serializer.fromJson<String>(json['createdAt']),
     );
   }
   @override
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
-      'sessionId': serializer.toJson<int>(sessionId),
-      'userId': serializer.toJson<int>(userId),
-      'branch': serializer.toJson<String>(branch),
-      'area': serializer.toJson<String>(area),
-      'shiftDate': serializer.toJson<String>(shiftDate),
-      'isOpen': serializer.toJson<bool>(isOpen),
+      'id': serializer.toJson<String>(id),
+      'userId': serializer.toJson<String>(userId),
+      'branchId': serializer.toJson<String>(branchId),
+      'openedAt': serializer.toJson<String>(openedAt),
+      'closedAt': serializer.toJson<String?>(closedAt),
       'openingFloat': serializer.toJson<double>(openingFloat),
-      'openingNotes': serializer.toJson<String?>(openingNotes),
-      'closingFloat': serializer.toJson<double?>(closingFloat),
-      'closingNotes': serializer.toJson<String?>(closingNotes),
-      'totalSales': serializer.toJson<double>(totalSales),
-      'expectedCash': serializer.toJson<double?>(expectedCash),
-      'variance': serializer.toJson<double?>(variance),
-      'remittance': serializer.toJson<double?>(remittance),
-      'transactionsCount': serializer.toJson<int>(transactionsCount),
-      'openedAt': serializer.toJson<int>(openedAt),
-      'closedAt': serializer.toJson<int?>(closedAt),
-      'syncedAt': serializer.toJson<int?>(syncedAt),
+      'closingCash': serializer.toJson<double?>(closingCash),
+      'status': serializer.toJson<String>(status),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'createdAt': serializer.toJson<String>(createdAt),
     };
   }
 
   Shift copyWith(
-          {int? id,
-          int? sessionId,
-          int? userId,
-          String? branch,
-          String? area,
-          String? shiftDate,
-          bool? isOpen,
+          {String? id,
+          String? userId,
+          String? branchId,
+          String? openedAt,
+          Value<String?> closedAt = const Value.absent(),
           double? openingFloat,
-          Value<String?> openingNotes = const Value.absent(),
-          Value<double?> closingFloat = const Value.absent(),
-          Value<String?> closingNotes = const Value.absent(),
-          double? totalSales,
-          Value<double?> expectedCash = const Value.absent(),
-          Value<double?> variance = const Value.absent(),
-          Value<double?> remittance = const Value.absent(),
-          int? transactionsCount,
-          int? openedAt,
-          Value<int?> closedAt = const Value.absent(),
-          Value<int?> syncedAt = const Value.absent()}) =>
+          Value<double?> closingCash = const Value.absent(),
+          String? status,
+          String? syncStatus,
+          String? createdAt}) =>
       Shift(
         id: id ?? this.id,
-        sessionId: sessionId ?? this.sessionId,
         userId: userId ?? this.userId,
-        branch: branch ?? this.branch,
-        area: area ?? this.area,
-        shiftDate: shiftDate ?? this.shiftDate,
-        isOpen: isOpen ?? this.isOpen,
-        openingFloat: openingFloat ?? this.openingFloat,
-        openingNotes:
-            openingNotes.present ? openingNotes.value : this.openingNotes,
-        closingFloat:
-            closingFloat.present ? closingFloat.value : this.closingFloat,
-        closingNotes:
-            closingNotes.present ? closingNotes.value : this.closingNotes,
-        totalSales: totalSales ?? this.totalSales,
-        expectedCash:
-            expectedCash.present ? expectedCash.value : this.expectedCash,
-        variance: variance.present ? variance.value : this.variance,
-        remittance: remittance.present ? remittance.value : this.remittance,
-        transactionsCount: transactionsCount ?? this.transactionsCount,
+        branchId: branchId ?? this.branchId,
         openedAt: openedAt ?? this.openedAt,
         closedAt: closedAt.present ? closedAt.value : this.closedAt,
-        syncedAt: syncedAt.present ? syncedAt.value : this.syncedAt,
+        openingFloat: openingFloat ?? this.openingFloat,
+        closingCash: closingCash.present ? closingCash.value : this.closingCash,
+        status: status ?? this.status,
+        syncStatus: syncStatus ?? this.syncStatus,
+        createdAt: createdAt ?? this.createdAt,
       );
   Shift copyWithCompanion(ShiftsCompanion data) {
     return Shift(
       id: data.id.present ? data.id.value : this.id,
-      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
       userId: data.userId.present ? data.userId.value : this.userId,
-      branch: data.branch.present ? data.branch.value : this.branch,
-      area: data.area.present ? data.area.value : this.area,
-      shiftDate: data.shiftDate.present ? data.shiftDate.value : this.shiftDate,
-      isOpen: data.isOpen.present ? data.isOpen.value : this.isOpen,
+      branchId: data.branchId.present ? data.branchId.value : this.branchId,
+      openedAt: data.openedAt.present ? data.openedAt.value : this.openedAt,
+      closedAt: data.closedAt.present ? data.closedAt.value : this.closedAt,
       openingFloat: data.openingFloat.present
           ? data.openingFloat.value
           : this.openingFloat,
-      openingNotes: data.openingNotes.present
-          ? data.openingNotes.value
-          : this.openingNotes,
-      closingFloat: data.closingFloat.present
-          ? data.closingFloat.value
-          : this.closingFloat,
-      closingNotes: data.closingNotes.present
-          ? data.closingNotes.value
-          : this.closingNotes,
-      totalSales:
-          data.totalSales.present ? data.totalSales.value : this.totalSales,
-      expectedCash: data.expectedCash.present
-          ? data.expectedCash.value
-          : this.expectedCash,
-      variance: data.variance.present ? data.variance.value : this.variance,
-      remittance:
-          data.remittance.present ? data.remittance.value : this.remittance,
-      transactionsCount: data.transactionsCount.present
-          ? data.transactionsCount.value
-          : this.transactionsCount,
-      openedAt: data.openedAt.present ? data.openedAt.value : this.openedAt,
-      closedAt: data.closedAt.present ? data.closedAt.value : this.closedAt,
-      syncedAt: data.syncedAt.present ? data.syncedAt.value : this.syncedAt,
+      closingCash:
+          data.closingCash.present ? data.closingCash.value : this.closingCash,
+      status: data.status.present ? data.status.value : this.status,
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
 
@@ -1803,225 +1553,135 @@ class Shift extends DataClass implements Insertable<Shift> {
   String toString() {
     return (StringBuffer('Shift(')
           ..write('id: $id, ')
-          ..write('sessionId: $sessionId, ')
           ..write('userId: $userId, ')
-          ..write('branch: $branch, ')
-          ..write('area: $area, ')
-          ..write('shiftDate: $shiftDate, ')
-          ..write('isOpen: $isOpen, ')
-          ..write('openingFloat: $openingFloat, ')
-          ..write('openingNotes: $openingNotes, ')
-          ..write('closingFloat: $closingFloat, ')
-          ..write('closingNotes: $closingNotes, ')
-          ..write('totalSales: $totalSales, ')
-          ..write('expectedCash: $expectedCash, ')
-          ..write('variance: $variance, ')
-          ..write('remittance: $remittance, ')
-          ..write('transactionsCount: $transactionsCount, ')
+          ..write('branchId: $branchId, ')
           ..write('openedAt: $openedAt, ')
           ..write('closedAt: $closedAt, ')
-          ..write('syncedAt: $syncedAt')
+          ..write('openingFloat: $openingFloat, ')
+          ..write('closingCash: $closingCash, ')
+          ..write('status: $status, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      id,
-      sessionId,
-      userId,
-      branch,
-      area,
-      shiftDate,
-      isOpen,
-      openingFloat,
-      openingNotes,
-      closingFloat,
-      closingNotes,
-      totalSales,
-      expectedCash,
-      variance,
-      remittance,
-      transactionsCount,
-      openedAt,
-      closedAt,
-      syncedAt);
+  int get hashCode => Object.hash(id, userId, branchId, openedAt, closedAt,
+      openingFloat, closingCash, status, syncStatus, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Shift &&
           other.id == this.id &&
-          other.sessionId == this.sessionId &&
           other.userId == this.userId &&
-          other.branch == this.branch &&
-          other.area == this.area &&
-          other.shiftDate == this.shiftDate &&
-          other.isOpen == this.isOpen &&
-          other.openingFloat == this.openingFloat &&
-          other.openingNotes == this.openingNotes &&
-          other.closingFloat == this.closingFloat &&
-          other.closingNotes == this.closingNotes &&
-          other.totalSales == this.totalSales &&
-          other.expectedCash == this.expectedCash &&
-          other.variance == this.variance &&
-          other.remittance == this.remittance &&
-          other.transactionsCount == this.transactionsCount &&
+          other.branchId == this.branchId &&
           other.openedAt == this.openedAt &&
           other.closedAt == this.closedAt &&
-          other.syncedAt == this.syncedAt);
+          other.openingFloat == this.openingFloat &&
+          other.closingCash == this.closingCash &&
+          other.status == this.status &&
+          other.syncStatus == this.syncStatus &&
+          other.createdAt == this.createdAt);
 }
 
 class ShiftsCompanion extends UpdateCompanion<Shift> {
-  final Value<int> id;
-  final Value<int> sessionId;
-  final Value<int> userId;
-  final Value<String> branch;
-  final Value<String> area;
-  final Value<String> shiftDate;
-  final Value<bool> isOpen;
+  final Value<String> id;
+  final Value<String> userId;
+  final Value<String> branchId;
+  final Value<String> openedAt;
+  final Value<String?> closedAt;
   final Value<double> openingFloat;
-  final Value<String?> openingNotes;
-  final Value<double?> closingFloat;
-  final Value<String?> closingNotes;
-  final Value<double> totalSales;
-  final Value<double?> expectedCash;
-  final Value<double?> variance;
-  final Value<double?> remittance;
-  final Value<int> transactionsCount;
-  final Value<int> openedAt;
-  final Value<int?> closedAt;
-  final Value<int?> syncedAt;
+  final Value<double?> closingCash;
+  final Value<String> status;
+  final Value<String> syncStatus;
+  final Value<String> createdAt;
+  final Value<int> rowid;
   const ShiftsCompanion({
     this.id = const Value.absent(),
-    this.sessionId = const Value.absent(),
     this.userId = const Value.absent(),
-    this.branch = const Value.absent(),
-    this.area = const Value.absent(),
-    this.shiftDate = const Value.absent(),
-    this.isOpen = const Value.absent(),
-    this.openingFloat = const Value.absent(),
-    this.openingNotes = const Value.absent(),
-    this.closingFloat = const Value.absent(),
-    this.closingNotes = const Value.absent(),
-    this.totalSales = const Value.absent(),
-    this.expectedCash = const Value.absent(),
-    this.variance = const Value.absent(),
-    this.remittance = const Value.absent(),
-    this.transactionsCount = const Value.absent(),
+    this.branchId = const Value.absent(),
     this.openedAt = const Value.absent(),
     this.closedAt = const Value.absent(),
-    this.syncedAt = const Value.absent(),
+    this.openingFloat = const Value.absent(),
+    this.closingCash = const Value.absent(),
+    this.status = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
   });
   ShiftsCompanion.insert({
-    this.id = const Value.absent(),
-    required int sessionId,
-    required int userId,
-    required String branch,
-    required String area,
-    required String shiftDate,
-    this.isOpen = const Value.absent(),
-    this.openingFloat = const Value.absent(),
-    this.openingNotes = const Value.absent(),
-    this.closingFloat = const Value.absent(),
-    this.closingNotes = const Value.absent(),
-    this.totalSales = const Value.absent(),
-    this.expectedCash = const Value.absent(),
-    this.variance = const Value.absent(),
-    this.remittance = const Value.absent(),
-    this.transactionsCount = const Value.absent(),
-    required int openedAt,
+    required String id,
+    required String userId,
+    required String branchId,
+    required String openedAt,
     this.closedAt = const Value.absent(),
-    this.syncedAt = const Value.absent(),
-  })  : sessionId = Value(sessionId),
+    required double openingFloat,
+    this.closingCash = const Value.absent(),
+    required String status,
+    required String syncStatus,
+    required String createdAt,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
         userId = Value(userId),
-        branch = Value(branch),
-        area = Value(area),
-        shiftDate = Value(shiftDate),
-        openedAt = Value(openedAt);
+        branchId = Value(branchId),
+        openedAt = Value(openedAt),
+        openingFloat = Value(openingFloat),
+        status = Value(status),
+        syncStatus = Value(syncStatus),
+        createdAt = Value(createdAt);
   static Insertable<Shift> custom({
-    Expression<int>? id,
-    Expression<int>? sessionId,
-    Expression<int>? userId,
-    Expression<String>? branch,
-    Expression<String>? area,
-    Expression<String>? shiftDate,
-    Expression<bool>? isOpen,
+    Expression<String>? id,
+    Expression<String>? userId,
+    Expression<String>? branchId,
+    Expression<String>? openedAt,
+    Expression<String>? closedAt,
     Expression<double>? openingFloat,
-    Expression<String>? openingNotes,
-    Expression<double>? closingFloat,
-    Expression<String>? closingNotes,
-    Expression<double>? totalSales,
-    Expression<double>? expectedCash,
-    Expression<double>? variance,
-    Expression<double>? remittance,
-    Expression<int>? transactionsCount,
-    Expression<int>? openedAt,
-    Expression<int>? closedAt,
-    Expression<int>? syncedAt,
+    Expression<double>? closingCash,
+    Expression<String>? status,
+    Expression<String>? syncStatus,
+    Expression<String>? createdAt,
+    Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
-      if (sessionId != null) 'session_id': sessionId,
       if (userId != null) 'user_id': userId,
-      if (branch != null) 'branch': branch,
-      if (area != null) 'area': area,
-      if (shiftDate != null) 'shift_date': shiftDate,
-      if (isOpen != null) 'is_open': isOpen,
-      if (openingFloat != null) 'opening_float': openingFloat,
-      if (openingNotes != null) 'opening_notes': openingNotes,
-      if (closingFloat != null) 'closing_float': closingFloat,
-      if (closingNotes != null) 'closing_notes': closingNotes,
-      if (totalSales != null) 'total_sales': totalSales,
-      if (expectedCash != null) 'expected_cash': expectedCash,
-      if (variance != null) 'variance': variance,
-      if (remittance != null) 'remittance': remittance,
-      if (transactionsCount != null) 'transactions_count': transactionsCount,
+      if (branchId != null) 'branch_id': branchId,
       if (openedAt != null) 'opened_at': openedAt,
       if (closedAt != null) 'closed_at': closedAt,
-      if (syncedAt != null) 'synced_at': syncedAt,
+      if (openingFloat != null) 'opening_float': openingFloat,
+      if (closingCash != null) 'closing_cash': closingCash,
+      if (status != null) 'status': status,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
     });
   }
 
   ShiftsCompanion copyWith(
-      {Value<int>? id,
-      Value<int>? sessionId,
-      Value<int>? userId,
-      Value<String>? branch,
-      Value<String>? area,
-      Value<String>? shiftDate,
-      Value<bool>? isOpen,
+      {Value<String>? id,
+      Value<String>? userId,
+      Value<String>? branchId,
+      Value<String>? openedAt,
+      Value<String?>? closedAt,
       Value<double>? openingFloat,
-      Value<String?>? openingNotes,
-      Value<double?>? closingFloat,
-      Value<String?>? closingNotes,
-      Value<double>? totalSales,
-      Value<double?>? expectedCash,
-      Value<double?>? variance,
-      Value<double?>? remittance,
-      Value<int>? transactionsCount,
-      Value<int>? openedAt,
-      Value<int?>? closedAt,
-      Value<int?>? syncedAt}) {
+      Value<double?>? closingCash,
+      Value<String>? status,
+      Value<String>? syncStatus,
+      Value<String>? createdAt,
+      Value<int>? rowid}) {
     return ShiftsCompanion(
       id: id ?? this.id,
-      sessionId: sessionId ?? this.sessionId,
       userId: userId ?? this.userId,
-      branch: branch ?? this.branch,
-      area: area ?? this.area,
-      shiftDate: shiftDate ?? this.shiftDate,
-      isOpen: isOpen ?? this.isOpen,
-      openingFloat: openingFloat ?? this.openingFloat,
-      openingNotes: openingNotes ?? this.openingNotes,
-      closingFloat: closingFloat ?? this.closingFloat,
-      closingNotes: closingNotes ?? this.closingNotes,
-      totalSales: totalSales ?? this.totalSales,
-      expectedCash: expectedCash ?? this.expectedCash,
-      variance: variance ?? this.variance,
-      remittance: remittance ?? this.remittance,
-      transactionsCount: transactionsCount ?? this.transactionsCount,
+      branchId: branchId ?? this.branchId,
       openedAt: openedAt ?? this.openedAt,
       closedAt: closedAt ?? this.closedAt,
-      syncedAt: syncedAt ?? this.syncedAt,
+      openingFloat: openingFloat ?? this.openingFloat,
+      closingCash: closingCash ?? this.closingCash,
+      status: status ?? this.status,
+      syncStatus: syncStatus ?? this.syncStatus,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
     );
   }
 
@@ -2029,61 +1689,37 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     if (id.present) {
-      map['id'] = Variable<int>(id.value);
-    }
-    if (sessionId.present) {
-      map['session_id'] = Variable<int>(sessionId.value);
+      map['id'] = Variable<String>(id.value);
     }
     if (userId.present) {
-      map['user_id'] = Variable<int>(userId.value);
+      map['user_id'] = Variable<String>(userId.value);
     }
-    if (branch.present) {
-      map['branch'] = Variable<String>(branch.value);
+    if (branchId.present) {
+      map['branch_id'] = Variable<String>(branchId.value);
     }
-    if (area.present) {
-      map['area'] = Variable<String>(area.value);
+    if (openedAt.present) {
+      map['opened_at'] = Variable<String>(openedAt.value);
     }
-    if (shiftDate.present) {
-      map['shift_date'] = Variable<String>(shiftDate.value);
-    }
-    if (isOpen.present) {
-      map['is_open'] = Variable<bool>(isOpen.value);
+    if (closedAt.present) {
+      map['closed_at'] = Variable<String>(closedAt.value);
     }
     if (openingFloat.present) {
       map['opening_float'] = Variable<double>(openingFloat.value);
     }
-    if (openingNotes.present) {
-      map['opening_notes'] = Variable<String>(openingNotes.value);
+    if (closingCash.present) {
+      map['closing_cash'] = Variable<double>(closingCash.value);
     }
-    if (closingFloat.present) {
-      map['closing_float'] = Variable<double>(closingFloat.value);
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
     }
-    if (closingNotes.present) {
-      map['closing_notes'] = Variable<String>(closingNotes.value);
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
     }
-    if (totalSales.present) {
-      map['total_sales'] = Variable<double>(totalSales.value);
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(createdAt.value);
     }
-    if (expectedCash.present) {
-      map['expected_cash'] = Variable<double>(expectedCash.value);
-    }
-    if (variance.present) {
-      map['variance'] = Variable<double>(variance.value);
-    }
-    if (remittance.present) {
-      map['remittance'] = Variable<double>(remittance.value);
-    }
-    if (transactionsCount.present) {
-      map['transactions_count'] = Variable<int>(transactionsCount.value);
-    }
-    if (openedAt.present) {
-      map['opened_at'] = Variable<int>(openedAt.value);
-    }
-    if (closedAt.present) {
-      map['closed_at'] = Variable<int>(closedAt.value);
-    }
-    if (syncedAt.present) {
-      map['synced_at'] = Variable<int>(syncedAt.value);
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
     }
     return map;
   }
@@ -2092,696 +1728,51 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
   String toString() {
     return (StringBuffer('ShiftsCompanion(')
           ..write('id: $id, ')
-          ..write('sessionId: $sessionId, ')
           ..write('userId: $userId, ')
-          ..write('branch: $branch, ')
-          ..write('area: $area, ')
-          ..write('shiftDate: $shiftDate, ')
-          ..write('isOpen: $isOpen, ')
-          ..write('openingFloat: $openingFloat, ')
-          ..write('openingNotes: $openingNotes, ')
-          ..write('closingFloat: $closingFloat, ')
-          ..write('closingNotes: $closingNotes, ')
-          ..write('totalSales: $totalSales, ')
-          ..write('expectedCash: $expectedCash, ')
-          ..write('variance: $variance, ')
-          ..write('remittance: $remittance, ')
-          ..write('transactionsCount: $transactionsCount, ')
+          ..write('branchId: $branchId, ')
           ..write('openedAt: $openedAt, ')
           ..write('closedAt: $closedAt, ')
-          ..write('syncedAt: $syncedAt')
+          ..write('openingFloat: $openingFloat, ')
+          ..write('closingCash: $closingCash, ')
+          ..write('status: $status, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
 }
 
-class $ShiftOpeningDenominationsTable extends ShiftOpeningDenominations
-    with TableInfo<$ShiftOpeningDenominationsTable, ShiftOpeningDenomination> {
+class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $ShiftOpeningDenominationsTable(this.attachedDatabase, [this._alias]);
+  $TicketsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
       'id', aliasedName, false,
-      hasAutoIncrement: true,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _shiftIdMeta =
       const VerificationMeta('shiftId');
   @override
-  late final GeneratedColumn<int> shiftId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> shiftId = GeneratedColumn<String>(
       'shift_id', aliasedName, false,
-      type: DriftSqlType.int,
-      requiredDuringInsert: true,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('REFERENCES shifts (id)'));
-  static const VerificationMeta _denomMeta = const VerificationMeta('denom');
-  @override
-  late final GeneratedColumn<int> denom = GeneratedColumn<int>(
-      'denom', aliasedName, false,
-      type: DriftSqlType.int, requiredDuringInsert: true);
-  static const VerificationMeta _quantityMeta =
-      const VerificationMeta('quantity');
-  @override
-  late final GeneratedColumn<int> quantity = GeneratedColumn<int>(
-      'quantity', aliasedName, false,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultValue: const Constant(0));
-  static const VerificationMeta _subtotalMeta =
-      const VerificationMeta('subtotal');
-  @override
-  late final GeneratedColumn<double> subtotal = GeneratedColumn<double>(
-      'subtotal', aliasedName, false,
-      type: DriftSqlType.double,
-      requiredDuringInsert: false,
-      defaultValue: const Constant(0.0));
-  @override
-  List<GeneratedColumn> get $columns =>
-      [id, shiftId, denom, quantity, subtotal];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'shift_opening_denominations';
-  @override
-  VerificationContext validateIntegrity(
-      Insertable<ShiftOpeningDenomination> instance,
-      {bool isInserting = false}) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    }
-    if (data.containsKey('shift_id')) {
-      context.handle(_shiftIdMeta,
-          shiftId.isAcceptableOrUnknown(data['shift_id']!, _shiftIdMeta));
-    } else if (isInserting) {
-      context.missing(_shiftIdMeta);
-    }
-    if (data.containsKey('denom')) {
-      context.handle(
-          _denomMeta, denom.isAcceptableOrUnknown(data['denom']!, _denomMeta));
-    } else if (isInserting) {
-      context.missing(_denomMeta);
-    }
-    if (data.containsKey('quantity')) {
-      context.handle(_quantityMeta,
-          quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta));
-    }
-    if (data.containsKey('subtotal')) {
-      context.handle(_subtotalMeta,
-          subtotal.isAcceptableOrUnknown(data['subtotal']!, _subtotalMeta));
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  ShiftOpeningDenomination map(Map<String, dynamic> data,
-      {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return ShiftOpeningDenomination(
-      id: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
-      shiftId: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}shift_id'])!,
-      denom: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}denom'])!,
-      quantity: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}quantity'])!,
-      subtotal: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}subtotal'])!,
-    );
-  }
-
-  @override
-  $ShiftOpeningDenominationsTable createAlias(String alias) {
-    return $ShiftOpeningDenominationsTable(attachedDatabase, alias);
-  }
-}
-
-class ShiftOpeningDenomination extends DataClass
-    implements Insertable<ShiftOpeningDenomination> {
-  final int id;
-  final int shiftId;
-
-  /// 1000, 500, 200, …
-  final int denom;
-  final int quantity;
-  final double subtotal;
-  const ShiftOpeningDenomination(
-      {required this.id,
-      required this.shiftId,
-      required this.denom,
-      required this.quantity,
-      required this.subtotal});
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
-    map['shift_id'] = Variable<int>(shiftId);
-    map['denom'] = Variable<int>(denom);
-    map['quantity'] = Variable<int>(quantity);
-    map['subtotal'] = Variable<double>(subtotal);
-    return map;
-  }
-
-  ShiftOpeningDenominationsCompanion toCompanion(bool nullToAbsent) {
-    return ShiftOpeningDenominationsCompanion(
-      id: Value(id),
-      shiftId: Value(shiftId),
-      denom: Value(denom),
-      quantity: Value(quantity),
-      subtotal: Value(subtotal),
-    );
-  }
-
-  factory ShiftOpeningDenomination.fromJson(Map<String, dynamic> json,
-      {ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return ShiftOpeningDenomination(
-      id: serializer.fromJson<int>(json['id']),
-      shiftId: serializer.fromJson<int>(json['shiftId']),
-      denom: serializer.fromJson<int>(json['denom']),
-      quantity: serializer.fromJson<int>(json['quantity']),
-      subtotal: serializer.fromJson<double>(json['subtotal']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
-      'shiftId': serializer.toJson<int>(shiftId),
-      'denom': serializer.toJson<int>(denom),
-      'quantity': serializer.toJson<int>(quantity),
-      'subtotal': serializer.toJson<double>(subtotal),
-    };
-  }
-
-  ShiftOpeningDenomination copyWith(
-          {int? id,
-          int? shiftId,
-          int? denom,
-          int? quantity,
-          double? subtotal}) =>
-      ShiftOpeningDenomination(
-        id: id ?? this.id,
-        shiftId: shiftId ?? this.shiftId,
-        denom: denom ?? this.denom,
-        quantity: quantity ?? this.quantity,
-        subtotal: subtotal ?? this.subtotal,
-      );
-  ShiftOpeningDenomination copyWithCompanion(
-      ShiftOpeningDenominationsCompanion data) {
-    return ShiftOpeningDenomination(
-      id: data.id.present ? data.id.value : this.id,
-      shiftId: data.shiftId.present ? data.shiftId.value : this.shiftId,
-      denom: data.denom.present ? data.denom.value : this.denom,
-      quantity: data.quantity.present ? data.quantity.value : this.quantity,
-      subtotal: data.subtotal.present ? data.subtotal.value : this.subtotal,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('ShiftOpeningDenomination(')
-          ..write('id: $id, ')
-          ..write('shiftId: $shiftId, ')
-          ..write('denom: $denom, ')
-          ..write('quantity: $quantity, ')
-          ..write('subtotal: $subtotal')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(id, shiftId, denom, quantity, subtotal);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is ShiftOpeningDenomination &&
-          other.id == this.id &&
-          other.shiftId == this.shiftId &&
-          other.denom == this.denom &&
-          other.quantity == this.quantity &&
-          other.subtotal == this.subtotal);
-}
-
-class ShiftOpeningDenominationsCompanion
-    extends UpdateCompanion<ShiftOpeningDenomination> {
-  final Value<int> id;
-  final Value<int> shiftId;
-  final Value<int> denom;
-  final Value<int> quantity;
-  final Value<double> subtotal;
-  const ShiftOpeningDenominationsCompanion({
-    this.id = const Value.absent(),
-    this.shiftId = const Value.absent(),
-    this.denom = const Value.absent(),
-    this.quantity = const Value.absent(),
-    this.subtotal = const Value.absent(),
-  });
-  ShiftOpeningDenominationsCompanion.insert({
-    this.id = const Value.absent(),
-    required int shiftId,
-    required int denom,
-    this.quantity = const Value.absent(),
-    this.subtotal = const Value.absent(),
-  })  : shiftId = Value(shiftId),
-        denom = Value(denom);
-  static Insertable<ShiftOpeningDenomination> custom({
-    Expression<int>? id,
-    Expression<int>? shiftId,
-    Expression<int>? denom,
-    Expression<int>? quantity,
-    Expression<double>? subtotal,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (shiftId != null) 'shift_id': shiftId,
-      if (denom != null) 'denom': denom,
-      if (quantity != null) 'quantity': quantity,
-      if (subtotal != null) 'subtotal': subtotal,
-    });
-  }
-
-  ShiftOpeningDenominationsCompanion copyWith(
-      {Value<int>? id,
-      Value<int>? shiftId,
-      Value<int>? denom,
-      Value<int>? quantity,
-      Value<double>? subtotal}) {
-    return ShiftOpeningDenominationsCompanion(
-      id: id ?? this.id,
-      shiftId: shiftId ?? this.shiftId,
-      denom: denom ?? this.denom,
-      quantity: quantity ?? this.quantity,
-      subtotal: subtotal ?? this.subtotal,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<int>(id.value);
-    }
-    if (shiftId.present) {
-      map['shift_id'] = Variable<int>(shiftId.value);
-    }
-    if (denom.present) {
-      map['denom'] = Variable<int>(denom.value);
-    }
-    if (quantity.present) {
-      map['quantity'] = Variable<int>(quantity.value);
-    }
-    if (subtotal.present) {
-      map['subtotal'] = Variable<double>(subtotal.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('ShiftOpeningDenominationsCompanion(')
-          ..write('id: $id, ')
-          ..write('shiftId: $shiftId, ')
-          ..write('denom: $denom, ')
-          ..write('quantity: $quantity, ')
-          ..write('subtotal: $subtotal')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class $ShiftClosingDenominationsTable extends ShiftClosingDenominations
-    with TableInfo<$ShiftClosingDenominationsTable, ShiftClosingDenomination> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $ShiftClosingDenominationsTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
-      'id', aliasedName, false,
-      hasAutoIncrement: true,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
-  static const VerificationMeta _shiftIdMeta =
-      const VerificationMeta('shiftId');
-  @override
-  late final GeneratedColumn<int> shiftId = GeneratedColumn<int>(
-      'shift_id', aliasedName, false,
-      type: DriftSqlType.int,
-      requiredDuringInsert: true,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('REFERENCES shifts (id)'));
-  static const VerificationMeta _denomMeta = const VerificationMeta('denom');
-  @override
-  late final GeneratedColumn<int> denom = GeneratedColumn<int>(
-      'denom', aliasedName, false,
-      type: DriftSqlType.int, requiredDuringInsert: true);
-  static const VerificationMeta _quantityMeta =
-      const VerificationMeta('quantity');
-  @override
-  late final GeneratedColumn<int> quantity = GeneratedColumn<int>(
-      'quantity', aliasedName, false,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultValue: const Constant(0));
-  static const VerificationMeta _subtotalMeta =
-      const VerificationMeta('subtotal');
-  @override
-  late final GeneratedColumn<double> subtotal = GeneratedColumn<double>(
-      'subtotal', aliasedName, false,
-      type: DriftSqlType.double,
-      requiredDuringInsert: false,
-      defaultValue: const Constant(0.0));
-  @override
-  List<GeneratedColumn> get $columns =>
-      [id, shiftId, denom, quantity, subtotal];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'shift_closing_denominations';
-  @override
-  VerificationContext validateIntegrity(
-      Insertable<ShiftClosingDenomination> instance,
-      {bool isInserting = false}) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    }
-    if (data.containsKey('shift_id')) {
-      context.handle(_shiftIdMeta,
-          shiftId.isAcceptableOrUnknown(data['shift_id']!, _shiftIdMeta));
-    } else if (isInserting) {
-      context.missing(_shiftIdMeta);
-    }
-    if (data.containsKey('denom')) {
-      context.handle(
-          _denomMeta, denom.isAcceptableOrUnknown(data['denom']!, _denomMeta));
-    } else if (isInserting) {
-      context.missing(_denomMeta);
-    }
-    if (data.containsKey('quantity')) {
-      context.handle(_quantityMeta,
-          quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta));
-    }
-    if (data.containsKey('subtotal')) {
-      context.handle(_subtotalMeta,
-          subtotal.isAcceptableOrUnknown(data['subtotal']!, _subtotalMeta));
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  ShiftClosingDenomination map(Map<String, dynamic> data,
-      {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return ShiftClosingDenomination(
-      id: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
-      shiftId: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}shift_id'])!,
-      denom: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}denom'])!,
-      quantity: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}quantity'])!,
-      subtotal: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}subtotal'])!,
-    );
-  }
-
-  @override
-  $ShiftClosingDenominationsTable createAlias(String alias) {
-    return $ShiftClosingDenominationsTable(attachedDatabase, alias);
-  }
-}
-
-class ShiftClosingDenomination extends DataClass
-    implements Insertable<ShiftClosingDenomination> {
-  final int id;
-  final int shiftId;
-  final int denom;
-  final int quantity;
-  final double subtotal;
-  const ShiftClosingDenomination(
-      {required this.id,
-      required this.shiftId,
-      required this.denom,
-      required this.quantity,
-      required this.subtotal});
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
-    map['shift_id'] = Variable<int>(shiftId);
-    map['denom'] = Variable<int>(denom);
-    map['quantity'] = Variable<int>(quantity);
-    map['subtotal'] = Variable<double>(subtotal);
-    return map;
-  }
-
-  ShiftClosingDenominationsCompanion toCompanion(bool nullToAbsent) {
-    return ShiftClosingDenominationsCompanion(
-      id: Value(id),
-      shiftId: Value(shiftId),
-      denom: Value(denom),
-      quantity: Value(quantity),
-      subtotal: Value(subtotal),
-    );
-  }
-
-  factory ShiftClosingDenomination.fromJson(Map<String, dynamic> json,
-      {ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return ShiftClosingDenomination(
-      id: serializer.fromJson<int>(json['id']),
-      shiftId: serializer.fromJson<int>(json['shiftId']),
-      denom: serializer.fromJson<int>(json['denom']),
-      quantity: serializer.fromJson<int>(json['quantity']),
-      subtotal: serializer.fromJson<double>(json['subtotal']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
-      'shiftId': serializer.toJson<int>(shiftId),
-      'denom': serializer.toJson<int>(denom),
-      'quantity': serializer.toJson<int>(quantity),
-      'subtotal': serializer.toJson<double>(subtotal),
-    };
-  }
-
-  ShiftClosingDenomination copyWith(
-          {int? id,
-          int? shiftId,
-          int? denom,
-          int? quantity,
-          double? subtotal}) =>
-      ShiftClosingDenomination(
-        id: id ?? this.id,
-        shiftId: shiftId ?? this.shiftId,
-        denom: denom ?? this.denom,
-        quantity: quantity ?? this.quantity,
-        subtotal: subtotal ?? this.subtotal,
-      );
-  ShiftClosingDenomination copyWithCompanion(
-      ShiftClosingDenominationsCompanion data) {
-    return ShiftClosingDenomination(
-      id: data.id.present ? data.id.value : this.id,
-      shiftId: data.shiftId.present ? data.shiftId.value : this.shiftId,
-      denom: data.denom.present ? data.denom.value : this.denom,
-      quantity: data.quantity.present ? data.quantity.value : this.quantity,
-      subtotal: data.subtotal.present ? data.subtotal.value : this.subtotal,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('ShiftClosingDenomination(')
-          ..write('id: $id, ')
-          ..write('shiftId: $shiftId, ')
-          ..write('denom: $denom, ')
-          ..write('quantity: $quantity, ')
-          ..write('subtotal: $subtotal')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(id, shiftId, denom, quantity, subtotal);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is ShiftClosingDenomination &&
-          other.id == this.id &&
-          other.shiftId == this.shiftId &&
-          other.denom == this.denom &&
-          other.quantity == this.quantity &&
-          other.subtotal == this.subtotal);
-}
-
-class ShiftClosingDenominationsCompanion
-    extends UpdateCompanion<ShiftClosingDenomination> {
-  final Value<int> id;
-  final Value<int> shiftId;
-  final Value<int> denom;
-  final Value<int> quantity;
-  final Value<double> subtotal;
-  const ShiftClosingDenominationsCompanion({
-    this.id = const Value.absent(),
-    this.shiftId = const Value.absent(),
-    this.denom = const Value.absent(),
-    this.quantity = const Value.absent(),
-    this.subtotal = const Value.absent(),
-  });
-  ShiftClosingDenominationsCompanion.insert({
-    this.id = const Value.absent(),
-    required int shiftId,
-    required int denom,
-    this.quantity = const Value.absent(),
-    this.subtotal = const Value.absent(),
-  })  : shiftId = Value(shiftId),
-        denom = Value(denom);
-  static Insertable<ShiftClosingDenomination> custom({
-    Expression<int>? id,
-    Expression<int>? shiftId,
-    Expression<int>? denom,
-    Expression<int>? quantity,
-    Expression<double>? subtotal,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (shiftId != null) 'shift_id': shiftId,
-      if (denom != null) 'denom': denom,
-      if (quantity != null) 'quantity': quantity,
-      if (subtotal != null) 'subtotal': subtotal,
-    });
-  }
-
-  ShiftClosingDenominationsCompanion copyWith(
-      {Value<int>? id,
-      Value<int>? shiftId,
-      Value<int>? denom,
-      Value<int>? quantity,
-      Value<double>? subtotal}) {
-    return ShiftClosingDenominationsCompanion(
-      id: id ?? this.id,
-      shiftId: shiftId ?? this.shiftId,
-      denom: denom ?? this.denom,
-      quantity: quantity ?? this.quantity,
-      subtotal: subtotal ?? this.subtotal,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<int>(id.value);
-    }
-    if (shiftId.present) {
-      map['shift_id'] = Variable<int>(shiftId.value);
-    }
-    if (denom.present) {
-      map['denom'] = Variable<int>(denom.value);
-    }
-    if (quantity.present) {
-      map['quantity'] = Variable<int>(quantity.value);
-    }
-    if (subtotal.present) {
-      map['subtotal'] = Variable<double>(subtotal.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('ShiftClosingDenominationsCompanion(')
-          ..write('id: $id, ')
-          ..write('shiftId: $shiftId, ')
-          ..write('denom: $denom, ')
-          ..write('quantity: $quantity, ')
-          ..write('subtotal: $subtotal')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class $ValetTransactionsTable extends ValetTransactions
-    with TableInfo<$ValetTransactionsTable, ValetTransaction> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $ValetTransactionsTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
-      'id', aliasedName, false,
-      hasAutoIncrement: true,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
-  static const VerificationMeta _localUuidMeta =
-      const VerificationMeta('localUuid');
-  @override
-  late final GeneratedColumn<String> localUuid = GeneratedColumn<String>(
-      'local_uuid', aliasedName, true,
       type: DriftSqlType.string,
-      requiredDuringInsert: false,
-      defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
-  static const VerificationMeta _checkinShiftIdMeta =
-      const VerificationMeta('checkinShiftId');
-  @override
-  late final GeneratedColumn<int> checkinShiftId = GeneratedColumn<int>(
-      'checkin_shift_id', aliasedName, false,
-      type: DriftSqlType.int,
       requiredDuringInsert: true,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('REFERENCES shifts (id)'));
-  static const VerificationMeta _checkoutShiftIdMeta =
-      const VerificationMeta('checkoutShiftId');
-  @override
-  late final GeneratedColumn<int> checkoutShiftId = GeneratedColumn<int>(
-      'checkout_shift_id', aliasedName, true,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('REFERENCES shifts (id)'));
   static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
   @override
-  late final GeneratedColumn<int> userId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
       'user_id', aliasedName, false,
-      type: DriftSqlType.int,
-      requiredDuringInsert: true,
-      defaultConstraints: GeneratedColumn.constraintIsAlways(
-          'REFERENCES offline_accounts (id)'));
-  static const VerificationMeta _ticketNumberMeta =
-      const VerificationMeta('ticketNumber');
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _branchIdMeta =
+      const VerificationMeta('branchId');
   @override
-  late final GeneratedColumn<String> ticketNumber = GeneratedColumn<String>(
-      'ticket_number', aliasedName, false,
-      type: DriftSqlType.string,
-      requiredDuringInsert: true,
-      defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
+  late final GeneratedColumn<String> branchId = GeneratedColumn<String>(
+      'branch_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _plateNumberMeta =
       const VerificationMeta('plateNumber');
   @override
@@ -2792,293 +1783,119 @@ class $ValetTransactionsTable extends ValetTransactions
       const VerificationMeta('vehicleBrand');
   @override
   late final GeneratedColumn<String> vehicleBrand = GeneratedColumn<String>(
-      'vehicle_brand', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _vehicleModelMeta =
-      const VerificationMeta('vehicleModel');
-  @override
-  late final GeneratedColumn<String> vehicleModel = GeneratedColumn<String>(
-      'vehicle_model', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _vehicleYearMeta =
-      const VerificationMeta('vehicleYear');
-  @override
-  late final GeneratedColumn<String> vehicleYear = GeneratedColumn<String>(
-      'vehicle_year', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
+      'vehicle_brand', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _vehicleColorMeta =
       const VerificationMeta('vehicleColor');
   @override
   late final GeneratedColumn<String> vehicleColor = GeneratedColumn<String>(
-      'vehicle_color', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
+      'vehicle_color', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _vehicleTypeMeta =
       const VerificationMeta('vehicleType');
   @override
   late final GeneratedColumn<String> vehicleType = GeneratedColumn<String>(
-      'vehicle_type', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _slotMeta = const VerificationMeta('slot');
+      'vehicle_type', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _cellphoneNumberMeta =
+      const VerificationMeta('cellphoneNumber');
   @override
-  late final GeneratedColumn<String> slot = GeneratedColumn<String>(
-      'slot', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _parkingLevelMeta =
-      const VerificationMeta('parkingLevel');
+  late final GeneratedColumn<String> cellphoneNumber = GeneratedColumn<String>(
+      'cellphone_number', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _damageMarkersMeta =
+      const VerificationMeta('damageMarkers');
   @override
-  late final GeneratedColumn<String> parkingLevel = GeneratedColumn<String>(
-      'parking_level', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _parkingSlotMeta =
-      const VerificationMeta('parkingSlot');
+  late final GeneratedColumn<String> damageMarkers = GeneratedColumn<String>(
+      'damage_markers', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _personalBelongingsMeta =
+      const VerificationMeta('personalBelongings');
   @override
-  late final GeneratedColumn<String> parkingSlot = GeneratedColumn<String>(
-      'parking_slot', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _belongingsJsonMeta =
-      const VerificationMeta('belongingsJson');
-  @override
-  late final GeneratedColumn<String> belongingsJson = GeneratedColumn<String>(
-      'belongings_json', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _otherBelongingsMeta =
-      const VerificationMeta('otherBelongings');
-  @override
-  late final GeneratedColumn<String> otherBelongings = GeneratedColumn<String>(
-      'other_belongings', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
+  late final GeneratedColumn<String> personalBelongings =
+      GeneratedColumn<String>('personal_belongings', aliasedName, false,
+          type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _signaturePngMeta =
       const VerificationMeta('signaturePng');
   @override
   late final GeneratedColumn<String> signaturePng = GeneratedColumn<String>(
       'signature_png', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _signatureCapturedAtMeta =
-      const VerificationMeta('signatureCapturedAt');
+  static const VerificationMeta _checkInAtMeta =
+      const VerificationMeta('checkInAt');
   @override
-  late final GeneratedColumn<int> signatureCapturedAt = GeneratedColumn<int>(
-      'signature_captured_at', aliasedName, true,
-      type: DriftSqlType.int, requiredDuringInsert: false);
-  static const VerificationMeta _customerFullNameMeta =
-      const VerificationMeta('customerFullName');
+  late final GeneratedColumn<String> checkInAt = GeneratedColumn<String>(
+      'check_in_at', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _checkOutAtMeta =
+      const VerificationMeta('checkOutAt');
   @override
-  late final GeneratedColumn<String> customerFullName = GeneratedColumn<String>(
-      'customer_full_name', aliasedName, true,
+  late final GeneratedColumn<String> checkOutAt = GeneratedColumn<String>(
+      'check_out_at', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _customerMobileMeta =
-      const VerificationMeta('customerMobile');
+  static const VerificationMeta _feeMeta = const VerificationMeta('fee');
   @override
-  late final GeneratedColumn<String> customerMobile = GeneratedColumn<String>(
-      'customer_mobile', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _assignedValetDriverMeta =
-      const VerificationMeta('assignedValetDriver');
-  @override
-  late final GeneratedColumn<String> assignedValetDriver =
-      GeneratedColumn<String>('assigned_valet_driver', aliasedName, true,
-          type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _specialInstructionsMeta =
-      const VerificationMeta('specialInstructions');
-  @override
-  late final GeneratedColumn<String> specialInstructions =
-      GeneratedColumn<String>('special_instructions', aliasedName, true,
-          type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _valetServiceTypeMeta =
-      const VerificationMeta('valetServiceType');
-  @override
-  late final GeneratedColumn<String> valetServiceType = GeneratedColumn<String>(
-      'valet_service_type', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _vehicleDamageJsonMeta =
-      const VerificationMeta('vehicleDamageJson');
-  @override
-  late final GeneratedColumn<String> vehicleDamageJson =
-      GeneratedColumn<String>('vehicle_damage_json', aliasedName, true,
-          type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _branchSnapshotMeta =
-      const VerificationMeta('branchSnapshot');
-  @override
-  late final GeneratedColumn<String> branchSnapshot = GeneratedColumn<String>(
-      'branch_snapshot', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _areaSnapshotMeta =
-      const VerificationMeta('areaSnapshot');
-  @override
-  late final GeneratedColumn<String> areaSnapshot = GeneratedColumn<String>(
-      'area_snapshot', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _deviceIdSnapshotMeta =
-      const VerificationMeta('deviceIdSnapshot');
-  @override
-  late final GeneratedColumn<String> deviceIdSnapshot = GeneratedColumn<String>(
-      'device_id_snapshot', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _serverTicketIdMeta =
-      const VerificationMeta('serverTicketId');
-  @override
-  late final GeneratedColumn<String> serverTicketId = GeneratedColumn<String>(
-      'server_ticket_id', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _lastModifiedAtMeta =
-      const VerificationMeta('lastModifiedAt');
-  @override
-  late final GeneratedColumn<int> lastModifiedAt = GeneratedColumn<int>(
-      'last_modified_at', aliasedName, true,
-      type: DriftSqlType.int, requiredDuringInsert: false);
-  static const VerificationMeta _localCreatedAtMeta =
-      const VerificationMeta('localCreatedAt');
-  @override
-  late final GeneratedColumn<int> localCreatedAt = GeneratedColumn<int>(
-      'local_created_at', aliasedName, true,
-      type: DriftSqlType.int, requiredDuringInsert: false);
-  static const VerificationMeta _timeInMeta = const VerificationMeta('timeIn');
-  @override
-  late final GeneratedColumn<int> timeIn = GeneratedColumn<int>(
-      'time_in', aliasedName, false,
-      type: DriftSqlType.int, requiredDuringInsert: true);
-  static const VerificationMeta _timeOutMeta =
-      const VerificationMeta('timeOut');
-  @override
-  late final GeneratedColumn<int> timeOut = GeneratedColumn<int>(
-      'time_out', aliasedName, true,
-      type: DriftSqlType.int, requiredDuringInsert: false);
-  static const VerificationMeta _durationMinutesMeta =
-      const VerificationMeta('durationMinutes');
-  @override
-  late final GeneratedColumn<int> durationMinutes = GeneratedColumn<int>(
-      'duration_minutes', aliasedName, true,
-      type: DriftSqlType.int, requiredDuringInsert: false);
-  static const VerificationMeta _flatRateMeta =
-      const VerificationMeta('flatRate');
-  @override
-  late final GeneratedColumn<double> flatRate = GeneratedColumn<double>(
-      'flat_rate', aliasedName, true,
-      type: DriftSqlType.double, requiredDuringInsert: false);
-  static const VerificationMeta _succeedingFeeMeta =
-      const VerificationMeta('succeedingFee');
-  @override
-  late final GeneratedColumn<double> succeedingFee = GeneratedColumn<double>(
-      'succeeding_fee', aliasedName, true,
-      type: DriftSqlType.double, requiredDuringInsert: false);
-  static const VerificationMeta _overnightFeeMeta =
-      const VerificationMeta('overnightFee');
-  @override
-  late final GeneratedColumn<double> overnightFee = GeneratedColumn<double>(
-      'overnight_fee', aliasedName, true,
-      type: DriftSqlType.double, requiredDuringInsert: false);
-  static const VerificationMeta _lostTicketFeeMeta =
-      const VerificationMeta('lostTicketFee');
-  @override
-  late final GeneratedColumn<double> lostTicketFee = GeneratedColumn<double>(
-      'lost_ticket_fee', aliasedName, true,
-      type: DriftSqlType.double, requiredDuringInsert: false);
-  static const VerificationMeta _totalFeeMeta =
-      const VerificationMeta('totalFee');
-  @override
-  late final GeneratedColumn<double> totalFee = GeneratedColumn<double>(
-      'total_fee', aliasedName, true,
-      type: DriftSqlType.double, requiredDuringInsert: false);
-  static const VerificationMeta _amountTenderedMeta =
-      const VerificationMeta('amountTendered');
-  @override
-  late final GeneratedColumn<double> amountTendered = GeneratedColumn<double>(
-      'amount_tendered', aliasedName, true,
-      type: DriftSqlType.double, requiredDuringInsert: false);
-  static const VerificationMeta _changeAmountMeta =
-      const VerificationMeta('changeAmount');
-  @override
-  late final GeneratedColumn<double> changeAmount = GeneratedColumn<double>(
-      'change_amount', aliasedName, true,
+  late final GeneratedColumn<double> fee = GeneratedColumn<double>(
+      'fee', aliasedName, true,
       type: DriftSqlType.double, requiredDuringInsert: false);
   static const VerificationMeta _statusMeta = const VerificationMeta('status');
   @override
   late final GeneratedColumn<String> status = GeneratedColumn<String>(
       'status', aliasedName, false,
-      type: DriftSqlType.string,
-      requiredDuringInsert: false,
-      defaultValue: const Constant('active'));
-  static const VerificationMeta _syncedAtMeta =
-      const VerificationMeta('syncedAt');
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _syncStatusMeta =
+      const VerificationMeta('syncStatus');
   @override
-  late final GeneratedColumn<int> syncedAt = GeneratedColumn<int>(
-      'synced_at', aliasedName, true,
-      type: DriftSqlType.int, requiredDuringInsert: false);
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+      'sync_status', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   @override
   List<GeneratedColumn> get $columns => [
         id,
-        localUuid,
-        checkinShiftId,
-        checkoutShiftId,
+        shiftId,
         userId,
-        ticketNumber,
+        branchId,
         plateNumber,
         vehicleBrand,
-        vehicleModel,
-        vehicleYear,
         vehicleColor,
         vehicleType,
-        slot,
-        parkingLevel,
-        parkingSlot,
-        belongingsJson,
-        otherBelongings,
+        cellphoneNumber,
+        damageMarkers,
+        personalBelongings,
         signaturePng,
-        signatureCapturedAt,
-        customerFullName,
-        customerMobile,
-        assignedValetDriver,
-        specialInstructions,
-        valetServiceType,
-        vehicleDamageJson,
-        branchSnapshot,
-        areaSnapshot,
-        deviceIdSnapshot,
-        serverTicketId,
-        lastModifiedAt,
-        localCreatedAt,
-        timeIn,
-        timeOut,
-        durationMinutes,
-        flatRate,
-        succeedingFee,
-        overnightFee,
-        lostTicketFee,
-        totalFee,
-        amountTendered,
-        changeAmount,
+        checkInAt,
+        checkOutAt,
+        fee,
         status,
-        syncedAt
+        syncStatus,
+        createdAt
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'transactions';
+  static const String $name = 'tickets';
   @override
-  VerificationContext validateIntegrity(Insertable<ValetTransaction> instance,
+  VerificationContext validateIntegrity(Insertable<Ticket> instance,
       {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    }
-    if (data.containsKey('local_uuid')) {
-      context.handle(_localUuidMeta,
-          localUuid.isAcceptableOrUnknown(data['local_uuid']!, _localUuidMeta));
-    }
-    if (data.containsKey('checkin_shift_id')) {
-      context.handle(
-          _checkinShiftIdMeta,
-          checkinShiftId.isAcceptableOrUnknown(
-              data['checkin_shift_id']!, _checkinShiftIdMeta));
     } else if (isInserting) {
-      context.missing(_checkinShiftIdMeta);
+      context.missing(_idMeta);
     }
-    if (data.containsKey('checkout_shift_id')) {
-      context.handle(
-          _checkoutShiftIdMeta,
-          checkoutShiftId.isAcceptableOrUnknown(
-              data['checkout_shift_id']!, _checkoutShiftIdMeta));
+    if (data.containsKey('shift_id')) {
+      context.handle(_shiftIdMeta,
+          shiftId.isAcceptableOrUnknown(data['shift_id']!, _shiftIdMeta));
+    } else if (isInserting) {
+      context.missing(_shiftIdMeta);
     }
     if (data.containsKey('user_id')) {
       context.handle(_userIdMeta,
@@ -3086,13 +1903,11 @@ class $ValetTransactionsTable extends ValetTransactions
     } else if (isInserting) {
       context.missing(_userIdMeta);
     }
-    if (data.containsKey('ticket_number')) {
-      context.handle(
-          _ticketNumberMeta,
-          ticketNumber.isAcceptableOrUnknown(
-              data['ticket_number']!, _ticketNumberMeta));
+    if (data.containsKey('branch_id')) {
+      context.handle(_branchIdMeta,
+          branchId.isAcceptableOrUnknown(data['branch_id']!, _branchIdMeta));
     } else if (isInserting) {
-      context.missing(_ticketNumberMeta);
+      context.missing(_branchIdMeta);
     }
     if (data.containsKey('plate_number')) {
       context.handle(
@@ -3107,58 +1922,48 @@ class $ValetTransactionsTable extends ValetTransactions
           _vehicleBrandMeta,
           vehicleBrand.isAcceptableOrUnknown(
               data['vehicle_brand']!, _vehicleBrandMeta));
-    }
-    if (data.containsKey('vehicle_model')) {
-      context.handle(
-          _vehicleModelMeta,
-          vehicleModel.isAcceptableOrUnknown(
-              data['vehicle_model']!, _vehicleModelMeta));
-    }
-    if (data.containsKey('vehicle_year')) {
-      context.handle(
-          _vehicleYearMeta,
-          vehicleYear.isAcceptableOrUnknown(
-              data['vehicle_year']!, _vehicleYearMeta));
+    } else if (isInserting) {
+      context.missing(_vehicleBrandMeta);
     }
     if (data.containsKey('vehicle_color')) {
       context.handle(
           _vehicleColorMeta,
           vehicleColor.isAcceptableOrUnknown(
               data['vehicle_color']!, _vehicleColorMeta));
+    } else if (isInserting) {
+      context.missing(_vehicleColorMeta);
     }
     if (data.containsKey('vehicle_type')) {
       context.handle(
           _vehicleTypeMeta,
           vehicleType.isAcceptableOrUnknown(
               data['vehicle_type']!, _vehicleTypeMeta));
+    } else if (isInserting) {
+      context.missing(_vehicleTypeMeta);
     }
-    if (data.containsKey('slot')) {
+    if (data.containsKey('cellphone_number')) {
       context.handle(
-          _slotMeta, slot.isAcceptableOrUnknown(data['slot']!, _slotMeta));
+          _cellphoneNumberMeta,
+          cellphoneNumber.isAcceptableOrUnknown(
+              data['cellphone_number']!, _cellphoneNumberMeta));
+    } else if (isInserting) {
+      context.missing(_cellphoneNumberMeta);
     }
-    if (data.containsKey('parking_level')) {
+    if (data.containsKey('damage_markers')) {
       context.handle(
-          _parkingLevelMeta,
-          parkingLevel.isAcceptableOrUnknown(
-              data['parking_level']!, _parkingLevelMeta));
+          _damageMarkersMeta,
+          damageMarkers.isAcceptableOrUnknown(
+              data['damage_markers']!, _damageMarkersMeta));
+    } else if (isInserting) {
+      context.missing(_damageMarkersMeta);
     }
-    if (data.containsKey('parking_slot')) {
+    if (data.containsKey('personal_belongings')) {
       context.handle(
-          _parkingSlotMeta,
-          parkingSlot.isAcceptableOrUnknown(
-              data['parking_slot']!, _parkingSlotMeta));
-    }
-    if (data.containsKey('belongings_json')) {
-      context.handle(
-          _belongingsJsonMeta,
-          belongingsJson.isAcceptableOrUnknown(
-              data['belongings_json']!, _belongingsJsonMeta));
-    }
-    if (data.containsKey('other_belongings')) {
-      context.handle(
-          _otherBelongingsMeta,
-          otherBelongings.isAcceptableOrUnknown(
-              data['other_belongings']!, _otherBelongingsMeta));
+          _personalBelongingsMeta,
+          personalBelongings.isAcceptableOrUnknown(
+              data['personal_belongings']!, _personalBelongingsMeta));
+    } else if (isInserting) {
+      context.missing(_personalBelongingsMeta);
     }
     if (data.containsKey('signature_png')) {
       context.handle(
@@ -3166,145 +1971,43 @@ class $ValetTransactionsTable extends ValetTransactions
           signaturePng.isAcceptableOrUnknown(
               data['signature_png']!, _signaturePngMeta));
     }
-    if (data.containsKey('signature_captured_at')) {
+    if (data.containsKey('check_in_at')) {
       context.handle(
-          _signatureCapturedAtMeta,
-          signatureCapturedAt.isAcceptableOrUnknown(
-              data['signature_captured_at']!, _signatureCapturedAtMeta));
-    }
-    if (data.containsKey('customer_full_name')) {
-      context.handle(
-          _customerFullNameMeta,
-          customerFullName.isAcceptableOrUnknown(
-              data['customer_full_name']!, _customerFullNameMeta));
-    }
-    if (data.containsKey('customer_mobile')) {
-      context.handle(
-          _customerMobileMeta,
-          customerMobile.isAcceptableOrUnknown(
-              data['customer_mobile']!, _customerMobileMeta));
-    }
-    if (data.containsKey('assigned_valet_driver')) {
-      context.handle(
-          _assignedValetDriverMeta,
-          assignedValetDriver.isAcceptableOrUnknown(
-              data['assigned_valet_driver']!, _assignedValetDriverMeta));
-    }
-    if (data.containsKey('special_instructions')) {
-      context.handle(
-          _specialInstructionsMeta,
-          specialInstructions.isAcceptableOrUnknown(
-              data['special_instructions']!, _specialInstructionsMeta));
-    }
-    if (data.containsKey('valet_service_type')) {
-      context.handle(
-          _valetServiceTypeMeta,
-          valetServiceType.isAcceptableOrUnknown(
-              data['valet_service_type']!, _valetServiceTypeMeta));
-    }
-    if (data.containsKey('vehicle_damage_json')) {
-      context.handle(
-          _vehicleDamageJsonMeta,
-          vehicleDamageJson.isAcceptableOrUnknown(
-              data['vehicle_damage_json']!, _vehicleDamageJsonMeta));
-    }
-    if (data.containsKey('branch_snapshot')) {
-      context.handle(
-          _branchSnapshotMeta,
-          branchSnapshot.isAcceptableOrUnknown(
-              data['branch_snapshot']!, _branchSnapshotMeta));
-    }
-    if (data.containsKey('area_snapshot')) {
-      context.handle(
-          _areaSnapshotMeta,
-          areaSnapshot.isAcceptableOrUnknown(
-              data['area_snapshot']!, _areaSnapshotMeta));
-    }
-    if (data.containsKey('device_id_snapshot')) {
-      context.handle(
-          _deviceIdSnapshotMeta,
-          deviceIdSnapshot.isAcceptableOrUnknown(
-              data['device_id_snapshot']!, _deviceIdSnapshotMeta));
-    }
-    if (data.containsKey('server_ticket_id')) {
-      context.handle(
-          _serverTicketIdMeta,
-          serverTicketId.isAcceptableOrUnknown(
-              data['server_ticket_id']!, _serverTicketIdMeta));
-    }
-    if (data.containsKey('last_modified_at')) {
-      context.handle(
-          _lastModifiedAtMeta,
-          lastModifiedAt.isAcceptableOrUnknown(
-              data['last_modified_at']!, _lastModifiedAtMeta));
-    }
-    if (data.containsKey('local_created_at')) {
-      context.handle(
-          _localCreatedAtMeta,
-          localCreatedAt.isAcceptableOrUnknown(
-              data['local_created_at']!, _localCreatedAtMeta));
-    }
-    if (data.containsKey('time_in')) {
-      context.handle(_timeInMeta,
-          timeIn.isAcceptableOrUnknown(data['time_in']!, _timeInMeta));
+          _checkInAtMeta,
+          checkInAt.isAcceptableOrUnknown(
+              data['check_in_at']!, _checkInAtMeta));
     } else if (isInserting) {
-      context.missing(_timeInMeta);
+      context.missing(_checkInAtMeta);
     }
-    if (data.containsKey('time_out')) {
-      context.handle(_timeOutMeta,
-          timeOut.isAcceptableOrUnknown(data['time_out']!, _timeOutMeta));
-    }
-    if (data.containsKey('duration_minutes')) {
+    if (data.containsKey('check_out_at')) {
       context.handle(
-          _durationMinutesMeta,
-          durationMinutes.isAcceptableOrUnknown(
-              data['duration_minutes']!, _durationMinutesMeta));
+          _checkOutAtMeta,
+          checkOutAt.isAcceptableOrUnknown(
+              data['check_out_at']!, _checkOutAtMeta));
     }
-    if (data.containsKey('flat_rate')) {
-      context.handle(_flatRateMeta,
-          flatRate.isAcceptableOrUnknown(data['flat_rate']!, _flatRateMeta));
-    }
-    if (data.containsKey('succeeding_fee')) {
+    if (data.containsKey('fee')) {
       context.handle(
-          _succeedingFeeMeta,
-          succeedingFee.isAcceptableOrUnknown(
-              data['succeeding_fee']!, _succeedingFeeMeta));
-    }
-    if (data.containsKey('overnight_fee')) {
-      context.handle(
-          _overnightFeeMeta,
-          overnightFee.isAcceptableOrUnknown(
-              data['overnight_fee']!, _overnightFeeMeta));
-    }
-    if (data.containsKey('lost_ticket_fee')) {
-      context.handle(
-          _lostTicketFeeMeta,
-          lostTicketFee.isAcceptableOrUnknown(
-              data['lost_ticket_fee']!, _lostTicketFeeMeta));
-    }
-    if (data.containsKey('total_fee')) {
-      context.handle(_totalFeeMeta,
-          totalFee.isAcceptableOrUnknown(data['total_fee']!, _totalFeeMeta));
-    }
-    if (data.containsKey('amount_tendered')) {
-      context.handle(
-          _amountTenderedMeta,
-          amountTendered.isAcceptableOrUnknown(
-              data['amount_tendered']!, _amountTenderedMeta));
-    }
-    if (data.containsKey('change_amount')) {
-      context.handle(
-          _changeAmountMeta,
-          changeAmount.isAcceptableOrUnknown(
-              data['change_amount']!, _changeAmountMeta));
+          _feeMeta, fee.isAcceptableOrUnknown(data['fee']!, _feeMeta));
     }
     if (data.containsKey('status')) {
       context.handle(_statusMeta,
           status.isAcceptableOrUnknown(data['status']!, _statusMeta));
+    } else if (isInserting) {
+      context.missing(_statusMeta);
     }
-    if (data.containsKey('synced_at')) {
-      context.handle(_syncedAtMeta,
-          syncedAt.isAcceptableOrUnknown(data['synced_at']!, _syncedAtMeta));
+    if (data.containsKey('sync_status')) {
+      context.handle(
+          _syncStatusMeta,
+          syncStatus.isAcceptableOrUnknown(
+              data['sync_status']!, _syncStatusMeta));
+    } else if (isInserting) {
+      context.missing(_syncStatusMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
     }
     return context;
   }
@@ -3312,1246 +2015,517 @@ class $ValetTransactionsTable extends ValetTransactions
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  ValetTransaction map(Map<String, dynamic> data, {String? tablePrefix}) {
+  Ticket map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return ValetTransaction(
+    return Ticket(
       id: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
-      localUuid: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}local_uuid']),
-      checkinShiftId: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}checkin_shift_id'])!,
-      checkoutShiftId: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}checkout_shift_id']),
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      shiftId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}shift_id'])!,
       userId: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}user_id'])!,
-      ticketNumber: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}ticket_number'])!,
+          .read(DriftSqlType.string, data['${effectivePrefix}user_id'])!,
+      branchId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}branch_id'])!,
       plateNumber: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}plate_number'])!,
       vehicleBrand: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}vehicle_brand']),
-      vehicleModel: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}vehicle_model']),
-      vehicleYear: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}vehicle_year']),
+          .read(DriftSqlType.string, data['${effectivePrefix}vehicle_brand'])!,
       vehicleColor: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}vehicle_color']),
+          .read(DriftSqlType.string, data['${effectivePrefix}vehicle_color'])!,
       vehicleType: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}vehicle_type']),
-      slot: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}slot']),
-      parkingLevel: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}parking_level']),
-      parkingSlot: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}parking_slot']),
-      belongingsJson: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}belongings_json']),
-      otherBelongings: attachedDatabase.typeMapping.read(
-          DriftSqlType.string, data['${effectivePrefix}other_belongings']),
+          .read(DriftSqlType.string, data['${effectivePrefix}vehicle_type'])!,
+      cellphoneNumber: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}cellphone_number'])!,
+      damageMarkers: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}damage_markers'])!,
+      personalBelongings: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}personal_belongings'])!,
       signaturePng: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}signature_png']),
-      signatureCapturedAt: attachedDatabase.typeMapping.read(
-          DriftSqlType.int, data['${effectivePrefix}signature_captured_at']),
-      customerFullName: attachedDatabase.typeMapping.read(
-          DriftSqlType.string, data['${effectivePrefix}customer_full_name']),
-      customerMobile: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}customer_mobile']),
-      assignedValetDriver: attachedDatabase.typeMapping.read(
-          DriftSqlType.string, data['${effectivePrefix}assigned_valet_driver']),
-      specialInstructions: attachedDatabase.typeMapping.read(
-          DriftSqlType.string, data['${effectivePrefix}special_instructions']),
-      valetServiceType: attachedDatabase.typeMapping.read(
-          DriftSqlType.string, data['${effectivePrefix}valet_service_type']),
-      vehicleDamageJson: attachedDatabase.typeMapping.read(
-          DriftSqlType.string, data['${effectivePrefix}vehicle_damage_json']),
-      branchSnapshot: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}branch_snapshot']),
-      areaSnapshot: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}area_snapshot']),
-      deviceIdSnapshot: attachedDatabase.typeMapping.read(
-          DriftSqlType.string, data['${effectivePrefix}device_id_snapshot']),
-      serverTicketId: attachedDatabase.typeMapping.read(
-          DriftSqlType.string, data['${effectivePrefix}server_ticket_id']),
-      lastModifiedAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}last_modified_at']),
-      localCreatedAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}local_created_at']),
-      timeIn: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}time_in'])!,
-      timeOut: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}time_out']),
-      durationMinutes: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}duration_minutes']),
-      flatRate: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}flat_rate']),
-      succeedingFee: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}succeeding_fee']),
-      overnightFee: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}overnight_fee']),
-      lostTicketFee: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}lost_ticket_fee']),
-      totalFee: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}total_fee']),
-      amountTendered: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}amount_tendered']),
-      changeAmount: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}change_amount']),
+      checkInAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}check_in_at'])!,
+      checkOutAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}check_out_at']),
+      fee: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}fee']),
       status: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
-      syncedAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}synced_at']),
+      syncStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}created_at'])!,
     );
   }
 
   @override
-  $ValetTransactionsTable createAlias(String alias) {
-    return $ValetTransactionsTable(attachedDatabase, alias);
+  $TicketsTable createAlias(String alias) {
+    return $TicketsTable(attachedDatabase, alias);
   }
 }
 
-class ValetTransaction extends DataClass
-    implements Insertable<ValetTransaction> {
-  final int id;
-
-  /// Client UUID for idempotent sync; backfilled on upgrade for legacy rows.
-  final String? localUuid;
-
-  /// Shift that was open when the vehicle was checked in (immutable).
-  final int checkinShiftId;
-
-  /// Shift responsible for checkout: set when adopting from a prior cashier's
-  /// open tickets, or on actual checkout. Null until assigned.
-  final int? checkoutShiftId;
-  final int userId;
-  final String ticketNumber;
+class Ticket extends DataClass implements Insertable<Ticket> {
+  final String id;
+  final String shiftId;
+  final String userId;
+  final String branchId;
   final String plateNumber;
-  final String? vehicleBrand;
-  final String? vehicleModel;
-  final String? vehicleYear;
-  final String? vehicleColor;
-  final String? vehicleType;
-  final String? slot;
-  final String? parkingLevel;
-  final String? parkingSlot;
-  final String? belongingsJson;
-  final String? otherBelongings;
+  final String vehicleBrand;
+  final String vehicleColor;
+  final String vehicleType;
+  final String cellphoneNumber;
 
-  /// Base64-encoded PNG (same bytes as before; stored as TEXT instead of BLOB).
+  /// JSON: [{zone, type, x, y}, ...]
+  final String damageMarkers;
+
+  /// JSON: ["iPad", ...]
+  final String personalBelongings;
+
+  /// Base64-encoded PNG, nullable until signed.
   final String? signaturePng;
-  final int? signatureCapturedAt;
-  final String? customerFullName;
-  final String? customerMobile;
-  final String? assignedValetDriver;
-  final String? specialInstructions;
-  final String? valetServiceType;
-  final String? vehicleDamageJson;
-  final String? branchSnapshot;
-  final String? areaSnapshot;
-  final String? deviceIdSnapshot;
-  final String? serverTicketId;
-  final int? lastModifiedAt;
-  final int? localCreatedAt;
-  final int timeIn;
-  final int? timeOut;
-  final int? durationMinutes;
-  final double? flatRate;
-  final double? succeedingFee;
-  final double? overnightFee;
-  final double? lostTicketFee;
-  final double? totalFee;
-  final double? amountTendered;
-  final double? changeAmount;
+  final String checkInAt;
+  final String? checkOutAt;
+  final double? fee;
+
+  /// `active` | `completed` | `lost`
   final String status;
-  final int? syncedAt;
-  const ValetTransaction(
+
+  /// `pending` | `synced`
+  final String syncStatus;
+  final String createdAt;
+  const Ticket(
       {required this.id,
-      this.localUuid,
-      required this.checkinShiftId,
-      this.checkoutShiftId,
+      required this.shiftId,
       required this.userId,
-      required this.ticketNumber,
+      required this.branchId,
       required this.plateNumber,
-      this.vehicleBrand,
-      this.vehicleModel,
-      this.vehicleYear,
-      this.vehicleColor,
-      this.vehicleType,
-      this.slot,
-      this.parkingLevel,
-      this.parkingSlot,
-      this.belongingsJson,
-      this.otherBelongings,
+      required this.vehicleBrand,
+      required this.vehicleColor,
+      required this.vehicleType,
+      required this.cellphoneNumber,
+      required this.damageMarkers,
+      required this.personalBelongings,
       this.signaturePng,
-      this.signatureCapturedAt,
-      this.customerFullName,
-      this.customerMobile,
-      this.assignedValetDriver,
-      this.specialInstructions,
-      this.valetServiceType,
-      this.vehicleDamageJson,
-      this.branchSnapshot,
-      this.areaSnapshot,
-      this.deviceIdSnapshot,
-      this.serverTicketId,
-      this.lastModifiedAt,
-      this.localCreatedAt,
-      required this.timeIn,
-      this.timeOut,
-      this.durationMinutes,
-      this.flatRate,
-      this.succeedingFee,
-      this.overnightFee,
-      this.lostTicketFee,
-      this.totalFee,
-      this.amountTendered,
-      this.changeAmount,
+      required this.checkInAt,
+      this.checkOutAt,
+      this.fee,
       required this.status,
-      this.syncedAt});
+      required this.syncStatus,
+      required this.createdAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
-    if (!nullToAbsent || localUuid != null) {
-      map['local_uuid'] = Variable<String>(localUuid);
-    }
-    map['checkin_shift_id'] = Variable<int>(checkinShiftId);
-    if (!nullToAbsent || checkoutShiftId != null) {
-      map['checkout_shift_id'] = Variable<int>(checkoutShiftId);
-    }
-    map['user_id'] = Variable<int>(userId);
-    map['ticket_number'] = Variable<String>(ticketNumber);
+    map['id'] = Variable<String>(id);
+    map['shift_id'] = Variable<String>(shiftId);
+    map['user_id'] = Variable<String>(userId);
+    map['branch_id'] = Variable<String>(branchId);
     map['plate_number'] = Variable<String>(plateNumber);
-    if (!nullToAbsent || vehicleBrand != null) {
-      map['vehicle_brand'] = Variable<String>(vehicleBrand);
-    }
-    if (!nullToAbsent || vehicleModel != null) {
-      map['vehicle_model'] = Variable<String>(vehicleModel);
-    }
-    if (!nullToAbsent || vehicleYear != null) {
-      map['vehicle_year'] = Variable<String>(vehicleYear);
-    }
-    if (!nullToAbsent || vehicleColor != null) {
-      map['vehicle_color'] = Variable<String>(vehicleColor);
-    }
-    if (!nullToAbsent || vehicleType != null) {
-      map['vehicle_type'] = Variable<String>(vehicleType);
-    }
-    if (!nullToAbsent || slot != null) {
-      map['slot'] = Variable<String>(slot);
-    }
-    if (!nullToAbsent || parkingLevel != null) {
-      map['parking_level'] = Variable<String>(parkingLevel);
-    }
-    if (!nullToAbsent || parkingSlot != null) {
-      map['parking_slot'] = Variable<String>(parkingSlot);
-    }
-    if (!nullToAbsent || belongingsJson != null) {
-      map['belongings_json'] = Variable<String>(belongingsJson);
-    }
-    if (!nullToAbsent || otherBelongings != null) {
-      map['other_belongings'] = Variable<String>(otherBelongings);
-    }
+    map['vehicle_brand'] = Variable<String>(vehicleBrand);
+    map['vehicle_color'] = Variable<String>(vehicleColor);
+    map['vehicle_type'] = Variable<String>(vehicleType);
+    map['cellphone_number'] = Variable<String>(cellphoneNumber);
+    map['damage_markers'] = Variable<String>(damageMarkers);
+    map['personal_belongings'] = Variable<String>(personalBelongings);
     if (!nullToAbsent || signaturePng != null) {
       map['signature_png'] = Variable<String>(signaturePng);
     }
-    if (!nullToAbsent || signatureCapturedAt != null) {
-      map['signature_captured_at'] = Variable<int>(signatureCapturedAt);
+    map['check_in_at'] = Variable<String>(checkInAt);
+    if (!nullToAbsent || checkOutAt != null) {
+      map['check_out_at'] = Variable<String>(checkOutAt);
     }
-    if (!nullToAbsent || customerFullName != null) {
-      map['customer_full_name'] = Variable<String>(customerFullName);
-    }
-    if (!nullToAbsent || customerMobile != null) {
-      map['customer_mobile'] = Variable<String>(customerMobile);
-    }
-    if (!nullToAbsent || assignedValetDriver != null) {
-      map['assigned_valet_driver'] = Variable<String>(assignedValetDriver);
-    }
-    if (!nullToAbsent || specialInstructions != null) {
-      map['special_instructions'] = Variable<String>(specialInstructions);
-    }
-    if (!nullToAbsent || valetServiceType != null) {
-      map['valet_service_type'] = Variable<String>(valetServiceType);
-    }
-    if (!nullToAbsent || vehicleDamageJson != null) {
-      map['vehicle_damage_json'] = Variable<String>(vehicleDamageJson);
-    }
-    if (!nullToAbsent || branchSnapshot != null) {
-      map['branch_snapshot'] = Variable<String>(branchSnapshot);
-    }
-    if (!nullToAbsent || areaSnapshot != null) {
-      map['area_snapshot'] = Variable<String>(areaSnapshot);
-    }
-    if (!nullToAbsent || deviceIdSnapshot != null) {
-      map['device_id_snapshot'] = Variable<String>(deviceIdSnapshot);
-    }
-    if (!nullToAbsent || serverTicketId != null) {
-      map['server_ticket_id'] = Variable<String>(serverTicketId);
-    }
-    if (!nullToAbsent || lastModifiedAt != null) {
-      map['last_modified_at'] = Variable<int>(lastModifiedAt);
-    }
-    if (!nullToAbsent || localCreatedAt != null) {
-      map['local_created_at'] = Variable<int>(localCreatedAt);
-    }
-    map['time_in'] = Variable<int>(timeIn);
-    if (!nullToAbsent || timeOut != null) {
-      map['time_out'] = Variable<int>(timeOut);
-    }
-    if (!nullToAbsent || durationMinutes != null) {
-      map['duration_minutes'] = Variable<int>(durationMinutes);
-    }
-    if (!nullToAbsent || flatRate != null) {
-      map['flat_rate'] = Variable<double>(flatRate);
-    }
-    if (!nullToAbsent || succeedingFee != null) {
-      map['succeeding_fee'] = Variable<double>(succeedingFee);
-    }
-    if (!nullToAbsent || overnightFee != null) {
-      map['overnight_fee'] = Variable<double>(overnightFee);
-    }
-    if (!nullToAbsent || lostTicketFee != null) {
-      map['lost_ticket_fee'] = Variable<double>(lostTicketFee);
-    }
-    if (!nullToAbsent || totalFee != null) {
-      map['total_fee'] = Variable<double>(totalFee);
-    }
-    if (!nullToAbsent || amountTendered != null) {
-      map['amount_tendered'] = Variable<double>(amountTendered);
-    }
-    if (!nullToAbsent || changeAmount != null) {
-      map['change_amount'] = Variable<double>(changeAmount);
+    if (!nullToAbsent || fee != null) {
+      map['fee'] = Variable<double>(fee);
     }
     map['status'] = Variable<String>(status);
-    if (!nullToAbsent || syncedAt != null) {
-      map['synced_at'] = Variable<int>(syncedAt);
-    }
+    map['sync_status'] = Variable<String>(syncStatus);
+    map['created_at'] = Variable<String>(createdAt);
     return map;
   }
 
-  ValetTransactionsCompanion toCompanion(bool nullToAbsent) {
-    return ValetTransactionsCompanion(
+  TicketsCompanion toCompanion(bool nullToAbsent) {
+    return TicketsCompanion(
       id: Value(id),
-      localUuid: localUuid == null && nullToAbsent
-          ? const Value.absent()
-          : Value(localUuid),
-      checkinShiftId: Value(checkinShiftId),
-      checkoutShiftId: checkoutShiftId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(checkoutShiftId),
+      shiftId: Value(shiftId),
       userId: Value(userId),
-      ticketNumber: Value(ticketNumber),
+      branchId: Value(branchId),
       plateNumber: Value(plateNumber),
-      vehicleBrand: vehicleBrand == null && nullToAbsent
-          ? const Value.absent()
-          : Value(vehicleBrand),
-      vehicleModel: vehicleModel == null && nullToAbsent
-          ? const Value.absent()
-          : Value(vehicleModel),
-      vehicleYear: vehicleYear == null && nullToAbsent
-          ? const Value.absent()
-          : Value(vehicleYear),
-      vehicleColor: vehicleColor == null && nullToAbsent
-          ? const Value.absent()
-          : Value(vehicleColor),
-      vehicleType: vehicleType == null && nullToAbsent
-          ? const Value.absent()
-          : Value(vehicleType),
-      slot: slot == null && nullToAbsent ? const Value.absent() : Value(slot),
-      parkingLevel: parkingLevel == null && nullToAbsent
-          ? const Value.absent()
-          : Value(parkingLevel),
-      parkingSlot: parkingSlot == null && nullToAbsent
-          ? const Value.absent()
-          : Value(parkingSlot),
-      belongingsJson: belongingsJson == null && nullToAbsent
-          ? const Value.absent()
-          : Value(belongingsJson),
-      otherBelongings: otherBelongings == null && nullToAbsent
-          ? const Value.absent()
-          : Value(otherBelongings),
+      vehicleBrand: Value(vehicleBrand),
+      vehicleColor: Value(vehicleColor),
+      vehicleType: Value(vehicleType),
+      cellphoneNumber: Value(cellphoneNumber),
+      damageMarkers: Value(damageMarkers),
+      personalBelongings: Value(personalBelongings),
       signaturePng: signaturePng == null && nullToAbsent
           ? const Value.absent()
           : Value(signaturePng),
-      signatureCapturedAt: signatureCapturedAt == null && nullToAbsent
+      checkInAt: Value(checkInAt),
+      checkOutAt: checkOutAt == null && nullToAbsent
           ? const Value.absent()
-          : Value(signatureCapturedAt),
-      customerFullName: customerFullName == null && nullToAbsent
-          ? const Value.absent()
-          : Value(customerFullName),
-      customerMobile: customerMobile == null && nullToAbsent
-          ? const Value.absent()
-          : Value(customerMobile),
-      assignedValetDriver: assignedValetDriver == null && nullToAbsent
-          ? const Value.absent()
-          : Value(assignedValetDriver),
-      specialInstructions: specialInstructions == null && nullToAbsent
-          ? const Value.absent()
-          : Value(specialInstructions),
-      valetServiceType: valetServiceType == null && nullToAbsent
-          ? const Value.absent()
-          : Value(valetServiceType),
-      vehicleDamageJson: vehicleDamageJson == null && nullToAbsent
-          ? const Value.absent()
-          : Value(vehicleDamageJson),
-      branchSnapshot: branchSnapshot == null && nullToAbsent
-          ? const Value.absent()
-          : Value(branchSnapshot),
-      areaSnapshot: areaSnapshot == null && nullToAbsent
-          ? const Value.absent()
-          : Value(areaSnapshot),
-      deviceIdSnapshot: deviceIdSnapshot == null && nullToAbsent
-          ? const Value.absent()
-          : Value(deviceIdSnapshot),
-      serverTicketId: serverTicketId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(serverTicketId),
-      lastModifiedAt: lastModifiedAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(lastModifiedAt),
-      localCreatedAt: localCreatedAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(localCreatedAt),
-      timeIn: Value(timeIn),
-      timeOut: timeOut == null && nullToAbsent
-          ? const Value.absent()
-          : Value(timeOut),
-      durationMinutes: durationMinutes == null && nullToAbsent
-          ? const Value.absent()
-          : Value(durationMinutes),
-      flatRate: flatRate == null && nullToAbsent
-          ? const Value.absent()
-          : Value(flatRate),
-      succeedingFee: succeedingFee == null && nullToAbsent
-          ? const Value.absent()
-          : Value(succeedingFee),
-      overnightFee: overnightFee == null && nullToAbsent
-          ? const Value.absent()
-          : Value(overnightFee),
-      lostTicketFee: lostTicketFee == null && nullToAbsent
-          ? const Value.absent()
-          : Value(lostTicketFee),
-      totalFee: totalFee == null && nullToAbsent
-          ? const Value.absent()
-          : Value(totalFee),
-      amountTendered: amountTendered == null && nullToAbsent
-          ? const Value.absent()
-          : Value(amountTendered),
-      changeAmount: changeAmount == null && nullToAbsent
-          ? const Value.absent()
-          : Value(changeAmount),
+          : Value(checkOutAt),
+      fee: fee == null && nullToAbsent ? const Value.absent() : Value(fee),
       status: Value(status),
-      syncedAt: syncedAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(syncedAt),
+      syncStatus: Value(syncStatus),
+      createdAt: Value(createdAt),
     );
   }
 
-  factory ValetTransaction.fromJson(Map<String, dynamic> json,
+  factory Ticket.fromJson(Map<String, dynamic> json,
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return ValetTransaction(
-      id: serializer.fromJson<int>(json['id']),
-      localUuid: serializer.fromJson<String?>(json['localUuid']),
-      checkinShiftId: serializer.fromJson<int>(json['checkinShiftId']),
-      checkoutShiftId: serializer.fromJson<int?>(json['checkoutShiftId']),
-      userId: serializer.fromJson<int>(json['userId']),
-      ticketNumber: serializer.fromJson<String>(json['ticketNumber']),
+    return Ticket(
+      id: serializer.fromJson<String>(json['id']),
+      shiftId: serializer.fromJson<String>(json['shiftId']),
+      userId: serializer.fromJson<String>(json['userId']),
+      branchId: serializer.fromJson<String>(json['branchId']),
       plateNumber: serializer.fromJson<String>(json['plateNumber']),
-      vehicleBrand: serializer.fromJson<String?>(json['vehicleBrand']),
-      vehicleModel: serializer.fromJson<String?>(json['vehicleModel']),
-      vehicleYear: serializer.fromJson<String?>(json['vehicleYear']),
-      vehicleColor: serializer.fromJson<String?>(json['vehicleColor']),
-      vehicleType: serializer.fromJson<String?>(json['vehicleType']),
-      slot: serializer.fromJson<String?>(json['slot']),
-      parkingLevel: serializer.fromJson<String?>(json['parkingLevel']),
-      parkingSlot: serializer.fromJson<String?>(json['parkingSlot']),
-      belongingsJson: serializer.fromJson<String?>(json['belongingsJson']),
-      otherBelongings: serializer.fromJson<String?>(json['otherBelongings']),
+      vehicleBrand: serializer.fromJson<String>(json['vehicleBrand']),
+      vehicleColor: serializer.fromJson<String>(json['vehicleColor']),
+      vehicleType: serializer.fromJson<String>(json['vehicleType']),
+      cellphoneNumber: serializer.fromJson<String>(json['cellphoneNumber']),
+      damageMarkers: serializer.fromJson<String>(json['damageMarkers']),
+      personalBelongings:
+          serializer.fromJson<String>(json['personalBelongings']),
       signaturePng: serializer.fromJson<String?>(json['signaturePng']),
-      signatureCapturedAt:
-          serializer.fromJson<int?>(json['signatureCapturedAt']),
-      customerFullName: serializer.fromJson<String?>(json['customerFullName']),
-      customerMobile: serializer.fromJson<String?>(json['customerMobile']),
-      assignedValetDriver:
-          serializer.fromJson<String?>(json['assignedValetDriver']),
-      specialInstructions:
-          serializer.fromJson<String?>(json['specialInstructions']),
-      valetServiceType: serializer.fromJson<String?>(json['valetServiceType']),
-      vehicleDamageJson:
-          serializer.fromJson<String?>(json['vehicleDamageJson']),
-      branchSnapshot: serializer.fromJson<String?>(json['branchSnapshot']),
-      areaSnapshot: serializer.fromJson<String?>(json['areaSnapshot']),
-      deviceIdSnapshot: serializer.fromJson<String?>(json['deviceIdSnapshot']),
-      serverTicketId: serializer.fromJson<String?>(json['serverTicketId']),
-      lastModifiedAt: serializer.fromJson<int?>(json['lastModifiedAt']),
-      localCreatedAt: serializer.fromJson<int?>(json['localCreatedAt']),
-      timeIn: serializer.fromJson<int>(json['timeIn']),
-      timeOut: serializer.fromJson<int?>(json['timeOut']),
-      durationMinutes: serializer.fromJson<int?>(json['durationMinutes']),
-      flatRate: serializer.fromJson<double?>(json['flatRate']),
-      succeedingFee: serializer.fromJson<double?>(json['succeedingFee']),
-      overnightFee: serializer.fromJson<double?>(json['overnightFee']),
-      lostTicketFee: serializer.fromJson<double?>(json['lostTicketFee']),
-      totalFee: serializer.fromJson<double?>(json['totalFee']),
-      amountTendered: serializer.fromJson<double?>(json['amountTendered']),
-      changeAmount: serializer.fromJson<double?>(json['changeAmount']),
+      checkInAt: serializer.fromJson<String>(json['checkInAt']),
+      checkOutAt: serializer.fromJson<String?>(json['checkOutAt']),
+      fee: serializer.fromJson<double?>(json['fee']),
       status: serializer.fromJson<String>(json['status']),
-      syncedAt: serializer.fromJson<int?>(json['syncedAt']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      createdAt: serializer.fromJson<String>(json['createdAt']),
     );
   }
   @override
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
-      'localUuid': serializer.toJson<String?>(localUuid),
-      'checkinShiftId': serializer.toJson<int>(checkinShiftId),
-      'checkoutShiftId': serializer.toJson<int?>(checkoutShiftId),
-      'userId': serializer.toJson<int>(userId),
-      'ticketNumber': serializer.toJson<String>(ticketNumber),
+      'id': serializer.toJson<String>(id),
+      'shiftId': serializer.toJson<String>(shiftId),
+      'userId': serializer.toJson<String>(userId),
+      'branchId': serializer.toJson<String>(branchId),
       'plateNumber': serializer.toJson<String>(plateNumber),
-      'vehicleBrand': serializer.toJson<String?>(vehicleBrand),
-      'vehicleModel': serializer.toJson<String?>(vehicleModel),
-      'vehicleYear': serializer.toJson<String?>(vehicleYear),
-      'vehicleColor': serializer.toJson<String?>(vehicleColor),
-      'vehicleType': serializer.toJson<String?>(vehicleType),
-      'slot': serializer.toJson<String?>(slot),
-      'parkingLevel': serializer.toJson<String?>(parkingLevel),
-      'parkingSlot': serializer.toJson<String?>(parkingSlot),
-      'belongingsJson': serializer.toJson<String?>(belongingsJson),
-      'otherBelongings': serializer.toJson<String?>(otherBelongings),
+      'vehicleBrand': serializer.toJson<String>(vehicleBrand),
+      'vehicleColor': serializer.toJson<String>(vehicleColor),
+      'vehicleType': serializer.toJson<String>(vehicleType),
+      'cellphoneNumber': serializer.toJson<String>(cellphoneNumber),
+      'damageMarkers': serializer.toJson<String>(damageMarkers),
+      'personalBelongings': serializer.toJson<String>(personalBelongings),
       'signaturePng': serializer.toJson<String?>(signaturePng),
-      'signatureCapturedAt': serializer.toJson<int?>(signatureCapturedAt),
-      'customerFullName': serializer.toJson<String?>(customerFullName),
-      'customerMobile': serializer.toJson<String?>(customerMobile),
-      'assignedValetDriver': serializer.toJson<String?>(assignedValetDriver),
-      'specialInstructions': serializer.toJson<String?>(specialInstructions),
-      'valetServiceType': serializer.toJson<String?>(valetServiceType),
-      'vehicleDamageJson': serializer.toJson<String?>(vehicleDamageJson),
-      'branchSnapshot': serializer.toJson<String?>(branchSnapshot),
-      'areaSnapshot': serializer.toJson<String?>(areaSnapshot),
-      'deviceIdSnapshot': serializer.toJson<String?>(deviceIdSnapshot),
-      'serverTicketId': serializer.toJson<String?>(serverTicketId),
-      'lastModifiedAt': serializer.toJson<int?>(lastModifiedAt),
-      'localCreatedAt': serializer.toJson<int?>(localCreatedAt),
-      'timeIn': serializer.toJson<int>(timeIn),
-      'timeOut': serializer.toJson<int?>(timeOut),
-      'durationMinutes': serializer.toJson<int?>(durationMinutes),
-      'flatRate': serializer.toJson<double?>(flatRate),
-      'succeedingFee': serializer.toJson<double?>(succeedingFee),
-      'overnightFee': serializer.toJson<double?>(overnightFee),
-      'lostTicketFee': serializer.toJson<double?>(lostTicketFee),
-      'totalFee': serializer.toJson<double?>(totalFee),
-      'amountTendered': serializer.toJson<double?>(amountTendered),
-      'changeAmount': serializer.toJson<double?>(changeAmount),
+      'checkInAt': serializer.toJson<String>(checkInAt),
+      'checkOutAt': serializer.toJson<String?>(checkOutAt),
+      'fee': serializer.toJson<double?>(fee),
       'status': serializer.toJson<String>(status),
-      'syncedAt': serializer.toJson<int?>(syncedAt),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'createdAt': serializer.toJson<String>(createdAt),
     };
   }
 
-  ValetTransaction copyWith(
-          {int? id,
-          Value<String?> localUuid = const Value.absent(),
-          int? checkinShiftId,
-          Value<int?> checkoutShiftId = const Value.absent(),
-          int? userId,
-          String? ticketNumber,
+  Ticket copyWith(
+          {String? id,
+          String? shiftId,
+          String? userId,
+          String? branchId,
           String? plateNumber,
-          Value<String?> vehicleBrand = const Value.absent(),
-          Value<String?> vehicleModel = const Value.absent(),
-          Value<String?> vehicleYear = const Value.absent(),
-          Value<String?> vehicleColor = const Value.absent(),
-          Value<String?> vehicleType = const Value.absent(),
-          Value<String?> slot = const Value.absent(),
-          Value<String?> parkingLevel = const Value.absent(),
-          Value<String?> parkingSlot = const Value.absent(),
-          Value<String?> belongingsJson = const Value.absent(),
-          Value<String?> otherBelongings = const Value.absent(),
+          String? vehicleBrand,
+          String? vehicleColor,
+          String? vehicleType,
+          String? cellphoneNumber,
+          String? damageMarkers,
+          String? personalBelongings,
           Value<String?> signaturePng = const Value.absent(),
-          Value<int?> signatureCapturedAt = const Value.absent(),
-          Value<String?> customerFullName = const Value.absent(),
-          Value<String?> customerMobile = const Value.absent(),
-          Value<String?> assignedValetDriver = const Value.absent(),
-          Value<String?> specialInstructions = const Value.absent(),
-          Value<String?> valetServiceType = const Value.absent(),
-          Value<String?> vehicleDamageJson = const Value.absent(),
-          Value<String?> branchSnapshot = const Value.absent(),
-          Value<String?> areaSnapshot = const Value.absent(),
-          Value<String?> deviceIdSnapshot = const Value.absent(),
-          Value<String?> serverTicketId = const Value.absent(),
-          Value<int?> lastModifiedAt = const Value.absent(),
-          Value<int?> localCreatedAt = const Value.absent(),
-          int? timeIn,
-          Value<int?> timeOut = const Value.absent(),
-          Value<int?> durationMinutes = const Value.absent(),
-          Value<double?> flatRate = const Value.absent(),
-          Value<double?> succeedingFee = const Value.absent(),
-          Value<double?> overnightFee = const Value.absent(),
-          Value<double?> lostTicketFee = const Value.absent(),
-          Value<double?> totalFee = const Value.absent(),
-          Value<double?> amountTendered = const Value.absent(),
-          Value<double?> changeAmount = const Value.absent(),
+          String? checkInAt,
+          Value<String?> checkOutAt = const Value.absent(),
+          Value<double?> fee = const Value.absent(),
           String? status,
-          Value<int?> syncedAt = const Value.absent()}) =>
-      ValetTransaction(
+          String? syncStatus,
+          String? createdAt}) =>
+      Ticket(
         id: id ?? this.id,
-        localUuid: localUuid.present ? localUuid.value : this.localUuid,
-        checkinShiftId: checkinShiftId ?? this.checkinShiftId,
-        checkoutShiftId: checkoutShiftId.present
-            ? checkoutShiftId.value
-            : this.checkoutShiftId,
+        shiftId: shiftId ?? this.shiftId,
         userId: userId ?? this.userId,
-        ticketNumber: ticketNumber ?? this.ticketNumber,
+        branchId: branchId ?? this.branchId,
         plateNumber: plateNumber ?? this.plateNumber,
-        vehicleBrand:
-            vehicleBrand.present ? vehicleBrand.value : this.vehicleBrand,
-        vehicleModel:
-            vehicleModel.present ? vehicleModel.value : this.vehicleModel,
-        vehicleYear: vehicleYear.present ? vehicleYear.value : this.vehicleYear,
-        vehicleColor:
-            vehicleColor.present ? vehicleColor.value : this.vehicleColor,
-        vehicleType: vehicleType.present ? vehicleType.value : this.vehicleType,
-        slot: slot.present ? slot.value : this.slot,
-        parkingLevel:
-            parkingLevel.present ? parkingLevel.value : this.parkingLevel,
-        parkingSlot: parkingSlot.present ? parkingSlot.value : this.parkingSlot,
-        belongingsJson:
-            belongingsJson.present ? belongingsJson.value : this.belongingsJson,
-        otherBelongings: otherBelongings.present
-            ? otherBelongings.value
-            : this.otherBelongings,
+        vehicleBrand: vehicleBrand ?? this.vehicleBrand,
+        vehicleColor: vehicleColor ?? this.vehicleColor,
+        vehicleType: vehicleType ?? this.vehicleType,
+        cellphoneNumber: cellphoneNumber ?? this.cellphoneNumber,
+        damageMarkers: damageMarkers ?? this.damageMarkers,
+        personalBelongings: personalBelongings ?? this.personalBelongings,
         signaturePng:
             signaturePng.present ? signaturePng.value : this.signaturePng,
-        signatureCapturedAt: signatureCapturedAt.present
-            ? signatureCapturedAt.value
-            : this.signatureCapturedAt,
-        customerFullName: customerFullName.present
-            ? customerFullName.value
-            : this.customerFullName,
-        customerMobile:
-            customerMobile.present ? customerMobile.value : this.customerMobile,
-        assignedValetDriver: assignedValetDriver.present
-            ? assignedValetDriver.value
-            : this.assignedValetDriver,
-        specialInstructions: specialInstructions.present
-            ? specialInstructions.value
-            : this.specialInstructions,
-        valetServiceType: valetServiceType.present
-            ? valetServiceType.value
-            : this.valetServiceType,
-        vehicleDamageJson: vehicleDamageJson.present
-            ? vehicleDamageJson.value
-            : this.vehicleDamageJson,
-        branchSnapshot:
-            branchSnapshot.present ? branchSnapshot.value : this.branchSnapshot,
-        areaSnapshot:
-            areaSnapshot.present ? areaSnapshot.value : this.areaSnapshot,
-        deviceIdSnapshot: deviceIdSnapshot.present
-            ? deviceIdSnapshot.value
-            : this.deviceIdSnapshot,
-        serverTicketId:
-            serverTicketId.present ? serverTicketId.value : this.serverTicketId,
-        lastModifiedAt:
-            lastModifiedAt.present ? lastModifiedAt.value : this.lastModifiedAt,
-        localCreatedAt:
-            localCreatedAt.present ? localCreatedAt.value : this.localCreatedAt,
-        timeIn: timeIn ?? this.timeIn,
-        timeOut: timeOut.present ? timeOut.value : this.timeOut,
-        durationMinutes: durationMinutes.present
-            ? durationMinutes.value
-            : this.durationMinutes,
-        flatRate: flatRate.present ? flatRate.value : this.flatRate,
-        succeedingFee:
-            succeedingFee.present ? succeedingFee.value : this.succeedingFee,
-        overnightFee:
-            overnightFee.present ? overnightFee.value : this.overnightFee,
-        lostTicketFee:
-            lostTicketFee.present ? lostTicketFee.value : this.lostTicketFee,
-        totalFee: totalFee.present ? totalFee.value : this.totalFee,
-        amountTendered:
-            amountTendered.present ? amountTendered.value : this.amountTendered,
-        changeAmount:
-            changeAmount.present ? changeAmount.value : this.changeAmount,
+        checkInAt: checkInAt ?? this.checkInAt,
+        checkOutAt: checkOutAt.present ? checkOutAt.value : this.checkOutAt,
+        fee: fee.present ? fee.value : this.fee,
         status: status ?? this.status,
-        syncedAt: syncedAt.present ? syncedAt.value : this.syncedAt,
+        syncStatus: syncStatus ?? this.syncStatus,
+        createdAt: createdAt ?? this.createdAt,
       );
-  ValetTransaction copyWithCompanion(ValetTransactionsCompanion data) {
-    return ValetTransaction(
+  Ticket copyWithCompanion(TicketsCompanion data) {
+    return Ticket(
       id: data.id.present ? data.id.value : this.id,
-      localUuid: data.localUuid.present ? data.localUuid.value : this.localUuid,
-      checkinShiftId: data.checkinShiftId.present
-          ? data.checkinShiftId.value
-          : this.checkinShiftId,
-      checkoutShiftId: data.checkoutShiftId.present
-          ? data.checkoutShiftId.value
-          : this.checkoutShiftId,
+      shiftId: data.shiftId.present ? data.shiftId.value : this.shiftId,
       userId: data.userId.present ? data.userId.value : this.userId,
-      ticketNumber: data.ticketNumber.present
-          ? data.ticketNumber.value
-          : this.ticketNumber,
+      branchId: data.branchId.present ? data.branchId.value : this.branchId,
       plateNumber:
           data.plateNumber.present ? data.plateNumber.value : this.plateNumber,
       vehicleBrand: data.vehicleBrand.present
           ? data.vehicleBrand.value
           : this.vehicleBrand,
-      vehicleModel: data.vehicleModel.present
-          ? data.vehicleModel.value
-          : this.vehicleModel,
-      vehicleYear:
-          data.vehicleYear.present ? data.vehicleYear.value : this.vehicleYear,
       vehicleColor: data.vehicleColor.present
           ? data.vehicleColor.value
           : this.vehicleColor,
       vehicleType:
           data.vehicleType.present ? data.vehicleType.value : this.vehicleType,
-      slot: data.slot.present ? data.slot.value : this.slot,
-      parkingLevel: data.parkingLevel.present
-          ? data.parkingLevel.value
-          : this.parkingLevel,
-      parkingSlot:
-          data.parkingSlot.present ? data.parkingSlot.value : this.parkingSlot,
-      belongingsJson: data.belongingsJson.present
-          ? data.belongingsJson.value
-          : this.belongingsJson,
-      otherBelongings: data.otherBelongings.present
-          ? data.otherBelongings.value
-          : this.otherBelongings,
+      cellphoneNumber: data.cellphoneNumber.present
+          ? data.cellphoneNumber.value
+          : this.cellphoneNumber,
+      damageMarkers: data.damageMarkers.present
+          ? data.damageMarkers.value
+          : this.damageMarkers,
+      personalBelongings: data.personalBelongings.present
+          ? data.personalBelongings.value
+          : this.personalBelongings,
       signaturePng: data.signaturePng.present
           ? data.signaturePng.value
           : this.signaturePng,
-      signatureCapturedAt: data.signatureCapturedAt.present
-          ? data.signatureCapturedAt.value
-          : this.signatureCapturedAt,
-      customerFullName: data.customerFullName.present
-          ? data.customerFullName.value
-          : this.customerFullName,
-      customerMobile: data.customerMobile.present
-          ? data.customerMobile.value
-          : this.customerMobile,
-      assignedValetDriver: data.assignedValetDriver.present
-          ? data.assignedValetDriver.value
-          : this.assignedValetDriver,
-      specialInstructions: data.specialInstructions.present
-          ? data.specialInstructions.value
-          : this.specialInstructions,
-      valetServiceType: data.valetServiceType.present
-          ? data.valetServiceType.value
-          : this.valetServiceType,
-      vehicleDamageJson: data.vehicleDamageJson.present
-          ? data.vehicleDamageJson.value
-          : this.vehicleDamageJson,
-      branchSnapshot: data.branchSnapshot.present
-          ? data.branchSnapshot.value
-          : this.branchSnapshot,
-      areaSnapshot: data.areaSnapshot.present
-          ? data.areaSnapshot.value
-          : this.areaSnapshot,
-      deviceIdSnapshot: data.deviceIdSnapshot.present
-          ? data.deviceIdSnapshot.value
-          : this.deviceIdSnapshot,
-      serverTicketId: data.serverTicketId.present
-          ? data.serverTicketId.value
-          : this.serverTicketId,
-      lastModifiedAt: data.lastModifiedAt.present
-          ? data.lastModifiedAt.value
-          : this.lastModifiedAt,
-      localCreatedAt: data.localCreatedAt.present
-          ? data.localCreatedAt.value
-          : this.localCreatedAt,
-      timeIn: data.timeIn.present ? data.timeIn.value : this.timeIn,
-      timeOut: data.timeOut.present ? data.timeOut.value : this.timeOut,
-      durationMinutes: data.durationMinutes.present
-          ? data.durationMinutes.value
-          : this.durationMinutes,
-      flatRate: data.flatRate.present ? data.flatRate.value : this.flatRate,
-      succeedingFee: data.succeedingFee.present
-          ? data.succeedingFee.value
-          : this.succeedingFee,
-      overnightFee: data.overnightFee.present
-          ? data.overnightFee.value
-          : this.overnightFee,
-      lostTicketFee: data.lostTicketFee.present
-          ? data.lostTicketFee.value
-          : this.lostTicketFee,
-      totalFee: data.totalFee.present ? data.totalFee.value : this.totalFee,
-      amountTendered: data.amountTendered.present
-          ? data.amountTendered.value
-          : this.amountTendered,
-      changeAmount: data.changeAmount.present
-          ? data.changeAmount.value
-          : this.changeAmount,
+      checkInAt: data.checkInAt.present ? data.checkInAt.value : this.checkInAt,
+      checkOutAt:
+          data.checkOutAt.present ? data.checkOutAt.value : this.checkOutAt,
+      fee: data.fee.present ? data.fee.value : this.fee,
       status: data.status.present ? data.status.value : this.status,
-      syncedAt: data.syncedAt.present ? data.syncedAt.value : this.syncedAt,
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
 
   @override
   String toString() {
-    return (StringBuffer('ValetTransaction(')
+    return (StringBuffer('Ticket(')
           ..write('id: $id, ')
-          ..write('localUuid: $localUuid, ')
-          ..write('checkinShiftId: $checkinShiftId, ')
-          ..write('checkoutShiftId: $checkoutShiftId, ')
+          ..write('shiftId: $shiftId, ')
           ..write('userId: $userId, ')
-          ..write('ticketNumber: $ticketNumber, ')
+          ..write('branchId: $branchId, ')
           ..write('plateNumber: $plateNumber, ')
           ..write('vehicleBrand: $vehicleBrand, ')
-          ..write('vehicleModel: $vehicleModel, ')
-          ..write('vehicleYear: $vehicleYear, ')
           ..write('vehicleColor: $vehicleColor, ')
           ..write('vehicleType: $vehicleType, ')
-          ..write('slot: $slot, ')
-          ..write('parkingLevel: $parkingLevel, ')
-          ..write('parkingSlot: $parkingSlot, ')
-          ..write('belongingsJson: $belongingsJson, ')
-          ..write('otherBelongings: $otherBelongings, ')
+          ..write('cellphoneNumber: $cellphoneNumber, ')
+          ..write('damageMarkers: $damageMarkers, ')
+          ..write('personalBelongings: $personalBelongings, ')
           ..write('signaturePng: $signaturePng, ')
-          ..write('signatureCapturedAt: $signatureCapturedAt, ')
-          ..write('customerFullName: $customerFullName, ')
-          ..write('customerMobile: $customerMobile, ')
-          ..write('assignedValetDriver: $assignedValetDriver, ')
-          ..write('specialInstructions: $specialInstructions, ')
-          ..write('valetServiceType: $valetServiceType, ')
-          ..write('vehicleDamageJson: $vehicleDamageJson, ')
-          ..write('branchSnapshot: $branchSnapshot, ')
-          ..write('areaSnapshot: $areaSnapshot, ')
-          ..write('deviceIdSnapshot: $deviceIdSnapshot, ')
-          ..write('serverTicketId: $serverTicketId, ')
-          ..write('lastModifiedAt: $lastModifiedAt, ')
-          ..write('localCreatedAt: $localCreatedAt, ')
-          ..write('timeIn: $timeIn, ')
-          ..write('timeOut: $timeOut, ')
-          ..write('durationMinutes: $durationMinutes, ')
-          ..write('flatRate: $flatRate, ')
-          ..write('succeedingFee: $succeedingFee, ')
-          ..write('overnightFee: $overnightFee, ')
-          ..write('lostTicketFee: $lostTicketFee, ')
-          ..write('totalFee: $totalFee, ')
-          ..write('amountTendered: $amountTendered, ')
-          ..write('changeAmount: $changeAmount, ')
+          ..write('checkInAt: $checkInAt, ')
+          ..write('checkOutAt: $checkOutAt, ')
+          ..write('fee: $fee, ')
           ..write('status: $status, ')
-          ..write('syncedAt: $syncedAt')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hashAll([
-        id,
-        localUuid,
-        checkinShiftId,
-        checkoutShiftId,
-        userId,
-        ticketNumber,
-        plateNumber,
-        vehicleBrand,
-        vehicleModel,
-        vehicleYear,
-        vehicleColor,
-        vehicleType,
-        slot,
-        parkingLevel,
-        parkingSlot,
-        belongingsJson,
-        otherBelongings,
-        signaturePng,
-        signatureCapturedAt,
-        customerFullName,
-        customerMobile,
-        assignedValetDriver,
-        specialInstructions,
-        valetServiceType,
-        vehicleDamageJson,
-        branchSnapshot,
-        areaSnapshot,
-        deviceIdSnapshot,
-        serverTicketId,
-        lastModifiedAt,
-        localCreatedAt,
-        timeIn,
-        timeOut,
-        durationMinutes,
-        flatRate,
-        succeedingFee,
-        overnightFee,
-        lostTicketFee,
-        totalFee,
-        amountTendered,
-        changeAmount,
-        status,
-        syncedAt
-      ]);
+  int get hashCode => Object.hash(
+      id,
+      shiftId,
+      userId,
+      branchId,
+      plateNumber,
+      vehicleBrand,
+      vehicleColor,
+      vehicleType,
+      cellphoneNumber,
+      damageMarkers,
+      personalBelongings,
+      signaturePng,
+      checkInAt,
+      checkOutAt,
+      fee,
+      status,
+      syncStatus,
+      createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is ValetTransaction &&
+      (other is Ticket &&
           other.id == this.id &&
-          other.localUuid == this.localUuid &&
-          other.checkinShiftId == this.checkinShiftId &&
-          other.checkoutShiftId == this.checkoutShiftId &&
+          other.shiftId == this.shiftId &&
           other.userId == this.userId &&
-          other.ticketNumber == this.ticketNumber &&
+          other.branchId == this.branchId &&
           other.plateNumber == this.plateNumber &&
           other.vehicleBrand == this.vehicleBrand &&
-          other.vehicleModel == this.vehicleModel &&
-          other.vehicleYear == this.vehicleYear &&
           other.vehicleColor == this.vehicleColor &&
           other.vehicleType == this.vehicleType &&
-          other.slot == this.slot &&
-          other.parkingLevel == this.parkingLevel &&
-          other.parkingSlot == this.parkingSlot &&
-          other.belongingsJson == this.belongingsJson &&
-          other.otherBelongings == this.otherBelongings &&
+          other.cellphoneNumber == this.cellphoneNumber &&
+          other.damageMarkers == this.damageMarkers &&
+          other.personalBelongings == this.personalBelongings &&
           other.signaturePng == this.signaturePng &&
-          other.signatureCapturedAt == this.signatureCapturedAt &&
-          other.customerFullName == this.customerFullName &&
-          other.customerMobile == this.customerMobile &&
-          other.assignedValetDriver == this.assignedValetDriver &&
-          other.specialInstructions == this.specialInstructions &&
-          other.valetServiceType == this.valetServiceType &&
-          other.vehicleDamageJson == this.vehicleDamageJson &&
-          other.branchSnapshot == this.branchSnapshot &&
-          other.areaSnapshot == this.areaSnapshot &&
-          other.deviceIdSnapshot == this.deviceIdSnapshot &&
-          other.serverTicketId == this.serverTicketId &&
-          other.lastModifiedAt == this.lastModifiedAt &&
-          other.localCreatedAt == this.localCreatedAt &&
-          other.timeIn == this.timeIn &&
-          other.timeOut == this.timeOut &&
-          other.durationMinutes == this.durationMinutes &&
-          other.flatRate == this.flatRate &&
-          other.succeedingFee == this.succeedingFee &&
-          other.overnightFee == this.overnightFee &&
-          other.lostTicketFee == this.lostTicketFee &&
-          other.totalFee == this.totalFee &&
-          other.amountTendered == this.amountTendered &&
-          other.changeAmount == this.changeAmount &&
+          other.checkInAt == this.checkInAt &&
+          other.checkOutAt == this.checkOutAt &&
+          other.fee == this.fee &&
           other.status == this.status &&
-          other.syncedAt == this.syncedAt);
+          other.syncStatus == this.syncStatus &&
+          other.createdAt == this.createdAt);
 }
 
-class ValetTransactionsCompanion extends UpdateCompanion<ValetTransaction> {
-  final Value<int> id;
-  final Value<String?> localUuid;
-  final Value<int> checkinShiftId;
-  final Value<int?> checkoutShiftId;
-  final Value<int> userId;
-  final Value<String> ticketNumber;
+class TicketsCompanion extends UpdateCompanion<Ticket> {
+  final Value<String> id;
+  final Value<String> shiftId;
+  final Value<String> userId;
+  final Value<String> branchId;
   final Value<String> plateNumber;
-  final Value<String?> vehicleBrand;
-  final Value<String?> vehicleModel;
-  final Value<String?> vehicleYear;
-  final Value<String?> vehicleColor;
-  final Value<String?> vehicleType;
-  final Value<String?> slot;
-  final Value<String?> parkingLevel;
-  final Value<String?> parkingSlot;
-  final Value<String?> belongingsJson;
-  final Value<String?> otherBelongings;
+  final Value<String> vehicleBrand;
+  final Value<String> vehicleColor;
+  final Value<String> vehicleType;
+  final Value<String> cellphoneNumber;
+  final Value<String> damageMarkers;
+  final Value<String> personalBelongings;
   final Value<String?> signaturePng;
-  final Value<int?> signatureCapturedAt;
-  final Value<String?> customerFullName;
-  final Value<String?> customerMobile;
-  final Value<String?> assignedValetDriver;
-  final Value<String?> specialInstructions;
-  final Value<String?> valetServiceType;
-  final Value<String?> vehicleDamageJson;
-  final Value<String?> branchSnapshot;
-  final Value<String?> areaSnapshot;
-  final Value<String?> deviceIdSnapshot;
-  final Value<String?> serverTicketId;
-  final Value<int?> lastModifiedAt;
-  final Value<int?> localCreatedAt;
-  final Value<int> timeIn;
-  final Value<int?> timeOut;
-  final Value<int?> durationMinutes;
-  final Value<double?> flatRate;
-  final Value<double?> succeedingFee;
-  final Value<double?> overnightFee;
-  final Value<double?> lostTicketFee;
-  final Value<double?> totalFee;
-  final Value<double?> amountTendered;
-  final Value<double?> changeAmount;
+  final Value<String> checkInAt;
+  final Value<String?> checkOutAt;
+  final Value<double?> fee;
   final Value<String> status;
-  final Value<int?> syncedAt;
-  const ValetTransactionsCompanion({
+  final Value<String> syncStatus;
+  final Value<String> createdAt;
+  final Value<int> rowid;
+  const TicketsCompanion({
     this.id = const Value.absent(),
-    this.localUuid = const Value.absent(),
-    this.checkinShiftId = const Value.absent(),
-    this.checkoutShiftId = const Value.absent(),
+    this.shiftId = const Value.absent(),
     this.userId = const Value.absent(),
-    this.ticketNumber = const Value.absent(),
+    this.branchId = const Value.absent(),
     this.plateNumber = const Value.absent(),
     this.vehicleBrand = const Value.absent(),
-    this.vehicleModel = const Value.absent(),
-    this.vehicleYear = const Value.absent(),
     this.vehicleColor = const Value.absent(),
     this.vehicleType = const Value.absent(),
-    this.slot = const Value.absent(),
-    this.parkingLevel = const Value.absent(),
-    this.parkingSlot = const Value.absent(),
-    this.belongingsJson = const Value.absent(),
-    this.otherBelongings = const Value.absent(),
+    this.cellphoneNumber = const Value.absent(),
+    this.damageMarkers = const Value.absent(),
+    this.personalBelongings = const Value.absent(),
     this.signaturePng = const Value.absent(),
-    this.signatureCapturedAt = const Value.absent(),
-    this.customerFullName = const Value.absent(),
-    this.customerMobile = const Value.absent(),
-    this.assignedValetDriver = const Value.absent(),
-    this.specialInstructions = const Value.absent(),
-    this.valetServiceType = const Value.absent(),
-    this.vehicleDamageJson = const Value.absent(),
-    this.branchSnapshot = const Value.absent(),
-    this.areaSnapshot = const Value.absent(),
-    this.deviceIdSnapshot = const Value.absent(),
-    this.serverTicketId = const Value.absent(),
-    this.lastModifiedAt = const Value.absent(),
-    this.localCreatedAt = const Value.absent(),
-    this.timeIn = const Value.absent(),
-    this.timeOut = const Value.absent(),
-    this.durationMinutes = const Value.absent(),
-    this.flatRate = const Value.absent(),
-    this.succeedingFee = const Value.absent(),
-    this.overnightFee = const Value.absent(),
-    this.lostTicketFee = const Value.absent(),
-    this.totalFee = const Value.absent(),
-    this.amountTendered = const Value.absent(),
-    this.changeAmount = const Value.absent(),
+    this.checkInAt = const Value.absent(),
+    this.checkOutAt = const Value.absent(),
+    this.fee = const Value.absent(),
     this.status = const Value.absent(),
-    this.syncedAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
   });
-  ValetTransactionsCompanion.insert({
-    this.id = const Value.absent(),
-    this.localUuid = const Value.absent(),
-    required int checkinShiftId,
-    this.checkoutShiftId = const Value.absent(),
-    required int userId,
-    required String ticketNumber,
+  TicketsCompanion.insert({
+    required String id,
+    required String shiftId,
+    required String userId,
+    required String branchId,
     required String plateNumber,
-    this.vehicleBrand = const Value.absent(),
-    this.vehicleModel = const Value.absent(),
-    this.vehicleYear = const Value.absent(),
-    this.vehicleColor = const Value.absent(),
-    this.vehicleType = const Value.absent(),
-    this.slot = const Value.absent(),
-    this.parkingLevel = const Value.absent(),
-    this.parkingSlot = const Value.absent(),
-    this.belongingsJson = const Value.absent(),
-    this.otherBelongings = const Value.absent(),
+    required String vehicleBrand,
+    required String vehicleColor,
+    required String vehicleType,
+    required String cellphoneNumber,
+    required String damageMarkers,
+    required String personalBelongings,
     this.signaturePng = const Value.absent(),
-    this.signatureCapturedAt = const Value.absent(),
-    this.customerFullName = const Value.absent(),
-    this.customerMobile = const Value.absent(),
-    this.assignedValetDriver = const Value.absent(),
-    this.specialInstructions = const Value.absent(),
-    this.valetServiceType = const Value.absent(),
-    this.vehicleDamageJson = const Value.absent(),
-    this.branchSnapshot = const Value.absent(),
-    this.areaSnapshot = const Value.absent(),
-    this.deviceIdSnapshot = const Value.absent(),
-    this.serverTicketId = const Value.absent(),
-    this.lastModifiedAt = const Value.absent(),
-    this.localCreatedAt = const Value.absent(),
-    required int timeIn,
-    this.timeOut = const Value.absent(),
-    this.durationMinutes = const Value.absent(),
-    this.flatRate = const Value.absent(),
-    this.succeedingFee = const Value.absent(),
-    this.overnightFee = const Value.absent(),
-    this.lostTicketFee = const Value.absent(),
-    this.totalFee = const Value.absent(),
-    this.amountTendered = const Value.absent(),
-    this.changeAmount = const Value.absent(),
-    this.status = const Value.absent(),
-    this.syncedAt = const Value.absent(),
-  })  : checkinShiftId = Value(checkinShiftId),
+    required String checkInAt,
+    this.checkOutAt = const Value.absent(),
+    this.fee = const Value.absent(),
+    required String status,
+    required String syncStatus,
+    required String createdAt,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        shiftId = Value(shiftId),
         userId = Value(userId),
-        ticketNumber = Value(ticketNumber),
+        branchId = Value(branchId),
         plateNumber = Value(plateNumber),
-        timeIn = Value(timeIn);
-  static Insertable<ValetTransaction> custom({
-    Expression<int>? id,
-    Expression<String>? localUuid,
-    Expression<int>? checkinShiftId,
-    Expression<int>? checkoutShiftId,
-    Expression<int>? userId,
-    Expression<String>? ticketNumber,
+        vehicleBrand = Value(vehicleBrand),
+        vehicleColor = Value(vehicleColor),
+        vehicleType = Value(vehicleType),
+        cellphoneNumber = Value(cellphoneNumber),
+        damageMarkers = Value(damageMarkers),
+        personalBelongings = Value(personalBelongings),
+        checkInAt = Value(checkInAt),
+        status = Value(status),
+        syncStatus = Value(syncStatus),
+        createdAt = Value(createdAt);
+  static Insertable<Ticket> custom({
+    Expression<String>? id,
+    Expression<String>? shiftId,
+    Expression<String>? userId,
+    Expression<String>? branchId,
     Expression<String>? plateNumber,
     Expression<String>? vehicleBrand,
-    Expression<String>? vehicleModel,
-    Expression<String>? vehicleYear,
     Expression<String>? vehicleColor,
     Expression<String>? vehicleType,
-    Expression<String>? slot,
-    Expression<String>? parkingLevel,
-    Expression<String>? parkingSlot,
-    Expression<String>? belongingsJson,
-    Expression<String>? otherBelongings,
+    Expression<String>? cellphoneNumber,
+    Expression<String>? damageMarkers,
+    Expression<String>? personalBelongings,
     Expression<String>? signaturePng,
-    Expression<int>? signatureCapturedAt,
-    Expression<String>? customerFullName,
-    Expression<String>? customerMobile,
-    Expression<String>? assignedValetDriver,
-    Expression<String>? specialInstructions,
-    Expression<String>? valetServiceType,
-    Expression<String>? vehicleDamageJson,
-    Expression<String>? branchSnapshot,
-    Expression<String>? areaSnapshot,
-    Expression<String>? deviceIdSnapshot,
-    Expression<String>? serverTicketId,
-    Expression<int>? lastModifiedAt,
-    Expression<int>? localCreatedAt,
-    Expression<int>? timeIn,
-    Expression<int>? timeOut,
-    Expression<int>? durationMinutes,
-    Expression<double>? flatRate,
-    Expression<double>? succeedingFee,
-    Expression<double>? overnightFee,
-    Expression<double>? lostTicketFee,
-    Expression<double>? totalFee,
-    Expression<double>? amountTendered,
-    Expression<double>? changeAmount,
+    Expression<String>? checkInAt,
+    Expression<String>? checkOutAt,
+    Expression<double>? fee,
     Expression<String>? status,
-    Expression<int>? syncedAt,
+    Expression<String>? syncStatus,
+    Expression<String>? createdAt,
+    Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
-      if (localUuid != null) 'local_uuid': localUuid,
-      if (checkinShiftId != null) 'checkin_shift_id': checkinShiftId,
-      if (checkoutShiftId != null) 'checkout_shift_id': checkoutShiftId,
+      if (shiftId != null) 'shift_id': shiftId,
       if (userId != null) 'user_id': userId,
-      if (ticketNumber != null) 'ticket_number': ticketNumber,
+      if (branchId != null) 'branch_id': branchId,
       if (plateNumber != null) 'plate_number': plateNumber,
       if (vehicleBrand != null) 'vehicle_brand': vehicleBrand,
-      if (vehicleModel != null) 'vehicle_model': vehicleModel,
-      if (vehicleYear != null) 'vehicle_year': vehicleYear,
       if (vehicleColor != null) 'vehicle_color': vehicleColor,
       if (vehicleType != null) 'vehicle_type': vehicleType,
-      if (slot != null) 'slot': slot,
-      if (parkingLevel != null) 'parking_level': parkingLevel,
-      if (parkingSlot != null) 'parking_slot': parkingSlot,
-      if (belongingsJson != null) 'belongings_json': belongingsJson,
-      if (otherBelongings != null) 'other_belongings': otherBelongings,
+      if (cellphoneNumber != null) 'cellphone_number': cellphoneNumber,
+      if (damageMarkers != null) 'damage_markers': damageMarkers,
+      if (personalBelongings != null) 'personal_belongings': personalBelongings,
       if (signaturePng != null) 'signature_png': signaturePng,
-      if (signatureCapturedAt != null)
-        'signature_captured_at': signatureCapturedAt,
-      if (customerFullName != null) 'customer_full_name': customerFullName,
-      if (customerMobile != null) 'customer_mobile': customerMobile,
-      if (assignedValetDriver != null)
-        'assigned_valet_driver': assignedValetDriver,
-      if (specialInstructions != null)
-        'special_instructions': specialInstructions,
-      if (valetServiceType != null) 'valet_service_type': valetServiceType,
-      if (vehicleDamageJson != null) 'vehicle_damage_json': vehicleDamageJson,
-      if (branchSnapshot != null) 'branch_snapshot': branchSnapshot,
-      if (areaSnapshot != null) 'area_snapshot': areaSnapshot,
-      if (deviceIdSnapshot != null) 'device_id_snapshot': deviceIdSnapshot,
-      if (serverTicketId != null) 'server_ticket_id': serverTicketId,
-      if (lastModifiedAt != null) 'last_modified_at': lastModifiedAt,
-      if (localCreatedAt != null) 'local_created_at': localCreatedAt,
-      if (timeIn != null) 'time_in': timeIn,
-      if (timeOut != null) 'time_out': timeOut,
-      if (durationMinutes != null) 'duration_minutes': durationMinutes,
-      if (flatRate != null) 'flat_rate': flatRate,
-      if (succeedingFee != null) 'succeeding_fee': succeedingFee,
-      if (overnightFee != null) 'overnight_fee': overnightFee,
-      if (lostTicketFee != null) 'lost_ticket_fee': lostTicketFee,
-      if (totalFee != null) 'total_fee': totalFee,
-      if (amountTendered != null) 'amount_tendered': amountTendered,
-      if (changeAmount != null) 'change_amount': changeAmount,
+      if (checkInAt != null) 'check_in_at': checkInAt,
+      if (checkOutAt != null) 'check_out_at': checkOutAt,
+      if (fee != null) 'fee': fee,
       if (status != null) 'status': status,
-      if (syncedAt != null) 'synced_at': syncedAt,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
     });
   }
 
-  ValetTransactionsCompanion copyWith(
-      {Value<int>? id,
-      Value<String?>? localUuid,
-      Value<int>? checkinShiftId,
-      Value<int?>? checkoutShiftId,
-      Value<int>? userId,
-      Value<String>? ticketNumber,
+  TicketsCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? shiftId,
+      Value<String>? userId,
+      Value<String>? branchId,
       Value<String>? plateNumber,
-      Value<String?>? vehicleBrand,
-      Value<String?>? vehicleModel,
-      Value<String?>? vehicleYear,
-      Value<String?>? vehicleColor,
-      Value<String?>? vehicleType,
-      Value<String?>? slot,
-      Value<String?>? parkingLevel,
-      Value<String?>? parkingSlot,
-      Value<String?>? belongingsJson,
-      Value<String?>? otherBelongings,
+      Value<String>? vehicleBrand,
+      Value<String>? vehicleColor,
+      Value<String>? vehicleType,
+      Value<String>? cellphoneNumber,
+      Value<String>? damageMarkers,
+      Value<String>? personalBelongings,
       Value<String?>? signaturePng,
-      Value<int?>? signatureCapturedAt,
-      Value<String?>? customerFullName,
-      Value<String?>? customerMobile,
-      Value<String?>? assignedValetDriver,
-      Value<String?>? specialInstructions,
-      Value<String?>? valetServiceType,
-      Value<String?>? vehicleDamageJson,
-      Value<String?>? branchSnapshot,
-      Value<String?>? areaSnapshot,
-      Value<String?>? deviceIdSnapshot,
-      Value<String?>? serverTicketId,
-      Value<int?>? lastModifiedAt,
-      Value<int?>? localCreatedAt,
-      Value<int>? timeIn,
-      Value<int?>? timeOut,
-      Value<int?>? durationMinutes,
-      Value<double?>? flatRate,
-      Value<double?>? succeedingFee,
-      Value<double?>? overnightFee,
-      Value<double?>? lostTicketFee,
-      Value<double?>? totalFee,
-      Value<double?>? amountTendered,
-      Value<double?>? changeAmount,
+      Value<String>? checkInAt,
+      Value<String?>? checkOutAt,
+      Value<double?>? fee,
       Value<String>? status,
-      Value<int?>? syncedAt}) {
-    return ValetTransactionsCompanion(
+      Value<String>? syncStatus,
+      Value<String>? createdAt,
+      Value<int>? rowid}) {
+    return TicketsCompanion(
       id: id ?? this.id,
-      localUuid: localUuid ?? this.localUuid,
-      checkinShiftId: checkinShiftId ?? this.checkinShiftId,
-      checkoutShiftId: checkoutShiftId ?? this.checkoutShiftId,
+      shiftId: shiftId ?? this.shiftId,
       userId: userId ?? this.userId,
-      ticketNumber: ticketNumber ?? this.ticketNumber,
+      branchId: branchId ?? this.branchId,
       plateNumber: plateNumber ?? this.plateNumber,
       vehicleBrand: vehicleBrand ?? this.vehicleBrand,
-      vehicleModel: vehicleModel ?? this.vehicleModel,
-      vehicleYear: vehicleYear ?? this.vehicleYear,
       vehicleColor: vehicleColor ?? this.vehicleColor,
       vehicleType: vehicleType ?? this.vehicleType,
-      slot: slot ?? this.slot,
-      parkingLevel: parkingLevel ?? this.parkingLevel,
-      parkingSlot: parkingSlot ?? this.parkingSlot,
-      belongingsJson: belongingsJson ?? this.belongingsJson,
-      otherBelongings: otherBelongings ?? this.otherBelongings,
+      cellphoneNumber: cellphoneNumber ?? this.cellphoneNumber,
+      damageMarkers: damageMarkers ?? this.damageMarkers,
+      personalBelongings: personalBelongings ?? this.personalBelongings,
       signaturePng: signaturePng ?? this.signaturePng,
-      signatureCapturedAt: signatureCapturedAt ?? this.signatureCapturedAt,
-      customerFullName: customerFullName ?? this.customerFullName,
-      customerMobile: customerMobile ?? this.customerMobile,
-      assignedValetDriver: assignedValetDriver ?? this.assignedValetDriver,
-      specialInstructions: specialInstructions ?? this.specialInstructions,
-      valetServiceType: valetServiceType ?? this.valetServiceType,
-      vehicleDamageJson: vehicleDamageJson ?? this.vehicleDamageJson,
-      branchSnapshot: branchSnapshot ?? this.branchSnapshot,
-      areaSnapshot: areaSnapshot ?? this.areaSnapshot,
-      deviceIdSnapshot: deviceIdSnapshot ?? this.deviceIdSnapshot,
-      serverTicketId: serverTicketId ?? this.serverTicketId,
-      lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
-      localCreatedAt: localCreatedAt ?? this.localCreatedAt,
-      timeIn: timeIn ?? this.timeIn,
-      timeOut: timeOut ?? this.timeOut,
-      durationMinutes: durationMinutes ?? this.durationMinutes,
-      flatRate: flatRate ?? this.flatRate,
-      succeedingFee: succeedingFee ?? this.succeedingFee,
-      overnightFee: overnightFee ?? this.overnightFee,
-      lostTicketFee: lostTicketFee ?? this.lostTicketFee,
-      totalFee: totalFee ?? this.totalFee,
-      amountTendered: amountTendered ?? this.amountTendered,
-      changeAmount: changeAmount ?? this.changeAmount,
+      checkInAt: checkInAt ?? this.checkInAt,
+      checkOutAt: checkOutAt ?? this.checkOutAt,
+      fee: fee ?? this.fee,
       status: status ?? this.status,
-      syncedAt: syncedAt ?? this.syncedAt,
+      syncStatus: syncStatus ?? this.syncStatus,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
     );
   }
 
@@ -4559,22 +2533,16 @@ class ValetTransactionsCompanion extends UpdateCompanion<ValetTransaction> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     if (id.present) {
-      map['id'] = Variable<int>(id.value);
+      map['id'] = Variable<String>(id.value);
     }
-    if (localUuid.present) {
-      map['local_uuid'] = Variable<String>(localUuid.value);
-    }
-    if (checkinShiftId.present) {
-      map['checkin_shift_id'] = Variable<int>(checkinShiftId.value);
-    }
-    if (checkoutShiftId.present) {
-      map['checkout_shift_id'] = Variable<int>(checkoutShiftId.value);
+    if (shiftId.present) {
+      map['shift_id'] = Variable<String>(shiftId.value);
     }
     if (userId.present) {
-      map['user_id'] = Variable<int>(userId.value);
+      map['user_id'] = Variable<String>(userId.value);
     }
-    if (ticketNumber.present) {
-      map['ticket_number'] = Variable<String>(ticketNumber.value);
+    if (branchId.present) {
+      map['branch_id'] = Variable<String>(branchId.value);
     }
     if (plateNumber.present) {
       map['plate_number'] = Variable<String>(plateNumber.value);
@@ -4582,161 +2550,70 @@ class ValetTransactionsCompanion extends UpdateCompanion<ValetTransaction> {
     if (vehicleBrand.present) {
       map['vehicle_brand'] = Variable<String>(vehicleBrand.value);
     }
-    if (vehicleModel.present) {
-      map['vehicle_model'] = Variable<String>(vehicleModel.value);
-    }
-    if (vehicleYear.present) {
-      map['vehicle_year'] = Variable<String>(vehicleYear.value);
-    }
     if (vehicleColor.present) {
       map['vehicle_color'] = Variable<String>(vehicleColor.value);
     }
     if (vehicleType.present) {
       map['vehicle_type'] = Variable<String>(vehicleType.value);
     }
-    if (slot.present) {
-      map['slot'] = Variable<String>(slot.value);
+    if (cellphoneNumber.present) {
+      map['cellphone_number'] = Variable<String>(cellphoneNumber.value);
     }
-    if (parkingLevel.present) {
-      map['parking_level'] = Variable<String>(parkingLevel.value);
+    if (damageMarkers.present) {
+      map['damage_markers'] = Variable<String>(damageMarkers.value);
     }
-    if (parkingSlot.present) {
-      map['parking_slot'] = Variable<String>(parkingSlot.value);
-    }
-    if (belongingsJson.present) {
-      map['belongings_json'] = Variable<String>(belongingsJson.value);
-    }
-    if (otherBelongings.present) {
-      map['other_belongings'] = Variable<String>(otherBelongings.value);
+    if (personalBelongings.present) {
+      map['personal_belongings'] = Variable<String>(personalBelongings.value);
     }
     if (signaturePng.present) {
       map['signature_png'] = Variable<String>(signaturePng.value);
     }
-    if (signatureCapturedAt.present) {
-      map['signature_captured_at'] = Variable<int>(signatureCapturedAt.value);
+    if (checkInAt.present) {
+      map['check_in_at'] = Variable<String>(checkInAt.value);
     }
-    if (customerFullName.present) {
-      map['customer_full_name'] = Variable<String>(customerFullName.value);
+    if (checkOutAt.present) {
+      map['check_out_at'] = Variable<String>(checkOutAt.value);
     }
-    if (customerMobile.present) {
-      map['customer_mobile'] = Variable<String>(customerMobile.value);
-    }
-    if (assignedValetDriver.present) {
-      map['assigned_valet_driver'] =
-          Variable<String>(assignedValetDriver.value);
-    }
-    if (specialInstructions.present) {
-      map['special_instructions'] = Variable<String>(specialInstructions.value);
-    }
-    if (valetServiceType.present) {
-      map['valet_service_type'] = Variable<String>(valetServiceType.value);
-    }
-    if (vehicleDamageJson.present) {
-      map['vehicle_damage_json'] = Variable<String>(vehicleDamageJson.value);
-    }
-    if (branchSnapshot.present) {
-      map['branch_snapshot'] = Variable<String>(branchSnapshot.value);
-    }
-    if (areaSnapshot.present) {
-      map['area_snapshot'] = Variable<String>(areaSnapshot.value);
-    }
-    if (deviceIdSnapshot.present) {
-      map['device_id_snapshot'] = Variable<String>(deviceIdSnapshot.value);
-    }
-    if (serverTicketId.present) {
-      map['server_ticket_id'] = Variable<String>(serverTicketId.value);
-    }
-    if (lastModifiedAt.present) {
-      map['last_modified_at'] = Variable<int>(lastModifiedAt.value);
-    }
-    if (localCreatedAt.present) {
-      map['local_created_at'] = Variable<int>(localCreatedAt.value);
-    }
-    if (timeIn.present) {
-      map['time_in'] = Variable<int>(timeIn.value);
-    }
-    if (timeOut.present) {
-      map['time_out'] = Variable<int>(timeOut.value);
-    }
-    if (durationMinutes.present) {
-      map['duration_minutes'] = Variable<int>(durationMinutes.value);
-    }
-    if (flatRate.present) {
-      map['flat_rate'] = Variable<double>(flatRate.value);
-    }
-    if (succeedingFee.present) {
-      map['succeeding_fee'] = Variable<double>(succeedingFee.value);
-    }
-    if (overnightFee.present) {
-      map['overnight_fee'] = Variable<double>(overnightFee.value);
-    }
-    if (lostTicketFee.present) {
-      map['lost_ticket_fee'] = Variable<double>(lostTicketFee.value);
-    }
-    if (totalFee.present) {
-      map['total_fee'] = Variable<double>(totalFee.value);
-    }
-    if (amountTendered.present) {
-      map['amount_tendered'] = Variable<double>(amountTendered.value);
-    }
-    if (changeAmount.present) {
-      map['change_amount'] = Variable<double>(changeAmount.value);
+    if (fee.present) {
+      map['fee'] = Variable<double>(fee.value);
     }
     if (status.present) {
       map['status'] = Variable<String>(status.value);
     }
-    if (syncedAt.present) {
-      map['synced_at'] = Variable<int>(syncedAt.value);
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
     }
     return map;
   }
 
   @override
   String toString() {
-    return (StringBuffer('ValetTransactionsCompanion(')
+    return (StringBuffer('TicketsCompanion(')
           ..write('id: $id, ')
-          ..write('localUuid: $localUuid, ')
-          ..write('checkinShiftId: $checkinShiftId, ')
-          ..write('checkoutShiftId: $checkoutShiftId, ')
+          ..write('shiftId: $shiftId, ')
           ..write('userId: $userId, ')
-          ..write('ticketNumber: $ticketNumber, ')
+          ..write('branchId: $branchId, ')
           ..write('plateNumber: $plateNumber, ')
           ..write('vehicleBrand: $vehicleBrand, ')
-          ..write('vehicleModel: $vehicleModel, ')
-          ..write('vehicleYear: $vehicleYear, ')
           ..write('vehicleColor: $vehicleColor, ')
           ..write('vehicleType: $vehicleType, ')
-          ..write('slot: $slot, ')
-          ..write('parkingLevel: $parkingLevel, ')
-          ..write('parkingSlot: $parkingSlot, ')
-          ..write('belongingsJson: $belongingsJson, ')
-          ..write('otherBelongings: $otherBelongings, ')
+          ..write('cellphoneNumber: $cellphoneNumber, ')
+          ..write('damageMarkers: $damageMarkers, ')
+          ..write('personalBelongings: $personalBelongings, ')
           ..write('signaturePng: $signaturePng, ')
-          ..write('signatureCapturedAt: $signatureCapturedAt, ')
-          ..write('customerFullName: $customerFullName, ')
-          ..write('customerMobile: $customerMobile, ')
-          ..write('assignedValetDriver: $assignedValetDriver, ')
-          ..write('specialInstructions: $specialInstructions, ')
-          ..write('valetServiceType: $valetServiceType, ')
-          ..write('vehicleDamageJson: $vehicleDamageJson, ')
-          ..write('branchSnapshot: $branchSnapshot, ')
-          ..write('areaSnapshot: $areaSnapshot, ')
-          ..write('deviceIdSnapshot: $deviceIdSnapshot, ')
-          ..write('serverTicketId: $serverTicketId, ')
-          ..write('lastModifiedAt: $lastModifiedAt, ')
-          ..write('localCreatedAt: $localCreatedAt, ')
-          ..write('timeIn: $timeIn, ')
-          ..write('timeOut: $timeOut, ')
-          ..write('durationMinutes: $durationMinutes, ')
-          ..write('flatRate: $flatRate, ')
-          ..write('succeedingFee: $succeedingFee, ')
-          ..write('overnightFee: $overnightFee, ')
-          ..write('lostTicketFee: $lostTicketFee, ')
-          ..write('totalFee: $totalFee, ')
-          ..write('amountTendered: $amountTendered, ')
-          ..write('changeAmount: $changeAmount, ')
+          ..write('checkInAt: $checkInAt, ')
+          ..write('checkOutAt: $checkOutAt, ')
+          ..write('fee: $fee, ')
           ..write('status: $status, ')
-          ..write('syncedAt: $syncedAt')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -4750,42 +2627,39 @@ class $SyncQueueTable extends SyncQueue
   $SyncQueueTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
       'id', aliasedName, false,
-      hasAutoIncrement: true,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
-  static const VerificationMeta _typeMeta = const VerificationMeta('type');
-  @override
-  late final GeneratedColumn<String> type = GeneratedColumn<String>(
-      'type', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _entityIdMeta =
-      const VerificationMeta('entityId');
+  static const VerificationMeta _operationMeta =
+      const VerificationMeta('operation');
   @override
-  late final GeneratedColumn<int> entityId = GeneratedColumn<int>(
-      'entity_id', aliasedName, false,
-      type: DriftSqlType.int, requiredDuringInsert: true);
+  late final GeneratedColumn<String> operation = GeneratedColumn<String>(
+      'operation', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _queueTableNameMeta =
+      const VerificationMeta('queueTableName');
+  @override
+  late final GeneratedColumn<String> queueTableName = GeneratedColumn<String>(
+      'table_name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _recordIdMeta =
+      const VerificationMeta('recordId');
+  @override
+  late final GeneratedColumn<String> recordId = GeneratedColumn<String>(
+      'record_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _payloadMeta =
       const VerificationMeta('payload');
   @override
   late final GeneratedColumn<String> payload = GeneratedColumn<String>(
       'payload', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _createdAtMeta =
-      const VerificationMeta('createdAt');
+  static const VerificationMeta _syncStatusMeta =
+      const VerificationMeta('syncStatus');
   @override
-  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
-      'created_at', aliasedName, false,
-      type: DriftSqlType.int, requiredDuringInsert: true);
-  static const VerificationMeta _syncedAtMeta =
-      const VerificationMeta('syncedAt');
-  @override
-  late final GeneratedColumn<int> syncedAt = GeneratedColumn<int>(
-      'synced_at', aliasedName, true,
-      type: DriftSqlType.int, requiredDuringInsert: false);
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+      'sync_status', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _retryCountMeta =
       const VerificationMeta('retryCount');
   @override
@@ -4794,15 +2668,23 @@ class $SyncQueueTable extends SyncQueue
       type: DriftSqlType.int,
       requiredDuringInsert: false,
       defaultValue: const Constant(0));
-  static const VerificationMeta _lastErrorMeta =
-      const VerificationMeta('lastError');
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
   @override
-  late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
-      'last_error', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
+  late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, type, entityId, payload, createdAt, syncedAt, retryCount, lastError];
+  List<GeneratedColumn> get $columns => [
+        id,
+        operation,
+        queueTableName,
+        recordId,
+        payload,
+        syncStatus,
+        retryCount,
+        createdAt
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -4815,18 +2697,28 @@ class $SyncQueueTable extends SyncQueue
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
     }
-    if (data.containsKey('type')) {
+    if (data.containsKey('operation')) {
+      context.handle(_operationMeta,
+          operation.isAcceptableOrUnknown(data['operation']!, _operationMeta));
+    } else if (isInserting) {
+      context.missing(_operationMeta);
+    }
+    if (data.containsKey('table_name')) {
       context.handle(
-          _typeMeta, type.isAcceptableOrUnknown(data['type']!, _typeMeta));
+          _queueTableNameMeta,
+          queueTableName.isAcceptableOrUnknown(
+              data['table_name']!, _queueTableNameMeta));
     } else if (isInserting) {
-      context.missing(_typeMeta);
+      context.missing(_queueTableNameMeta);
     }
-    if (data.containsKey('entity_id')) {
-      context.handle(_entityIdMeta,
-          entityId.isAcceptableOrUnknown(data['entity_id']!, _entityIdMeta));
+    if (data.containsKey('record_id')) {
+      context.handle(_recordIdMeta,
+          recordId.isAcceptableOrUnknown(data['record_id']!, _recordIdMeta));
     } else if (isInserting) {
-      context.missing(_entityIdMeta);
+      context.missing(_recordIdMeta);
     }
     if (data.containsKey('payload')) {
       context.handle(_payloadMeta,
@@ -4834,15 +2726,13 @@ class $SyncQueueTable extends SyncQueue
     } else if (isInserting) {
       context.missing(_payloadMeta);
     }
-    if (data.containsKey('created_at')) {
-      context.handle(_createdAtMeta,
-          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    if (data.containsKey('sync_status')) {
+      context.handle(
+          _syncStatusMeta,
+          syncStatus.isAcceptableOrUnknown(
+              data['sync_status']!, _syncStatusMeta));
     } else if (isInserting) {
-      context.missing(_createdAtMeta);
-    }
-    if (data.containsKey('synced_at')) {
-      context.handle(_syncedAtMeta,
-          syncedAt.isAcceptableOrUnknown(data['synced_at']!, _syncedAtMeta));
+      context.missing(_syncStatusMeta);
     }
     if (data.containsKey('retry_count')) {
       context.handle(
@@ -4850,9 +2740,11 @@ class $SyncQueueTable extends SyncQueue
           retryCount.isAcceptableOrUnknown(
               data['retry_count']!, _retryCountMeta));
     }
-    if (data.containsKey('last_error')) {
-      context.handle(_lastErrorMeta,
-          lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta));
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
     }
     return context;
   }
@@ -4864,21 +2756,21 @@ class $SyncQueueTable extends SyncQueue
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return SyncQueueData(
       id: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
-      type: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}type'])!,
-      entityId: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}entity_id'])!,
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      operation: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}operation'])!,
+      queueTableName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}table_name'])!,
+      recordId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}record_id'])!,
       payload: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}payload'])!,
-      createdAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}created_at'])!,
-      syncedAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}synced_at']),
+      syncStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
       retryCount: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}retry_count'])!,
-      lastError: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}last_error']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}created_at'])!,
     );
   }
 
@@ -4889,55 +2781,55 @@ class $SyncQueueTable extends SyncQueue
 }
 
 class SyncQueueData extends DataClass implements Insertable<SyncQueueData> {
-  final int id;
-  final String type;
-  final int entityId;
+  final String id;
+
+  /// `create` | `update`
+  final String operation;
+
+  /// Logical table for API routing: `shifts` | `tickets` (SQL: `table_name`).
+  final String queueTableName;
+  final String recordId;
+
+  /// Full row JSON.
   final String payload;
-  final int createdAt;
-  final int? syncedAt;
+
+  /// `pending` | `synced` | `failed`
+  final String syncStatus;
   final int retryCount;
-  final String? lastError;
+  final String createdAt;
   const SyncQueueData(
       {required this.id,
-      required this.type,
-      required this.entityId,
+      required this.operation,
+      required this.queueTableName,
+      required this.recordId,
       required this.payload,
-      required this.createdAt,
-      this.syncedAt,
+      required this.syncStatus,
       required this.retryCount,
-      this.lastError});
+      required this.createdAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
-    map['type'] = Variable<String>(type);
-    map['entity_id'] = Variable<int>(entityId);
+    map['id'] = Variable<String>(id);
+    map['operation'] = Variable<String>(operation);
+    map['table_name'] = Variable<String>(queueTableName);
+    map['record_id'] = Variable<String>(recordId);
     map['payload'] = Variable<String>(payload);
-    map['created_at'] = Variable<int>(createdAt);
-    if (!nullToAbsent || syncedAt != null) {
-      map['synced_at'] = Variable<int>(syncedAt);
-    }
+    map['sync_status'] = Variable<String>(syncStatus);
     map['retry_count'] = Variable<int>(retryCount);
-    if (!nullToAbsent || lastError != null) {
-      map['last_error'] = Variable<String>(lastError);
-    }
+    map['created_at'] = Variable<String>(createdAt);
     return map;
   }
 
   SyncQueueCompanion toCompanion(bool nullToAbsent) {
     return SyncQueueCompanion(
       id: Value(id),
-      type: Value(type),
-      entityId: Value(entityId),
+      operation: Value(operation),
+      queueTableName: Value(queueTableName),
+      recordId: Value(recordId),
       payload: Value(payload),
-      createdAt: Value(createdAt),
-      syncedAt: syncedAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(syncedAt),
+      syncStatus: Value(syncStatus),
       retryCount: Value(retryCount),
-      lastError: lastError == null && nullToAbsent
-          ? const Value.absent()
-          : Value(lastError),
+      createdAt: Value(createdAt),
     );
   }
 
@@ -4945,61 +2837,64 @@ class SyncQueueData extends DataClass implements Insertable<SyncQueueData> {
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return SyncQueueData(
-      id: serializer.fromJson<int>(json['id']),
-      type: serializer.fromJson<String>(json['type']),
-      entityId: serializer.fromJson<int>(json['entityId']),
+      id: serializer.fromJson<String>(json['id']),
+      operation: serializer.fromJson<String>(json['operation']),
+      queueTableName: serializer.fromJson<String>(json['queueTableName']),
+      recordId: serializer.fromJson<String>(json['recordId']),
       payload: serializer.fromJson<String>(json['payload']),
-      createdAt: serializer.fromJson<int>(json['createdAt']),
-      syncedAt: serializer.fromJson<int?>(json['syncedAt']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
       retryCount: serializer.fromJson<int>(json['retryCount']),
-      lastError: serializer.fromJson<String?>(json['lastError']),
+      createdAt: serializer.fromJson<String>(json['createdAt']),
     );
   }
   @override
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
-      'type': serializer.toJson<String>(type),
-      'entityId': serializer.toJson<int>(entityId),
+      'id': serializer.toJson<String>(id),
+      'operation': serializer.toJson<String>(operation),
+      'queueTableName': serializer.toJson<String>(queueTableName),
+      'recordId': serializer.toJson<String>(recordId),
       'payload': serializer.toJson<String>(payload),
-      'createdAt': serializer.toJson<int>(createdAt),
-      'syncedAt': serializer.toJson<int?>(syncedAt),
+      'syncStatus': serializer.toJson<String>(syncStatus),
       'retryCount': serializer.toJson<int>(retryCount),
-      'lastError': serializer.toJson<String?>(lastError),
+      'createdAt': serializer.toJson<String>(createdAt),
     };
   }
 
   SyncQueueData copyWith(
-          {int? id,
-          String? type,
-          int? entityId,
+          {String? id,
+          String? operation,
+          String? queueTableName,
+          String? recordId,
           String? payload,
-          int? createdAt,
-          Value<int?> syncedAt = const Value.absent(),
+          String? syncStatus,
           int? retryCount,
-          Value<String?> lastError = const Value.absent()}) =>
+          String? createdAt}) =>
       SyncQueueData(
         id: id ?? this.id,
-        type: type ?? this.type,
-        entityId: entityId ?? this.entityId,
+        operation: operation ?? this.operation,
+        queueTableName: queueTableName ?? this.queueTableName,
+        recordId: recordId ?? this.recordId,
         payload: payload ?? this.payload,
-        createdAt: createdAt ?? this.createdAt,
-        syncedAt: syncedAt.present ? syncedAt.value : this.syncedAt,
+        syncStatus: syncStatus ?? this.syncStatus,
         retryCount: retryCount ?? this.retryCount,
-        lastError: lastError.present ? lastError.value : this.lastError,
+        createdAt: createdAt ?? this.createdAt,
       );
   SyncQueueData copyWithCompanion(SyncQueueCompanion data) {
     return SyncQueueData(
       id: data.id.present ? data.id.value : this.id,
-      type: data.type.present ? data.type.value : this.type,
-      entityId: data.entityId.present ? data.entityId.value : this.entityId,
+      operation: data.operation.present ? data.operation.value : this.operation,
+      queueTableName: data.queueTableName.present
+          ? data.queueTableName.value
+          : this.queueTableName,
+      recordId: data.recordId.present ? data.recordId.value : this.recordId,
       payload: data.payload.present ? data.payload.value : this.payload,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
-      syncedAt: data.syncedAt.present ? data.syncedAt.value : this.syncedAt,
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
       retryCount:
           data.retryCount.present ? data.retryCount.value : this.retryCount,
-      lastError: data.lastError.present ? data.lastError.value : this.lastError,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
 
@@ -5007,106 +2902,116 @@ class SyncQueueData extends DataClass implements Insertable<SyncQueueData> {
   String toString() {
     return (StringBuffer('SyncQueueData(')
           ..write('id: $id, ')
-          ..write('type: $type, ')
-          ..write('entityId: $entityId, ')
+          ..write('operation: $operation, ')
+          ..write('queueTableName: $queueTableName, ')
+          ..write('recordId: $recordId, ')
           ..write('payload: $payload, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('syncedAt: $syncedAt, ')
+          ..write('syncStatus: $syncStatus, ')
           ..write('retryCount: $retryCount, ')
-          ..write('lastError: $lastError')
+          ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      id, type, entityId, payload, createdAt, syncedAt, retryCount, lastError);
+  int get hashCode => Object.hash(id, operation, queueTableName, recordId,
+      payload, syncStatus, retryCount, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is SyncQueueData &&
           other.id == this.id &&
-          other.type == this.type &&
-          other.entityId == this.entityId &&
+          other.operation == this.operation &&
+          other.queueTableName == this.queueTableName &&
+          other.recordId == this.recordId &&
           other.payload == this.payload &&
-          other.createdAt == this.createdAt &&
-          other.syncedAt == this.syncedAt &&
+          other.syncStatus == this.syncStatus &&
           other.retryCount == this.retryCount &&
-          other.lastError == this.lastError);
+          other.createdAt == this.createdAt);
 }
 
 class SyncQueueCompanion extends UpdateCompanion<SyncQueueData> {
-  final Value<int> id;
-  final Value<String> type;
-  final Value<int> entityId;
+  final Value<String> id;
+  final Value<String> operation;
+  final Value<String> queueTableName;
+  final Value<String> recordId;
   final Value<String> payload;
-  final Value<int> createdAt;
-  final Value<int?> syncedAt;
+  final Value<String> syncStatus;
   final Value<int> retryCount;
-  final Value<String?> lastError;
+  final Value<String> createdAt;
+  final Value<int> rowid;
   const SyncQueueCompanion({
     this.id = const Value.absent(),
-    this.type = const Value.absent(),
-    this.entityId = const Value.absent(),
+    this.operation = const Value.absent(),
+    this.queueTableName = const Value.absent(),
+    this.recordId = const Value.absent(),
     this.payload = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    this.syncedAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
     this.retryCount = const Value.absent(),
-    this.lastError = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
   });
   SyncQueueCompanion.insert({
-    this.id = const Value.absent(),
-    required String type,
-    required int entityId,
+    required String id,
+    required String operation,
+    required String queueTableName,
+    required String recordId,
     required String payload,
-    required int createdAt,
-    this.syncedAt = const Value.absent(),
+    required String syncStatus,
     this.retryCount = const Value.absent(),
-    this.lastError = const Value.absent(),
-  })  : type = Value(type),
-        entityId = Value(entityId),
+    required String createdAt,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        operation = Value(operation),
+        queueTableName = Value(queueTableName),
+        recordId = Value(recordId),
         payload = Value(payload),
+        syncStatus = Value(syncStatus),
         createdAt = Value(createdAt);
   static Insertable<SyncQueueData> custom({
-    Expression<int>? id,
-    Expression<String>? type,
-    Expression<int>? entityId,
+    Expression<String>? id,
+    Expression<String>? operation,
+    Expression<String>? queueTableName,
+    Expression<String>? recordId,
     Expression<String>? payload,
-    Expression<int>? createdAt,
-    Expression<int>? syncedAt,
+    Expression<String>? syncStatus,
     Expression<int>? retryCount,
-    Expression<String>? lastError,
+    Expression<String>? createdAt,
+    Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
-      if (type != null) 'type': type,
-      if (entityId != null) 'entity_id': entityId,
+      if (operation != null) 'operation': operation,
+      if (queueTableName != null) 'table_name': queueTableName,
+      if (recordId != null) 'record_id': recordId,
       if (payload != null) 'payload': payload,
-      if (createdAt != null) 'created_at': createdAt,
-      if (syncedAt != null) 'synced_at': syncedAt,
+      if (syncStatus != null) 'sync_status': syncStatus,
       if (retryCount != null) 'retry_count': retryCount,
-      if (lastError != null) 'last_error': lastError,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
     });
   }
 
   SyncQueueCompanion copyWith(
-      {Value<int>? id,
-      Value<String>? type,
-      Value<int>? entityId,
+      {Value<String>? id,
+      Value<String>? operation,
+      Value<String>? queueTableName,
+      Value<String>? recordId,
       Value<String>? payload,
-      Value<int>? createdAt,
-      Value<int?>? syncedAt,
+      Value<String>? syncStatus,
       Value<int>? retryCount,
-      Value<String?>? lastError}) {
+      Value<String>? createdAt,
+      Value<int>? rowid}) {
     return SyncQueueCompanion(
       id: id ?? this.id,
-      type: type ?? this.type,
-      entityId: entityId ?? this.entityId,
+      operation: operation ?? this.operation,
+      queueTableName: queueTableName ?? this.queueTableName,
+      recordId: recordId ?? this.recordId,
       payload: payload ?? this.payload,
-      createdAt: createdAt ?? this.createdAt,
-      syncedAt: syncedAt ?? this.syncedAt,
+      syncStatus: syncStatus ?? this.syncStatus,
       retryCount: retryCount ?? this.retryCount,
-      lastError: lastError ?? this.lastError,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
     );
   }
 
@@ -5114,28 +3019,31 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueData> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     if (id.present) {
-      map['id'] = Variable<int>(id.value);
+      map['id'] = Variable<String>(id.value);
     }
-    if (type.present) {
-      map['type'] = Variable<String>(type.value);
+    if (operation.present) {
+      map['operation'] = Variable<String>(operation.value);
     }
-    if (entityId.present) {
-      map['entity_id'] = Variable<int>(entityId.value);
+    if (queueTableName.present) {
+      map['table_name'] = Variable<String>(queueTableName.value);
+    }
+    if (recordId.present) {
+      map['record_id'] = Variable<String>(recordId.value);
     }
     if (payload.present) {
       map['payload'] = Variable<String>(payload.value);
     }
-    if (createdAt.present) {
-      map['created_at'] = Variable<int>(createdAt.value);
-    }
-    if (syncedAt.present) {
-      map['synced_at'] = Variable<int>(syncedAt.value);
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
     }
     if (retryCount.present) {
       map['retry_count'] = Variable<int>(retryCount.value);
     }
-    if (lastError.present) {
-      map['last_error'] = Variable<String>(lastError.value);
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
     }
     return map;
   }
@@ -5144,13 +3052,917 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueData> {
   String toString() {
     return (StringBuffer('SyncQueueCompanion(')
           ..write('id: $id, ')
-          ..write('type: $type, ')
-          ..write('entityId: $entityId, ')
+          ..write('operation: $operation, ')
+          ..write('queueTableName: $queueTableName, ')
+          ..write('recordId: $recordId, ')
           ..write('payload: $payload, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('syncedAt: $syncedAt, ')
+          ..write('syncStatus: $syncStatus, ')
           ..write('retryCount: $retryCount, ')
-          ..write('lastError: $lastError')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RatesTable extends Rates with TableInfo<$RatesTable, Rate> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _branchIdMeta =
+      const VerificationMeta('branchId');
+  @override
+  late final GeneratedColumn<String> branchId = GeneratedColumn<String>(
+      'branch_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _vehicleTypeMeta =
+      const VerificationMeta('vehicleType');
+  @override
+  late final GeneratedColumn<String> vehicleType = GeneratedColumn<String>(
+      'vehicle_type', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _flatRateHoursMeta =
+      const VerificationMeta('flatRateHours');
+  @override
+  late final GeneratedColumn<int> flatRateHours = GeneratedColumn<int>(
+      'flat_rate_hours', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _flatRateFeeMeta =
+      const VerificationMeta('flatRateFee');
+  @override
+  late final GeneratedColumn<double> flatRateFee = GeneratedColumn<double>(
+      'flat_rate_fee', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _succeedingHourFeeMeta =
+      const VerificationMeta('succeedingHourFee');
+  @override
+  late final GeneratedColumn<double> succeedingHourFee =
+      GeneratedColumn<double>('succeeding_hour_fee', aliasedName, false,
+          type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _overnightFeeMeta =
+      const VerificationMeta('overnightFee');
+  @override
+  late final GeneratedColumn<double> overnightFee = GeneratedColumn<double>(
+      'overnight_fee', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _lostTicketFeeMeta =
+      const VerificationMeta('lostTicketFee');
+  @override
+  late final GeneratedColumn<double> lostTicketFee = GeneratedColumn<double>(
+      'lost_ticket_fee', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _syncStatusMeta =
+      const VerificationMeta('syncStatus');
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+      'sync_status', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<String> updatedAt = GeneratedColumn<String>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        branchId,
+        vehicleType,
+        flatRateHours,
+        flatRateFee,
+        succeedingHourFee,
+        overnightFee,
+        lostTicketFee,
+        syncStatus,
+        updatedAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'rates';
+  @override
+  VerificationContext validateIntegrity(Insertable<Rate> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('branch_id')) {
+      context.handle(_branchIdMeta,
+          branchId.isAcceptableOrUnknown(data['branch_id']!, _branchIdMeta));
+    } else if (isInserting) {
+      context.missing(_branchIdMeta);
+    }
+    if (data.containsKey('vehicle_type')) {
+      context.handle(
+          _vehicleTypeMeta,
+          vehicleType.isAcceptableOrUnknown(
+              data['vehicle_type']!, _vehicleTypeMeta));
+    } else if (isInserting) {
+      context.missing(_vehicleTypeMeta);
+    }
+    if (data.containsKey('flat_rate_hours')) {
+      context.handle(
+          _flatRateHoursMeta,
+          flatRateHours.isAcceptableOrUnknown(
+              data['flat_rate_hours']!, _flatRateHoursMeta));
+    } else if (isInserting) {
+      context.missing(_flatRateHoursMeta);
+    }
+    if (data.containsKey('flat_rate_fee')) {
+      context.handle(
+          _flatRateFeeMeta,
+          flatRateFee.isAcceptableOrUnknown(
+              data['flat_rate_fee']!, _flatRateFeeMeta));
+    } else if (isInserting) {
+      context.missing(_flatRateFeeMeta);
+    }
+    if (data.containsKey('succeeding_hour_fee')) {
+      context.handle(
+          _succeedingHourFeeMeta,
+          succeedingHourFee.isAcceptableOrUnknown(
+              data['succeeding_hour_fee']!, _succeedingHourFeeMeta));
+    } else if (isInserting) {
+      context.missing(_succeedingHourFeeMeta);
+    }
+    if (data.containsKey('overnight_fee')) {
+      context.handle(
+          _overnightFeeMeta,
+          overnightFee.isAcceptableOrUnknown(
+              data['overnight_fee']!, _overnightFeeMeta));
+    } else if (isInserting) {
+      context.missing(_overnightFeeMeta);
+    }
+    if (data.containsKey('lost_ticket_fee')) {
+      context.handle(
+          _lostTicketFeeMeta,
+          lostTicketFee.isAcceptableOrUnknown(
+              data['lost_ticket_fee']!, _lostTicketFeeMeta));
+    } else if (isInserting) {
+      context.missing(_lostTicketFeeMeta);
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+          _syncStatusMeta,
+          syncStatus.isAcceptableOrUnknown(
+              data['sync_status']!, _syncStatusMeta));
+    } else if (isInserting) {
+      context.missing(_syncStatusMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+        {branchId, vehicleType},
+      ];
+  @override
+  Rate map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Rate(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      branchId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}branch_id'])!,
+      vehicleType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}vehicle_type'])!,
+      flatRateHours: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}flat_rate_hours'])!,
+      flatRateFee: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}flat_rate_fee'])!,
+      succeedingHourFee: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}succeeding_hour_fee'])!,
+      overnightFee: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}overnight_fee'])!,
+      lostTicketFee: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}lost_ticket_fee'])!,
+      syncStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $RatesTable createAlias(String alias) {
+    return $RatesTable(attachedDatabase, alias);
+  }
+}
+
+class Rate extends DataClass implements Insertable<Rate> {
+  final String id;
+  final String branchId;
+  final String vehicleType;
+  final int flatRateHours;
+  final double flatRateFee;
+  final double succeedingHourFee;
+  final double overnightFee;
+  final double lostTicketFee;
+
+  /// `pending` | `synced`
+  final String syncStatus;
+  final String updatedAt;
+  const Rate(
+      {required this.id,
+      required this.branchId,
+      required this.vehicleType,
+      required this.flatRateHours,
+      required this.flatRateFee,
+      required this.succeedingHourFee,
+      required this.overnightFee,
+      required this.lostTicketFee,
+      required this.syncStatus,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['branch_id'] = Variable<String>(branchId);
+    map['vehicle_type'] = Variable<String>(vehicleType);
+    map['flat_rate_hours'] = Variable<int>(flatRateHours);
+    map['flat_rate_fee'] = Variable<double>(flatRateFee);
+    map['succeeding_hour_fee'] = Variable<double>(succeedingHourFee);
+    map['overnight_fee'] = Variable<double>(overnightFee);
+    map['lost_ticket_fee'] = Variable<double>(lostTicketFee);
+    map['sync_status'] = Variable<String>(syncStatus);
+    map['updated_at'] = Variable<String>(updatedAt);
+    return map;
+  }
+
+  RatesCompanion toCompanion(bool nullToAbsent) {
+    return RatesCompanion(
+      id: Value(id),
+      branchId: Value(branchId),
+      vehicleType: Value(vehicleType),
+      flatRateHours: Value(flatRateHours),
+      flatRateFee: Value(flatRateFee),
+      succeedingHourFee: Value(succeedingHourFee),
+      overnightFee: Value(overnightFee),
+      lostTicketFee: Value(lostTicketFee),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory Rate.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Rate(
+      id: serializer.fromJson<String>(json['id']),
+      branchId: serializer.fromJson<String>(json['branchId']),
+      vehicleType: serializer.fromJson<String>(json['vehicleType']),
+      flatRateHours: serializer.fromJson<int>(json['flatRateHours']),
+      flatRateFee: serializer.fromJson<double>(json['flatRateFee']),
+      succeedingHourFee: serializer.fromJson<double>(json['succeedingHourFee']),
+      overnightFee: serializer.fromJson<double>(json['overnightFee']),
+      lostTicketFee: serializer.fromJson<double>(json['lostTicketFee']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      updatedAt: serializer.fromJson<String>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'branchId': serializer.toJson<String>(branchId),
+      'vehicleType': serializer.toJson<String>(vehicleType),
+      'flatRateHours': serializer.toJson<int>(flatRateHours),
+      'flatRateFee': serializer.toJson<double>(flatRateFee),
+      'succeedingHourFee': serializer.toJson<double>(succeedingHourFee),
+      'overnightFee': serializer.toJson<double>(overnightFee),
+      'lostTicketFee': serializer.toJson<double>(lostTicketFee),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'updatedAt': serializer.toJson<String>(updatedAt),
+    };
+  }
+
+  Rate copyWith(
+          {String? id,
+          String? branchId,
+          String? vehicleType,
+          int? flatRateHours,
+          double? flatRateFee,
+          double? succeedingHourFee,
+          double? overnightFee,
+          double? lostTicketFee,
+          String? syncStatus,
+          String? updatedAt}) =>
+      Rate(
+        id: id ?? this.id,
+        branchId: branchId ?? this.branchId,
+        vehicleType: vehicleType ?? this.vehicleType,
+        flatRateHours: flatRateHours ?? this.flatRateHours,
+        flatRateFee: flatRateFee ?? this.flatRateFee,
+        succeedingHourFee: succeedingHourFee ?? this.succeedingHourFee,
+        overnightFee: overnightFee ?? this.overnightFee,
+        lostTicketFee: lostTicketFee ?? this.lostTicketFee,
+        syncStatus: syncStatus ?? this.syncStatus,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  Rate copyWithCompanion(RatesCompanion data) {
+    return Rate(
+      id: data.id.present ? data.id.value : this.id,
+      branchId: data.branchId.present ? data.branchId.value : this.branchId,
+      vehicleType:
+          data.vehicleType.present ? data.vehicleType.value : this.vehicleType,
+      flatRateHours: data.flatRateHours.present
+          ? data.flatRateHours.value
+          : this.flatRateHours,
+      flatRateFee:
+          data.flatRateFee.present ? data.flatRateFee.value : this.flatRateFee,
+      succeedingHourFee: data.succeedingHourFee.present
+          ? data.succeedingHourFee.value
+          : this.succeedingHourFee,
+      overnightFee: data.overnightFee.present
+          ? data.overnightFee.value
+          : this.overnightFee,
+      lostTicketFee: data.lostTicketFee.present
+          ? data.lostTicketFee.value
+          : this.lostTicketFee,
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Rate(')
+          ..write('id: $id, ')
+          ..write('branchId: $branchId, ')
+          ..write('vehicleType: $vehicleType, ')
+          ..write('flatRateHours: $flatRateHours, ')
+          ..write('flatRateFee: $flatRateFee, ')
+          ..write('succeedingHourFee: $succeedingHourFee, ')
+          ..write('overnightFee: $overnightFee, ')
+          ..write('lostTicketFee: $lostTicketFee, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      branchId,
+      vehicleType,
+      flatRateHours,
+      flatRateFee,
+      succeedingHourFee,
+      overnightFee,
+      lostTicketFee,
+      syncStatus,
+      updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Rate &&
+          other.id == this.id &&
+          other.branchId == this.branchId &&
+          other.vehicleType == this.vehicleType &&
+          other.flatRateHours == this.flatRateHours &&
+          other.flatRateFee == this.flatRateFee &&
+          other.succeedingHourFee == this.succeedingHourFee &&
+          other.overnightFee == this.overnightFee &&
+          other.lostTicketFee == this.lostTicketFee &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt);
+}
+
+class RatesCompanion extends UpdateCompanion<Rate> {
+  final Value<String> id;
+  final Value<String> branchId;
+  final Value<String> vehicleType;
+  final Value<int> flatRateHours;
+  final Value<double> flatRateFee;
+  final Value<double> succeedingHourFee;
+  final Value<double> overnightFee;
+  final Value<double> lostTicketFee;
+  final Value<String> syncStatus;
+  final Value<String> updatedAt;
+  final Value<int> rowid;
+  const RatesCompanion({
+    this.id = const Value.absent(),
+    this.branchId = const Value.absent(),
+    this.vehicleType = const Value.absent(),
+    this.flatRateHours = const Value.absent(),
+    this.flatRateFee = const Value.absent(),
+    this.succeedingHourFee = const Value.absent(),
+    this.overnightFee = const Value.absent(),
+    this.lostTicketFee = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RatesCompanion.insert({
+    required String id,
+    required String branchId,
+    required String vehicleType,
+    required int flatRateHours,
+    required double flatRateFee,
+    required double succeedingHourFee,
+    required double overnightFee,
+    required double lostTicketFee,
+    required String syncStatus,
+    required String updatedAt,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        branchId = Value(branchId),
+        vehicleType = Value(vehicleType),
+        flatRateHours = Value(flatRateHours),
+        flatRateFee = Value(flatRateFee),
+        succeedingHourFee = Value(succeedingHourFee),
+        overnightFee = Value(overnightFee),
+        lostTicketFee = Value(lostTicketFee),
+        syncStatus = Value(syncStatus),
+        updatedAt = Value(updatedAt);
+  static Insertable<Rate> custom({
+    Expression<String>? id,
+    Expression<String>? branchId,
+    Expression<String>? vehicleType,
+    Expression<int>? flatRateHours,
+    Expression<double>? flatRateFee,
+    Expression<double>? succeedingHourFee,
+    Expression<double>? overnightFee,
+    Expression<double>? lostTicketFee,
+    Expression<String>? syncStatus,
+    Expression<String>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (branchId != null) 'branch_id': branchId,
+      if (vehicleType != null) 'vehicle_type': vehicleType,
+      if (flatRateHours != null) 'flat_rate_hours': flatRateHours,
+      if (flatRateFee != null) 'flat_rate_fee': flatRateFee,
+      if (succeedingHourFee != null) 'succeeding_hour_fee': succeedingHourFee,
+      if (overnightFee != null) 'overnight_fee': overnightFee,
+      if (lostTicketFee != null) 'lost_ticket_fee': lostTicketFee,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RatesCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? branchId,
+      Value<String>? vehicleType,
+      Value<int>? flatRateHours,
+      Value<double>? flatRateFee,
+      Value<double>? succeedingHourFee,
+      Value<double>? overnightFee,
+      Value<double>? lostTicketFee,
+      Value<String>? syncStatus,
+      Value<String>? updatedAt,
+      Value<int>? rowid}) {
+    return RatesCompanion(
+      id: id ?? this.id,
+      branchId: branchId ?? this.branchId,
+      vehicleType: vehicleType ?? this.vehicleType,
+      flatRateHours: flatRateHours ?? this.flatRateHours,
+      flatRateFee: flatRateFee ?? this.flatRateFee,
+      succeedingHourFee: succeedingHourFee ?? this.succeedingHourFee,
+      overnightFee: overnightFee ?? this.overnightFee,
+      lostTicketFee: lostTicketFee ?? this.lostTicketFee,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (branchId.present) {
+      map['branch_id'] = Variable<String>(branchId.value);
+    }
+    if (vehicleType.present) {
+      map['vehicle_type'] = Variable<String>(vehicleType.value);
+    }
+    if (flatRateHours.present) {
+      map['flat_rate_hours'] = Variable<int>(flatRateHours.value);
+    }
+    if (flatRateFee.present) {
+      map['flat_rate_fee'] = Variable<double>(flatRateFee.value);
+    }
+    if (succeedingHourFee.present) {
+      map['succeeding_hour_fee'] = Variable<double>(succeedingHourFee.value);
+    }
+    if (overnightFee.present) {
+      map['overnight_fee'] = Variable<double>(overnightFee.value);
+    }
+    if (lostTicketFee.present) {
+      map['lost_ticket_fee'] = Variable<double>(lostTicketFee.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<String>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RatesCompanion(')
+          ..write('id: $id, ')
+          ..write('branchId: $branchId, ')
+          ..write('vehicleType: $vehicleType, ')
+          ..write('flatRateHours: $flatRateHours, ')
+          ..write('flatRateFee: $flatRateFee, ')
+          ..write('succeedingHourFee: $succeedingHourFee, ')
+          ..write('overnightFee: $overnightFee, ')
+          ..write('lostTicketFee: $lostTicketFee, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $BranchConfigsTable extends BranchConfigs
+    with TableInfo<$BranchConfigsTable, BranchConfig> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BranchConfigsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _branchIdMeta =
+      const VerificationMeta('branchId');
+  @override
+  late final GeneratedColumn<String> branchId = GeneratedColumn<String>(
+      'branch_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _configKeyMeta =
+      const VerificationMeta('configKey');
+  @override
+  late final GeneratedColumn<String> configKey = GeneratedColumn<String>(
+      'config_key', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _configValueMeta =
+      const VerificationMeta('configValue');
+  @override
+  late final GeneratedColumn<String> configValue = GeneratedColumn<String>(
+      'config_value', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _syncStatusMeta =
+      const VerificationMeta('syncStatus');
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+      'sync_status', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<String> updatedAt = GeneratedColumn<String>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, branchId, configKey, configValue, syncStatus, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'branch_config';
+  @override
+  VerificationContext validateIntegrity(Insertable<BranchConfig> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('branch_id')) {
+      context.handle(_branchIdMeta,
+          branchId.isAcceptableOrUnknown(data['branch_id']!, _branchIdMeta));
+    } else if (isInserting) {
+      context.missing(_branchIdMeta);
+    }
+    if (data.containsKey('config_key')) {
+      context.handle(_configKeyMeta,
+          configKey.isAcceptableOrUnknown(data['config_key']!, _configKeyMeta));
+    } else if (isInserting) {
+      context.missing(_configKeyMeta);
+    }
+    if (data.containsKey('config_value')) {
+      context.handle(
+          _configValueMeta,
+          configValue.isAcceptableOrUnknown(
+              data['config_value']!, _configValueMeta));
+    } else if (isInserting) {
+      context.missing(_configValueMeta);
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+          _syncStatusMeta,
+          syncStatus.isAcceptableOrUnknown(
+              data['sync_status']!, _syncStatusMeta));
+    } else if (isInserting) {
+      context.missing(_syncStatusMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+        {branchId, configKey},
+      ];
+  @override
+  BranchConfig map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BranchConfig(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      branchId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}branch_id'])!,
+      configKey: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}config_key'])!,
+      configValue: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}config_value'])!,
+      syncStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $BranchConfigsTable createAlias(String alias) {
+    return $BranchConfigsTable(attachedDatabase, alias);
+  }
+}
+
+class BranchConfig extends DataClass implements Insertable<BranchConfig> {
+  final String id;
+  final String branchId;
+  final String configKey;
+  final String configValue;
+
+  /// `pending` | `synced`
+  final String syncStatus;
+  final String updatedAt;
+  const BranchConfig(
+      {required this.id,
+      required this.branchId,
+      required this.configKey,
+      required this.configValue,
+      required this.syncStatus,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['branch_id'] = Variable<String>(branchId);
+    map['config_key'] = Variable<String>(configKey);
+    map['config_value'] = Variable<String>(configValue);
+    map['sync_status'] = Variable<String>(syncStatus);
+    map['updated_at'] = Variable<String>(updatedAt);
+    return map;
+  }
+
+  BranchConfigsCompanion toCompanion(bool nullToAbsent) {
+    return BranchConfigsCompanion(
+      id: Value(id),
+      branchId: Value(branchId),
+      configKey: Value(configKey),
+      configValue: Value(configValue),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory BranchConfig.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BranchConfig(
+      id: serializer.fromJson<String>(json['id']),
+      branchId: serializer.fromJson<String>(json['branchId']),
+      configKey: serializer.fromJson<String>(json['configKey']),
+      configValue: serializer.fromJson<String>(json['configValue']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      updatedAt: serializer.fromJson<String>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'branchId': serializer.toJson<String>(branchId),
+      'configKey': serializer.toJson<String>(configKey),
+      'configValue': serializer.toJson<String>(configValue),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'updatedAt': serializer.toJson<String>(updatedAt),
+    };
+  }
+
+  BranchConfig copyWith(
+          {String? id,
+          String? branchId,
+          String? configKey,
+          String? configValue,
+          String? syncStatus,
+          String? updatedAt}) =>
+      BranchConfig(
+        id: id ?? this.id,
+        branchId: branchId ?? this.branchId,
+        configKey: configKey ?? this.configKey,
+        configValue: configValue ?? this.configValue,
+        syncStatus: syncStatus ?? this.syncStatus,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  BranchConfig copyWithCompanion(BranchConfigsCompanion data) {
+    return BranchConfig(
+      id: data.id.present ? data.id.value : this.id,
+      branchId: data.branchId.present ? data.branchId.value : this.branchId,
+      configKey: data.configKey.present ? data.configKey.value : this.configKey,
+      configValue:
+          data.configValue.present ? data.configValue.value : this.configValue,
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BranchConfig(')
+          ..write('id: $id, ')
+          ..write('branchId: $branchId, ')
+          ..write('configKey: $configKey, ')
+          ..write('configValue: $configValue, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, branchId, configKey, configValue, syncStatus, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BranchConfig &&
+          other.id == this.id &&
+          other.branchId == this.branchId &&
+          other.configKey == this.configKey &&
+          other.configValue == this.configValue &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt);
+}
+
+class BranchConfigsCompanion extends UpdateCompanion<BranchConfig> {
+  final Value<String> id;
+  final Value<String> branchId;
+  final Value<String> configKey;
+  final Value<String> configValue;
+  final Value<String> syncStatus;
+  final Value<String> updatedAt;
+  final Value<int> rowid;
+  const BranchConfigsCompanion({
+    this.id = const Value.absent(),
+    this.branchId = const Value.absent(),
+    this.configKey = const Value.absent(),
+    this.configValue = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BranchConfigsCompanion.insert({
+    required String id,
+    required String branchId,
+    required String configKey,
+    required String configValue,
+    required String syncStatus,
+    required String updatedAt,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        branchId = Value(branchId),
+        configKey = Value(configKey),
+        configValue = Value(configValue),
+        syncStatus = Value(syncStatus),
+        updatedAt = Value(updatedAt);
+  static Insertable<BranchConfig> custom({
+    Expression<String>? id,
+    Expression<String>? branchId,
+    Expression<String>? configKey,
+    Expression<String>? configValue,
+    Expression<String>? syncStatus,
+    Expression<String>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (branchId != null) 'branch_id': branchId,
+      if (configKey != null) 'config_key': configKey,
+      if (configValue != null) 'config_value': configValue,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BranchConfigsCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? branchId,
+      Value<String>? configKey,
+      Value<String>? configValue,
+      Value<String>? syncStatus,
+      Value<String>? updatedAt,
+      Value<int>? rowid}) {
+    return BranchConfigsCompanion(
+      id: id ?? this.id,
+      branchId: branchId ?? this.branchId,
+      configKey: configKey ?? this.configKey,
+      configValue: configValue ?? this.configValue,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (branchId.present) {
+      map['branch_id'] = Variable<String>(branchId.value);
+    }
+    if (configKey.present) {
+      map['config_key'] = Variable<String>(configKey.value);
+    }
+    if (configValue.present) {
+      map['config_value'] = Variable<String>(configValue.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<String>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BranchConfigsCompanion(')
+          ..write('id: $id, ')
+          ..write('branchId: $branchId, ')
+          ..write('configKey: $configKey, ')
+          ..write('configValue: $configValue, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -5164,13 +3976,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $OfflineAccountsTable(this);
   late final $SessionsTable sessions = $SessionsTable(this);
   late final $ShiftsTable shifts = $ShiftsTable(this);
-  late final $ShiftOpeningDenominationsTable shiftOpeningDenominations =
-      $ShiftOpeningDenominationsTable(this);
-  late final $ShiftClosingDenominationsTable shiftClosingDenominations =
-      $ShiftClosingDenominationsTable(this);
-  late final $ValetTransactionsTable valetTransactions =
-      $ValetTransactionsTable(this);
+  late final $TicketsTable tickets = $TicketsTable(this);
   late final $SyncQueueTable syncQueue = $SyncQueueTable(this);
+  late final $RatesTable rates = $RatesTable(this);
+  late final $BranchConfigsTable branchConfigs = $BranchConfigsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5180,10 +3989,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         offlineAccounts,
         sessions,
         shifts,
-        shiftOpeningDenominations,
-        shiftClosingDenominations,
-        valetTransactions,
-        syncQueue
+        tickets,
+        syncQueue,
+        rates,
+        branchConfigs
       ];
 }
 
@@ -5456,36 +4265,6 @@ class $$OfflineAccountsTableFilterComposer
                 $state.db, $state.db.sessions, joinBuilder, parentComposers)));
     return f(composer);
   }
-
-  ComposableFilter shiftsRefs(
-      ComposableFilter Function($$ShiftsTableFilterComposer f) f) {
-    final $$ShiftsTableFilterComposer composer = $state.composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.id,
-        referencedTable: $state.db.shifts,
-        getReferencedColumn: (t) => t.userId,
-        builder: (joinBuilder, parentComposers) => $$ShiftsTableFilterComposer(
-            ComposerState(
-                $state.db, $state.db.shifts, joinBuilder, parentComposers)));
-    return f(composer);
-  }
-
-  ComposableFilter valetTransactionsRefs(
-      ComposableFilter Function($$ValetTransactionsTableFilterComposer f) f) {
-    final $$ValetTransactionsTableFilterComposer composer =
-        $state.composerBuilder(
-            composer: this,
-            getCurrentColumn: (t) => t.id,
-            referencedTable: $state.db.valetTransactions,
-            getReferencedColumn: (t) => t.userId,
-            builder: (joinBuilder, parentComposers) =>
-                $$ValetTransactionsTableFilterComposer(ComposerState(
-                    $state.db,
-                    $state.db.valetTransactions,
-                    joinBuilder,
-                    parentComposers)));
-    return f(composer);
-  }
 }
 
 class $$OfflineAccountsTableOrderingComposer
@@ -5667,19 +4446,6 @@ class $$SessionsTableFilterComposer
                     $state.db.offlineAccounts, joinBuilder, parentComposers)));
     return composer;
   }
-
-  ComposableFilter shiftsRefs(
-      ComposableFilter Function($$ShiftsTableFilterComposer f) f) {
-    final $$ShiftsTableFilterComposer composer = $state.composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.id,
-        referencedTable: $state.db.shifts,
-        getReferencedColumn: (t) => t.sessionId,
-        builder: (joinBuilder, parentComposers) => $$ShiftsTableFilterComposer(
-            ComposerState(
-                $state.db, $state.db.shifts, joinBuilder, parentComposers)));
-    return f(composer);
-  }
 }
 
 class $$SessionsTableOrderingComposer
@@ -5735,46 +4501,30 @@ class $$SessionsTableOrderingComposer
 }
 
 typedef $$ShiftsTableCreateCompanionBuilder = ShiftsCompanion Function({
-  Value<int> id,
-  required int sessionId,
-  required int userId,
-  required String branch,
-  required String area,
-  required String shiftDate,
-  Value<bool> isOpen,
-  Value<double> openingFloat,
-  Value<String?> openingNotes,
-  Value<double?> closingFloat,
-  Value<String?> closingNotes,
-  Value<double> totalSales,
-  Value<double?> expectedCash,
-  Value<double?> variance,
-  Value<double?> remittance,
-  Value<int> transactionsCount,
-  required int openedAt,
-  Value<int?> closedAt,
-  Value<int?> syncedAt,
+  required String id,
+  required String userId,
+  required String branchId,
+  required String openedAt,
+  Value<String?> closedAt,
+  required double openingFloat,
+  Value<double?> closingCash,
+  required String status,
+  required String syncStatus,
+  required String createdAt,
+  Value<int> rowid,
 });
 typedef $$ShiftsTableUpdateCompanionBuilder = ShiftsCompanion Function({
-  Value<int> id,
-  Value<int> sessionId,
-  Value<int> userId,
-  Value<String> branch,
-  Value<String> area,
-  Value<String> shiftDate,
-  Value<bool> isOpen,
+  Value<String> id,
+  Value<String> userId,
+  Value<String> branchId,
+  Value<String> openedAt,
+  Value<String?> closedAt,
   Value<double> openingFloat,
-  Value<String?> openingNotes,
-  Value<double?> closingFloat,
-  Value<String?> closingNotes,
-  Value<double> totalSales,
-  Value<double?> expectedCash,
-  Value<double?> variance,
-  Value<double?> remittance,
-  Value<int> transactionsCount,
-  Value<int> openedAt,
-  Value<int?> closedAt,
-  Value<int?> syncedAt,
+  Value<double?> closingCash,
+  Value<String> status,
+  Value<String> syncStatus,
+  Value<String> createdAt,
+  Value<int> rowid,
 });
 
 class $$ShiftsTableTableManager extends RootTableManager<
@@ -5794,88 +4544,56 @@ class $$ShiftsTableTableManager extends RootTableManager<
           orderingComposer:
               $$ShiftsTableOrderingComposer(ComposerState(db, table)),
           updateCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            Value<int> sessionId = const Value.absent(),
-            Value<int> userId = const Value.absent(),
-            Value<String> branch = const Value.absent(),
-            Value<String> area = const Value.absent(),
-            Value<String> shiftDate = const Value.absent(),
-            Value<bool> isOpen = const Value.absent(),
+            Value<String> id = const Value.absent(),
+            Value<String> userId = const Value.absent(),
+            Value<String> branchId = const Value.absent(),
+            Value<String> openedAt = const Value.absent(),
+            Value<String?> closedAt = const Value.absent(),
             Value<double> openingFloat = const Value.absent(),
-            Value<String?> openingNotes = const Value.absent(),
-            Value<double?> closingFloat = const Value.absent(),
-            Value<String?> closingNotes = const Value.absent(),
-            Value<double> totalSales = const Value.absent(),
-            Value<double?> expectedCash = const Value.absent(),
-            Value<double?> variance = const Value.absent(),
-            Value<double?> remittance = const Value.absent(),
-            Value<int> transactionsCount = const Value.absent(),
-            Value<int> openedAt = const Value.absent(),
-            Value<int?> closedAt = const Value.absent(),
-            Value<int?> syncedAt = const Value.absent(),
+            Value<double?> closingCash = const Value.absent(),
+            Value<String> status = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
+            Value<String> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
           }) =>
               ShiftsCompanion(
             id: id,
-            sessionId: sessionId,
             userId: userId,
-            branch: branch,
-            area: area,
-            shiftDate: shiftDate,
-            isOpen: isOpen,
-            openingFloat: openingFloat,
-            openingNotes: openingNotes,
-            closingFloat: closingFloat,
-            closingNotes: closingNotes,
-            totalSales: totalSales,
-            expectedCash: expectedCash,
-            variance: variance,
-            remittance: remittance,
-            transactionsCount: transactionsCount,
+            branchId: branchId,
             openedAt: openedAt,
             closedAt: closedAt,
-            syncedAt: syncedAt,
+            openingFloat: openingFloat,
+            closingCash: closingCash,
+            status: status,
+            syncStatus: syncStatus,
+            createdAt: createdAt,
+            rowid: rowid,
           ),
           createCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            required int sessionId,
-            required int userId,
-            required String branch,
-            required String area,
-            required String shiftDate,
-            Value<bool> isOpen = const Value.absent(),
-            Value<double> openingFloat = const Value.absent(),
-            Value<String?> openingNotes = const Value.absent(),
-            Value<double?> closingFloat = const Value.absent(),
-            Value<String?> closingNotes = const Value.absent(),
-            Value<double> totalSales = const Value.absent(),
-            Value<double?> expectedCash = const Value.absent(),
-            Value<double?> variance = const Value.absent(),
-            Value<double?> remittance = const Value.absent(),
-            Value<int> transactionsCount = const Value.absent(),
-            required int openedAt,
-            Value<int?> closedAt = const Value.absent(),
-            Value<int?> syncedAt = const Value.absent(),
+            required String id,
+            required String userId,
+            required String branchId,
+            required String openedAt,
+            Value<String?> closedAt = const Value.absent(),
+            required double openingFloat,
+            Value<double?> closingCash = const Value.absent(),
+            required String status,
+            required String syncStatus,
+            required String createdAt,
+            Value<int> rowid = const Value.absent(),
           }) =>
               ShiftsCompanion.insert(
             id: id,
-            sessionId: sessionId,
             userId: userId,
-            branch: branch,
-            area: area,
-            shiftDate: shiftDate,
-            isOpen: isOpen,
-            openingFloat: openingFloat,
-            openingNotes: openingNotes,
-            closingFloat: closingFloat,
-            closingNotes: closingNotes,
-            totalSales: totalSales,
-            expectedCash: expectedCash,
-            variance: variance,
-            remittance: remittance,
-            transactionsCount: transactionsCount,
+            branchId: branchId,
             openedAt: openedAt,
             closedAt: closedAt,
-            syncedAt: syncedAt,
+            openingFloat: openingFloat,
+            closingCash: closingCash,
+            status: status,
+            syncStatus: syncStatus,
+            createdAt: createdAt,
+            rowid: rowid,
           ),
         ));
 }
@@ -5883,28 +4601,28 @@ class $$ShiftsTableTableManager extends RootTableManager<
 class $$ShiftsTableFilterComposer
     extends FilterComposer<_$AppDatabase, $ShiftsTable> {
   $$ShiftsTableFilterComposer(super.$state);
-  ColumnFilters<int> get id => $state.composableBuilder(
+  ColumnFilters<String> get id => $state.composableBuilder(
       column: $state.table.id,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<String> get branch => $state.composableBuilder(
-      column: $state.table.branch,
+  ColumnFilters<String> get userId => $state.composableBuilder(
+      column: $state.table.userId,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<String> get area => $state.composableBuilder(
-      column: $state.table.area,
+  ColumnFilters<String> get branchId => $state.composableBuilder(
+      column: $state.table.branchId,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<String> get shiftDate => $state.composableBuilder(
-      column: $state.table.shiftDate,
+  ColumnFilters<String> get openedAt => $state.composableBuilder(
+      column: $state.table.openedAt,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<bool> get isOpen => $state.composableBuilder(
-      column: $state.table.isOpen,
+  ColumnFilters<String> get closedAt => $state.composableBuilder(
+      column: $state.table.closedAt,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -5913,155 +4631,36 @@ class $$ShiftsTableFilterComposer
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<String> get openingNotes => $state.composableBuilder(
-      column: $state.table.openingNotes,
+  ColumnFilters<double> get closingCash => $state.composableBuilder(
+      column: $state.table.closingCash,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<double> get closingFloat => $state.composableBuilder(
-      column: $state.table.closingFloat,
+  ColumnFilters<String> get status => $state.composableBuilder(
+      column: $state.table.status,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<String> get closingNotes => $state.composableBuilder(
-      column: $state.table.closingNotes,
+  ColumnFilters<String> get syncStatus => $state.composableBuilder(
+      column: $state.table.syncStatus,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<double> get totalSales => $state.composableBuilder(
-      column: $state.table.totalSales,
+  ColumnFilters<String> get createdAt => $state.composableBuilder(
+      column: $state.table.createdAt,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<double> get expectedCash => $state.composableBuilder(
-      column: $state.table.expectedCash,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<double> get variance => $state.composableBuilder(
-      column: $state.table.variance,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<double> get remittance => $state.composableBuilder(
-      column: $state.table.remittance,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<int> get transactionsCount => $state.composableBuilder(
-      column: $state.table.transactionsCount,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<int> get openedAt => $state.composableBuilder(
-      column: $state.table.openedAt,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<int> get closedAt => $state.composableBuilder(
-      column: $state.table.closedAt,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<int> get syncedAt => $state.composableBuilder(
-      column: $state.table.syncedAt,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  $$SessionsTableFilterComposer get sessionId {
-    final $$SessionsTableFilterComposer composer = $state.composerBuilder(
+  ComposableFilter ticketsRefs(
+      ComposableFilter Function($$TicketsTableFilterComposer f) f) {
+    final $$TicketsTableFilterComposer composer = $state.composerBuilder(
         composer: this,
-        getCurrentColumn: (t) => t.sessionId,
-        referencedTable: $state.db.sessions,
-        getReferencedColumn: (t) => t.id,
-        builder: (joinBuilder, parentComposers) =>
-            $$SessionsTableFilterComposer(ComposerState(
-                $state.db, $state.db.sessions, joinBuilder, parentComposers)));
-    return composer;
-  }
-
-  $$OfflineAccountsTableFilterComposer get userId {
-    final $$OfflineAccountsTableFilterComposer composer =
-        $state.composerBuilder(
-            composer: this,
-            getCurrentColumn: (t) => t.userId,
-            referencedTable: $state.db.offlineAccounts,
-            getReferencedColumn: (t) => t.id,
-            builder: (joinBuilder, parentComposers) =>
-                $$OfflineAccountsTableFilterComposer(ComposerState($state.db,
-                    $state.db.offlineAccounts, joinBuilder, parentComposers)));
-    return composer;
-  }
-
-  ComposableFilter shiftOpeningDenominationsRefs(
-      ComposableFilter Function(
-              $$ShiftOpeningDenominationsTableFilterComposer f)
-          f) {
-    final $$ShiftOpeningDenominationsTableFilterComposer composer =
-        $state.composerBuilder(
-            composer: this,
-            getCurrentColumn: (t) => t.id,
-            referencedTable: $state.db.shiftOpeningDenominations,
-            getReferencedColumn: (t) => t.shiftId,
-            builder: (joinBuilder, parentComposers) =>
-                $$ShiftOpeningDenominationsTableFilterComposer(ComposerState(
-                    $state.db,
-                    $state.db.shiftOpeningDenominations,
-                    joinBuilder,
-                    parentComposers)));
-    return f(composer);
-  }
-
-  ComposableFilter shiftClosingDenominationsRefs(
-      ComposableFilter Function(
-              $$ShiftClosingDenominationsTableFilterComposer f)
-          f) {
-    final $$ShiftClosingDenominationsTableFilterComposer composer =
-        $state.composerBuilder(
-            composer: this,
-            getCurrentColumn: (t) => t.id,
-            referencedTable: $state.db.shiftClosingDenominations,
-            getReferencedColumn: (t) => t.shiftId,
-            builder: (joinBuilder, parentComposers) =>
-                $$ShiftClosingDenominationsTableFilterComposer(ComposerState(
-                    $state.db,
-                    $state.db.shiftClosingDenominations,
-                    joinBuilder,
-                    parentComposers)));
-    return f(composer);
-  }
-
-  ComposableFilter valet_tx_checkin_shift_ref(
-      ComposableFilter Function($$ValetTransactionsTableFilterComposer f) f) {
-    final $$ValetTransactionsTableFilterComposer composer =
-        $state.composerBuilder(
-            composer: this,
-            getCurrentColumn: (t) => t.id,
-            referencedTable: $state.db.valetTransactions,
-            getReferencedColumn: (t) => t.checkinShiftId,
-            builder: (joinBuilder, parentComposers) =>
-                $$ValetTransactionsTableFilterComposer(ComposerState(
-                    $state.db,
-                    $state.db.valetTransactions,
-                    joinBuilder,
-                    parentComposers)));
-    return f(composer);
-  }
-
-  ComposableFilter valet_tx_checkout_shift_ref(
-      ComposableFilter Function($$ValetTransactionsTableFilterComposer f) f) {
-    final $$ValetTransactionsTableFilterComposer composer =
-        $state.composerBuilder(
-            composer: this,
-            getCurrentColumn: (t) => t.id,
-            referencedTable: $state.db.valetTransactions,
-            getReferencedColumn: (t) => t.checkoutShiftId,
-            builder: (joinBuilder, parentComposers) =>
-                $$ValetTransactionsTableFilterComposer(ComposerState(
-                    $state.db,
-                    $state.db.valetTransactions,
-                    joinBuilder,
-                    parentComposers)));
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $state.db.tickets,
+        getReferencedColumn: (t) => t.shiftId,
+        builder: (joinBuilder, parentComposers) => $$TicketsTableFilterComposer(
+            ComposerState(
+                $state.db, $state.db.tickets, joinBuilder, parentComposers)));
     return f(composer);
   }
 }
@@ -6069,28 +4668,28 @@ class $$ShiftsTableFilterComposer
 class $$ShiftsTableOrderingComposer
     extends OrderingComposer<_$AppDatabase, $ShiftsTable> {
   $$ShiftsTableOrderingComposer(super.$state);
-  ColumnOrderings<int> get id => $state.composableBuilder(
+  ColumnOrderings<String> get id => $state.composableBuilder(
       column: $state.table.id,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<String> get branch => $state.composableBuilder(
-      column: $state.table.branch,
+  ColumnOrderings<String> get userId => $state.composableBuilder(
+      column: $state.table.userId,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<String> get area => $state.composableBuilder(
-      column: $state.table.area,
+  ColumnOrderings<String> get branchId => $state.composableBuilder(
+      column: $state.table.branchId,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<String> get shiftDate => $state.composableBuilder(
-      column: $state.table.shiftDate,
+  ColumnOrderings<String> get openedAt => $state.composableBuilder(
+      column: $state.table.openedAt,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<bool> get isOpen => $state.composableBuilder(
-      column: $state.table.isOpen,
+  ColumnOrderings<String> get closedAt => $state.composableBuilder(
+      column: $state.table.closedAt,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
@@ -6099,669 +4698,188 @@ class $$ShiftsTableOrderingComposer
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<String> get openingNotes => $state.composableBuilder(
-      column: $state.table.openingNotes,
+  ColumnOrderings<double> get closingCash => $state.composableBuilder(
+      column: $state.table.closingCash,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<double> get closingFloat => $state.composableBuilder(
-      column: $state.table.closingFloat,
+  ColumnOrderings<String> get status => $state.composableBuilder(
+      column: $state.table.status,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<String> get closingNotes => $state.composableBuilder(
-      column: $state.table.closingNotes,
+  ColumnOrderings<String> get syncStatus => $state.composableBuilder(
+      column: $state.table.syncStatus,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<double> get totalSales => $state.composableBuilder(
-      column: $state.table.totalSales,
+  ColumnOrderings<String> get createdAt => $state.composableBuilder(
+      column: $state.table.createdAt,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<double> get expectedCash => $state.composableBuilder(
-      column: $state.table.expectedCash,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<double> get variance => $state.composableBuilder(
-      column: $state.table.variance,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<double> get remittance => $state.composableBuilder(
-      column: $state.table.remittance,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<int> get transactionsCount => $state.composableBuilder(
-      column: $state.table.transactionsCount,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<int> get openedAt => $state.composableBuilder(
-      column: $state.table.openedAt,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<int> get closedAt => $state.composableBuilder(
-      column: $state.table.closedAt,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<int> get syncedAt => $state.composableBuilder(
-      column: $state.table.syncedAt,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  $$SessionsTableOrderingComposer get sessionId {
-    final $$SessionsTableOrderingComposer composer = $state.composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.sessionId,
-        referencedTable: $state.db.sessions,
-        getReferencedColumn: (t) => t.id,
-        builder: (joinBuilder, parentComposers) =>
-            $$SessionsTableOrderingComposer(ComposerState(
-                $state.db, $state.db.sessions, joinBuilder, parentComposers)));
-    return composer;
-  }
-
-  $$OfflineAccountsTableOrderingComposer get userId {
-    final $$OfflineAccountsTableOrderingComposer composer =
-        $state.composerBuilder(
-            composer: this,
-            getCurrentColumn: (t) => t.userId,
-            referencedTable: $state.db.offlineAccounts,
-            getReferencedColumn: (t) => t.id,
-            builder: (joinBuilder, parentComposers) =>
-                $$OfflineAccountsTableOrderingComposer(ComposerState($state.db,
-                    $state.db.offlineAccounts, joinBuilder, parentComposers)));
-    return composer;
-  }
 }
 
-typedef $$ShiftOpeningDenominationsTableCreateCompanionBuilder
-    = ShiftOpeningDenominationsCompanion Function({
-  Value<int> id,
-  required int shiftId,
-  required int denom,
-  Value<int> quantity,
-  Value<double> subtotal,
-});
-typedef $$ShiftOpeningDenominationsTableUpdateCompanionBuilder
-    = ShiftOpeningDenominationsCompanion Function({
-  Value<int> id,
-  Value<int> shiftId,
-  Value<int> denom,
-  Value<int> quantity,
-  Value<double> subtotal,
-});
-
-class $$ShiftOpeningDenominationsTableTableManager extends RootTableManager<
-    _$AppDatabase,
-    $ShiftOpeningDenominationsTable,
-    ShiftOpeningDenomination,
-    $$ShiftOpeningDenominationsTableFilterComposer,
-    $$ShiftOpeningDenominationsTableOrderingComposer,
-    $$ShiftOpeningDenominationsTableCreateCompanionBuilder,
-    $$ShiftOpeningDenominationsTableUpdateCompanionBuilder> {
-  $$ShiftOpeningDenominationsTableTableManager(
-      _$AppDatabase db, $ShiftOpeningDenominationsTable table)
-      : super(TableManagerState(
-          db: db,
-          table: table,
-          filteringComposer: $$ShiftOpeningDenominationsTableFilterComposer(
-              ComposerState(db, table)),
-          orderingComposer: $$ShiftOpeningDenominationsTableOrderingComposer(
-              ComposerState(db, table)),
-          updateCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            Value<int> shiftId = const Value.absent(),
-            Value<int> denom = const Value.absent(),
-            Value<int> quantity = const Value.absent(),
-            Value<double> subtotal = const Value.absent(),
-          }) =>
-              ShiftOpeningDenominationsCompanion(
-            id: id,
-            shiftId: shiftId,
-            denom: denom,
-            quantity: quantity,
-            subtotal: subtotal,
-          ),
-          createCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            required int shiftId,
-            required int denom,
-            Value<int> quantity = const Value.absent(),
-            Value<double> subtotal = const Value.absent(),
-          }) =>
-              ShiftOpeningDenominationsCompanion.insert(
-            id: id,
-            shiftId: shiftId,
-            denom: denom,
-            quantity: quantity,
-            subtotal: subtotal,
-          ),
-        ));
-}
-
-class $$ShiftOpeningDenominationsTableFilterComposer
-    extends FilterComposer<_$AppDatabase, $ShiftOpeningDenominationsTable> {
-  $$ShiftOpeningDenominationsTableFilterComposer(super.$state);
-  ColumnFilters<int> get id => $state.composableBuilder(
-      column: $state.table.id,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<int> get denom => $state.composableBuilder(
-      column: $state.table.denom,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<int> get quantity => $state.composableBuilder(
-      column: $state.table.quantity,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<double> get subtotal => $state.composableBuilder(
-      column: $state.table.subtotal,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  $$ShiftsTableFilterComposer get shiftId {
-    final $$ShiftsTableFilterComposer composer = $state.composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.shiftId,
-        referencedTable: $state.db.shifts,
-        getReferencedColumn: (t) => t.id,
-        builder: (joinBuilder, parentComposers) => $$ShiftsTableFilterComposer(
-            ComposerState(
-                $state.db, $state.db.shifts, joinBuilder, parentComposers)));
-    return composer;
-  }
-}
-
-class $$ShiftOpeningDenominationsTableOrderingComposer
-    extends OrderingComposer<_$AppDatabase, $ShiftOpeningDenominationsTable> {
-  $$ShiftOpeningDenominationsTableOrderingComposer(super.$state);
-  ColumnOrderings<int> get id => $state.composableBuilder(
-      column: $state.table.id,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<int> get denom => $state.composableBuilder(
-      column: $state.table.denom,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<int> get quantity => $state.composableBuilder(
-      column: $state.table.quantity,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<double> get subtotal => $state.composableBuilder(
-      column: $state.table.subtotal,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  $$ShiftsTableOrderingComposer get shiftId {
-    final $$ShiftsTableOrderingComposer composer = $state.composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.shiftId,
-        referencedTable: $state.db.shifts,
-        getReferencedColumn: (t) => t.id,
-        builder: (joinBuilder, parentComposers) =>
-            $$ShiftsTableOrderingComposer(ComposerState(
-                $state.db, $state.db.shifts, joinBuilder, parentComposers)));
-    return composer;
-  }
-}
-
-typedef $$ShiftClosingDenominationsTableCreateCompanionBuilder
-    = ShiftClosingDenominationsCompanion Function({
-  Value<int> id,
-  required int shiftId,
-  required int denom,
-  Value<int> quantity,
-  Value<double> subtotal,
-});
-typedef $$ShiftClosingDenominationsTableUpdateCompanionBuilder
-    = ShiftClosingDenominationsCompanion Function({
-  Value<int> id,
-  Value<int> shiftId,
-  Value<int> denom,
-  Value<int> quantity,
-  Value<double> subtotal,
-});
-
-class $$ShiftClosingDenominationsTableTableManager extends RootTableManager<
-    _$AppDatabase,
-    $ShiftClosingDenominationsTable,
-    ShiftClosingDenomination,
-    $$ShiftClosingDenominationsTableFilterComposer,
-    $$ShiftClosingDenominationsTableOrderingComposer,
-    $$ShiftClosingDenominationsTableCreateCompanionBuilder,
-    $$ShiftClosingDenominationsTableUpdateCompanionBuilder> {
-  $$ShiftClosingDenominationsTableTableManager(
-      _$AppDatabase db, $ShiftClosingDenominationsTable table)
-      : super(TableManagerState(
-          db: db,
-          table: table,
-          filteringComposer: $$ShiftClosingDenominationsTableFilterComposer(
-              ComposerState(db, table)),
-          orderingComposer: $$ShiftClosingDenominationsTableOrderingComposer(
-              ComposerState(db, table)),
-          updateCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            Value<int> shiftId = const Value.absent(),
-            Value<int> denom = const Value.absent(),
-            Value<int> quantity = const Value.absent(),
-            Value<double> subtotal = const Value.absent(),
-          }) =>
-              ShiftClosingDenominationsCompanion(
-            id: id,
-            shiftId: shiftId,
-            denom: denom,
-            quantity: quantity,
-            subtotal: subtotal,
-          ),
-          createCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            required int shiftId,
-            required int denom,
-            Value<int> quantity = const Value.absent(),
-            Value<double> subtotal = const Value.absent(),
-          }) =>
-              ShiftClosingDenominationsCompanion.insert(
-            id: id,
-            shiftId: shiftId,
-            denom: denom,
-            quantity: quantity,
-            subtotal: subtotal,
-          ),
-        ));
-}
-
-class $$ShiftClosingDenominationsTableFilterComposer
-    extends FilterComposer<_$AppDatabase, $ShiftClosingDenominationsTable> {
-  $$ShiftClosingDenominationsTableFilterComposer(super.$state);
-  ColumnFilters<int> get id => $state.composableBuilder(
-      column: $state.table.id,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<int> get denom => $state.composableBuilder(
-      column: $state.table.denom,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<int> get quantity => $state.composableBuilder(
-      column: $state.table.quantity,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<double> get subtotal => $state.composableBuilder(
-      column: $state.table.subtotal,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  $$ShiftsTableFilterComposer get shiftId {
-    final $$ShiftsTableFilterComposer composer = $state.composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.shiftId,
-        referencedTable: $state.db.shifts,
-        getReferencedColumn: (t) => t.id,
-        builder: (joinBuilder, parentComposers) => $$ShiftsTableFilterComposer(
-            ComposerState(
-                $state.db, $state.db.shifts, joinBuilder, parentComposers)));
-    return composer;
-  }
-}
-
-class $$ShiftClosingDenominationsTableOrderingComposer
-    extends OrderingComposer<_$AppDatabase, $ShiftClosingDenominationsTable> {
-  $$ShiftClosingDenominationsTableOrderingComposer(super.$state);
-  ColumnOrderings<int> get id => $state.composableBuilder(
-      column: $state.table.id,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<int> get denom => $state.composableBuilder(
-      column: $state.table.denom,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<int> get quantity => $state.composableBuilder(
-      column: $state.table.quantity,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<double> get subtotal => $state.composableBuilder(
-      column: $state.table.subtotal,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  $$ShiftsTableOrderingComposer get shiftId {
-    final $$ShiftsTableOrderingComposer composer = $state.composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.shiftId,
-        referencedTable: $state.db.shifts,
-        getReferencedColumn: (t) => t.id,
-        builder: (joinBuilder, parentComposers) =>
-            $$ShiftsTableOrderingComposer(ComposerState(
-                $state.db, $state.db.shifts, joinBuilder, parentComposers)));
-    return composer;
-  }
-}
-
-typedef $$ValetTransactionsTableCreateCompanionBuilder
-    = ValetTransactionsCompanion Function({
-  Value<int> id,
-  Value<String?> localUuid,
-  required int checkinShiftId,
-  Value<int?> checkoutShiftId,
-  required int userId,
-  required String ticketNumber,
+typedef $$TicketsTableCreateCompanionBuilder = TicketsCompanion Function({
+  required String id,
+  required String shiftId,
+  required String userId,
+  required String branchId,
   required String plateNumber,
-  Value<String?> vehicleBrand,
-  Value<String?> vehicleModel,
-  Value<String?> vehicleYear,
-  Value<String?> vehicleColor,
-  Value<String?> vehicleType,
-  Value<String?> slot,
-  Value<String?> parkingLevel,
-  Value<String?> parkingSlot,
-  Value<String?> belongingsJson,
-  Value<String?> otherBelongings,
+  required String vehicleBrand,
+  required String vehicleColor,
+  required String vehicleType,
+  required String cellphoneNumber,
+  required String damageMarkers,
+  required String personalBelongings,
   Value<String?> signaturePng,
-  Value<int?> signatureCapturedAt,
-  Value<String?> customerFullName,
-  Value<String?> customerMobile,
-  Value<String?> assignedValetDriver,
-  Value<String?> specialInstructions,
-  Value<String?> valetServiceType,
-  Value<String?> vehicleDamageJson,
-  Value<String?> branchSnapshot,
-  Value<String?> areaSnapshot,
-  Value<String?> deviceIdSnapshot,
-  Value<String?> serverTicketId,
-  Value<int?> lastModifiedAt,
-  Value<int?> localCreatedAt,
-  required int timeIn,
-  Value<int?> timeOut,
-  Value<int?> durationMinutes,
-  Value<double?> flatRate,
-  Value<double?> succeedingFee,
-  Value<double?> overnightFee,
-  Value<double?> lostTicketFee,
-  Value<double?> totalFee,
-  Value<double?> amountTendered,
-  Value<double?> changeAmount,
-  Value<String> status,
-  Value<int?> syncedAt,
+  required String checkInAt,
+  Value<String?> checkOutAt,
+  Value<double?> fee,
+  required String status,
+  required String syncStatus,
+  required String createdAt,
+  Value<int> rowid,
 });
-typedef $$ValetTransactionsTableUpdateCompanionBuilder
-    = ValetTransactionsCompanion Function({
-  Value<int> id,
-  Value<String?> localUuid,
-  Value<int> checkinShiftId,
-  Value<int?> checkoutShiftId,
-  Value<int> userId,
-  Value<String> ticketNumber,
+typedef $$TicketsTableUpdateCompanionBuilder = TicketsCompanion Function({
+  Value<String> id,
+  Value<String> shiftId,
+  Value<String> userId,
+  Value<String> branchId,
   Value<String> plateNumber,
-  Value<String?> vehicleBrand,
-  Value<String?> vehicleModel,
-  Value<String?> vehicleYear,
-  Value<String?> vehicleColor,
-  Value<String?> vehicleType,
-  Value<String?> slot,
-  Value<String?> parkingLevel,
-  Value<String?> parkingSlot,
-  Value<String?> belongingsJson,
-  Value<String?> otherBelongings,
+  Value<String> vehicleBrand,
+  Value<String> vehicleColor,
+  Value<String> vehicleType,
+  Value<String> cellphoneNumber,
+  Value<String> damageMarkers,
+  Value<String> personalBelongings,
   Value<String?> signaturePng,
-  Value<int?> signatureCapturedAt,
-  Value<String?> customerFullName,
-  Value<String?> customerMobile,
-  Value<String?> assignedValetDriver,
-  Value<String?> specialInstructions,
-  Value<String?> valetServiceType,
-  Value<String?> vehicleDamageJson,
-  Value<String?> branchSnapshot,
-  Value<String?> areaSnapshot,
-  Value<String?> deviceIdSnapshot,
-  Value<String?> serverTicketId,
-  Value<int?> lastModifiedAt,
-  Value<int?> localCreatedAt,
-  Value<int> timeIn,
-  Value<int?> timeOut,
-  Value<int?> durationMinutes,
-  Value<double?> flatRate,
-  Value<double?> succeedingFee,
-  Value<double?> overnightFee,
-  Value<double?> lostTicketFee,
-  Value<double?> totalFee,
-  Value<double?> amountTendered,
-  Value<double?> changeAmount,
+  Value<String> checkInAt,
+  Value<String?> checkOutAt,
+  Value<double?> fee,
   Value<String> status,
-  Value<int?> syncedAt,
+  Value<String> syncStatus,
+  Value<String> createdAt,
+  Value<int> rowid,
 });
 
-class $$ValetTransactionsTableTableManager extends RootTableManager<
+class $$TicketsTableTableManager extends RootTableManager<
     _$AppDatabase,
-    $ValetTransactionsTable,
-    ValetTransaction,
-    $$ValetTransactionsTableFilterComposer,
-    $$ValetTransactionsTableOrderingComposer,
-    $$ValetTransactionsTableCreateCompanionBuilder,
-    $$ValetTransactionsTableUpdateCompanionBuilder> {
-  $$ValetTransactionsTableTableManager(
-      _$AppDatabase db, $ValetTransactionsTable table)
+    $TicketsTable,
+    Ticket,
+    $$TicketsTableFilterComposer,
+    $$TicketsTableOrderingComposer,
+    $$TicketsTableCreateCompanionBuilder,
+    $$TicketsTableUpdateCompanionBuilder> {
+  $$TicketsTableTableManager(_$AppDatabase db, $TicketsTable table)
       : super(TableManagerState(
           db: db,
           table: table,
           filteringComposer:
-              $$ValetTransactionsTableFilterComposer(ComposerState(db, table)),
-          orderingComposer: $$ValetTransactionsTableOrderingComposer(
-              ComposerState(db, table)),
+              $$TicketsTableFilterComposer(ComposerState(db, table)),
+          orderingComposer:
+              $$TicketsTableOrderingComposer(ComposerState(db, table)),
           updateCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            Value<String?> localUuid = const Value.absent(),
-            Value<int> checkinShiftId = const Value.absent(),
-            Value<int?> checkoutShiftId = const Value.absent(),
-            Value<int> userId = const Value.absent(),
-            Value<String> ticketNumber = const Value.absent(),
+            Value<String> id = const Value.absent(),
+            Value<String> shiftId = const Value.absent(),
+            Value<String> userId = const Value.absent(),
+            Value<String> branchId = const Value.absent(),
             Value<String> plateNumber = const Value.absent(),
-            Value<String?> vehicleBrand = const Value.absent(),
-            Value<String?> vehicleModel = const Value.absent(),
-            Value<String?> vehicleYear = const Value.absent(),
-            Value<String?> vehicleColor = const Value.absent(),
-            Value<String?> vehicleType = const Value.absent(),
-            Value<String?> slot = const Value.absent(),
-            Value<String?> parkingLevel = const Value.absent(),
-            Value<String?> parkingSlot = const Value.absent(),
-            Value<String?> belongingsJson = const Value.absent(),
-            Value<String?> otherBelongings = const Value.absent(),
+            Value<String> vehicleBrand = const Value.absent(),
+            Value<String> vehicleColor = const Value.absent(),
+            Value<String> vehicleType = const Value.absent(),
+            Value<String> cellphoneNumber = const Value.absent(),
+            Value<String> damageMarkers = const Value.absent(),
+            Value<String> personalBelongings = const Value.absent(),
             Value<String?> signaturePng = const Value.absent(),
-            Value<int?> signatureCapturedAt = const Value.absent(),
-            Value<String?> customerFullName = const Value.absent(),
-            Value<String?> customerMobile = const Value.absent(),
-            Value<String?> assignedValetDriver = const Value.absent(),
-            Value<String?> specialInstructions = const Value.absent(),
-            Value<String?> valetServiceType = const Value.absent(),
-            Value<String?> vehicleDamageJson = const Value.absent(),
-            Value<String?> branchSnapshot = const Value.absent(),
-            Value<String?> areaSnapshot = const Value.absent(),
-            Value<String?> deviceIdSnapshot = const Value.absent(),
-            Value<String?> serverTicketId = const Value.absent(),
-            Value<int?> lastModifiedAt = const Value.absent(),
-            Value<int?> localCreatedAt = const Value.absent(),
-            Value<int> timeIn = const Value.absent(),
-            Value<int?> timeOut = const Value.absent(),
-            Value<int?> durationMinutes = const Value.absent(),
-            Value<double?> flatRate = const Value.absent(),
-            Value<double?> succeedingFee = const Value.absent(),
-            Value<double?> overnightFee = const Value.absent(),
-            Value<double?> lostTicketFee = const Value.absent(),
-            Value<double?> totalFee = const Value.absent(),
-            Value<double?> amountTendered = const Value.absent(),
-            Value<double?> changeAmount = const Value.absent(),
+            Value<String> checkInAt = const Value.absent(),
+            Value<String?> checkOutAt = const Value.absent(),
+            Value<double?> fee = const Value.absent(),
             Value<String> status = const Value.absent(),
-            Value<int?> syncedAt = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
+            Value<String> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
           }) =>
-              ValetTransactionsCompanion(
+              TicketsCompanion(
             id: id,
-            localUuid: localUuid,
-            checkinShiftId: checkinShiftId,
-            checkoutShiftId: checkoutShiftId,
+            shiftId: shiftId,
             userId: userId,
-            ticketNumber: ticketNumber,
+            branchId: branchId,
             plateNumber: plateNumber,
             vehicleBrand: vehicleBrand,
-            vehicleModel: vehicleModel,
-            vehicleYear: vehicleYear,
             vehicleColor: vehicleColor,
             vehicleType: vehicleType,
-            slot: slot,
-            parkingLevel: parkingLevel,
-            parkingSlot: parkingSlot,
-            belongingsJson: belongingsJson,
-            otherBelongings: otherBelongings,
+            cellphoneNumber: cellphoneNumber,
+            damageMarkers: damageMarkers,
+            personalBelongings: personalBelongings,
             signaturePng: signaturePng,
-            signatureCapturedAt: signatureCapturedAt,
-            customerFullName: customerFullName,
-            customerMobile: customerMobile,
-            assignedValetDriver: assignedValetDriver,
-            specialInstructions: specialInstructions,
-            valetServiceType: valetServiceType,
-            vehicleDamageJson: vehicleDamageJson,
-            branchSnapshot: branchSnapshot,
-            areaSnapshot: areaSnapshot,
-            deviceIdSnapshot: deviceIdSnapshot,
-            serverTicketId: serverTicketId,
-            lastModifiedAt: lastModifiedAt,
-            localCreatedAt: localCreatedAt,
-            timeIn: timeIn,
-            timeOut: timeOut,
-            durationMinutes: durationMinutes,
-            flatRate: flatRate,
-            succeedingFee: succeedingFee,
-            overnightFee: overnightFee,
-            lostTicketFee: lostTicketFee,
-            totalFee: totalFee,
-            amountTendered: amountTendered,
-            changeAmount: changeAmount,
+            checkInAt: checkInAt,
+            checkOutAt: checkOutAt,
+            fee: fee,
             status: status,
-            syncedAt: syncedAt,
+            syncStatus: syncStatus,
+            createdAt: createdAt,
+            rowid: rowid,
           ),
           createCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            Value<String?> localUuid = const Value.absent(),
-            required int checkinShiftId,
-            Value<int?> checkoutShiftId = const Value.absent(),
-            required int userId,
-            required String ticketNumber,
+            required String id,
+            required String shiftId,
+            required String userId,
+            required String branchId,
             required String plateNumber,
-            Value<String?> vehicleBrand = const Value.absent(),
-            Value<String?> vehicleModel = const Value.absent(),
-            Value<String?> vehicleYear = const Value.absent(),
-            Value<String?> vehicleColor = const Value.absent(),
-            Value<String?> vehicleType = const Value.absent(),
-            Value<String?> slot = const Value.absent(),
-            Value<String?> parkingLevel = const Value.absent(),
-            Value<String?> parkingSlot = const Value.absent(),
-            Value<String?> belongingsJson = const Value.absent(),
-            Value<String?> otherBelongings = const Value.absent(),
+            required String vehicleBrand,
+            required String vehicleColor,
+            required String vehicleType,
+            required String cellphoneNumber,
+            required String damageMarkers,
+            required String personalBelongings,
             Value<String?> signaturePng = const Value.absent(),
-            Value<int?> signatureCapturedAt = const Value.absent(),
-            Value<String?> customerFullName = const Value.absent(),
-            Value<String?> customerMobile = const Value.absent(),
-            Value<String?> assignedValetDriver = const Value.absent(),
-            Value<String?> specialInstructions = const Value.absent(),
-            Value<String?> valetServiceType = const Value.absent(),
-            Value<String?> vehicleDamageJson = const Value.absent(),
-            Value<String?> branchSnapshot = const Value.absent(),
-            Value<String?> areaSnapshot = const Value.absent(),
-            Value<String?> deviceIdSnapshot = const Value.absent(),
-            Value<String?> serverTicketId = const Value.absent(),
-            Value<int?> lastModifiedAt = const Value.absent(),
-            Value<int?> localCreatedAt = const Value.absent(),
-            required int timeIn,
-            Value<int?> timeOut = const Value.absent(),
-            Value<int?> durationMinutes = const Value.absent(),
-            Value<double?> flatRate = const Value.absent(),
-            Value<double?> succeedingFee = const Value.absent(),
-            Value<double?> overnightFee = const Value.absent(),
-            Value<double?> lostTicketFee = const Value.absent(),
-            Value<double?> totalFee = const Value.absent(),
-            Value<double?> amountTendered = const Value.absent(),
-            Value<double?> changeAmount = const Value.absent(),
-            Value<String> status = const Value.absent(),
-            Value<int?> syncedAt = const Value.absent(),
+            required String checkInAt,
+            Value<String?> checkOutAt = const Value.absent(),
+            Value<double?> fee = const Value.absent(),
+            required String status,
+            required String syncStatus,
+            required String createdAt,
+            Value<int> rowid = const Value.absent(),
           }) =>
-              ValetTransactionsCompanion.insert(
+              TicketsCompanion.insert(
             id: id,
-            localUuid: localUuid,
-            checkinShiftId: checkinShiftId,
-            checkoutShiftId: checkoutShiftId,
+            shiftId: shiftId,
             userId: userId,
-            ticketNumber: ticketNumber,
+            branchId: branchId,
             plateNumber: plateNumber,
             vehicleBrand: vehicleBrand,
-            vehicleModel: vehicleModel,
-            vehicleYear: vehicleYear,
             vehicleColor: vehicleColor,
             vehicleType: vehicleType,
-            slot: slot,
-            parkingLevel: parkingLevel,
-            parkingSlot: parkingSlot,
-            belongingsJson: belongingsJson,
-            otherBelongings: otherBelongings,
+            cellphoneNumber: cellphoneNumber,
+            damageMarkers: damageMarkers,
+            personalBelongings: personalBelongings,
             signaturePng: signaturePng,
-            signatureCapturedAt: signatureCapturedAt,
-            customerFullName: customerFullName,
-            customerMobile: customerMobile,
-            assignedValetDriver: assignedValetDriver,
-            specialInstructions: specialInstructions,
-            valetServiceType: valetServiceType,
-            vehicleDamageJson: vehicleDamageJson,
-            branchSnapshot: branchSnapshot,
-            areaSnapshot: areaSnapshot,
-            deviceIdSnapshot: deviceIdSnapshot,
-            serverTicketId: serverTicketId,
-            lastModifiedAt: lastModifiedAt,
-            localCreatedAt: localCreatedAt,
-            timeIn: timeIn,
-            timeOut: timeOut,
-            durationMinutes: durationMinutes,
-            flatRate: flatRate,
-            succeedingFee: succeedingFee,
-            overnightFee: overnightFee,
-            lostTicketFee: lostTicketFee,
-            totalFee: totalFee,
-            amountTendered: amountTendered,
-            changeAmount: changeAmount,
+            checkInAt: checkInAt,
+            checkOutAt: checkOutAt,
+            fee: fee,
             status: status,
-            syncedAt: syncedAt,
+            syncStatus: syncStatus,
+            createdAt: createdAt,
+            rowid: rowid,
           ),
         ));
 }
 
-class $$ValetTransactionsTableFilterComposer
-    extends FilterComposer<_$AppDatabase, $ValetTransactionsTable> {
-  $$ValetTransactionsTableFilterComposer(super.$state);
-  ColumnFilters<int> get id => $state.composableBuilder(
+class $$TicketsTableFilterComposer
+    extends FilterComposer<_$AppDatabase, $TicketsTable> {
+  $$TicketsTableFilterComposer(super.$state);
+  ColumnFilters<String> get id => $state.composableBuilder(
       column: $state.table.id,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<String> get localUuid => $state.composableBuilder(
-      column: $state.table.localUuid,
+  ColumnFilters<String> get userId => $state.composableBuilder(
+      column: $state.table.userId,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<String> get ticketNumber => $state.composableBuilder(
-      column: $state.table.ticketNumber,
+  ColumnFilters<String> get branchId => $state.composableBuilder(
+      column: $state.table.branchId,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -6775,16 +4893,6 @@ class $$ValetTransactionsTableFilterComposer
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<String> get vehicleModel => $state.composableBuilder(
-      column: $state.table.vehicleModel,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<String> get vehicleYear => $state.composableBuilder(
-      column: $state.table.vehicleYear,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
   ColumnFilters<String> get vehicleColor => $state.composableBuilder(
       column: $state.table.vehicleColor,
       builder: (column, joinBuilders) =>
@@ -6795,28 +4903,18 @@ class $$ValetTransactionsTableFilterComposer
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<String> get slot => $state.composableBuilder(
-      column: $state.table.slot,
+  ColumnFilters<String> get cellphoneNumber => $state.composableBuilder(
+      column: $state.table.cellphoneNumber,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<String> get parkingLevel => $state.composableBuilder(
-      column: $state.table.parkingLevel,
+  ColumnFilters<String> get damageMarkers => $state.composableBuilder(
+      column: $state.table.damageMarkers,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<String> get parkingSlot => $state.composableBuilder(
-      column: $state.table.parkingSlot,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<String> get belongingsJson => $state.composableBuilder(
-      column: $state.table.belongingsJson,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<String> get otherBelongings => $state.composableBuilder(
-      column: $state.table.otherBelongings,
+  ColumnFilters<String> get personalBelongings => $state.composableBuilder(
+      column: $state.table.personalBelongings,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -6825,118 +4923,18 @@ class $$ValetTransactionsTableFilterComposer
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<int> get signatureCapturedAt => $state.composableBuilder(
-      column: $state.table.signatureCapturedAt,
+  ColumnFilters<String> get checkInAt => $state.composableBuilder(
+      column: $state.table.checkInAt,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<String> get customerFullName => $state.composableBuilder(
-      column: $state.table.customerFullName,
+  ColumnFilters<String> get checkOutAt => $state.composableBuilder(
+      column: $state.table.checkOutAt,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<String> get customerMobile => $state.composableBuilder(
-      column: $state.table.customerMobile,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<String> get assignedValetDriver => $state.composableBuilder(
-      column: $state.table.assignedValetDriver,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<String> get specialInstructions => $state.composableBuilder(
-      column: $state.table.specialInstructions,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<String> get valetServiceType => $state.composableBuilder(
-      column: $state.table.valetServiceType,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<String> get vehicleDamageJson => $state.composableBuilder(
-      column: $state.table.vehicleDamageJson,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<String> get branchSnapshot => $state.composableBuilder(
-      column: $state.table.branchSnapshot,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<String> get areaSnapshot => $state.composableBuilder(
-      column: $state.table.areaSnapshot,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<String> get deviceIdSnapshot => $state.composableBuilder(
-      column: $state.table.deviceIdSnapshot,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<String> get serverTicketId => $state.composableBuilder(
-      column: $state.table.serverTicketId,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<int> get lastModifiedAt => $state.composableBuilder(
-      column: $state.table.lastModifiedAt,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<int> get localCreatedAt => $state.composableBuilder(
-      column: $state.table.localCreatedAt,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<int> get timeIn => $state.composableBuilder(
-      column: $state.table.timeIn,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<int> get timeOut => $state.composableBuilder(
-      column: $state.table.timeOut,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<int> get durationMinutes => $state.composableBuilder(
-      column: $state.table.durationMinutes,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<double> get flatRate => $state.composableBuilder(
-      column: $state.table.flatRate,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<double> get succeedingFee => $state.composableBuilder(
-      column: $state.table.succeedingFee,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<double> get overnightFee => $state.composableBuilder(
-      column: $state.table.overnightFee,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<double> get lostTicketFee => $state.composableBuilder(
-      column: $state.table.lostTicketFee,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<double> get totalFee => $state.composableBuilder(
-      column: $state.table.totalFee,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<double> get amountTendered => $state.composableBuilder(
-      column: $state.table.amountTendered,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<double> get changeAmount => $state.composableBuilder(
-      column: $state.table.changeAmount,
+  ColumnFilters<double> get fee => $state.composableBuilder(
+      column: $state.table.fee,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -6945,64 +4943,44 @@ class $$ValetTransactionsTableFilterComposer
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<int> get syncedAt => $state.composableBuilder(
-      column: $state.table.syncedAt,
+  ColumnFilters<String> get syncStatus => $state.composableBuilder(
+      column: $state.table.syncStatus,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  $$ShiftsTableFilterComposer get checkinShiftId {
+  ColumnFilters<String> get createdAt => $state.composableBuilder(
+      column: $state.table.createdAt,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  $$ShiftsTableFilterComposer get shiftId {
     final $$ShiftsTableFilterComposer composer = $state.composerBuilder(
         composer: this,
-        getCurrentColumn: (t) => t.checkinShiftId,
+        getCurrentColumn: (t) => t.shiftId,
         referencedTable: $state.db.shifts,
         getReferencedColumn: (t) => t.id,
         builder: (joinBuilder, parentComposers) => $$ShiftsTableFilterComposer(
             ComposerState(
                 $state.db, $state.db.shifts, joinBuilder, parentComposers)));
-    return composer;
-  }
-
-  $$ShiftsTableFilterComposer get checkoutShiftId {
-    final $$ShiftsTableFilterComposer composer = $state.composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.checkoutShiftId,
-        referencedTable: $state.db.shifts,
-        getReferencedColumn: (t) => t.id,
-        builder: (joinBuilder, parentComposers) => $$ShiftsTableFilterComposer(
-            ComposerState(
-                $state.db, $state.db.shifts, joinBuilder, parentComposers)));
-    return composer;
-  }
-
-  $$OfflineAccountsTableFilterComposer get userId {
-    final $$OfflineAccountsTableFilterComposer composer =
-        $state.composerBuilder(
-            composer: this,
-            getCurrentColumn: (t) => t.userId,
-            referencedTable: $state.db.offlineAccounts,
-            getReferencedColumn: (t) => t.id,
-            builder: (joinBuilder, parentComposers) =>
-                $$OfflineAccountsTableFilterComposer(ComposerState($state.db,
-                    $state.db.offlineAccounts, joinBuilder, parentComposers)));
     return composer;
   }
 }
 
-class $$ValetTransactionsTableOrderingComposer
-    extends OrderingComposer<_$AppDatabase, $ValetTransactionsTable> {
-  $$ValetTransactionsTableOrderingComposer(super.$state);
-  ColumnOrderings<int> get id => $state.composableBuilder(
+class $$TicketsTableOrderingComposer
+    extends OrderingComposer<_$AppDatabase, $TicketsTable> {
+  $$TicketsTableOrderingComposer(super.$state);
+  ColumnOrderings<String> get id => $state.composableBuilder(
       column: $state.table.id,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<String> get localUuid => $state.composableBuilder(
-      column: $state.table.localUuid,
+  ColumnOrderings<String> get userId => $state.composableBuilder(
+      column: $state.table.userId,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<String> get ticketNumber => $state.composableBuilder(
-      column: $state.table.ticketNumber,
+  ColumnOrderings<String> get branchId => $state.composableBuilder(
+      column: $state.table.branchId,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
@@ -7016,16 +4994,6 @@ class $$ValetTransactionsTableOrderingComposer
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<String> get vehicleModel => $state.composableBuilder(
-      column: $state.table.vehicleModel,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<String> get vehicleYear => $state.composableBuilder(
-      column: $state.table.vehicleYear,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
   ColumnOrderings<String> get vehicleColor => $state.composableBuilder(
       column: $state.table.vehicleColor,
       builder: (column, joinBuilders) =>
@@ -7036,28 +5004,18 @@ class $$ValetTransactionsTableOrderingComposer
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<String> get slot => $state.composableBuilder(
-      column: $state.table.slot,
+  ColumnOrderings<String> get cellphoneNumber => $state.composableBuilder(
+      column: $state.table.cellphoneNumber,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<String> get parkingLevel => $state.composableBuilder(
-      column: $state.table.parkingLevel,
+  ColumnOrderings<String> get damageMarkers => $state.composableBuilder(
+      column: $state.table.damageMarkers,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<String> get parkingSlot => $state.composableBuilder(
-      column: $state.table.parkingSlot,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<String> get belongingsJson => $state.composableBuilder(
-      column: $state.table.belongingsJson,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<String> get otherBelongings => $state.composableBuilder(
-      column: $state.table.otherBelongings,
+  ColumnOrderings<String> get personalBelongings => $state.composableBuilder(
+      column: $state.table.personalBelongings,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
@@ -7066,118 +5024,18 @@ class $$ValetTransactionsTableOrderingComposer
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<int> get signatureCapturedAt => $state.composableBuilder(
-      column: $state.table.signatureCapturedAt,
+  ColumnOrderings<String> get checkInAt => $state.composableBuilder(
+      column: $state.table.checkInAt,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<String> get customerFullName => $state.composableBuilder(
-      column: $state.table.customerFullName,
+  ColumnOrderings<String> get checkOutAt => $state.composableBuilder(
+      column: $state.table.checkOutAt,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<String> get customerMobile => $state.composableBuilder(
-      column: $state.table.customerMobile,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<String> get assignedValetDriver => $state.composableBuilder(
-      column: $state.table.assignedValetDriver,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<String> get specialInstructions => $state.composableBuilder(
-      column: $state.table.specialInstructions,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<String> get valetServiceType => $state.composableBuilder(
-      column: $state.table.valetServiceType,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<String> get vehicleDamageJson => $state.composableBuilder(
-      column: $state.table.vehicleDamageJson,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<String> get branchSnapshot => $state.composableBuilder(
-      column: $state.table.branchSnapshot,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<String> get areaSnapshot => $state.composableBuilder(
-      column: $state.table.areaSnapshot,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<String> get deviceIdSnapshot => $state.composableBuilder(
-      column: $state.table.deviceIdSnapshot,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<String> get serverTicketId => $state.composableBuilder(
-      column: $state.table.serverTicketId,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<int> get lastModifiedAt => $state.composableBuilder(
-      column: $state.table.lastModifiedAt,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<int> get localCreatedAt => $state.composableBuilder(
-      column: $state.table.localCreatedAt,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<int> get timeIn => $state.composableBuilder(
-      column: $state.table.timeIn,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<int> get timeOut => $state.composableBuilder(
-      column: $state.table.timeOut,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<int> get durationMinutes => $state.composableBuilder(
-      column: $state.table.durationMinutes,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<double> get flatRate => $state.composableBuilder(
-      column: $state.table.flatRate,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<double> get succeedingFee => $state.composableBuilder(
-      column: $state.table.succeedingFee,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<double> get overnightFee => $state.composableBuilder(
-      column: $state.table.overnightFee,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<double> get lostTicketFee => $state.composableBuilder(
-      column: $state.table.lostTicketFee,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<double> get totalFee => $state.composableBuilder(
-      column: $state.table.totalFee,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<double> get amountTendered => $state.composableBuilder(
-      column: $state.table.amountTendered,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<double> get changeAmount => $state.composableBuilder(
-      column: $state.table.changeAmount,
+  ColumnOrderings<double> get fee => $state.composableBuilder(
+      column: $state.table.fee,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
@@ -7186,68 +5044,50 @@ class $$ValetTransactionsTableOrderingComposer
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<int> get syncedAt => $state.composableBuilder(
-      column: $state.table.syncedAt,
+  ColumnOrderings<String> get syncStatus => $state.composableBuilder(
+      column: $state.table.syncStatus,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  $$ShiftsTableOrderingComposer get checkinShiftId {
+  ColumnOrderings<String> get createdAt => $state.composableBuilder(
+      column: $state.table.createdAt,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  $$ShiftsTableOrderingComposer get shiftId {
     final $$ShiftsTableOrderingComposer composer = $state.composerBuilder(
         composer: this,
-        getCurrentColumn: (t) => t.checkinShiftId,
+        getCurrentColumn: (t) => t.shiftId,
         referencedTable: $state.db.shifts,
         getReferencedColumn: (t) => t.id,
         builder: (joinBuilder, parentComposers) =>
             $$ShiftsTableOrderingComposer(ComposerState(
                 $state.db, $state.db.shifts, joinBuilder, parentComposers)));
-    return composer;
-  }
-
-  $$ShiftsTableOrderingComposer get checkoutShiftId {
-    final $$ShiftsTableOrderingComposer composer = $state.composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.checkoutShiftId,
-        referencedTable: $state.db.shifts,
-        getReferencedColumn: (t) => t.id,
-        builder: (joinBuilder, parentComposers) =>
-            $$ShiftsTableOrderingComposer(ComposerState(
-                $state.db, $state.db.shifts, joinBuilder, parentComposers)));
-    return composer;
-  }
-
-  $$OfflineAccountsTableOrderingComposer get userId {
-    final $$OfflineAccountsTableOrderingComposer composer =
-        $state.composerBuilder(
-            composer: this,
-            getCurrentColumn: (t) => t.userId,
-            referencedTable: $state.db.offlineAccounts,
-            getReferencedColumn: (t) => t.id,
-            builder: (joinBuilder, parentComposers) =>
-                $$OfflineAccountsTableOrderingComposer(ComposerState($state.db,
-                    $state.db.offlineAccounts, joinBuilder, parentComposers)));
     return composer;
   }
 }
 
 typedef $$SyncQueueTableCreateCompanionBuilder = SyncQueueCompanion Function({
-  Value<int> id,
-  required String type,
-  required int entityId,
+  required String id,
+  required String operation,
+  required String queueTableName,
+  required String recordId,
   required String payload,
-  required int createdAt,
-  Value<int?> syncedAt,
+  required String syncStatus,
   Value<int> retryCount,
-  Value<String?> lastError,
+  required String createdAt,
+  Value<int> rowid,
 });
 typedef $$SyncQueueTableUpdateCompanionBuilder = SyncQueueCompanion Function({
-  Value<int> id,
-  Value<String> type,
-  Value<int> entityId,
+  Value<String> id,
+  Value<String> operation,
+  Value<String> queueTableName,
+  Value<String> recordId,
   Value<String> payload,
-  Value<int> createdAt,
-  Value<int?> syncedAt,
+  Value<String> syncStatus,
   Value<int> retryCount,
-  Value<String?> lastError,
+  Value<String> createdAt,
+  Value<int> rowid,
 });
 
 class $$SyncQueueTableTableManager extends RootTableManager<
@@ -7267,44 +5107,48 @@ class $$SyncQueueTableTableManager extends RootTableManager<
           orderingComposer:
               $$SyncQueueTableOrderingComposer(ComposerState(db, table)),
           updateCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            Value<String> type = const Value.absent(),
-            Value<int> entityId = const Value.absent(),
+            Value<String> id = const Value.absent(),
+            Value<String> operation = const Value.absent(),
+            Value<String> queueTableName = const Value.absent(),
+            Value<String> recordId = const Value.absent(),
             Value<String> payload = const Value.absent(),
-            Value<int> createdAt = const Value.absent(),
-            Value<int?> syncedAt = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
             Value<int> retryCount = const Value.absent(),
-            Value<String?> lastError = const Value.absent(),
+            Value<String> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
           }) =>
               SyncQueueCompanion(
             id: id,
-            type: type,
-            entityId: entityId,
+            operation: operation,
+            queueTableName: queueTableName,
+            recordId: recordId,
             payload: payload,
-            createdAt: createdAt,
-            syncedAt: syncedAt,
+            syncStatus: syncStatus,
             retryCount: retryCount,
-            lastError: lastError,
+            createdAt: createdAt,
+            rowid: rowid,
           ),
           createCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            required String type,
-            required int entityId,
+            required String id,
+            required String operation,
+            required String queueTableName,
+            required String recordId,
             required String payload,
-            required int createdAt,
-            Value<int?> syncedAt = const Value.absent(),
+            required String syncStatus,
             Value<int> retryCount = const Value.absent(),
-            Value<String?> lastError = const Value.absent(),
+            required String createdAt,
+            Value<int> rowid = const Value.absent(),
           }) =>
               SyncQueueCompanion.insert(
             id: id,
-            type: type,
-            entityId: entityId,
+            operation: operation,
+            queueTableName: queueTableName,
+            recordId: recordId,
             payload: payload,
-            createdAt: createdAt,
-            syncedAt: syncedAt,
+            syncStatus: syncStatus,
             retryCount: retryCount,
-            lastError: lastError,
+            createdAt: createdAt,
+            rowid: rowid,
           ),
         ));
 }
@@ -7312,18 +5156,23 @@ class $$SyncQueueTableTableManager extends RootTableManager<
 class $$SyncQueueTableFilterComposer
     extends FilterComposer<_$AppDatabase, $SyncQueueTable> {
   $$SyncQueueTableFilterComposer(super.$state);
-  ColumnFilters<int> get id => $state.composableBuilder(
+  ColumnFilters<String> get id => $state.composableBuilder(
       column: $state.table.id,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<String> get type => $state.composableBuilder(
-      column: $state.table.type,
+  ColumnFilters<String> get operation => $state.composableBuilder(
+      column: $state.table.operation,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<int> get entityId => $state.composableBuilder(
-      column: $state.table.entityId,
+  ColumnFilters<String> get queueTableName => $state.composableBuilder(
+      column: $state.table.queueTableName,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get recordId => $state.composableBuilder(
+      column: $state.table.recordId,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -7332,13 +5181,8 @@ class $$SyncQueueTableFilterComposer
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<int> get createdAt => $state.composableBuilder(
-      column: $state.table.createdAt,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<int> get syncedAt => $state.composableBuilder(
-      column: $state.table.syncedAt,
+  ColumnFilters<String> get syncStatus => $state.composableBuilder(
+      column: $state.table.syncStatus,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -7347,8 +5191,8 @@ class $$SyncQueueTableFilterComposer
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<String> get lastError => $state.composableBuilder(
-      column: $state.table.lastError,
+  ColumnFilters<String> get createdAt => $state.composableBuilder(
+      column: $state.table.createdAt,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 }
@@ -7356,18 +5200,23 @@ class $$SyncQueueTableFilterComposer
 class $$SyncQueueTableOrderingComposer
     extends OrderingComposer<_$AppDatabase, $SyncQueueTable> {
   $$SyncQueueTableOrderingComposer(super.$state);
-  ColumnOrderings<int> get id => $state.composableBuilder(
+  ColumnOrderings<String> get id => $state.composableBuilder(
       column: $state.table.id,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<String> get type => $state.composableBuilder(
-      column: $state.table.type,
+  ColumnOrderings<String> get operation => $state.composableBuilder(
+      column: $state.table.operation,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<int> get entityId => $state.composableBuilder(
-      column: $state.table.entityId,
+  ColumnOrderings<String> get queueTableName => $state.composableBuilder(
+      column: $state.table.queueTableName,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get recordId => $state.composableBuilder(
+      column: $state.table.recordId,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
@@ -7376,13 +5225,8 @@ class $$SyncQueueTableOrderingComposer
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<int> get createdAt => $state.composableBuilder(
-      column: $state.table.createdAt,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<int> get syncedAt => $state.composableBuilder(
-      column: $state.table.syncedAt,
+  ColumnOrderings<String> get syncStatus => $state.composableBuilder(
+      column: $state.table.syncStatus,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
@@ -7391,8 +5235,358 @@ class $$SyncQueueTableOrderingComposer
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<String> get lastError => $state.composableBuilder(
-      column: $state.table.lastError,
+  ColumnOrderings<String> get createdAt => $state.composableBuilder(
+      column: $state.table.createdAt,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+}
+
+typedef $$RatesTableCreateCompanionBuilder = RatesCompanion Function({
+  required String id,
+  required String branchId,
+  required String vehicleType,
+  required int flatRateHours,
+  required double flatRateFee,
+  required double succeedingHourFee,
+  required double overnightFee,
+  required double lostTicketFee,
+  required String syncStatus,
+  required String updatedAt,
+  Value<int> rowid,
+});
+typedef $$RatesTableUpdateCompanionBuilder = RatesCompanion Function({
+  Value<String> id,
+  Value<String> branchId,
+  Value<String> vehicleType,
+  Value<int> flatRateHours,
+  Value<double> flatRateFee,
+  Value<double> succeedingHourFee,
+  Value<double> overnightFee,
+  Value<double> lostTicketFee,
+  Value<String> syncStatus,
+  Value<String> updatedAt,
+  Value<int> rowid,
+});
+
+class $$RatesTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $RatesTable,
+    Rate,
+    $$RatesTableFilterComposer,
+    $$RatesTableOrderingComposer,
+    $$RatesTableCreateCompanionBuilder,
+    $$RatesTableUpdateCompanionBuilder> {
+  $$RatesTableTableManager(_$AppDatabase db, $RatesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          filteringComposer:
+              $$RatesTableFilterComposer(ComposerState(db, table)),
+          orderingComposer:
+              $$RatesTableOrderingComposer(ComposerState(db, table)),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> branchId = const Value.absent(),
+            Value<String> vehicleType = const Value.absent(),
+            Value<int> flatRateHours = const Value.absent(),
+            Value<double> flatRateFee = const Value.absent(),
+            Value<double> succeedingHourFee = const Value.absent(),
+            Value<double> overnightFee = const Value.absent(),
+            Value<double> lostTicketFee = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
+            Value<String> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              RatesCompanion(
+            id: id,
+            branchId: branchId,
+            vehicleType: vehicleType,
+            flatRateHours: flatRateHours,
+            flatRateFee: flatRateFee,
+            succeedingHourFee: succeedingHourFee,
+            overnightFee: overnightFee,
+            lostTicketFee: lostTicketFee,
+            syncStatus: syncStatus,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String branchId,
+            required String vehicleType,
+            required int flatRateHours,
+            required double flatRateFee,
+            required double succeedingHourFee,
+            required double overnightFee,
+            required double lostTicketFee,
+            required String syncStatus,
+            required String updatedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              RatesCompanion.insert(
+            id: id,
+            branchId: branchId,
+            vehicleType: vehicleType,
+            flatRateHours: flatRateHours,
+            flatRateFee: flatRateFee,
+            succeedingHourFee: succeedingHourFee,
+            overnightFee: overnightFee,
+            lostTicketFee: lostTicketFee,
+            syncStatus: syncStatus,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+        ));
+}
+
+class $$RatesTableFilterComposer
+    extends FilterComposer<_$AppDatabase, $RatesTable> {
+  $$RatesTableFilterComposer(super.$state);
+  ColumnFilters<String> get id => $state.composableBuilder(
+      column: $state.table.id,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get branchId => $state.composableBuilder(
+      column: $state.table.branchId,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get vehicleType => $state.composableBuilder(
+      column: $state.table.vehicleType,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<int> get flatRateHours => $state.composableBuilder(
+      column: $state.table.flatRateHours,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<double> get flatRateFee => $state.composableBuilder(
+      column: $state.table.flatRateFee,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<double> get succeedingHourFee => $state.composableBuilder(
+      column: $state.table.succeedingHourFee,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<double> get overnightFee => $state.composableBuilder(
+      column: $state.table.overnightFee,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<double> get lostTicketFee => $state.composableBuilder(
+      column: $state.table.lostTicketFee,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get syncStatus => $state.composableBuilder(
+      column: $state.table.syncStatus,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get updatedAt => $state.composableBuilder(
+      column: $state.table.updatedAt,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+}
+
+class $$RatesTableOrderingComposer
+    extends OrderingComposer<_$AppDatabase, $RatesTable> {
+  $$RatesTableOrderingComposer(super.$state);
+  ColumnOrderings<String> get id => $state.composableBuilder(
+      column: $state.table.id,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get branchId => $state.composableBuilder(
+      column: $state.table.branchId,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get vehicleType => $state.composableBuilder(
+      column: $state.table.vehicleType,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<int> get flatRateHours => $state.composableBuilder(
+      column: $state.table.flatRateHours,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<double> get flatRateFee => $state.composableBuilder(
+      column: $state.table.flatRateFee,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<double> get succeedingHourFee => $state.composableBuilder(
+      column: $state.table.succeedingHourFee,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<double> get overnightFee => $state.composableBuilder(
+      column: $state.table.overnightFee,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<double> get lostTicketFee => $state.composableBuilder(
+      column: $state.table.lostTicketFee,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get syncStatus => $state.composableBuilder(
+      column: $state.table.syncStatus,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get updatedAt => $state.composableBuilder(
+      column: $state.table.updatedAt,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+}
+
+typedef $$BranchConfigsTableCreateCompanionBuilder = BranchConfigsCompanion
+    Function({
+  required String id,
+  required String branchId,
+  required String configKey,
+  required String configValue,
+  required String syncStatus,
+  required String updatedAt,
+  Value<int> rowid,
+});
+typedef $$BranchConfigsTableUpdateCompanionBuilder = BranchConfigsCompanion
+    Function({
+  Value<String> id,
+  Value<String> branchId,
+  Value<String> configKey,
+  Value<String> configValue,
+  Value<String> syncStatus,
+  Value<String> updatedAt,
+  Value<int> rowid,
+});
+
+class $$BranchConfigsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $BranchConfigsTable,
+    BranchConfig,
+    $$BranchConfigsTableFilterComposer,
+    $$BranchConfigsTableOrderingComposer,
+    $$BranchConfigsTableCreateCompanionBuilder,
+    $$BranchConfigsTableUpdateCompanionBuilder> {
+  $$BranchConfigsTableTableManager(_$AppDatabase db, $BranchConfigsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          filteringComposer:
+              $$BranchConfigsTableFilterComposer(ComposerState(db, table)),
+          orderingComposer:
+              $$BranchConfigsTableOrderingComposer(ComposerState(db, table)),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> branchId = const Value.absent(),
+            Value<String> configKey = const Value.absent(),
+            Value<String> configValue = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
+            Value<String> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              BranchConfigsCompanion(
+            id: id,
+            branchId: branchId,
+            configKey: configKey,
+            configValue: configValue,
+            syncStatus: syncStatus,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String branchId,
+            required String configKey,
+            required String configValue,
+            required String syncStatus,
+            required String updatedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              BranchConfigsCompanion.insert(
+            id: id,
+            branchId: branchId,
+            configKey: configKey,
+            configValue: configValue,
+            syncStatus: syncStatus,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+        ));
+}
+
+class $$BranchConfigsTableFilterComposer
+    extends FilterComposer<_$AppDatabase, $BranchConfigsTable> {
+  $$BranchConfigsTableFilterComposer(super.$state);
+  ColumnFilters<String> get id => $state.composableBuilder(
+      column: $state.table.id,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get branchId => $state.composableBuilder(
+      column: $state.table.branchId,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get configKey => $state.composableBuilder(
+      column: $state.table.configKey,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get configValue => $state.composableBuilder(
+      column: $state.table.configValue,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get syncStatus => $state.composableBuilder(
+      column: $state.table.syncStatus,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get updatedAt => $state.composableBuilder(
+      column: $state.table.updatedAt,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+}
+
+class $$BranchConfigsTableOrderingComposer
+    extends OrderingComposer<_$AppDatabase, $BranchConfigsTable> {
+  $$BranchConfigsTableOrderingComposer(super.$state);
+  ColumnOrderings<String> get id => $state.composableBuilder(
+      column: $state.table.id,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get branchId => $state.composableBuilder(
+      column: $state.table.branchId,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get configKey => $state.composableBuilder(
+      column: $state.table.configKey,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get configValue => $state.composableBuilder(
+      column: $state.table.configValue,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get syncStatus => $state.composableBuilder(
+      column: $state.table.syncStatus,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get updatedAt => $state.composableBuilder(
+      column: $state.table.updatedAt,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 }
@@ -7408,14 +5602,12 @@ class $AppDatabaseManager {
       $$SessionsTableTableManager(_db, _db.sessions);
   $$ShiftsTableTableManager get shifts =>
       $$ShiftsTableTableManager(_db, _db.shifts);
-  $$ShiftOpeningDenominationsTableTableManager get shiftOpeningDenominations =>
-      $$ShiftOpeningDenominationsTableTableManager(
-          _db, _db.shiftOpeningDenominations);
-  $$ShiftClosingDenominationsTableTableManager get shiftClosingDenominations =>
-      $$ShiftClosingDenominationsTableTableManager(
-          _db, _db.shiftClosingDenominations);
-  $$ValetTransactionsTableTableManager get valetTransactions =>
-      $$ValetTransactionsTableTableManager(_db, _db.valetTransactions);
+  $$TicketsTableTableManager get tickets =>
+      $$TicketsTableTableManager(_db, _db.tickets);
   $$SyncQueueTableTableManager get syncQueue =>
       $$SyncQueueTableTableManager(_db, _db.syncQueue);
+  $$RatesTableTableManager get rates =>
+      $$RatesTableTableManager(_db, _db.rates);
+  $$BranchConfigsTableTableManager get branchConfigs =>
+      $$BranchConfigsTableTableManager(_db, _db.branchConfigs);
 }

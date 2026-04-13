@@ -1,14 +1,18 @@
 import 'package:bloc/bloc.dart';
 
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/shift_service.dart';
+import '../../sync/state/sync_cubit.dart';
 import '../cash_sales_formulas.dart';
 import '../models/open_transaction.dart';
 import 'close_cash_state.dart';
 
 class CloseCashCubit extends Cubit<CloseCashState> {
-  CloseCashCubit(this._auth) : super(const CloseCashInitial());
+  CloseCashCubit(this._auth, this._shifts, this._sync) : super(const CloseCashInitial());
 
   final AuthRepository _auth;
+  final ShiftService _shifts;
+  final SyncCubit _sync;
 
   CloseCashLoaded? _loaded;
 
@@ -29,8 +33,8 @@ class CloseCashCubit extends Cubit<CloseCashState> {
       final opening = shift.openingFloat;
       final expected = CashSalesFormulas.expectedCash(opening, totalSales);
       final remit = CashSalesFormulas.salesToRemit(opening, totalSales);
-      final openRows = await _auth.queryOpenTransactionsForShiftClose(shift.id);
-      final openTx = openRows.map(OpenTransaction.fromRow).toList();
+      final openRows = await _auth.queryOpenTicketsForShiftClose(shift.id);
+      final openTx = openRows.map(OpenTransaction.fromTicket).toList();
 
       final loaded = CloseCashLoaded(
         shift: shift,
@@ -86,6 +90,12 @@ class CloseCashCubit extends Cubit<CloseCashState> {
     if (cur == null) return;
     emit(const CloseCashConfirming());
     try {
+      await _shifts.closeActiveShiftForLocalUser(
+        localUserId,
+        cur.actualCash,
+      );
+      // Flush while session + bearer token still exist; [confirmCloseCash] clears the token.
+      await _sync.flush();
       await _auth.confirmCloseCash(
         localUserId: localUserId,
         closingFloat: cur.actualCash,

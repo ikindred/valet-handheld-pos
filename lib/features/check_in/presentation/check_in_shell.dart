@@ -20,9 +20,15 @@ class _CheckInShellState extends State<CheckInShell> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final c = context.read<CheckInCubit>();
+      await c.ensureDraftTicketReserved();
       if (!mounted) return;
-      context.read<CheckInCubit>().ensureTicket();
+      if (c.state.ticketNumber.isEmpty) {
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        if (!mounted) return;
+        await c.ensureDraftTicketReserved();
+      }
     });
   }
 
@@ -43,7 +49,7 @@ class _CheckInShellState extends State<CheckInShell> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  CheckInFlowHeader(stepIndex: stepIndex),
+                  CheckInFlowHeader(stepIndex: stepIndex, totalSteps: 6),
                   Expanded(child: widget.child),
                 ],
               ),
