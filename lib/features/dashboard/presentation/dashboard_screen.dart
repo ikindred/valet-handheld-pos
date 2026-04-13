@@ -10,7 +10,7 @@ import '../../../core/formatting/peso_currency.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/branch_config_service.dart';
 import '../../../data/services/rate_service.dart';
-import '../../../shared/widgets/rates_bottom_sheet.dart';
+import '../../../shared/widgets/branch_rates_dialog.dart';
 import '../../auth/state/auth_bloc.dart';
 import '../../check_in/state/check_in_cubit.dart';
 import '../state/dashboard_cubit.dart';
@@ -206,7 +206,7 @@ class _HeaderRow extends StatelessWidget {
               final bid = site.branch.trim().isEmpty ? '_' : site.branch.trim();
               final name = branchRatesSubtitle(site);
               if (!context.mounted) return;
-              await showBranchRatesBottomSheet(
+              await showBranchRatesDialog(
                 context,
                 rateService: rateService,
                 branchId: bid,

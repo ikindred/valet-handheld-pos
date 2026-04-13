@@ -15,6 +15,7 @@ import '../../core/session/standard_parking_rates.dart';
 import '../../core/time/unix_timestamp.dart';
 import '../local/db/app_database.dart';
 import '../remote/auth_api.dart';
+import '../services/rate_service.dart';
 import '../services/shift_service.dart';
 import '../services/ticket_sync_payload.dart';
 
@@ -44,14 +45,22 @@ class AuthRepository {
     this._api,
     this._refresh,
     this._shifts,
+    this._rates,
   );
 
   final AppDatabase _db;
   final AuthApi _api;
   final RouterRefreshNotifier _refresh;
   final ShiftService _shifts;
+  final RateService _rates;
 
   static const _uuid = Uuid();
+
+  /// Seeds `rates` for [device_info.branch] when empty (offline defaults if API gave none).
+  Future<void> hydrateLocalRatesIfEmpty() async {
+    final site = await branchAndAreaFromDb();
+    await _rates.syncFromAuthIfEmpty(branchId: site.branch, rates: null);
+  }
 
   /// `SELECT * FROM sessions WHERE is_active = 1 LIMIT 1`
   Future<Session?> getActiveSession() {
@@ -304,6 +313,11 @@ class AuthRepository {
     });
 
     _refresh.notifyAuthChanged();
+    final site = await branchAndAreaFromDb();
+    await _rates.syncFromAuthIfEmpty(
+      branchId: site.branch,
+      rates: res.standardRates,
+    );
     ValetLog.debug(
       'AuthRepository.loginOnline',
       'success localUserId=$accountId',
@@ -343,6 +357,7 @@ class AuthRepository {
     });
 
     _refresh.notifyAuthChanged();
+    await hydrateLocalRatesIfEmpty();
     ValetLog.debug(
       'AuthRepository.loginOffline',
       'success localUserId=${row.id}',
@@ -400,6 +415,11 @@ class AuthRepository {
     });
 
     _refresh.notifyAuthChanged();
+    final site = await branchAndAreaFromDb();
+    await _rates.syncFromAuthIfEmpty(
+      branchId: site.branch,
+      rates: res.standardRates,
+    );
     return res.standardRates;
   }
 

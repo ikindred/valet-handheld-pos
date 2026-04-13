@@ -8,17 +8,20 @@ import 'package:uuid/uuid.dart';
 import '../../core/config/app_config.dart';
 import '../../core/logging/valet_log.dart';
 import '../local/db/app_database.dart';
+import 'ticket_service.dart';
 
 /// Local `shifts` + `sync_queue` lifecycle with best-effort REST sync.
 class ShiftService {
   ShiftService(
     this._db,
     this._dio, {
+    required TicketService ticketService,
     this.onShiftMutated,
-  });
+  }) : _tickets = ticketService;
 
   final AppDatabase _db;
   final Dio _dio;
+  final TicketService _tickets;
   final void Function()? onShiftMutated;
 
   static const _uuid = Uuid();
@@ -88,6 +91,9 @@ class ShiftService {
 
     onShiftMutated?.call();
     unawaited(_postShiftCreate(id));
+    unawaited(
+      _tickets.purgeOrphanedDrafts(id).catchError((_, __) {}),
+    );
     return (_db.select(_db.shifts)..where((s) => s.id.equals(id))).getSingle();
   }
 

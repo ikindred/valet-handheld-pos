@@ -64,42 +64,56 @@ class RatesOutlinePill extends StatelessWidget {
   }
 }
 
-Future<void> showBranchRatesBottomSheet(
+/// Centered modal with branch rates (read-only). Uses [showDialog] so it works
+/// with bundled fonts when [GoogleFonts.config.allowRuntimeFetching] is false.
+Future<void> showBranchRatesDialog(
   BuildContext context, {
   required RateService rateService,
   required String branchId,
   required String branchName,
 }) {
-  return showModalBottomSheet<void>(
+  return showDialog<void>(
     context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
+    barrierDismissible: true,
     builder: (ctx) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-          child: FutureBuilder<CheckoutRatesResolved?>(
-            future: rateService.checkoutRatesResolved(
-              branchId: branchId,
-              vehicleType: 'Standard',
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            clipBehavior: Clip.antiAlias,
+            elevation: 12,
+            shadowColor: Colors.black.withValues(alpha: 0.18),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+              child: FutureBuilder<CheckoutRatesResolved?>(
+                future: rateService.checkoutRatesResolved(
+                  branchId: branchId,
+                  vehicleType: 'Standard',
+                ),
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const SizedBox(
+                      height: 200,
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  final resolved = snap.data;
+                  if (resolved == null) {
+                    return _EmptyRates(branchName: branchName);
+                  }
+                  return _RatesDialogContent(
+                    branchName: branchName,
+                    flatBlockHours: resolved.flatBlockHours,
+                    rates: resolved.rates,
+                  );
+                },
+              ),
             ),
-            builder: (context, snap) {
-              if (snap.connectionState == ConnectionState.waiting) {
-                return const SizedBox(
-                  height: 200,
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              final resolved = snap.data;
-              if (resolved == null) {
-                return _EmptyRates(branchName: branchName);
-              }
-              return _RatesSheetContent(
-                branchName: branchName,
-                flatBlockHours: resolved.flatBlockHours,
-                rates: resolved.rates,
-              );
-            },
           ),
         ),
       );
@@ -137,7 +151,8 @@ class _EmptyRates extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         Text(
-          'No rates available for this branch. Please go online to sync rates.',
+          'No rates are stored for this branch yet. Assign the device to a branch '
+          'in the admin console, or sign in online once so rates can sync.',
           style: GoogleFonts.poppins(
             fontSize: 14,
             fontWeight: FontWeight.w400,
@@ -164,8 +179,8 @@ class _EmptyRates extends StatelessWidget {
   }
 }
 
-class _RatesSheetContent extends StatelessWidget {
-  const _RatesSheetContent({
+class _RatesDialogContent extends StatelessWidget {
+  const _RatesDialogContent({
     required this.branchName,
     required this.flatBlockHours,
     required this.rates,
@@ -174,8 +189,6 @@ class _RatesSheetContent extends StatelessWidget {
   final String branchName;
   final int flatBlockHours;
   final StandardParkingRates rates;
-
-  static const _mono = ['Roboto Mono', 'Noto Sans', 'Roboto'];
 
   @override
   Widget build(BuildContext context) {
@@ -205,25 +218,21 @@ class _RatesSheetContent extends StatelessWidget {
           _AmountRow(
             label: 'Flat Rate (First $flatBlockHours hours)',
             amountPesos: rates.flatRatePesos,
-            monoFallback: _mono,
           ),
           const SizedBox(height: 14),
           _AmountRow(
             label: 'Succeeding Hour',
             amountPesos: rates.succeedingHourPesos,
-            monoFallback: _mono,
           ),
           const SizedBox(height: 14),
           _AmountRow(
             label: 'Overnight Fee (after 1:30AM)',
             amountPesos: rates.overnightFeePesos,
-            monoFallback: _mono,
           ),
           const SizedBox(height: 14),
           _AmountRow(
             label: 'Lost Ticket Fee',
             amountPesos: rates.lostTicketFeePesos,
-            monoFallback: _mono,
           ),
           const SizedBox(height: 20),
           Align(
@@ -249,12 +258,10 @@ class _AmountRow extends StatelessWidget {
   const _AmountRow({
     required this.label,
     required this.amountPesos,
-    required this.monoFallback,
   });
 
   final String label;
   final int amountPesos;
-  final List<String> monoFallback;
 
   @override
   Widget build(BuildContext context) {
@@ -276,11 +283,13 @@ class _AmountRow extends StatelessWidget {
         const SizedBox(width: 12),
         Text(
           amt,
-          style: GoogleFonts.robotoMono(
+          style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w600,
             color: kSpidOrange,
-          ).copyWith(fontFamilyFallback: monoFallback),
+            fontFamily: 'monospace',
+            fontFamilyFallback: const ['Noto Sans', 'Roboto'],
+          ),
         ),
       ],
     );

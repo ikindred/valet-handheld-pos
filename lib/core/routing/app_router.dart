@@ -90,12 +90,12 @@ GoRouter createAppRouter(
               ),
               GoRoute(
                 path: 'step-3',
-                builder: (context, state) =>
-                    const CheckInVehicleConditionScreen(),
+                builder: (context, state) => const CheckInValuablesScreen(),
               ),
               GoRoute(
                 path: 'step-4',
-                builder: (context, state) => const CheckInValuablesScreen(),
+                builder: (context, state) =>
+                    const CheckInVehicleConditionScreen(),
               ),
               GoRoute(
                 path: 'step-5',

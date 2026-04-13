@@ -29,8 +29,9 @@ class RateService {
     return set;
   }
 
-  /// When [rates] has no rows for [branchId], insert one **Standard** row using
-  /// login [StandardParkingRates] (pesos → double). No-op if rows exist or [rates] is null.
+  /// When there are no rows for [branchId], insert one **Standard** row.
+  /// Uses [rates] from the login API when present; otherwise [StandardParkingRates.offlineDefault]
+  /// so offline login and missing `standard_rates` still populate local Drift data.
   Future<void> syncFromAuthIfEmpty({
     required String branchId,
     StandardParkingRates? rates,
@@ -39,8 +40,9 @@ class RateService {
     final existing = await (_db.select(_db.rates)
           ..where((r) => r.branchId.equals(bid)))
         .get();
-    if (existing.isNotEmpty || rates == null) return;
+    if (existing.isNotEmpty) return;
 
+    final effective = rates ?? StandardParkingRates.offlineDefault;
     final now = DateTime.now().toIso8601String();
     await _db.into(_db.rates).insert(
           RatesCompanion.insert(
@@ -48,10 +50,10 @@ class RateService {
             branchId: bid,
             vehicleType: 'Standard',
             flatRateHours: CheckoutPricing.defaultFlatBlockHours,
-            flatRateFee: rates.flatRatePesos.toDouble(),
-            succeedingHourFee: rates.succeedingHourPesos.toDouble(),
-            overnightFee: rates.overnightFeePesos.toDouble(),
-            lostTicketFee: rates.lostTicketFeePesos.toDouble(),
+            flatRateFee: effective.flatRatePesos.toDouble(),
+            succeedingHourFee: effective.succeedingHourPesos.toDouble(),
+            overnightFee: effective.overnightFeePesos.toDouble(),
+            lostTicketFee: effective.lostTicketFeePesos.toDouble(),
             syncStatus: 'synced',
             updatedAt: now,
           ),

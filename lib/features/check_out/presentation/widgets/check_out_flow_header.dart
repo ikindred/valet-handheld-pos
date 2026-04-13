@@ -75,17 +75,21 @@ class CheckOutFlowHeader extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 16),
             BlocBuilder<CheckOutCubit, CheckOutState>(
               buildWhen: (a, b) =>
                   a.ticket?.id != b.ticket?.id ||
                   a.receiptTicket != b.receiptTicket ||
                   a.receiptSnapshot != b.receiptSnapshot,
               builder: (context, state) {
-                final ticket = state.ticket?.id ??
-                    state.receiptTicket ??
-                    '';
-                return _TicketPill(ticketNumber: ticket);
+                final ticket = state.ticket?.id ?? state.receiptTicket ?? '';
+                if (ticket.isEmpty) return const SizedBox.shrink();
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(width: 16),
+                    _TicketPill(ticketNumber: ticket),
+                  ],
+                );
               },
             ),
             const SizedBox(width: 16),
@@ -112,7 +116,7 @@ class _TicketPill extends StatelessWidget {
         border: Border.all(color: const Color(0xFFF68D00)),
       ),
       child: Text(
-        ticketNumber.isEmpty ? '…' : ticketNumber,
+        ticketNumber,
         style: GoogleFonts.poppins(
           fontSize: 15,
           fontWeight: FontWeight.w700,

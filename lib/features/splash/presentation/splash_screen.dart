@@ -69,6 +69,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
       Future<void> restoreLocalSession() async {
         await OfflineModePrefs.write(prefs, true);
+        await repo.hydrateLocalRatesIfEmpty();
         final email = await repo.emailForOfflineAccountId(session.userId);
         if (!mounted) return;
         await syncAuthBlocAndNavigate(

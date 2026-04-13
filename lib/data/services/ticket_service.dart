@@ -61,6 +61,15 @@ class TicketService {
     await (_db.delete(_db.tickets)..where((r) => r.id.equals(t))).go();
   }
 
+  /// Hard-delete all `draft` rows for [shiftId]. No sync queue (same as [deleteDraftTicket]).
+  Future<void> purgeOrphanedDrafts(String shiftId) async {
+    final sid = shiftId.trim();
+    if (sid.isEmpty) return;
+    await (_db.delete(_db.tickets)
+          ..where((t) => t.shiftId.equals(sid) & t.status.equals('draft')))
+        .go();
+  }
+
   /// Promotes a draft row to `active` and enqueues sync (same as [createTicket]).
   Future<Ticket> finalizeDraftTicket({
     required String ticketId,

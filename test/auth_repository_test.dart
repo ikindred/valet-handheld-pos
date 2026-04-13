@@ -8,7 +8,9 @@ import 'package:valet_handheld_pos/core/storage/prefs_keys.dart';
 import 'package:valet_handheld_pos/data/local/db/app_database.dart';
 import 'package:valet_handheld_pos/data/remote/auth_api.dart';
 import 'package:valet_handheld_pos/data/repositories/auth_repository.dart';
+import 'package:valet_handheld_pos/data/services/rate_service.dart';
 import 'package:valet_handheld_pos/data/services/shift_service.dart';
+import 'package:valet_handheld_pos/data/services/ticket_service.dart';
 
 void main() {
   group('AuthRepository', () {
@@ -32,8 +34,16 @@ void main() {
           );
       final api = AuthApi(Dio());
       final refresh = RouterRefreshNotifier();
-      shifts = ShiftService(db, Dio(), onShiftMutated: refresh.notifyAuthChanged);
-      repo = AuthRepository(db, api, refresh, shifts);
+      final dio = Dio();
+      final tickets = TicketService(db, dio);
+      shifts = ShiftService(
+        db,
+        dio,
+        ticketService: tickets,
+        onShiftMutated: refresh.notifyAuthChanged,
+      );
+      final rates = RateService(db);
+      repo = AuthRepository(db, api, refresh, shifts, rates);
     });
 
     tearDown(() async {

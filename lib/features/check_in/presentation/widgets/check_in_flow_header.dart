@@ -4,13 +4,13 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../data/repositories/auth_repository.dart';
 import '../../../../data/services/rate_service.dart';
-import '../../../../shared/widgets/rates_bottom_sheet.dart';
+import '../../../../shared/widgets/branch_rates_dialog.dart';
 import '../../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../../state/check_in_cubit.dart';
 
 /// Top title bar for check-in — same container pattern as [CashPageHeader]
 /// (`open_cash_screen`): fixed 96px, `#FAFAFA`, **bottom border only**.
-/// **Left → right:** step caption + ticket id, dot stepper; [Rates]; online pill.
+/// **Left:** step caption + dot stepper. **Right:** [ticket] [Rates] [status] — one row, equal gaps.
 class CheckInFlowHeader extends StatelessWidget {
   const CheckInFlowHeader({
     super.key,
@@ -25,14 +25,13 @@ class CheckInFlowHeader extends StatelessWidget {
   static const List<String> stepTitles = [
     'CUSTOMER AND VALET DETAILS',
     'VEHICLE DETAILS',
-    'VEHICLE CONDITION',
     'PERSONAL BELONGINGS',
+    'VEHICLE CONDITION',
     'REVIEW',
     'PRINT TICKET',
   ];
 
   static const Color _headerSurface = Color(0xFFFAFAFA);
-  static const Color _ticketOrange = Color(0xFFE87722);
 
   @override
   Widget build(BuildContext context) {
@@ -58,36 +57,19 @@ class CheckInFlowHeader extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
+                mainAxisSize: MainAxisSize.max,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'STEP $stepLabel OF $totalSteps — $title',
-                          textAlign: TextAlign.left,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.poppins(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                            height: 1.35,
-                            color: const Color(0xFF6C7688),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      BlocBuilder<CheckInCubit, CheckInState>(
-                        buildWhen: (a, b) => a.ticketNumber != b.ticketNumber,
-                        builder: (context, state) {
-                          return _TicketHeaderBlock(
-                            ticketNumber: state.ticketNumber,
-                            monoColor: _ticketOrange,
-                          );
-                        },
-                      ),
-                    ],
+                  Text(
+                    'STEP $stepLabel OF $totalSteps — $title',
+                    textAlign: TextAlign.left,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      height: 1.35,
+                      color: const Color(0xFF6C7688),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   CheckInDotStepper(
@@ -99,6 +81,13 @@ class CheckInFlowHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
+            BlocBuilder<CheckInCubit, CheckInState>(
+              buildWhen: (a, b) => a.ticketNumber != b.ticketNumber,
+              builder: (context, state) {
+                return _TicketPill(ticketNumber: state.ticketNumber);
+              },
+            ),
+            const SizedBox(width: 12),
             RatesOutlinePill(
               onPressed: () async {
                 final auth = context.read<AuthRepository>();
@@ -107,7 +96,7 @@ class CheckInFlowHeader extends StatelessWidget {
                 final bid = site.branch.trim().isEmpty ? '_' : site.branch.trim();
                 final name = branchRatesSubtitle(site);
                 if (!context.mounted) return;
-                await showBranchRatesBottomSheet(
+                await showBranchRatesDialog(
                   context,
                   rateService: rates,
                   branchId: bid,
@@ -124,43 +113,39 @@ class CheckInFlowHeader extends StatelessWidget {
   }
 }
 
-class _TicketHeaderBlock extends StatelessWidget {
-  const _TicketHeaderBlock({
-    required this.ticketNumber,
-    required this.monoColor,
-  });
+/// Capsule badge — same visual language as [DashboardStatusPill] (e.g. Online).
+class _TicketPill extends StatelessWidget {
+  const _TicketPill({required this.ticketNumber});
 
   final String ticketNumber;
-  final Color monoColor;
 
-  static const _mono = ['Roboto Mono', 'Noto Sans', 'Roboto'];
+  /// SPiD orange; background matches warm cream used with status pills.
+  static const Color _orange = Color(0xFFE87722);
+  static const Color _bg = Color(0xFFFFF7EC);
 
   @override
   Widget build(BuildContext context) {
     final display = ticketNumber.trim().isEmpty ? '…' : ticketNumber.trim();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'TICKET NO.',
-          style: GoogleFonts.poppins(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.6,
-            color: const Color(0xFF6C7688),
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: _bg,
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(color: _orange),
+      ),
+      child: Text(
+        display,
+        textHeightBehavior: const TextHeightBehavior(
+          applyHeightToFirstAscent: false,
+          applyHeightToLastDescent: false,
         ),
-        const SizedBox(height: 2),
-        Text(
-          display,
-          style: GoogleFonts.robotoMono(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: monoColor,
-          ).copyWith(fontFamilyFallback: _mono),
+        style: GoogleFonts.poppins(
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+          height: 1.0,
+          color: _orange,
         ),
-      ],
+      ),
     );
   }
 }

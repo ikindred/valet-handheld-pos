@@ -13,7 +13,7 @@ import 'widgets/check_in_vehicle_details_widgets.dart';
 /// Step 2 — Vehicle details
 /// ([Figma](https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-1719)).
 ///
-/// Two-column grid (landscape): vehicle identification | parking & belongings.
+/// Two-column grid (landscape): vehicle identification | parking.
 class CheckInVehicleDetailsScreen extends StatefulWidget {
   const CheckInVehicleDetailsScreen({super.key});
 

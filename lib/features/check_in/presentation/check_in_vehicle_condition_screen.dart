@@ -32,11 +32,11 @@ class CheckInVehicleConditionScreen extends StatelessWidget {
               context.go('/dashboard');
             },
             onSignature: () => showCustomerSignatureModal(context),
-            onBack: () => context.go('/check-in/step-2'),
+            onBack: () => context.go('/check-in/step-3'),
             onNext: () {
               final signed = state.hasCustomerSignature;
               if (signed) {
-                context.go('/check-in/step-4');
+                context.go('/check-in/step-5');
               } else {
                 showCustomerSignatureModal(context);
               }

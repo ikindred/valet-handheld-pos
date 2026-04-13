@@ -37,18 +37,19 @@ class AppProviders extends StatelessWidget {
         Provider<Dio>(create: (_) => createAppDio()),
         Provider<AuthApi>(create: (c) => AuthApi(c.read<Dio>())),
         Provider<TransactionsApi>(create: (c) => TransactionsApi(c.read<Dio>())),
-        Provider<ShiftService>(
-          create: (c) => ShiftService(
-            c.read<AppDatabase>(),
-            c.read<Dio>(),
-            onShiftMutated: () => c.read<RouterRefreshNotifier>().notifyAuthChanged(),
-          ),
-        ),
         Provider<RateService>(
           create: (c) => RateService(c.read<AppDatabase>()),
         ),
         Provider<TicketService>(
           create: (c) => TicketService(c.read<AppDatabase>(), c.read<Dio>()),
+        ),
+        Provider<ShiftService>(
+          create: (c) => ShiftService(
+            c.read<AppDatabase>(),
+            c.read<Dio>(),
+            ticketService: c.read<TicketService>(),
+            onShiftMutated: () => c.read<RouterRefreshNotifier>().notifyAuthChanged(),
+          ),
         ),
         Provider<ValetPrintService>(
           create: (_) => NoopValetPrintService(),
@@ -59,6 +60,7 @@ class AppProviders extends StatelessWidget {
             c.read<AuthApi>(),
             c.read<RouterRefreshNotifier>(),
             c.read<ShiftService>(),
+            c.read<RateService>(),
           ),
         ),
         BlocProvider<SyncCubit>(

@@ -9,6 +9,16 @@ class StandardParkingRates extends Equatable {
     required this.lostTicketFeePesos,
   });
 
+  /// When the API sends no rates (or offline login), [RateService] seeds the local
+  /// `rates` table with these values so checkout / Branch Rates work offline-first.
+  /// Matches stub login defaults in [AuthApi].
+  static const StandardParkingRates offlineDefault = StandardParkingRates(
+    flatRatePesos: 150,
+    succeedingHourPesos: 30,
+    overnightFeePesos: 200,
+    lostTicketFeePesos: 200,
+  );
+
   /// First block (e.g. first 3 hours).
   final int flatRatePesos;
 

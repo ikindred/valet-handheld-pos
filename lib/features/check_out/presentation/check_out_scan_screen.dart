@@ -203,7 +203,11 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen> {
                 children: [
                   Text(
                     'CAMERA ACTIVE',
-                    style: _poppins(15, FontWeight.w500, DashboardStyles.orange),
+                    style: _poppins(
+                      15,
+                      FontWeight.w500,
+                      DashboardStyles.orange,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Container(
@@ -334,10 +338,7 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen> {
         const SizedBox(height: 16),
         CheckInFormField(
           label: 'PLATE NUMBER',
-          child: CheckInTextField(
-            controller: _plateCtrl,
-            hint: 'ABC 1234',
-          ),
+          child: CheckInTextField(controller: _plateCtrl, hint: 'ABC 1234'),
         ),
         const SizedBox(height: 20),
         SizedBox(
@@ -376,73 +377,81 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return CheckOutStepBody(
-      primaryLabel: 'Next: Vehicle review',
-      onPrimary: () {
-        final s = context.read<CheckOutCubit>().state;
-        if (s.ticket != null) {
-          context.go('/check-out/step-2');
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Scan or look up a ticket first.')),
-          );
-        }
-      },
-      child: LayoutBuilder(
-        builder: (context, c) {
-          final wide = c.maxWidth >= 900;
-          final manual = BlocBuilder<CheckOutCubit, CheckOutState>(
-            buildWhen: (a, b) =>
-                a.isLookupBusy != b.isLookupBusy || a.scanError != b.scanError,
-            builder: (context, state) {
-              final busy = state.isLookupBusy;
-              return _manualPanel(
-                context,
-                state,
-                busy,
-                pinLostFeeToBottom: wide,
+    // Wide layout uses a Row + [Spacer] in the manual column; that requires a
+    // bounded height. [CheckOutStepBody] defaults to a [SingleChildScrollView],
+    // which gives the child unbounded height and triggers "infinite height"
+    // assertions. When wide, disable scrolling so [Expanded] in the shell
+    // provides a finite max height.
+    return LayoutBuilder(
+      builder: (context, outer) {
+        final wide = outer.maxWidth >= 900;
+        return CheckOutStepBody(
+          scrollable: !wide,
+          primaryLabel: 'Next: Vehicle review',
+          onPrimary: () {
+            final s = context.read<CheckOutCubit>().state;
+            if (s.ticket != null) {
+              context.go('/check-out/step-2');
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Scan or look up a ticket first.'),
+                ),
+              );
+            }
+          },
+          child: LayoutBuilder(
+            builder: (context, c) {
+              final wideInner = c.maxWidth >= 900;
+              final manual = BlocBuilder<CheckOutCubit, CheckOutState>(
+                buildWhen: (a, b) =>
+                    a.isLookupBusy != b.isLookupBusy ||
+                    a.scanError != b.scanError,
+                builder: (context, state) {
+                  final busy = state.isLookupBusy;
+                  return _manualPanel(
+                    context,
+                    state,
+                    busy,
+                    pinLostFeeToBottom: wideInner,
+                  );
+                },
+              );
+
+              final scannerCol = Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _cameraHeaderRow(),
+                  const SizedBox(height: 12),
+                  _scannerCard(),
+                ],
+              );
+
+              if (wideInner) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(flex: 12, child: scannerCol),
+                    _verticalOrDivider(),
+                    Expanded(flex: 11, child: manual),
+                  ],
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  scannerCol,
+                  const SizedBox(height: 20),
+                  _horizontalOrDivider(),
+                  const SizedBox(height: 20),
+                  manual,
+                ],
               );
             },
-          );
-
-          final scannerCol = Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _cameraHeaderRow(),
-              const SizedBox(height: 12),
-              _scannerCard(),
-            ],
-          );
-
-          if (wide) {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  flex: 12,
-                  child: scannerCol,
-                ),
-                _verticalOrDivider(),
-                Expanded(
-                  flex: 11,
-                  child: manual,
-                ),
-              ],
-            );
-          }
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              scannerCol,
-              const SizedBox(height: 20),
-              _horizontalOrDivider(),
-              const SizedBox(height: 20),
-              manual,
-            ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }
