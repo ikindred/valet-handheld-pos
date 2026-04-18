@@ -14,6 +14,19 @@ import '../storage/prefs_keys.dart';
 class DeviceIdService {
   DeviceIdService._();
 
+  /// SHA-256 hex digest of **raw** ANDROID_ID only (for server `android_id_hash` / device claim).
+  /// Empty string when unavailable (non-Android or error).
+  static Future<String> sha256RawAndroidId() async {
+    if (!Platform.isAndroid) return '';
+    try {
+      final raw = await const AndroidId().getId();
+      if (raw == null || raw.isEmpty) return '';
+      return sha256.convert(utf8.encode(raw)).toString();
+    } catch (_) {
+      return '';
+    }
+  }
+
   static Future<String> getOrCreate() async {
     final prefs = await SharedPreferences.getInstance();
 

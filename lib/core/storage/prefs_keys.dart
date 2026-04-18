@@ -14,4 +14,7 @@ abstract final class PrefsKeys {
 
   /// Site area from device register (response or defaults).
   static const deviceArea = 'spid_device_area';
+
+  /// Server-claimed POS terminal identity key; splash routes to login only when set.
+  static const deviceIdentityKey = 'device_identity_key';
 }

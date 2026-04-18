@@ -1,6 +1,9 @@
+import 'package:dio/dio.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/local/db/app_database.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/offline_login_screen.dart';
 import '../../features/cash/presentation/cash_screen.dart';
@@ -23,6 +26,8 @@ import '../../features/check_out/presentation/check_out_shell.dart';
 import '../../features/check_out/presentation/check_out_vehicle_info_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/dashboard/presentation/ticket_detail_screen.dart';
+import '../../features/device_setup/cubit/device_setup_cubit.dart';
+import '../../features/device_setup/screens/device_setup_screen.dart';
 import '../../features/reports/presentation/reports_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
@@ -42,6 +47,16 @@ GoRouter createAppRouter(
       GoRoute(
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/device-setup',
+        builder: (context, state) => BlocProvider(
+          create: (context) => DeviceSetupCubit(
+            dio: context.read<Dio>(),
+            database: context.read<AppDatabase>(),
+          ),
+          child: const DeviceSetupScreen(),
+        ),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(

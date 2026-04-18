@@ -53,6 +53,14 @@ class AppConfig {
   static String get authLogout =>
       baseUrl + (_env('API_AUTH_LOGOUT') ?? '/api/v1/auth/logout');
 
+  /// GET active POS terminals available for claim (pre-configured on server).
+  static String get devicesActiveUrl =>
+      baseUrl + (_env('API_DEVICES_ACTIVE') ?? '/api/v1/devices/active');
+
+  /// POST claim a terminal identity for this physical device.
+  static String get devicesClaimUrl =>
+      baseUrl + (_env('API_DEVICES_CLAIM') ?? '/api/v1/devices/claim');
+
   // ── SHIFT ─────────────────────────────────
   static String get shiftOpen =>
       baseUrl + (_env('API_SHIFT_OPEN') ?? '/api/v1/shifts/open');

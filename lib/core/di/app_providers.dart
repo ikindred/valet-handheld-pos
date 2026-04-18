@@ -13,6 +13,8 @@ import '../../data/services/branch_config_service.dart';
 import '../../data/services/rate_service.dart';
 import '../../data/services/shift_service.dart';
 import '../../data/services/ticket_service.dart';
+import '../../services/device_conflict_service.dart';
+import '../../widgets/device_conflict_listener.dart';
 import '../connectivity/connectivity_service.dart';
 import '../routing/router_refresh_notifier.dart';
 import '../../features/auth/state/auth_bloc.dart';
@@ -62,6 +64,9 @@ class AppProviders extends StatelessWidget {
             c.read<ShiftService>(),
             c.read<RateService>(),
           ),
+        ),
+        Provider<DeviceConflictService>(
+          create: (_) => DeviceConflictServiceStub(),
         ),
         BlocProvider<SyncCubit>(
           create: (c) => SyncCubit(
@@ -114,7 +119,9 @@ class AppProviders extends StatelessWidget {
         ),
         BlocProvider(create: (_) => SettingsCubit()),
       ],
-      child: ConnectivityScope(child: child),
+      child: DeviceConflictListener(
+        child: ConnectivityScope(child: child),
+      ),
     );
   }
 }

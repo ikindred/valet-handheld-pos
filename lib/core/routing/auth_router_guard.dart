@@ -13,8 +13,10 @@ class AuthRouterGuard {
     final auth = context.read<AuthBloc>().state;
     final loc = state.uri.path;
 
-    final isPublic =
-        loc == '/splash' || loc == '/login' || loc == '/offline-login';
+    final isPublic = loc == '/splash' ||
+        loc == '/login' ||
+        loc == '/offline-login' ||
+        loc == '/device-setup';
     final isCashOpen = loc.startsWith('/cash/open');
     final isCashClose = loc.startsWith('/cash/close');
 
@@ -23,7 +25,10 @@ class AuthRouterGuard {
     }
 
     if (auth is AuthAuthenticated) {
-      if (loc == '/splash' || loc == '/login' || loc == '/offline-login') {
+      if (loc == '/splash' ||
+          loc == '/login' ||
+          loc == '/offline-login' ||
+          loc == '/device-setup') {
         return auth.cashSessionStatus == CashSessionStatus.closed
             ? '/cash/open'
             : '/dashboard';

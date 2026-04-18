@@ -29,6 +29,30 @@ class DeviceInfo extends Table {
   IntColumn get registeredAt => integer()();
 }
 
+/// Server-managed POS terminal identity (authoritative). Legacy [DeviceInfo] unchanged.
+class DeviceIdentity extends Table {
+  @override
+  String get tableName => 'device_identity';
+
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get deviceLabel => text()();
+
+  TextColumn get serverDeviceId => text().unique()();
+
+  /// SHA-256 of raw ANDROID_ID (never store raw id).
+  TextColumn get androidIdHash => text()();
+
+  TextColumn get branch => text()();
+
+  TextColumn get area => text()();
+
+  BoolColumn get isActive =>
+      boolean().withDefault(const Constant(false))();
+
+  DateTimeColumn get claimedAt => dateTime().nullable()();
+}
+
 /// Offline credentials (email + bcrypt hash, plus API metadata).
 class OfflineAccounts extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -253,6 +277,7 @@ class BranchConfigs extends Table {
 @DriftDatabase(
   tables: [
     DeviceInfo,
+    DeviceIdentity,
     OfflineAccounts,
     Sessions,
     Shifts,
@@ -276,7 +301,7 @@ class AppDatabase extends _$AppDatabase {
   final bool _skipDevOfflineSeed;
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -290,6 +315,11 @@ class AppDatabase extends _$AppDatabase {
             if (kDebugMode) {
               await RatesSeeder().seed(this);
             }
+          }
+        },
+        onUpgrade: (Migrator m, int from, int to) async {
+          if (from < 2) {
+            await m.createTable(deviceIdentity);
           }
         },
       );

@@ -11,6 +11,7 @@ import '../../../core/logging/valet_log.dart';
 import '../../../core/platform/device_info_payload.dart';
 import '../../../core/services/device_id_service.dart';
 import '../../../core/storage/offline_mode_prefs.dart';
+import '../../../core/storage/prefs_keys.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../auth/auth_session_sync.dart';
 
@@ -38,6 +39,16 @@ class _SplashScreenState extends State<SplashScreen> {
     final prefs = await SharedPreferences.getInstance();
     try {
       ValetLog.debug('splash/_bootstrap', 'start');
+      final deviceIdentityKey = prefs.getString(PrefsKeys.deviceIdentityKey);
+      if (deviceIdentityKey == null || deviceIdentityKey.isEmpty) {
+        ValetLog.debug(
+          'splash/_bootstrap',
+          'no device_identity_key, navigating to device setup',
+        );
+        if (mounted) context.go('/device-setup');
+        return;
+      }
+
       final deviceId = await DeviceIdService.getOrCreate();
       final deviceInfo = await buildDeviceInfoPayload();
 

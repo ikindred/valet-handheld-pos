@@ -306,6 +306,441 @@ class DeviceInfoCompanion extends UpdateCompanion<DeviceInfoData> {
   }
 }
 
+class $DeviceIdentityTable extends DeviceIdentity
+    with TableInfo<$DeviceIdentityTable, DeviceIdentityData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DeviceIdentityTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _deviceLabelMeta =
+      const VerificationMeta('deviceLabel');
+  @override
+  late final GeneratedColumn<String> deviceLabel = GeneratedColumn<String>(
+      'device_label', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _serverDeviceIdMeta =
+      const VerificationMeta('serverDeviceId');
+  @override
+  late final GeneratedColumn<String> serverDeviceId = GeneratedColumn<String>(
+      'server_device_id', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: true,
+      defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
+  static const VerificationMeta _androidIdHashMeta =
+      const VerificationMeta('androidIdHash');
+  @override
+  late final GeneratedColumn<String> androidIdHash = GeneratedColumn<String>(
+      'android_id_hash', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _branchMeta = const VerificationMeta('branch');
+  @override
+  late final GeneratedColumn<String> branch = GeneratedColumn<String>(
+      'branch', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _areaMeta = const VerificationMeta('area');
+  @override
+  late final GeneratedColumn<String> area = GeneratedColumn<String>(
+      'area', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _isActiveMeta =
+      const VerificationMeta('isActive');
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+      'is_active', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_active" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _claimedAtMeta =
+      const VerificationMeta('claimedAt');
+  @override
+  late final GeneratedColumn<DateTime> claimedAt = GeneratedColumn<DateTime>(
+      'claimed_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        deviceLabel,
+        serverDeviceId,
+        androidIdHash,
+        branch,
+        area,
+        isActive,
+        claimedAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'device_identity';
+  @override
+  VerificationContext validateIntegrity(Insertable<DeviceIdentityData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('device_label')) {
+      context.handle(
+          _deviceLabelMeta,
+          deviceLabel.isAcceptableOrUnknown(
+              data['device_label']!, _deviceLabelMeta));
+    } else if (isInserting) {
+      context.missing(_deviceLabelMeta);
+    }
+    if (data.containsKey('server_device_id')) {
+      context.handle(
+          _serverDeviceIdMeta,
+          serverDeviceId.isAcceptableOrUnknown(
+              data['server_device_id']!, _serverDeviceIdMeta));
+    } else if (isInserting) {
+      context.missing(_serverDeviceIdMeta);
+    }
+    if (data.containsKey('android_id_hash')) {
+      context.handle(
+          _androidIdHashMeta,
+          androidIdHash.isAcceptableOrUnknown(
+              data['android_id_hash']!, _androidIdHashMeta));
+    } else if (isInserting) {
+      context.missing(_androidIdHashMeta);
+    }
+    if (data.containsKey('branch')) {
+      context.handle(_branchMeta,
+          branch.isAcceptableOrUnknown(data['branch']!, _branchMeta));
+    } else if (isInserting) {
+      context.missing(_branchMeta);
+    }
+    if (data.containsKey('area')) {
+      context.handle(
+          _areaMeta, area.isAcceptableOrUnknown(data['area']!, _areaMeta));
+    } else if (isInserting) {
+      context.missing(_areaMeta);
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(_isActiveMeta,
+          isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta));
+    }
+    if (data.containsKey('claimed_at')) {
+      context.handle(_claimedAtMeta,
+          claimedAt.isAcceptableOrUnknown(data['claimed_at']!, _claimedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DeviceIdentityData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DeviceIdentityData(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      deviceLabel: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_label'])!,
+      serverDeviceId: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}server_device_id'])!,
+      androidIdHash: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}android_id_hash'])!,
+      branch: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}branch'])!,
+      area: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}area'])!,
+      isActive: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_active'])!,
+      claimedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}claimed_at']),
+    );
+  }
+
+  @override
+  $DeviceIdentityTable createAlias(String alias) {
+    return $DeviceIdentityTable(attachedDatabase, alias);
+  }
+}
+
+class DeviceIdentityData extends DataClass
+    implements Insertable<DeviceIdentityData> {
+  final int id;
+  final String deviceLabel;
+  final String serverDeviceId;
+
+  /// SHA-256 of raw ANDROID_ID (never store raw id).
+  final String androidIdHash;
+  final String branch;
+  final String area;
+  final bool isActive;
+  final DateTime? claimedAt;
+  const DeviceIdentityData(
+      {required this.id,
+      required this.deviceLabel,
+      required this.serverDeviceId,
+      required this.androidIdHash,
+      required this.branch,
+      required this.area,
+      required this.isActive,
+      this.claimedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['device_label'] = Variable<String>(deviceLabel);
+    map['server_device_id'] = Variable<String>(serverDeviceId);
+    map['android_id_hash'] = Variable<String>(androidIdHash);
+    map['branch'] = Variable<String>(branch);
+    map['area'] = Variable<String>(area);
+    map['is_active'] = Variable<bool>(isActive);
+    if (!nullToAbsent || claimedAt != null) {
+      map['claimed_at'] = Variable<DateTime>(claimedAt);
+    }
+    return map;
+  }
+
+  DeviceIdentityCompanion toCompanion(bool nullToAbsent) {
+    return DeviceIdentityCompanion(
+      id: Value(id),
+      deviceLabel: Value(deviceLabel),
+      serverDeviceId: Value(serverDeviceId),
+      androidIdHash: Value(androidIdHash),
+      branch: Value(branch),
+      area: Value(area),
+      isActive: Value(isActive),
+      claimedAt: claimedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(claimedAt),
+    );
+  }
+
+  factory DeviceIdentityData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DeviceIdentityData(
+      id: serializer.fromJson<int>(json['id']),
+      deviceLabel: serializer.fromJson<String>(json['deviceLabel']),
+      serverDeviceId: serializer.fromJson<String>(json['serverDeviceId']),
+      androidIdHash: serializer.fromJson<String>(json['androidIdHash']),
+      branch: serializer.fromJson<String>(json['branch']),
+      area: serializer.fromJson<String>(json['area']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+      claimedAt: serializer.fromJson<DateTime?>(json['claimedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'deviceLabel': serializer.toJson<String>(deviceLabel),
+      'serverDeviceId': serializer.toJson<String>(serverDeviceId),
+      'androidIdHash': serializer.toJson<String>(androidIdHash),
+      'branch': serializer.toJson<String>(branch),
+      'area': serializer.toJson<String>(area),
+      'isActive': serializer.toJson<bool>(isActive),
+      'claimedAt': serializer.toJson<DateTime?>(claimedAt),
+    };
+  }
+
+  DeviceIdentityData copyWith(
+          {int? id,
+          String? deviceLabel,
+          String? serverDeviceId,
+          String? androidIdHash,
+          String? branch,
+          String? area,
+          bool? isActive,
+          Value<DateTime?> claimedAt = const Value.absent()}) =>
+      DeviceIdentityData(
+        id: id ?? this.id,
+        deviceLabel: deviceLabel ?? this.deviceLabel,
+        serverDeviceId: serverDeviceId ?? this.serverDeviceId,
+        androidIdHash: androidIdHash ?? this.androidIdHash,
+        branch: branch ?? this.branch,
+        area: area ?? this.area,
+        isActive: isActive ?? this.isActive,
+        claimedAt: claimedAt.present ? claimedAt.value : this.claimedAt,
+      );
+  DeviceIdentityData copyWithCompanion(DeviceIdentityCompanion data) {
+    return DeviceIdentityData(
+      id: data.id.present ? data.id.value : this.id,
+      deviceLabel:
+          data.deviceLabel.present ? data.deviceLabel.value : this.deviceLabel,
+      serverDeviceId: data.serverDeviceId.present
+          ? data.serverDeviceId.value
+          : this.serverDeviceId,
+      androidIdHash: data.androidIdHash.present
+          ? data.androidIdHash.value
+          : this.androidIdHash,
+      branch: data.branch.present ? data.branch.value : this.branch,
+      area: data.area.present ? data.area.value : this.area,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      claimedAt: data.claimedAt.present ? data.claimedAt.value : this.claimedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeviceIdentityData(')
+          ..write('id: $id, ')
+          ..write('deviceLabel: $deviceLabel, ')
+          ..write('serverDeviceId: $serverDeviceId, ')
+          ..write('androidIdHash: $androidIdHash, ')
+          ..write('branch: $branch, ')
+          ..write('area: $area, ')
+          ..write('isActive: $isActive, ')
+          ..write('claimedAt: $claimedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, deviceLabel, serverDeviceId,
+      androidIdHash, branch, area, isActive, claimedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DeviceIdentityData &&
+          other.id == this.id &&
+          other.deviceLabel == this.deviceLabel &&
+          other.serverDeviceId == this.serverDeviceId &&
+          other.androidIdHash == this.androidIdHash &&
+          other.branch == this.branch &&
+          other.area == this.area &&
+          other.isActive == this.isActive &&
+          other.claimedAt == this.claimedAt);
+}
+
+class DeviceIdentityCompanion extends UpdateCompanion<DeviceIdentityData> {
+  final Value<int> id;
+  final Value<String> deviceLabel;
+  final Value<String> serverDeviceId;
+  final Value<String> androidIdHash;
+  final Value<String> branch;
+  final Value<String> area;
+  final Value<bool> isActive;
+  final Value<DateTime?> claimedAt;
+  const DeviceIdentityCompanion({
+    this.id = const Value.absent(),
+    this.deviceLabel = const Value.absent(),
+    this.serverDeviceId = const Value.absent(),
+    this.androidIdHash = const Value.absent(),
+    this.branch = const Value.absent(),
+    this.area = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.claimedAt = const Value.absent(),
+  });
+  DeviceIdentityCompanion.insert({
+    this.id = const Value.absent(),
+    required String deviceLabel,
+    required String serverDeviceId,
+    required String androidIdHash,
+    required String branch,
+    required String area,
+    this.isActive = const Value.absent(),
+    this.claimedAt = const Value.absent(),
+  })  : deviceLabel = Value(deviceLabel),
+        serverDeviceId = Value(serverDeviceId),
+        androidIdHash = Value(androidIdHash),
+        branch = Value(branch),
+        area = Value(area);
+  static Insertable<DeviceIdentityData> custom({
+    Expression<int>? id,
+    Expression<String>? deviceLabel,
+    Expression<String>? serverDeviceId,
+    Expression<String>? androidIdHash,
+    Expression<String>? branch,
+    Expression<String>? area,
+    Expression<bool>? isActive,
+    Expression<DateTime>? claimedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceLabel != null) 'device_label': deviceLabel,
+      if (serverDeviceId != null) 'server_device_id': serverDeviceId,
+      if (androidIdHash != null) 'android_id_hash': androidIdHash,
+      if (branch != null) 'branch': branch,
+      if (area != null) 'area': area,
+      if (isActive != null) 'is_active': isActive,
+      if (claimedAt != null) 'claimed_at': claimedAt,
+    });
+  }
+
+  DeviceIdentityCompanion copyWith(
+      {Value<int>? id,
+      Value<String>? deviceLabel,
+      Value<String>? serverDeviceId,
+      Value<String>? androidIdHash,
+      Value<String>? branch,
+      Value<String>? area,
+      Value<bool>? isActive,
+      Value<DateTime?>? claimedAt}) {
+    return DeviceIdentityCompanion(
+      id: id ?? this.id,
+      deviceLabel: deviceLabel ?? this.deviceLabel,
+      serverDeviceId: serverDeviceId ?? this.serverDeviceId,
+      androidIdHash: androidIdHash ?? this.androidIdHash,
+      branch: branch ?? this.branch,
+      area: area ?? this.area,
+      isActive: isActive ?? this.isActive,
+      claimedAt: claimedAt ?? this.claimedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (deviceLabel.present) {
+      map['device_label'] = Variable<String>(deviceLabel.value);
+    }
+    if (serverDeviceId.present) {
+      map['server_device_id'] = Variable<String>(serverDeviceId.value);
+    }
+    if (androidIdHash.present) {
+      map['android_id_hash'] = Variable<String>(androidIdHash.value);
+    }
+    if (branch.present) {
+      map['branch'] = Variable<String>(branch.value);
+    }
+    if (area.present) {
+      map['area'] = Variable<String>(area.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (claimedAt.present) {
+      map['claimed_at'] = Variable<DateTime>(claimedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeviceIdentityCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceLabel: $deviceLabel, ')
+          ..write('serverDeviceId: $serverDeviceId, ')
+          ..write('androidIdHash: $androidIdHash, ')
+          ..write('branch: $branch, ')
+          ..write('area: $area, ')
+          ..write('isActive: $isActive, ')
+          ..write('claimedAt: $claimedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $OfflineAccountsTable extends OfflineAccounts
     with TableInfo<$OfflineAccountsTable, OfflineAccount> {
   @override
@@ -2086,7 +2521,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
   final String? checkOutAt;
   final double? fee;
 
-  /// `active` | `completed` | `lost`
+  /// `active` | `completed` | `lost` | `draft` (reserved id before check-in completes)
   final String status;
 
   /// `pending` | `synced`
@@ -3972,6 +4407,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $DeviceInfoTable deviceInfo = $DeviceInfoTable(this);
+  late final $DeviceIdentityTable deviceIdentity = $DeviceIdentityTable(this);
   late final $OfflineAccountsTable offlineAccounts =
       $OfflineAccountsTable(this);
   late final $SessionsTable sessions = $SessionsTable(this);
@@ -3986,6 +4422,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
         deviceInfo,
+        deviceIdentity,
         offlineAccounts,
         sessions,
         shifts,
@@ -4112,6 +4549,177 @@ class $$DeviceInfoTableOrderingComposer
 
   ColumnOrderings<int> get registeredAt => $state.composableBuilder(
       column: $state.table.registeredAt,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+}
+
+typedef $$DeviceIdentityTableCreateCompanionBuilder = DeviceIdentityCompanion
+    Function({
+  Value<int> id,
+  required String deviceLabel,
+  required String serverDeviceId,
+  required String androidIdHash,
+  required String branch,
+  required String area,
+  Value<bool> isActive,
+  Value<DateTime?> claimedAt,
+});
+typedef $$DeviceIdentityTableUpdateCompanionBuilder = DeviceIdentityCompanion
+    Function({
+  Value<int> id,
+  Value<String> deviceLabel,
+  Value<String> serverDeviceId,
+  Value<String> androidIdHash,
+  Value<String> branch,
+  Value<String> area,
+  Value<bool> isActive,
+  Value<DateTime?> claimedAt,
+});
+
+class $$DeviceIdentityTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $DeviceIdentityTable,
+    DeviceIdentityData,
+    $$DeviceIdentityTableFilterComposer,
+    $$DeviceIdentityTableOrderingComposer,
+    $$DeviceIdentityTableCreateCompanionBuilder,
+    $$DeviceIdentityTableUpdateCompanionBuilder> {
+  $$DeviceIdentityTableTableManager(
+      _$AppDatabase db, $DeviceIdentityTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          filteringComposer:
+              $$DeviceIdentityTableFilterComposer(ComposerState(db, table)),
+          orderingComposer:
+              $$DeviceIdentityTableOrderingComposer(ComposerState(db, table)),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> deviceLabel = const Value.absent(),
+            Value<String> serverDeviceId = const Value.absent(),
+            Value<String> androidIdHash = const Value.absent(),
+            Value<String> branch = const Value.absent(),
+            Value<String> area = const Value.absent(),
+            Value<bool> isActive = const Value.absent(),
+            Value<DateTime?> claimedAt = const Value.absent(),
+          }) =>
+              DeviceIdentityCompanion(
+            id: id,
+            deviceLabel: deviceLabel,
+            serverDeviceId: serverDeviceId,
+            androidIdHash: androidIdHash,
+            branch: branch,
+            area: area,
+            isActive: isActive,
+            claimedAt: claimedAt,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required String deviceLabel,
+            required String serverDeviceId,
+            required String androidIdHash,
+            required String branch,
+            required String area,
+            Value<bool> isActive = const Value.absent(),
+            Value<DateTime?> claimedAt = const Value.absent(),
+          }) =>
+              DeviceIdentityCompanion.insert(
+            id: id,
+            deviceLabel: deviceLabel,
+            serverDeviceId: serverDeviceId,
+            androidIdHash: androidIdHash,
+            branch: branch,
+            area: area,
+            isActive: isActive,
+            claimedAt: claimedAt,
+          ),
+        ));
+}
+
+class $$DeviceIdentityTableFilterComposer
+    extends FilterComposer<_$AppDatabase, $DeviceIdentityTable> {
+  $$DeviceIdentityTableFilterComposer(super.$state);
+  ColumnFilters<int> get id => $state.composableBuilder(
+      column: $state.table.id,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get deviceLabel => $state.composableBuilder(
+      column: $state.table.deviceLabel,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get serverDeviceId => $state.composableBuilder(
+      column: $state.table.serverDeviceId,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get androidIdHash => $state.composableBuilder(
+      column: $state.table.androidIdHash,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get branch => $state.composableBuilder(
+      column: $state.table.branch,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get area => $state.composableBuilder(
+      column: $state.table.area,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<bool> get isActive => $state.composableBuilder(
+      column: $state.table.isActive,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<DateTime> get claimedAt => $state.composableBuilder(
+      column: $state.table.claimedAt,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+}
+
+class $$DeviceIdentityTableOrderingComposer
+    extends OrderingComposer<_$AppDatabase, $DeviceIdentityTable> {
+  $$DeviceIdentityTableOrderingComposer(super.$state);
+  ColumnOrderings<int> get id => $state.composableBuilder(
+      column: $state.table.id,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get deviceLabel => $state.composableBuilder(
+      column: $state.table.deviceLabel,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get serverDeviceId => $state.composableBuilder(
+      column: $state.table.serverDeviceId,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get androidIdHash => $state.composableBuilder(
+      column: $state.table.androidIdHash,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get branch => $state.composableBuilder(
+      column: $state.table.branch,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get area => $state.composableBuilder(
+      column: $state.table.area,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<bool> get isActive => $state.composableBuilder(
+      column: $state.table.isActive,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<DateTime> get claimedAt => $state.composableBuilder(
+      column: $state.table.claimedAt,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 }
@@ -5596,6 +6204,8 @@ class $AppDatabaseManager {
   $AppDatabaseManager(this._db);
   $$DeviceInfoTableTableManager get deviceInfo =>
       $$DeviceInfoTableTableManager(_db, _db.deviceInfo);
+  $$DeviceIdentityTableTableManager get deviceIdentity =>
+      $$DeviceIdentityTableTableManager(_db, _db.deviceIdentity);
   $$OfflineAccountsTableTableManager get offlineAccounts =>
       $$OfflineAccountsTableTableManager(_db, _db.offlineAccounts);
   $$SessionsTableTableManager get sessions =>
