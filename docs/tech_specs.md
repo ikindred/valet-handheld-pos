@@ -332,3 +332,5 @@ dev_dependencies:
 ---
 
 _Database structure, data models, business logic, and folder structure will be covered in separate documents._
+
+https://software-fwd-gmbh-linking.trycloudflare.com/api/docs#/
