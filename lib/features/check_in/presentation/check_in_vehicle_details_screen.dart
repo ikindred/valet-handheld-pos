@@ -218,6 +218,10 @@ class _CheckInVehicleDetailsScreenState
         _modelYearRow(),
         const SizedBox(height: 16),
         _brandColorRow(),
+        const SizedBox(height: 20),
+        const CheckInSectionTitle(text: 'VEHICLE TYPE'),
+        const SizedBox(height: 12),
+        const CheckInVehicleBodyTypeGrid(),
       ],
     );
   }

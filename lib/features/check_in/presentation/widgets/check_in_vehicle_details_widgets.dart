@@ -83,11 +83,19 @@ class CheckInPlateNumberField extends StatelessWidget {
   }
 }
 
-/// Two-column grid of vehicle body type cards (Figma: 2×3, same selection chrome as valet type).
+/// Vehicle type cards: row 1 (Sedan | SUV | Van), row 2 (Luxury | EV/PHEV), same widths as row 1.
 class CheckInVehicleBodyTypeGrid extends StatelessWidget {
   const CheckInVehicleBodyTypeGrid({super.key});
 
-  static const _types = VehicleBodyType.values;
+  static const _row1 = [
+    VehicleBodyType.sedan,
+    VehicleBodyType.suv,
+    VehicleBodyType.van,
+  ];
+  static const _row2 = [
+    VehicleBodyType.luxury,
+    VehicleBodyType.evPhev,
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -96,24 +104,43 @@ class CheckInVehicleBodyTypeGrid extends StatelessWidget {
       builder: (context, state) {
         return LayoutBuilder(
           builder: (context, constraints) {
+            const gap = 12.0;
             final w = constraints.maxWidth;
-            final gap = 12.0;
-            final cellW = (w - gap) / 2;
-            return Wrap(
-              spacing: gap,
-              runSpacing: gap,
-              children: _types.map((t) {
-                return SizedBox(
-                  width: cellW,
-                  child: _VehicleTypeCard(
-                    type: t,
-                    selected: state.vehicleBodyType == t,
-                    onTap: () => context.read<CheckInCubit>().updateVehicleStep(
-                      vehicleBodyType: t,
-                    ),
-                  ),
-                );
-              }).toList(),
+            final cellW = (w - 2 * gap) / 3;
+
+            Widget card(VehicleBodyType t) => SizedBox(
+              width: cellW,
+              child: _VehicleTypeCard(
+                type: t,
+                selected: state.vehicleBodyType == t,
+                onTap: () => context.read<CheckInCubit>().updateVehicleStep(
+                  vehicleBodyType: t,
+                ),
+              ),
+            );
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    card(_row1[0]),
+                    const SizedBox(width: gap),
+                    card(_row1[1]),
+                    const SizedBox(width: gap),
+                    card(_row1[2]),
+                  ],
+                ),
+                const SizedBox(height: gap),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    card(_row2[0]),
+                    const SizedBox(width: gap),
+                    card(_row2[1]),
+                  ],
+                ),
+              ],
             );
           },
         );
@@ -150,7 +177,7 @@ class _VehicleTypeCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          height: 96,
+          height: 120,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
             color: bg,
@@ -172,10 +199,10 @@ class _VehicleTypeCard extends StatelessWidget {
               Text(
                 type.label,
                 textAlign: TextAlign.center,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
-                  fontSize: 13,
+                  fontSize: 15,
                   fontWeight: FontWeight.w500,
                   color: labelColor,
                 ),
