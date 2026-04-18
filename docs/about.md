@@ -68,14 +68,30 @@ The tablet app is the **cashier and valet attendant-facing component** of the Va
 
 ---
 
+## Bootstrap & terminal identity
+
+On first launch (or after data loss), the tablet has **no server-claimed POS terminal identity**. The app enforces a one-time **Device Setup** flow:
+
+1. **Splash** — If `device_identity_key` is **not** set in local preferences, navigation goes to **Device Setup** instead of the normal splash continuation.
+2. **Device Setup** — Staff selects a pre-configured terminal from the server (`GET /devices/active`), then **claims** it (`POST /devices/claim`) using a SHA-256 hash of the physical `ANDROID_ID` (raw ID is never stored).
+3. On a successful **active** claim, the app stores the identity in Drift (`device_identity` table) and writes `device_identity_key` (the server’s logical terminal id) to preferences, then continues to **Login**.
+
+The legacy `device_info` table in Drift remains for backward compatibility; **authoritative** branch/area/label for the claimed terminal is stored in `device_identity` going forward.
+
+After login, a **device conflict** listener (WebSocket transport still TBD) can show a blocking dialog if another device attempts to use the same terminal identity. **Logout** from that dialog ends the session via the existing auth repository path and does **not** clear terminal identity data, so the tablet keeps its claimed terminal unless re-provisioned.
+
+---
+
 ## Session Flow
 
-### Login → Open Cash → Dashboard
+### Splash → (Device Setup) → Login → Open Cash → Dashboard
+
+If `device_identity_key` is already set, splash proceeds as before (session restore or **Login**). Otherwise the user must complete **Device Setup** once per physical device.
 
 After a successful login, the staff is **not taken directly to the dashboard**. Instead, they are required to complete the **Open Cash** screen first — entering the opening float for the shift. Only after confirming the opening float does the app navigate to the dashboard. This ensures every shift starts with a recorded cash position.
 
 ```
-Login → Open Cash (required) → Dashboard
+Splash → [Device Setup if no terminal identity] → Login → Open Cash (required) → Dashboard
 ```
 
 ### Logout Flow
@@ -131,6 +147,8 @@ Rates are fetched from the server and cached locally for offline use. No rates a
 
 | #   | Screen           | Description                                                                     |
 | --- | ---------------- | ------------------------------------------------------------------------------- |
+| —   | Splash           | Bootstrap, session restore, routing                                             |
+| —   | Device Setup     | One-time claim of server POS terminal (shown when `device_identity_key` unset)  |
 | 1   | Login            | Staff authentication with branch selection                                      |
 | 2   | Open Cash        | Opening float entry — **required only if the user session is currently closed** |
 | 3   | Dashboard        | Active vehicles, shift stats, quick actions                                     |
@@ -162,6 +180,7 @@ Active branches covered by the system:
 
 ## System Architecture Notes
 
+- **POS terminal identity**: Ticket and billing identifiers are tied to the **server terminal id** after device claim, not to a raw Android hardware id.
 - **Offline-first**: All check-in/check-out operations work without an internet connection. Data syncs to the backend when connectivity is restored.
 - **Config from server**: All fees, branch details, areas, zones, levels, and slot configurations are fetched from the server API on login and cached locally in the database for offline reference. No values are hardcoded.
 - **QR-based ticket flow**: Each ticket embeds a QR code linked to the transaction record, enabling fast scan-out at exit.
@@ -176,8 +195,8 @@ Active branches covered by the system:
 | ------------- | ------------------------------- |
 | Product Name  | Valet Master                    |
 | Client        | SPiD Smart Parking Technologies |
-| Primary Color | Dark Grey `#3C3434`             |
-| Accent Color  | Orange `#E8831A`                |
+| Primary Color | Dark Grey `#3C3434` / near-black `#1C1C1A` (setup flows) |
+| Accent Color  | Orange `#E87722` (device setup & CTAs); theme accent `#E8831A` elsewhere |
 
 ---
 

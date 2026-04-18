@@ -1,5 +1,8 @@
 flowchart TD
-A(["Splash screen"]) --> B["Login"]
+A(["Splash screen"]) --> A1{"Terminal identity\n(device_identity_key)?"}
+A1 -->|"not set"| DS["Device setup\nClaim terminal"]
+A1 -->|"set"| B["Login / session restore"]
+DS --> B
 B --> C{"Shift status\nfrom API?"}
 
     C -->|"no open shift"| D["Open cash\nEnter float"]
@@ -49,6 +52,7 @@ B --> C{"Shift status\nfrom API?"}
     O(["Logged out"]) -->|"back to login"| B
 
     style A fill:#3C3434,color:#fff,stroke:#3C3434
+    style DS fill:#1C1C1A,color:#fff,stroke:#E87722
     style E fill:#3C3434,color:#fff,stroke:#3C3434
     style F5 fill:#2E7D52,color:#fff,stroke:#2E7D52
     style G5 fill:#2E7D52,color:#fff,stroke:#2E7D52

@@ -1,6 +1,8 @@
 <!-- Splash
 https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=174-303&m=dev
 
+Device Setup (first-run POS terminal claim — dark theme, `assets/images/app_logo.png`, Poppins; route `/device-setup`)
+
 Login
 https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=30-401&m=dev
 
