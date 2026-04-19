@@ -23,5 +23,6 @@ class _CheckOutPaymentCollectScreenState
   @override
   Widget build(BuildContext context) {
     return const SizedBox.shrink();
+    //sample
   }
 }
