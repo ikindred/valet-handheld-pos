@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Valet Master — Mobile API Reference</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0f0f0f;
+    --bg2: #161616;
+    --bg3: #1e1e1e;
+    --bg4: #252525;
+    --border: #2a2a2a;
+    --border2: #333;
+    --text: #e8e4dc;
+    --text2: #8a8680;
+    --text3: #5a5855;
+    --orange: #e87722;
+    --orange-dim: rgba(232,119,34,0.12);
+    --orange-border: rgba(232,119,34,0.3);
+    --green: #3d9e6b;
+    --green-dim: rgba(61,158,107,0.1);
+    --green-border: rgba(61,158,107,0.3);
+    --blue: #4a8fc4;
+    --blue-dim: rgba(74,143,196,0.1);
+    --blue-border: rgba(74,143,196,0.3);
+    --amber: #c49a3a;
+    --amber-dim: rgba(196,154,58,0.1);
+    --amber-border: rgba(196,154,58,0.3);
+    --red: #c45a4a;
+    --red-dim: rgba(196,90,74,0.12);
+    --red-border: rgba(196,90,74,0.3);
+    --radius: 8px;
+    --radius-lg: 12px;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ── */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-logo {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-logo .product {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    color: var(--text3);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .sidebar-logo .title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .sidebar-logo .sub {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 2px;
+  }
+
+  .sidebar-nav { padding: 16px 0; flex: 1; }
+
+  .nav-section {
+    padding: 6px 20px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-top: 12px;
+  }
+  .nav-section:first-child { margin-top: 0; }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 20px;
+    cursor: pointer;
+    transition: background .12s;
+    text-decoration: none;
+    color: var(--text2);
+    font-size: 13px;
+  }
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: var(--orange-dim); color: var(--orange); }
+  .nav-item.active .nav-dot { background: var(--orange); }
+
+  .nav-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--border2);
+    flex-shrink: 0;
+  }
+
+  .sidebar-stats {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 12px;
+  }
+  .stat-pill {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    text-align: center;
+  }
+  .stat-pill .num { font-size: 18px; font-weight: 700; color: var(--text); }
+  .stat-pill .lbl { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; }
+
+  /* ── Main ── */
+  .main {
+    flex: 1;
+    min-width: 0;
+    padding: 40px 48px;
+  }
+
+  .page-header {
+    margin-bottom: 40px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  .page-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .page-header p {
+    font-size: 14px;
+    color: var(--text2);
+  }
+
+  .header-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .base-url {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    padding: 5px 12px;
+    border-radius: var(--radius);
+    color: var(--text2);
+  }
+
+  /* ── Filter bar ── */
+  .filter-bar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 14px;
+    border-radius: 100px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .filter-btn:hover { border-color: var(--text3); color: var(--text); }
+  .filter-btn.active {
+    background: var(--orange);
+    border-color: var(--orange);
+    color: #fff;
+  }
+  .filter-btn.missing-btn.active {
+    background: var(--red);
+    border-color: var(--red);
+  }
+
+  /* ── Section ── */
+  .section { margin-bottom: 48px; }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .section-header h2 {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text3);
+  }
+  .section-line { flex: 1; height: 1px; background: var(--border); }
+
+  /* ── Endpoint card ── */
+  .endpoint {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 10px;
+    overflow: hidden;
+    transition: border-color .15s;
+  }
+  .endpoint:hover { border-color: var(--border2); }
+  .endpoint.missing { border-color: var(--red-border); }
+  .endpoint.reserved { border-color: var(--amber-border); }
+
+  .ep-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .ep-header:hover { background: var(--bg3); }
+
+  .method-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 6px;
+    min-width: 58px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .GET  { background: var(--green-dim); color: var(--green); border: 1px solid var(--green-border); }
+  .POST { background: var(--blue-dim);  color: var(--blue);  border: 1px solid var(--blue-border); }
+  .PATCH{ background: var(--amber-dim); color: var(--amber); border: 1px solid var(--amber-border); }
+
+  .ep-path {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .ep-desc {
+    font-size: 12px;
+    color: var(--text2);
+    margin-left: auto;
+    text-align: right;
+    max-width: 220px;
+    flex-shrink: 0;
+  }
+
+  .status-badge {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 100px;
+    flex-shrink: 0;
+  }
+  .badge-ok       { background: var(--green-dim); color: var(--green);  border: 1px solid var(--green-border); }
+  .badge-missing  { background: var(--red-dim);   color: var(--red);    border: 1px solid var(--red-border); }
+  .badge-reserved { background: var(--amber-dim); color: var(--amber);  border: 1px solid var(--amber-border); }
+
+  .chevron {
+    color: var(--text3);
+    font-size: 16px;
+    transition: transform .2s;
+    flex-shrink: 0;
+    margin-left: 4px;
+  }
+  .chevron.open { transform: rotate(90deg); }
+
+  /* ── Endpoint body ── */
+  .ep-body {
+    border-top: 1px solid var(--border);
+    padding: 20px 18px;
+    display: none;
+    animation: fadeIn .15s ease;
+  }
+  .ep-body.open { display: block; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+  .ep-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .ep-grid.single { grid-template-columns: 1fr; }
+
+  .block-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 8px;
+  }
+
+  pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: #c9c4ba;
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.7;
+  }
+
+  .note {
+    margin-top: 16px;
+    padding: 10px 14px;
+    background: var(--bg3);
+    border-left: 2px solid var(--orange);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.65;
+  }
+  .note code {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--bg4);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--orange);
+  }
+
+  .block { margin-bottom: 4px; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* JSON syntax coloring */
+  .str { color: #7ec8a0; }
+  .num { color: #e8c97a; }
+  .key { color: #89b8e8; }
+  .null { color: #a0a0a0; }
+  .bool { color: #e87722; }
+
+  /* ── Process Flow ── */
+  .flow-phase {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 2px;
+    overflow: hidden;
+  }
+  .flow-phase-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--orange);
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--orange-dim);
+  }
+  .flow-phase-sub {
+    font-size: 10px;
+    color: var(--text3);
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    margin-left: 6px;
+  }
+  .flow-step {
+    display: flex;
+    gap: 14px;
+    padding: 18px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .flow-step:last-child { border-bottom: none; }
+  .flow-step-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--bg4);
+    border: 1px solid var(--border2);
+    color: var(--text2);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-family: var(--mono);
+    margin-top: 2px;
+  }
+  .flow-step-content { flex: 1; min-width: 0; }
+  .flow-step-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .flow-step-desc {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.65;
+    margin-bottom: 12px;
+  }
+  .flow-ep-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .flow-ep-tag code {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    background: var(--bg4);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+  }
+  .flow-payload-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 5px;
+    margin-top: 10px;
+  }
+  .flow-note {
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: var(--bg3);
+    border-left: 2px solid var(--orange);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    font-size: 11px;
+    color: var(--text2);
+    line-height: 1.6;
+  }
+  .flow-note code {
+    font-family: var(--mono);
+    font-size: 10px;
+    background: var(--bg4);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--orange);
+  }
+  .flow-divider {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text3);
+    font-family: var(--mono);
+    padding: 10px 0;
+    letter-spacing: .04em;
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="product">SPiD Smart Parking</div>
+    <div class="title">Valet Master</div>
+    <div class="sub">Mobile API Reference</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section">Overview</div>
+    <a class="nav-item" href="#flow" onclick="scrollTo('flow')"><span class="nav-dot"></span>Process Flow</a>
+    <div class="nav-section">Endpoints</div>
+    <a class="nav-item" href="#auth" onclick="scrollTo('auth')"><span class="nav-dot"></span>Auth</a>
+    <a class="nav-item" href="#device" onclick="scrollTo('device')"><span class="nav-dot"></span>Device</a>
+    <a class="nav-item" href="#cash" onclick="scrollTo('cash')"><span class="nav-dot"></span>Cash Sessions</a>
+    <a class="nav-item" href="#transactions" onclick="scrollTo('transactions')"><span class="nav-dot"></span>Transactions</a>
+    <a class="nav-item" href="#rates" onclick="scrollTo('rates')"><span class="nav-dot"></span>Branches & Rates</a>
+    <a class="nav-item" href="#settings" onclick="scrollTo('settings')"><span class="nav-dot"></span>Settings</a>
+
+    <div class="nav-section">Status</div>
+    <a class="nav-item" style="pointer-events:none"><span class="nav-dot" style="background:var(--green)"></span><span style="color:var(--green)">In swagger</span></a>
+    <a class="nav-item" style="pointer-events:none"><span class="nav-dot" style="background:var(--red)"></span><span style="color:var(--red)">Missing</span></a>
+    <a class="nav-item" style="pointer-events:none"><span class="nav-dot" style="background:var(--amber)"></span><span style="color:var(--amber)">Wired, reserved</span></a>
+  </nav>
+
+  <div class="sidebar-stats">
+    <div class="stat-pill">
+      <div class="num" style="color:var(--green)">18</div>
+      <div class="lbl">Total</div>
+    </div>
+    <div class="stat-pill">
+      <div class="num" style="color:var(--red)">2</div>
+      <div class="lbl">Missing</div>
+    </div>
+    <div class="stat-pill">
+      <div class="num" style="color:var(--amber)">2</div>
+      <div class="lbl">Reserved</div>
+    </div>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="main">
+  <div class="page-header">
+    <h1>Mobile API Reference</h1>
+    <p>All endpoints consumed by the Valet Master Flutter tablet app. Verified against the codebase.</p>
+    <div class="header-meta">
+      <span class="base-url">Base URL: https://&lt;server&gt;/api/v1</span>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="filterAll(this)">All</button>
+    <button class="filter-btn" onclick="filterGroup(this,'flow')">Process Flow</button>
+    <button class="filter-btn" onclick="filterGroup(this,'auth')">Auth</button>
+    <button class="filter-btn" onclick="filterGroup(this,'device')">Device</button>
+    <button class="filter-btn" onclick="filterGroup(this,'cash')">Cash Sessions</button>
+    <button class="filter-btn" onclick="filterGroup(this,'transactions')">Transactions</button>
+    <button class="filter-btn" onclick="filterGroup(this,'rates')">Branches & Rates</button>
+    <button class="filter-btn" onclick="filterGroup(this,'settings')">Settings</button>
+    <button class="filter-btn missing-btn" onclick="filterMissing(this)">❌ Missing only</button>
+  </div>
+
+  <!-- ── PROCESS FLOW ── -->
+  <div class="section" id="flow" data-group="flow">
+    <div class="section-header">
+      <h2>Process Flow — Check-in to Check-out</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <!-- CHECK-IN -->
+    <div class="flow-phase">
+      <div class="flow-phase-label">Check-In</div>
+
+      <div class="flow-step">
+        <div class="flow-step-num">1</div>
+        <div class="flow-step-content">
+          <div class="flow-step-title">Car arrives — create draft ticket</div>
+          <div class="flow-step-desc">The moment the customer arrives, immediately create a draft transaction with just the contact number and valet type. This gives you back the server UUID (<code>server_ticket_id</code>) that all subsequent calls for this ticket will use as <code>:id</code>.</div>
+          <div class="flow-ep-tag">
+            <span class="method-badge POST" style="font-size:10px;padding:2px 8px;">POST</span>
+            <code>/transactions</code>
+          </div>
+          <div class="flow-payload-label">Request Body</div>
+          <pre>{
+  <span class="key">"customer_name"</span>: <span class="null">null</span>,
+  <span class="key">"contact_number"</span>: <span class="str">"09171234567"</span>,
+  <span class="key">"valet_type"</span>: <span class="str">"standard_valet"</span>,
+  <span class="key">"driver_id"</span>: <span class="null">null</span>,
+  <span class="key">"notes"</span>: <span class="null">null</span>
+}</pre>
+          <div class="flow-payload-label">Response 201</div>
+          <pre>{
+  <span class="key">"id"</span>: <span class="str">"550e8400-e29b-41d4-a716-446655440000"</span>,
+  <span class="key">"ticket_number"</span>: <span class="str">"TKT-0001"</span>
+}</pre>
+          <div class="flow-note">Save the returned <code>id</code> as <code>server_ticket_id</code> locally. Without it, all subsequent syncs for this ticket are skipped. The app keeps its own <code>TKT-XXXX</code> as the display number.</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-step-num">2</div>
+        <div class="flow-step-content">
+          <div class="flow-step-title">Fill car details, belongings, damage, signature — finalize check-in</div>
+          <div class="flow-step-desc">Attendant fills in the plate number, car info, ticks off belongings in the car, marks any pre-existing damage on the diagram, and captures the customer's signature acknowledging the T&amp;C. One PATCH sends everything and completes the check-in. After this succeeds, the thermal ticket prints.</div>
+          <div class="flow-ep-tag">
+            <span class="method-badge PATCH" style="font-size:10px;padding:2px 8px;">PATCH</span>
+            <code>/transactions/:id</code>
+          </div>
+          <div class="flow-payload-label">Request Body</div>
+          <pre>{
+  <span class="key">"vehicle"</span>: {
+    <span class="key">"plate_number"</span>: <span class="str">"ABC 1234"</span>,
+    <span class="key">"brand"</span>: <span class="str">"Toyota Camry"</span>,
+    <span class="key">"color"</span>: <span class="str">"Silver"</span>,
+    <span class="key">"type"</span>: <span class="str">"sedan"</span>,
+    <span class="key">"model"</span>: <span class="str">""</span>,
+    <span class="key">"year"</span>: <span class="null">null</span>
+  },
+  <span class="key">"driver_in"</span>: <span class="str">"Juan dela Cruz"</span>,
+  <span class="key">"parking"</span>: { <span class="key">"level"</span>: <span class="null">null</span>, <span class="key">"slot"</span>: <span class="null">null</span> },
+  <span class="key">"belongings"</span>: [<span class="str">"iPad"</span>, <span class="str">"Cellphone / Charger"</span>],
+  <span class="key">"condition"</span>: {
+    <span class="key">"damages"</span>: [
+      { <span class="key">"zone"</span>: <span class="str">"Hood"</span>, <span class="key">"type"</span>: <span class="str">"dent"</span>, <span class="key">"x"</span>: <span class="num">0.2</span>, <span class="key">"y"</span>: <span class="num">0.15</span> }
+    ],
+    <span class="key">"signature"</span>: <span class="str">"data:image/png;base64,iVBORw0KGgo..."</span>
+  }
+}</pre>
+          <div class="flow-payload-label">Response 200</div>
+          <pre>{
+  <span class="key">"id"</span>: <span class="str">"550e8400-e29b-41d4-a716-446655440000"</span>,
+  <span class="key">"status"</span>: <span class="str">"active"</span>
+}</pre>
+          <div class="flow-note"><code>:id</code> is always the <code>server_ticket_id</code> UUID from step 1 — never the local <code>TKT-XXXX</code>. Thermal ticket prints after success: attendant copy, customer claim stub with QR, key tag.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="flow-divider">↓ car is parked — customer keeps the claim stub</div>
+
+    <!-- CHECK-OUT -->
+    <div class="flow-phase">
+      <div class="flow-phase-label">Check-Out</div>
+
+      <div class="flow-step">
+        <div class="flow-step-num">3</div>
+        <div class="flow-step-content">
+          <div class="flow-step-title">Customer presents ticket — look up the transaction</div>
+          <div class="flow-step-desc">Customer returns and presents their stub. Cashier either scans the QR code or manually types the TKT-XXXX. The app fetches the transaction to get the check-in time, then computes the fee locally using the cached branch rates — no server-side fee computation.</div>
+          <div class="flow-ep-tag">
+            <span class="method-badge GET" style="font-size:10px;padding:2px 8px;">GET</span>
+            <code>/tickets/by-number/:ticketNumber</code>
+            <span style="font-size:11px;color:var(--text3);">manual TKT-XXXX</span>
+          </div>
+          <div class="flow-ep-tag" style="margin-top:4px;">
+            <span class="method-badge GET" style="font-size:10px;padding:2px 8px;">GET</span>
+            <code>/transactions/:id</code>
+            <span style="font-size:11px;color:var(--text3);">QR scan</span>
+          </div>
+          <div class="flow-payload-label">Response 200</div>
+          <pre>{
+  <span class="key">"id"</span>: <span class="str">"550e8400-e29b-41d4-a716-446655440000"</span>,
+  <span class="key">"ticket_number"</span>: <span class="str">"TKT-0001"</span>,
+  <span class="key">"check_in_time"</span>: <span class="str">"2024-01-01T10:00:00.000Z"</span>,
+  <span class="key">"vehicle"</span>: {
+    <span class="key">"plate_number"</span>: <span class="str">"ABC 1234"</span>,
+    <span class="key">"brand"</span>: <span class="str">"Toyota Camry"</span>,
+    <span class="key">"color"</span>: <span class="str">"Silver"</span>,
+    <span class="key">"type"</span>: <span class="str">"sedan"</span>
+  },
+  <span class="key">"status"</span>: <span class="str">"active"</span>
+}</pre>
+          <div class="flow-note">Both endpoints return the same shape. App resolves from local Drift first — these calls are fallback for cross-device lookups or tickets not found locally.</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-step-num">4</div>
+        <div class="flow-step-content">
+          <div class="flow-step-title">Record checkout condition before releasing the car</div>
+          <div class="flow-step-desc">Before the car is handed back, the attendant checks the vehicle condition and records any damage on the diagram. This is your dispute protection — if a customer claims damage happened during valet, you have both check-in and checkout condition on record. This must succeed before payment is collected.</div>
+          <div class="flow-ep-tag">
+            <span class="method-badge PATCH" style="font-size:10px;padding:2px 8px;">PATCH</span>
+            <code>/transactions/:id</code>
+          </div>
+          <div class="flow-payload-label">Request Body</div>
+          <pre>{
+  <span class="key">"driver_out"</span>: <span class="str">"Pedro Santos"</span>,
+  <span class="key">"condition_checkout"</span>: [
+    { <span class="key">"zone"</span>: <span class="str">"Front Bumper"</span>, <span class="key">"type"</span>: <span class="str">"scratch"</span>, <span class="key">"x"</span>: <span class="num">0.5</span>, <span class="key">"y"</span>: <span class="num">0.05</span> }
+  ],
+  <span class="key">"status"</span>: <span class="str">"active"</span>
+}</pre>
+          <div class="flow-payload-label">Response 200</div>
+          <pre>{
+  <span class="key">"id"</span>: <span class="str">"550e8400-e29b-41d4-a716-446655440000"</span>,
+  <span class="key">"status"</span>: <span class="str">"active"</span>
+}</pre>
+          <div class="flow-note">Same endpoint as check-in PATCH, different payload. This is the second use of <code>PATCH /transactions/:id</code> in the ticket lifecycle.</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-step-num">5</div>
+        <div class="flow-step-content">
+          <div class="flow-step-title">Collect payment — finalize transaction</div>
+          <div class="flow-step-desc">Customer pays the computed fee. App sends the amount collected. Server returns the change amount. Receipt prints, car is released to the customer.</div>
+          <div class="flow-ep-tag">
+            <span class="method-badge POST" style="font-size:10px;padding:2px 8px;">POST</span>
+            <code>/transactions/:id/pay</code>
+          </div>
+          <div class="flow-payload-label">Request Body</div>
+          <pre>{
+  <span class="key">"method"</span>: <span class="str">"cash"</span>,
+  <span class="key">"amount_paid"</span>: <span class="num">200</span>
+}</pre>
+          <div class="flow-payload-label">Response 200</div>
+          <pre>{
+  <span class="key">"change"</span>: <span class="num">50</span>
+}</pre>
+          <div class="flow-note">Only called when <code>fee &gt; 0</code>. App displays the change amount to the cashier. Transaction is marked closed locally. Car is released.</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ── AUTH ── -->
+
+  <div class="section" id="auth" data-group="auth">
+    <div class="section-header">
+      <h2>Auth</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge POST">POST</span>
+        <span class="ep-path">/auth/login</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Login, get token + shift status</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Request Body</div>
+            <pre>{
+  <span class="key">"email"</span>: <span class="str">"user@example.com"</span>,
+  <span class="key">"password"</span>: <span class="str">"strongpassword"</span>,
+  <span class="key">"device_id"</span>: <span class="str">"sha256-hash"</span>
+}</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 200</div>
+            <pre>{
+  <span class="key">"accessToken"</span>: <span class="str">"jwt"</span>,
+  <span class="key">"token"</span>: <span class="str">"jwt"</span>,
+  <span class="key">"is_open_cash"</span>: <span class="bool">true</span>,
+  <span class="key">"user"</span>: {
+    <span class="key">"id"</span>: <span class="str">"uuid"</span>,
+    <span class="key">"email"</span>: <span class="str">"john.doe@example.com"</span>,
+    <span class="key">"firstName"</span>: <span class="str">"John"</span>,
+    <span class="key">"lastName"</span>: <span class="str">"Doe"</span>,
+    <span class="key">"role"</span>: <span class="str">"CASHIER"</span>,
+    <span class="key">"full_name"</span>: <span class="str">"John Doe"</span>,
+    <span class="key">"branch"</span>: {
+      <span class="key">"id"</span>: <span class="str">"uuid"</span>,
+      <span class="key">"name"</span>: <span class="str">"Jazz Mall"</span>
+    },
+    <span class="key">"isActive"</span>: <span class="bool">true</span>
+  }
+}</pre>
+          </div>
+        </div>
+        <div class="note">App reads <code>token</code> OR <code>accessToken</code>, <code>user.id</code>, <code>user.role</code>, <code>user.full_name</code>, and <code>is_open_cash</code>. All must be present. Called by <code>AuthApi.login()</code> on the Login screen.</div>
+      </div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge POST">POST</span>
+        <span class="ep-path">/auth/validate-token</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Splash token revalidation</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header + Body</div>
+            <pre>Authorization: Bearer &lt;token&gt;
+
+{
+  <span class="key">"device_id"</span>: <span class="str">"sha256-hash"</span>
+}</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 200</div>
+            <pre>{
+  <span class="key">"valid"</span>: <span class="bool">true</span>,
+  <span class="key">"is_open_cash"</span>: <span class="bool">true</span>,
+  <span class="key">"user"</span>: {
+    <span class="key">"id"</span>: <span class="str">"uuid"</span>,
+    <span class="key">"email"</span>: <span class="str">"user@example.com"</span>,
+    <span class="key">"full_name"</span>: <span class="str">"John Doe"</span>,
+    <span class="key">"role"</span>: <span class="str">"CASHIER"</span>
+  }
+}</pre>
+          </div>
+        </div>
+        <div class="note">If <code>valid: false</code> the app kills the session and navigates to /login. Optionally returns a rotated <code>token</code>/<code>accessToken</code>. Called by <code>AuthApi.revalidateToken()</code> on every online splash.</div>
+      </div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge POST">POST</span>
+        <span class="ep-path">/auth/logout</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Fire and forget on logout</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header + Body</div>
+            <pre>Authorization: Bearer &lt;token&gt;
+
+{
+  <span class="key">"device_id"</span>: <span class="str">"sha256-hash"</span>
+}</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 200</div>
+            <pre><span class="str">"Logged out successfully"</span></pre>
+          </div>
+        </div>
+        <div class="note">Called fire-and-forget. Errors are swallowed by <code>AuthApi.logout()</code>. Local session is already cleared before this HTTP call is made.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DEVICE ── -->
+  <div class="section" id="device" data-group="device">
+    <div class="section-header">
+      <h2>Device</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge POST">POST</span>
+        <span class="ep-path">/device/register</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Called every online splash</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header + Body</div>
+            <pre>Authorization: Bearer &lt;token&gt; (if available)
+
+{
+  <span class="key">"device_id"</span>: <span class="str">"sha256-hash"</span>,
+  <span class="key">"device_model"</span>: <span class="str">"Samsung Galaxy Tab S9"</span>,
+  <span class="key">"os_version"</span>: <span class="str">"Android 14"</span>,
+  <span class="key">"branch"</span>: <span class="str">"jazz-mall"</span>,
+  <span class="key">"area"</span>: <span class="str">"Area A"</span>
+}</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 200</div>
+            <pre>{
+  <span class="key">"success"</span>: <span class="bool">true</span>,
+  <span class="key">"branch"</span>: <span class="str">"jazz-mall"</span>,
+  <span class="key">"area"</span>: <span class="str">"Area A"</span>
+}</pre>
+          </div>
+        </div>
+        <div class="note">App persists <code>branch</code> and <code>area</code> from response into local <code>device_info</code> table and SharedPreferences. Called on every splash when online to keep site assignment in sync.</div>
+      </div>
+    </div>
+
+    <div class="endpoint missing" data-status="missing">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge GET">GET</span>
+        <span class="ep-path">/devices/active</span>
+        <span class="status-badge badge-missing">missing</span>
+        <span class="ep-desc">Device setup — list terminal slots</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header</div>
+            <pre>none (pre-login screen)</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 200</div>
+            <pre>[
+  {
+    <span class="key">"server_device_id"</span>: <span class="str">"uuid"</span>,
+    <span class="key">"device_label"</span>: <span class="str">"Jazz Main Cashier"</span>,
+    <span class="key">"branch"</span>: <span class="str">"jazz-mall"</span>,
+    <span class="key">"area"</span>: <span class="str">"Area A"</span>,
+    <span class="key">"is_active"</span>: <span class="bool">true</span>
+  }
+]</pre>
+          </div>
+        </div>
+        <div class="note">Used in <code>DeviceSetupCubit.fetchDevices()</code>. Returns unclaimed terminal slots the admin pre-created in the web portal. Physical tablet shows this list and the staff picks one to claim.</div>
+      </div>
+    </div>
+
+    <div class="endpoint missing" data-status="missing">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge POST">POST</span>
+        <span class="ep-path">/devices/claim</span>
+        <span class="status-badge badge-missing">missing</span>
+        <span class="ep-desc">Device setup — link tablet to slot</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header + Body</div>
+            <pre>none (pre-login screen)
+
+{
+  <span class="key">"server_device_id"</span>: <span class="str">"uuid"</span>,
+  <span class="key">"android_id_hash"</span>: <span class="str">"sha256-hex"</span>
+}</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 200</div>
+            <pre>{
+  <span class="key">"server_device_id"</span>: <span class="str">"uuid"</span>,
+  <span class="key">"device_label"</span>: <span class="str">"Jazz Main Cashier"</span>,
+  <span class="key">"branch"</span>: <span class="str">"jazz-mall"</span>,
+  <span class="key">"area"</span>: <span class="str">"Area A"</span>,
+  <span class="key">"is_active"</span>: <span class="bool">true</span>
+}</pre>
+          </div>
+        </div>
+        <div class="note">Used in <code>DeviceSetupCubit.claimDevice()</code>. If <code>is_active: false</code> → app shows "Pending Activation" screen and stops. If <code>is_active: true</code> → <code>server_device_id</code> is saved to <code>PrefsKeys.deviceIdentityKey</code> and app navigates to /login.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CASH SESSIONS ── -->
+  <div class="section" id="cash" data-group="cash">
+    <div class="section-header">
+      <h2>Cash Sessions</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge POST">POST</span>
+        <span class="ep-path">/cash-sessions/start</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Open shift</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header + Body</div>
+            <pre>Authorization: Bearer &lt;token&gt;
+
+{
+  <span class="key">"opening_balance"</span>: <span class="num">2000</span>,
+  <span class="key">"notes"</span>: <span class="null">null</span>
+}</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 201</div>
+            <pre>{
+  <span class="key">"id"</span>: <span class="str">"uuid"</span>
+}</pre>
+          </div>
+        </div>
+        <div class="note">Called by <code>ShiftService._postShiftCreate()</code> after local shift row is created. Also called by <code>SyncCubit</code> when flushing <code>shifts/create</code> queue items. 201 = success, local shift marked <code>syncStatus: synced</code>.</div>
+      </div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge POST">POST</span>
+        <span class="ep-path">/cash-sessions/close</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Close shift</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header + Body</div>
+            <pre>Authorization: Bearer &lt;token&gt;
+
+{
+  <span class="key">"shift_id"</span>: <span class="str">"uuid"</span>,
+  <span class="key">"actual_cash"</span>: <span class="num">3890</span>,
+  <span class="key">"notes"</span>: <span class="null">null</span>
+}</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 200</div>
+            <pre>{
+  <span class="key">"status"</span>: <span class="str">"closed"</span>
+}</pre>
+          </div>
+        </div>
+        <div class="note">Called by <code>ShiftService._patchShift()</code> and by <code>SyncCubit</code> for <code>shifts/update</code> queue items. Also called during <code>CloseCashCubit</code> flow — importantly, before the session token is cleared. 200 = success.</div>
+      </div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge GET">GET</span>
+        <span class="ep-path">/cash-sessions/current</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Wired, not yet actively called</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header</div>
+            <pre>Authorization: Bearer &lt;token&gt;</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 200</div>
+            <pre>{
+  <span class="key">"id"</span>: <span class="str">"uuid"</span>,
+  <span class="key">"status"</span>: <span class="str">"open"</span>,
+  <span class="key">"opening_balance"</span>: <span class="num">2000</span>,
+  <span class="key">"opened_at"</span>: <span class="str">"2024-01-01T08:00:00.000Z"</span>
+}</pre>
+          </div>
+        </div>
+        <div class="note">Referenced in <code>AppConfig.cashSessionCurrent</code>. Not yet called from any active screen — wired for future use.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TRANSACTIONS ── -->
+  <div class="section" id="transactions" data-group="transactions">
+    <div class="section-header">
+      <h2>Transactions — Check-in / Check-out</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge POST">POST</span>
+        <span class="ep-path">/transactions</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Create draft — step 1 of check-in</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header + Body</div>
+            <pre>Authorization: Bearer &lt;token&gt;
+
+{
+  <span class="key">"customer_name"</span>: <span class="null">null</span>,
+  <span class="key">"contact_number"</span>: <span class="str">"09171234567"</span>,
+  <span class="key">"valet_type"</span>: <span class="str">"standard_valet"</span>,
+  <span class="key">"driver_id"</span>: <span class="null">null</span>,
+  <span class="key">"notes"</span>: <span class="null">null</span>
+}</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 201</div>
+            <pre>{
+  <span class="key">"id"</span>: <span class="str">"uuid"</span>,
+  <span class="key">"ticket_number"</span>: <span class="str">"TKT-0001"</span>
+}</pre>
+          </div>
+        </div>
+        <div class="note">Called in <code>TicketService._postTicketCreate()</code>. The returned <code>id</code> (UUID) is saved as <code>server_ticket_id</code> on the local ticket row. Without <code>id</code> in the response, all subsequent sync for this ticket is skipped. The app keeps its own local <code>TKT-XXXX</code> as the display ID.</div>
+      </div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge PATCH">PATCH</span>
+        <span class="ep-path">/transactions/:id</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Check-in details + checkout condition</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Check-in body (sent after draft created)</div>
+            <pre>{
+  <span class="key">"vehicle"</span>: {
+    <span class="key">"plate_number"</span>: <span class="str">"ABC 1234"</span>,
+    <span class="key">"brand"</span>: <span class="str">"Toyota Camry"</span>,
+    <span class="key">"color"</span>: <span class="str">"Silver"</span>,
+    <span class="key">"type"</span>: <span class="str">"sedan"</span>,
+    <span class="key">"model"</span>: <span class="str">""</span>,
+    <span class="key">"year"</span>: <span class="null">null</span>
+  },
+  <span class="key">"driver_in"</span>: <span class="str">"Juan dela Cruz"</span>,
+  <span class="key">"parking"</span>: {
+    <span class="key">"level"</span>: <span class="null">null</span>,
+    <span class="key">"slot"</span>: <span class="null">null</span>
+  },
+  <span class="key">"belongings"</span>: [<span class="str">"iPad"</span>, <span class="str">"Cellphone / Charger"</span>],
+  <span class="key">"condition"</span>: {
+    <span class="key">"damages"</span>: [
+      {
+        <span class="key">"zone"</span>: <span class="str">"Hood"</span>,
+        <span class="key">"type"</span>: <span class="str">"dent"</span>,
+        <span class="key">"x"</span>: <span class="num">0.2</span>,
+        <span class="key">"y"</span>: <span class="num">0.5</span>
+      }
+    ],
+    <span class="key">"signature"</span>: <span class="str">"&lt;base64-png or null&gt;"</span>
+  }
+}</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Checkout condition body (sent when vehicle exits)</div>
+            <pre>{
+  <span class="key">"driver_out"</span>: <span class="str">"Pedro Santos"</span>,
+  <span class="key">"condition_checkout"</span>: [
+    {
+      <span class="key">"zone"</span>: <span class="str">"Front bumper"</span>,
+      <span class="key">"type"</span>: <span class="str">"scratch"</span>,
+      <span class="key">"x"</span>: <span class="num">0.05</span>,
+      <span class="key">"y"</span>: <span class="num">0.5</span>
+    }
+  ],
+  <span class="key">"status"</span>: <span class="str">"active"</span>
+}
+
+
+
+Response 200
+{
+  <span class="key">"id"</span>: <span class="str">"uuid"</span>,
+  <span class="key">"status"</span>: <span class="str">"active"</span>
+}</pre>
+          </div>
+        </div>
+        <div class="note">Same endpoint is used twice per ticket lifecycle. <code>:id</code> is always <code>server_ticket_id</code> (UUID), never the local <code>TKT-XXXX</code>. Check-in PATCH is called immediately after the draft POST. Checkout condition PATCH is called before the pay POST.</div>
+      </div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge POST">POST</span>
+        <span class="ep-path">/transactions/:id/pay</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Collect payment at checkout</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header + Body</div>
+            <pre>Authorization: Bearer &lt;token&gt;
+
+{
+  <span class="key">"method"</span>: <span class="str">"cash"</span>,
+  <span class="key">"amount_paid"</span>: <span class="num">200</span>
+}</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 200</div>
+            <pre>{
+  <span class="key">"change"</span>: <span class="num">50</span>
+}</pre>
+          </div>
+        </div>
+        <div class="note">Called by <code>TicketService._patchTicketCheckout()</code> only when <code>fee &gt; 0</code>. Called after the condition PATCH. App logs the returned <code>change</code> value. 200 = success.</div>
+      </div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge GET">GET</span>
+        <span class="ep-path">/transactions/:id</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Lookup by server UUID — wired</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid single">
+          <div class="block">
+            <div class="block-label">Header</div>
+            <pre>Authorization: Bearer &lt;token&gt;</pre>
+          </div>
+        </div>
+        <div class="note">Wired via <code>AppConfig.transactionGetUrl()</code>. Not yet actively called from any current screen.</div>
+      </div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge GET">GET</span>
+        <span class="ep-path">/tickets/by-number/:ticketNumber</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Lookup by TKT-XXXX — wired</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid single">
+          <div class="block">
+            <div class="block-label">Header</div>
+            <pre>Authorization: Bearer &lt;token&gt;</pre>
+          </div>
+        </div>
+        <div class="note">Wired via <code>AppConfig.ticketByNumberUrl()</code>. Not yet called from active screen code — reserved for future QR scan lookup path.</div>
+      </div>
+    </div>
+
+    <div class="endpoint reserved" data-status="reserved">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge POST">POST</span>
+        <span class="ep-path">/tickets/:id/lost</span>
+        <span class="status-badge badge-reserved">wired, reserved</span>
+        <span class="ep-desc">Mark ticket as lost</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header + Body</div>
+            <pre>Authorization: Bearer &lt;token&gt;
+
+{
+  <span class="key">"notes"</span>: <span class="str">"Customer unable to produce ticket"</span>
+}</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 200</div>
+            <pre>{
+  <span class="key">"status"</span>: <span class="str">"LOST"</span>,
+  <span class="key">"fee"</span>: <span class="num">200</span>
+}</pre>
+          </div>
+        </div>
+        <div class="note">Wired via <code>AppConfig.ticketLost()</code>. No screen currently calls it — reserved for lost ticket flow. The lost ticket fee is configured per branch in the rates table.</div>
+      </div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge GET">GET</span>
+        <span class="ep-path">/transactions</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Background sync for Reports tab</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header + Query params</div>
+            <pre>Authorization: Bearer &lt;token&gt;
+
+?date_from=2024-01-01
+&date_to=2024-01-31
+&limit=200
+&page=1</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 200</div>
+            <pre>{
+  <span class="key">"data"</span>: [ ... ],
+  <span class="key">"total"</span>: <span class="num">42</span>
+}</pre>
+          </div>
+        </div>
+        <div class="note">Called by <code>TransactionsApi.fetchTransactions()</code>. Only triggered for date ranges that extend beyond today (Tier 2 historical sync). Response is not merged into local Drift — used for display only in the Reports tab.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── BRANCHES & RATES ── -->
+  <div class="section" id="rates" data-group="rates">
+    <div class="section-header">
+      <h2>Branches & Rates</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge GET">GET</span>
+        <span class="ep-path">/branches/:id</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Branch hours for overnight window</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header</div>
+            <pre>Authorization: Bearer &lt;token&gt;</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 200</div>
+            <pre>{
+  <span class="key">"id"</span>: <span class="str">"uuid"</span>,
+  <span class="key">"name"</span>: <span class="str">"Jazz Mall"</span>,
+  <span class="key">"opensAt"</span>: <span class="str">"10:00"</span>,
+  <span class="key">"closesAt"</span>: <span class="str">"21:00"</span>,
+  <span class="key">"status"</span>: <span class="str">"ACTIVE"</span>
+}</pre>
+          </div>
+        </div>
+        <div class="note">App reads <code>opensAt</code>/<code>opens_at</code> and <code>closesAt</code>/<code>closes_at</code>, stores as <code>mall_open_time</code> / <code>mall_close_time</code> in local <code>branch_config</code> table via <code>BranchConfigService</code>.</div>
+      </div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge GET">GET</span>
+        <span class="ep-path">/branches/:id/rates</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Standard branch rates</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header</div>
+            <pre>Authorization: Bearer &lt;token&gt;</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 200</div>
+            <pre>{
+  <span class="key">"flatRate"</span>: <span class="num">150</span>,
+  <span class="key">"succeedingRate"</span>: <span class="num">30</span>,
+  <span class="key">"overnightFee"</span>: <span class="num">200</span>,
+  <span class="key">"lostTicketFee"</span>: <span class="num">200</span>
+}</pre>
+          </div>
+        </div>
+        <div class="note">Also accepts snake_case variants (<code>flat_rate</code>, <code>succeeding_rate</code>, etc.). Stored as the <code>Standard</code> vehicle type row in the local <code>rates</code> table via <code>RateFetchService.syncRatesForBranch()</code>.</div>
+      </div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge GET">GET</span>
+        <span class="ep-path">/rates/branches/:branchId/vehicle-types</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Per-vehicle-type rates</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header</div>
+            <pre>Authorization: Bearer &lt;token&gt;</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 200</div>
+            <pre>[
+  {
+    <span class="key">"name"</span>: <span class="str">"Sedan / Hatchback"</span>,
+    <span class="key">"flatRate"</span>: <span class="num">150</span>,
+    <span class="key">"succeedingRate"</span>: <span class="num">30</span>,
+    <span class="key">"overnightFee"</span>: <span class="num">200</span>,
+    <span class="key">"lostTicketFee"</span>: <span class="num">200</span>,
+    <span class="key">"status"</span>: <span class="str">"ACTIVE"</span>
+  }
+]</pre>
+          </div>
+        </div>
+        <div class="note">App filters <code>status == "ACTIVE"</code> only. Maps server <code>name</code> to local keys: <code>sedan</code>, <code>suv</code>, <code>van</code>, <code>luxury</code>, <code>ev_phev</code>. Used in checkout pricing via <code>RateService.checkoutRatesResolved()</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SETTINGS ── -->
+  <div class="section" id="settings" data-group="settings">
+    <div class="section-header">
+      <h2>Settings</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="endpoint" data-status="ok">
+      <div class="ep-header" onclick="toggle(this)">
+        <span class="method-badge GET">GET</span>
+        <span class="ep-path">/settings</span>
+        <span class="status-badge badge-ok">in swagger</span>
+        <span class="ep-desc">Overnight cutoff + system config</span>
+        <span class="chevron">›</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-grid">
+          <div class="block">
+            <div class="block-label">Header</div>
+            <pre>Authorization: Bearer &lt;token&gt;</pre>
+          </div>
+          <div class="block">
+            <div class="block-label">Response 200</div>
+            <pre>{
+  <span class="key">"overnightCutoff"</span>: <span class="str">"01:30"</span>,
+  <span class="key">"ticketPrefix"</span>: <span class="str">"TKT-"</span>,
+  <span class="key">"ticketNumberLength"</span>: <span class="str">"4"</span>,
+  <span class="key">"openingFloat"</span>: <span class="str">"2000"</span>,
+  <span class="key">"receiptFooter"</span>: <span class="str">"NOTE: This is not an Official Receipt (OR)."</span>,
+  <span class="key">"systemName"</span>: <span class="str">"Valet Master"</span>,
+  <span class="key">"timezone"</span>: <span class="str">"Asia/Manila"</span>
+}</pre>
+          </div>
+        </div>
+        <div class="note">App reads <code>overnightCutoff</code> (also checks <code>overnight_cutoff</code>, <code>overnightStart</code>, <code>overnight_start_time</code>) and stores as <code>overnight_start_time</code> in <code>branch_config</code> table. The <code>overnight_end_time</code> is hardcoded to <code>06:00</code> on the app side.</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<script>
+  function toggle(header) {
+    const body = header.nextElementSibling;
+    const chev = header.querySelector('.chevron');
+    const open = body.classList.toggle('open');
+    if (chev) chev.classList.toggle('open', open);
+  }
+
+  function filterAll(btn) {
+    setBtnActive(btn);
+    document.querySelectorAll('.section').forEach(s => s.style.display = '');
+    document.querySelectorAll('.endpoint').forEach(e => e.style.display = '');
+  }
+
+  function filterGroup(btn, group) {
+    setBtnActive(btn);
+    document.querySelectorAll('.section').forEach(s => {
+      s.style.display = s.dataset.group === group ? '' : 'none';
+    });
+    document.querySelectorAll('.endpoint').forEach(e => e.style.display = '');
+  }
+
+  function filterMissing(btn) {
+    setBtnActive(btn);
+    document.querySelectorAll('.section').forEach(s => s.style.display = '');
+    document.querySelectorAll('.endpoint').forEach(e => {
+      e.style.display = e.dataset.status === 'missing' ? '' : 'none';
+    });
+    document.querySelectorAll('.section').forEach(s => {
+      const visible = [...s.querySelectorAll('.endpoint')].some(e => e.style.display !== 'none');
+      s.style.display = visible ? '' : 'none';
+    });
+  }
+
+  function setBtnActive(btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  function scrollTo(id) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  document.querySelectorAll('.nav-item[href]').forEach(item => {
+    item.addEventListener('click', e => {
+      e.preventDefault();
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>

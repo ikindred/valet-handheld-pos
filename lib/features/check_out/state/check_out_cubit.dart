@@ -4,8 +4,10 @@ import 'dart:convert';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 
+import '../../../core/connectivity/internet_reachability.dart';
 import '../../../core/session/standard_parking_rates.dart';
 import '../../../data/local/db/app_database.dart';
+import '../../../data/remote/transactions_api.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/rate_service.dart';
 import '../../../data/services/ticket_service.dart';
@@ -261,6 +263,46 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     emit(state.copyWith(scanError: '', isLookupBusy: true));
     try {
       final ticket = _normalizeQrPayload(code);
+      final local = await _tickets.activeTicketByTicketNumber(ticket) ??
+          await _tickets.activeTicketByTicketNumber(code);
+      if (local != null) {
+        beginFromTicket(local);
+        emit(state.copyWith(isLookupBusy: false));
+        return;
+      }
+
+      final online = await InternetReachability.hasInternet();
+      if (!online) {
+        emit(
+          state.copyWith(
+            scanError:
+                'Ticket not found on this device and app is offline. Connect to the internet and try again.',
+            isLookupBusy: false,
+          ),
+        );
+        return;
+      }
+
+      try {
+        await _tickets.getTransactionByTicketNumber(ticket);
+      } on TransactionsApiException catch (e) {
+        emit(
+          state.copyWith(
+            scanError: e.message,
+            isLookupBusy: false,
+          ),
+        );
+        return;
+      } catch (_) {
+        emit(
+          state.copyWith(
+            scanError: 'Could not reach server. Please try again.',
+            isLookupBusy: false,
+          ),
+        );
+        return;
+      }
+
       final vt = await _tickets.activeTicketByTicketNumber(ticket) ??
           await _tickets.activeTicketByTicketNumber(code);
       if (vt == null) {
@@ -293,7 +335,8 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       if (vt == null) {
         emit(
           state.copyWith(
-            scanError: 'No open ticket found for that plate.',
+            scanError:
+                'Ticket not found. Try scanning the QR code or entering the ticket number instead.',
             isLookupBusy: false,
           ),
         );

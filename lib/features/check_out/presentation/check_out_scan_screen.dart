@@ -340,6 +340,16 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen> {
           label: 'PLATE NUMBER',
           child: CheckInTextField(controller: _plateCtrl, hint: 'ABC 1234'),
         ),
+        if (busy) ...[
+          const SizedBox(height: 16),
+          const Center(
+            child: SizedBox(
+              width: 36,
+              height: 36,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+          ),
+        ],
         const SizedBox(height: 20),
         SizedBox(
           height: 54,
@@ -402,51 +412,73 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen> {
           },
           child: LayoutBuilder(
             builder: (context, c) {
-              final wideInner = c.maxWidth >= 900;
-              final manual = BlocBuilder<CheckOutCubit, CheckOutState>(
+              return BlocBuilder<CheckOutCubit, CheckOutState>(
                 buildWhen: (a, b) =>
                     a.isLookupBusy != b.isLookupBusy ||
                     a.scanError != b.scanError,
                 builder: (context, state) {
+                  final wideInner = c.maxWidth >= 900;
                   final busy = state.isLookupBusy;
-                  return _manualPanel(
+
+                  final scannerCol = Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (busy) ...[
+                        const Center(
+                          child: SizedBox(
+                            width: 36,
+                            height: 36,
+                            child: CircularProgressIndicator(strokeWidth: 3),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      _cameraHeaderRow(),
+                      const SizedBox(height: 12),
+                      _scannerCard(),
+                      if (state.scanError.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          state.scanError,
+                          style: _poppins(
+                            13,
+                            FontWeight.w500,
+                            AppColors.error,
+                          ),
+                        ),
+                      ],
+                    ],
+                  );
+
+                  final manual = _manualPanel(
                     context,
                     state,
                     busy,
                     pinLostFeeToBottom: wideInner,
                   );
+
+                  if (wideInner) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(flex: 12, child: scannerCol),
+                        _verticalOrDivider(),
+                        Expanded(flex: 11, child: manual),
+                      ],
+                    );
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      scannerCol,
+                      const SizedBox(height: 20),
+                      _horizontalOrDivider(),
+                      const SizedBox(height: 20),
+                      manual,
+                    ],
+                  );
                 },
-              );
-
-              final scannerCol = Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _cameraHeaderRow(),
-                  const SizedBox(height: 12),
-                  _scannerCard(),
-                ],
-              );
-
-              if (wideInner) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(flex: 12, child: scannerCol),
-                    _verticalOrDivider(),
-                    Expanded(flex: 11, child: manual),
-                  ],
-                );
-              }
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  scannerCol,
-                  const SizedBox(height: 20),
-                  _horizontalOrDivider(),
-                  const SizedBox(height: 20),
-                  manual,
-                ],
               );
             },
           ),

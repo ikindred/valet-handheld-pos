@@ -48,7 +48,11 @@ class AppProviders extends StatelessWidget {
               RateFetchService(c.read<AppDatabase>(), c.read<Dio>()),
         ),
         Provider<TicketService>(
-          create: (c) => TicketService(c.read<AppDatabase>(), c.read<Dio>()),
+          create: (c) => TicketService(
+            c.read<AppDatabase>(),
+            c.read<Dio>(),
+            c.read<TransactionsApi>(),
+          ),
         ),
         Provider<ShiftService>(
           create: (c) => ShiftService(

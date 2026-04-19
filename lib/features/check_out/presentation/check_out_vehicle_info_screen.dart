@@ -76,7 +76,10 @@ class CheckOutVehicleInfoScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<CheckOutCubit, CheckOutState>(
-      buildWhen: (a, b) => a.ticket != b.ticket,
+      buildWhen: (a, b) =>
+          a.ticket != b.ticket ||
+          a.driverIn != b.driverIn ||
+          a.driverOut != b.driverOut,
       builder: (context, state) {
         final row = state.ticket;
         if (row == null) {
@@ -207,7 +210,12 @@ class CheckOutVehicleInfoScreen extends StatelessWidget {
                 ),
               );
 
-              const valetName = '—';
+              final dIn = state.driverIn?.trim();
+              final valetInName =
+                  (dIn == null || dIn.isEmpty) ? '—' : dIn;
+              final dOut = state.driverOut?.trim();
+              final valetOutName =
+                  (dOut == null || dOut.isEmpty) ? '—' : dOut;
 
               final staffCard = _WhiteCard(
                 padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
@@ -216,11 +224,11 @@ class CheckOutVehicleInfoScreen extends StatelessWidget {
                   children: [
                     Text('STAFF', style: _poppins(15, FontWeight.w500, AppColors.textPrimary)),
                     const SizedBox(height: 25),
-                    _StaffRow(label: 'Valet In', name: valetName),
+                    _StaffRow(label: 'Valet In', name: valetInName),
                     const SizedBox(height: 8),
                     Divider(height: 1, thickness: 1, color: Colors.black.withValues(alpha: 0.13)),
                     const SizedBox(height: 8),
-                    _StaffRow(label: 'Valet Out', name: valetName),
+                    _StaffRow(label: 'Valet Out', name: valetOutName),
                   ],
                 ),
               );

@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Valet Master — Data Flow</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap');
+:root {
+  --bg: #0f0f0f;
+  --bg2: #161616;
+  --bg3: #1e1e1e;
+  --bg4: #252525;
+  --border: #2a2a2a;
+  --border2: #333;
+  --text: #e8e4dc;
+  --text2: #8a8680;
+  --text3: #5a5855;
+  --orange: #e87722;
+  --orange-dim: rgba(232,119,34,0.12);
+  --orange-border: rgba(232,119,34,0.3);
+  --teal: #3d9e6b;
+  --teal-dim: rgba(61,158,107,0.12);
+  --teal-border: rgba(61,158,107,0.3);
+  --purple: #7f77dd;
+  --purple-dim: rgba(127,119,221,0.12);
+  --purple-border: rgba(127,119,221,0.3);
+  --amber: #c49a3a;
+  --amber-dim: rgba(196,154,58,0.12);
+  --amber-border: rgba(196,154,58,0.3);
+  --gray-dim: rgba(136,135,128,0.1);
+  --gray-border: rgba(136,135,128,0.25);
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Syne', sans-serif;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.layout { display: flex; min-height: 100vh; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-logo {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-logo .product { font-size: 10px; font-weight: 600; letter-spacing: .12em; color: var(--text3); text-transform: uppercase; margin-bottom: 4px; }
+.sidebar-logo .title { font-size: 15px; font-weight: 700; color: var(--text); }
+.sidebar-logo .sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.sidebar-nav { padding: 16px 0; flex: 1; }
+.nav-section { padding: 6px 20px 4px; font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--text3); margin-top: 12px; }
+.nav-section:first-child { margin-top: 0; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 7px 20px; cursor: pointer; text-decoration: none; color: var(--text2); font-size: 12px; transition: background .12s; }
+.nav-item:hover { background: var(--bg3); color: var(--text); }
+.nav-item.active { background: var(--orange-dim); color: var(--orange); }
+.nav-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border2); flex-shrink: 0; }
+
+/* legend */
+.legend {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text2); }
+.legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+/* ── Main ── */
+.main { flex: 1; min-width: 0; padding: 40px 48px; overflow-x: auto; }
+.page-header { margin-bottom: 36px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+.page-header h1 { font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+.page-header p { font-size: 13px; color: var(--text2); }
+
+/* ── Tab bar ── */
+.tab-bar { display: flex; gap: 4px; margin-bottom: 36px; }
+.tab-btn {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all .15s;
+  letter-spacing: .04em;
+}
+.tab-btn:hover { border-color: var(--text3); color: var(--text); }
+.tab-btn.active { background: var(--orange); border-color: var(--orange); color: #fff; }
+
+/* ── Flow panel ── */
+.flow-panel { display: none; }
+.flow-panel.active { display: block; }
+
+/* ── Phase ── */
+.phase { margin-bottom: 4px; }
+.phase-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 10px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.phase-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── Step ── */
+.step {
+  display: flex;
+  gap: 16px;
+  padding: 12px 0;
+  position: relative;
+}
+.step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 44px;
+  bottom: -12px;
+  width: 1px;
+  background: var(--border);
+}
+.step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg4);
+  border: 1px solid var(--border2);
+  color: var(--text3);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: var(--mono);
+  margin-top: 8px;
+  z-index: 1;
+}
+.step-content { flex: 1; min-width: 0; }
+
+/* ── Node types ── */
+.node {
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 6px;
+  border: 1px solid;
+}
+.node-action {
+  background: var(--gray-dim);
+  border-color: var(--gray-border);
+}
+.node-api {
+  background: var(--teal-dim);
+  border-color: var(--teal-border);
+}
+.node-local {
+  background: var(--purple-dim);
+  border-color: var(--purple-border);
+}
+.node-queue {
+  background: var(--amber-dim);
+  border-color: var(--amber-border);
+}
+.node-decision {
+  background: var(--gray-dim);
+  border-color: var(--gray-border);
+}
+
+.node-title {
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.node-sub {
+  font-size: 11px;
+  color: var(--text2);
+  font-family: var(--mono);
+}
+.node-tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.tag-api { background: var(--teal-dim); color: var(--teal); border: 1px solid var(--teal-border); }
+.tag-local { background: var(--purple-dim); color: var(--purple); border: 1px solid var(--purple-border); }
+.tag-queue { background: var(--amber-dim); color: var(--amber); border: 1px solid var(--amber-border); }
+.tag-screen { background: var(--gray-dim); color: var(--text2); border: 1px solid var(--gray-border); }
+
+/* method badge */
+.method {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.GET  { background: var(--teal-dim); color: var(--teal); border: 1px solid var(--teal-border); }
+.POST { background: rgba(74,143,196,0.1); color: #4a8fc4; border: 1px solid rgba(74,143,196,0.3); }
+.PATCH { background: var(--amber-dim); color: var(--amber); border: 1px solid var(--amber-border); }
+
+/* step connector arrow */
+.connector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0 2px 44px;
+  color: var(--text3);
+  font-size: 11px;
+}
+.connector::before { content: '↓'; font-size: 14px; color: var(--border2); }
+
+/* decision branch */
+.branch-wrap { display: flex; gap: 12px; margin-bottom: 6px; }
+.branch {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.branch-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+.branch-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="product">SPiD Smart Parking</div>
+    <div class="title">Valet Master</div>
+    <div class="sub">Data Flow Reference</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Flows</div>
+    <a class="nav-item active" href="#" onclick="switchTab('online',this)"><span class="nav-dot" style="background:var(--teal)"></span>Online flow</a>
+    <a class="nav-item" href="#" onclick="switchTab('offline',this)"><span class="nav-dot" style="background:var(--amber)"></span>Offline flow</a>
+    <div class="nav-section">Phases</div>
+    <a class="nav-item" href="#login"><span class="nav-dot"></span>Login</a>
+    <a class="nav-item" href="#opencash"><span class="nav-dot"></span>Open cash</a>
+    <a class="nav-item" href="#checkin"><span class="nav-dot"></span>Check-in</a>
+    <a class="nav-item" href="#checkout"><span class="nav-dot"></span>Check-out</a>
+    <a class="nav-item" href="#sync"><span class="nav-dot"></span>Sync</a>
+    <a class="nav-item" href="#closecash"><span class="nav-dot"></span>Close cash</a>
+  </nav>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--teal-dim);border:1px solid var(--teal-border)"></div>API call to server</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--purple-dim);border:1px solid var(--purple-border)"></div>Local Drift write</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--amber-dim);border:1px solid var(--amber-border)"></div>Sync queue entry</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--gray-dim);border:1px solid var(--gray-border)"></div>Screen / decision</div>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="main">
+  <div class="page-header">
+    <h1>Data Flow Reference</h1>
+    <p>How Valet Master processes data from login to logout — online vs offline.</p>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('online',this)">🟢 Online</button>
+    <button class="tab-btn" onclick="switchTab('offline',this)">🔴 Offline</button>
+  </div>
+
+  <!-- ═══════════ ONLINE FLOW ═══════════ -->
+  <div class="flow-panel active" id="panel-online">
+
+    <!-- LOGIN -->
+    <div class="phase" id="login">
+      <div class="phase-label">Login</div>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="node node-action">
+            <div class="node-title"><span class="node-tag tag-screen">Screen</span>App launches — splash screen</div>
+          </div>
+          <div class="node node-api">
+            <div class="node-title"><span class="method POST">POST</span>/auth/validate-token &nbsp;<span style="color:var(--text3)">+</span>&nbsp; <span class="method POST">POST</span>/device/register</div>
+            <div class="node-sub">parallel calls — check token validity + register device</div>
+          </div>
+          <div class="branch-wrap">
+            <div class="branch">
+              <div class="branch-label">Token valid → skip login</div>
+              <div class="branch-body">
+                <div class="node node-action" style="margin:0"><div class="node-title">Navigate to open cash / dashboard</div></div>
+              </div>
+            </div>
+            <div class="branch">
+              <div class="branch-label">Token invalid → login screen</div>
+              <div class="branch-body">
+                <div class="node node-api" style="margin:0"><div class="node-title"><span class="method POST">POST</span>/auth/login</div><div class="node-sub">email + password + device_id → token + is_open_cash</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OPEN CASH -->
+    <div class="phase" id="opencash">
+      <div class="phase-label">Open Cash</div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="node node-api">
+            <div class="node-title"><span class="method POST">POST</span>/cash-sessions/start</div>
+            <div class="node-sub">opening_balance → res: shift UUID</div>
+          </div>
+          <div class="node node-local">
+            <div class="node-title"><span class="node-tag tag-local">Drift</span>Save shift row — shifts table</div>
+            <div class="node-sub">server shift id stored, syncStatus: synced</div>
+          </div>
+          <div class="node node-api">
+            <div class="node-title"><span class="method GET">GET</span>/branches/:id &nbsp; <span class="method GET">GET</span>/rates &nbsp; <span class="method GET">GET</span>/vehicle-types &nbsp; <span class="method GET">GET</span>/settings</div>
+            <div class="node-sub">background hydration — branch config + rates + overnight cutoff</div>
+          </div>
+          <div class="node node-local">
+            <div class="node-title"><span class="node-tag tag-local">Drift</span>Save to branch_config + rates tables</div>
+            <div class="node-sub">used for offline fee computation at checkout</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHECK-IN -->
+    <div class="phase" id="checkin">
+      <div class="phase-label">Check-In</div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="node node-api">
+            <div class="node-title"><span class="method POST">POST</span>/transactions</div>
+            <div class="node-sub">contact_number + valet_type → res: server UUID (server_ticket_id)</div>
+          </div>
+          <div class="node node-local">
+            <div class="node-title"><span class="node-tag tag-local">Drift</span>Save draft — tickets table</div>
+            <div class="node-sub">server_ticket_id saved — required for all subsequent sync</div>
+          </div>
+          <div class="node node-api">
+            <div class="node-title"><span class="method PATCH">PATCH</span>/transactions/:id</div>
+            <div class="node-sub">vehicle + driver_in + parking + belongings + condition + signature</div>
+          </div>
+          <div class="node node-local">
+            <div class="node-title"><span class="node-tag tag-local">Drift</span>Update ticket row — status: active, syncStatus: synced</div>
+          </div>
+          <div class="node node-action">
+            <div class="node-title"><span class="node-tag tag-screen">Print</span>Thermal ticket — attendant copy + customer claim stub + key tag</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHECK-OUT -->
+    <div class="phase" id="checkout">
+      <div class="phase-label">Check-Out</div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="branch-wrap">
+            <div class="branch">
+              <div class="branch-label">QR scan</div>
+              <div class="branch-body">
+                <div class="node node-local" style="margin:0"><div class="node-title"><span class="node-tag tag-local">Drift</span>Lookup by server_ticket_id</div><div class="node-sub">local first</div></div>
+                <div class="node node-api" style="margin:0;margin-top:6px"><div class="node-title"><span class="method GET">GET</span>/transactions/:id</div><div class="node-sub">remote fallback if not found locally</div></div>
+              </div>
+            </div>
+            <div class="branch">
+              <div class="branch-label">Manual TKT-XXXX</div>
+              <div class="branch-body">
+                <div class="node node-local" style="margin:0"><div class="node-title"><span class="node-tag tag-local">Drift</span>Lookup by ticket_number</div><div class="node-sub">local first</div></div>
+                <div class="node node-api" style="margin:0;margin-top:6px"><div class="node-title"><span class="method GET">GET</span>/tickets/by-number/:n</div><div class="node-sub">remote fallback if not found locally</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="node node-action">
+            <div class="node-title"><span class="node-tag tag-screen">On-device</span>Fee computed from cached Drift rates — no server call</div>
+            <div class="node-sub">flat_rate + succeeding_hours + overnight_fee if applicable</div>
+          </div>
+          <div class="node node-api">
+            <div class="node-title"><span class="method PATCH">PATCH</span>/transactions/:id</div>
+            <div class="node-sub">driver_out + condition_checkout + status: active</div>
+          </div>
+          <div class="node node-api">
+            <div class="node-title"><span class="method POST">POST</span>/transactions/:id/pay</div>
+            <div class="node-sub">method: cash + amount_paid → res: change</div>
+          </div>
+          <div class="node node-local">
+            <div class="node-title"><span class="node-tag tag-local">Drift</span>Update ticket — status: completed, syncStatus: synced</div>
+            <div class="node-sub">fee + driverOut + damageMarkers persisted</div>
+          </div>
+          <div class="node node-action">
+            <div class="node-title"><span class="node-tag tag-screen">Print</span>Receipt — change displayed, car released</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLOSE CASH -->
+    <div class="phase" id="closecash">
+      <div class="phase-label">Close Cash + Logout</div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <div class="node node-api">
+            <div class="node-title"><span class="method POST">POST</span>/cash-sessions/close</div>
+            <div class="node-sub">shift_id + actual_cash → res: status: closed</div>
+          </div>
+          <div class="node node-api">
+            <div class="node-title"><span class="method POST">POST</span>/auth/logout</div>
+            <div class="node-sub">fire-and-forget — session already cleared locally before this call</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end online panel -->
+
+  <!-- ═══════════ OFFLINE FLOW ═══════════ -->
+  <div class="flow-panel" id="panel-offline">
+
+    <!-- LOGIN -->
+    <div class="phase">
+      <div class="phase-label">Login</div>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="node node-action">
+            <div class="node-title"><span class="node-tag tag-screen">Screen</span>App launches — splash screen detects offline</div>
+            <div class="node-sub">InternetReachability.hasInternet() returns false</div>
+          </div>
+          <div class="node node-local">
+            <div class="node-title"><span class="node-tag tag-local">Drift</span>Offline login — read from offline_accounts table</div>
+            <div class="node-sub">no server call — cached credentials used</div>
+          </div>
+          <div class="node node-local">
+            <div class="node-title"><span class="node-tag tag-local">Drift</span>Rates + config — read from last synced cache</div>
+            <div class="node-sub">rates, branch_config tables used as-is</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OPEN CASH -->
+    <div class="phase">
+      <div class="phase-label">Open Cash</div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="node node-local">
+            <div class="node-title"><span class="node-tag tag-local">Drift</span>Write shift row — shifts table</div>
+            <div class="node-sub">opening_balance saved, syncStatus: pending</div>
+          </div>
+          <div class="node node-queue">
+            <div class="node-title"><span class="node-tag tag-queue">Queue</span>shifts/create → sync_queue</div>
+            <div class="node-sub">POST /cash-sessions/start will fire when online</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHECK-IN -->
+    <div class="phase">
+      <div class="phase-label">Check-In</div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="node node-local">
+            <div class="node-title"><span class="node-tag tag-local">Drift</span>Write draft — tickets table</div>
+            <div class="node-sub">local TKT-XXXX generated — no server_ticket_id yet</div>
+          </div>
+          <div class="node node-queue">
+            <div class="node-title"><span class="node-tag tag-queue">Queue</span>tickets/create → sync_queue</div>
+            <div class="node-sub">POST /transactions will fire first to get server UUID</div>
+          </div>
+          <div class="node node-local">
+            <div class="node-title"><span class="node-tag tag-local">Drift</span>Update ticket — full check-in data</div>
+            <div class="node-sub">vehicle + driver_in + belongings + condition + signature</div>
+          </div>
+          <div class="node node-queue">
+            <div class="node-title"><span class="node-tag tag-queue">Queue</span>tickets/update (check-in) → sync_queue</div>
+            <div class="node-sub">PATCH payload queued — fires after POST gets server UUID</div>
+          </div>
+          <div class="node node-action">
+            <div class="node-title"><span class="node-tag tag-screen">Print</span>Thermal ticket — works offline</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHECK-OUT -->
+    <div class="phase">
+      <div class="phase-label">Check-Out</div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="node node-local">
+            <div class="node-title"><span class="node-tag tag-local">Drift</span>Lookup ticket — local only</div>
+            <div class="node-sub">no remote fallback — if not on device, cannot proceed until online</div>
+          </div>
+          <div class="node node-action">
+            <div class="node-title"><span class="node-tag tag-screen">On-device</span>Fee computed from cached Drift rates</div>
+            <div class="node-sub">flat_rate + succeeding_hours + overnight_fee if applicable</div>
+          </div>
+          <div class="node node-local">
+            <div class="node-title"><span class="node-tag tag-local">Drift</span>Update ticket — checkout condition + payment</div>
+            <div class="node-sub">driver_out + condition_checkout + fee + status: completed</div>
+          </div>
+          <div class="node node-queue">
+            <div class="node-title"><span class="node-tag tag-queue">Queue</span>tickets/update (checkout) + pay → sync_queue</div>
+            <div class="node-sub">PATCH condition then POST pay — queued in strict order</div>
+          </div>
+          <div class="node node-action">
+            <div class="node-title"><span class="node-tag tag-screen">Print</span>Receipt — works offline, car released</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SYNC -->
+    <div class="phase" id="sync">
+      <div class="phase-label">Sync — when connectivity returns</div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <div class="node node-action">
+            <div class="node-title"><span class="node-tag tag-screen">SyncCubit</span>Detects connectivity — flushes sync_queue in order</div>
+          </div>
+          <div class="node node-api">
+            <div class="node-title"><span class="method POST">POST</span>/transactions → get server_ticket_id</div>
+            <div class="node-sub">must fire first — UUID required for all subsequent calls</div>
+          </div>
+          <div class="node node-local">
+            <div class="node-title"><span class="node-tag tag-local">Drift</span>Save server_ticket_id → ticket row</div>
+            <div class="node-sub">subsequent queue items resolve :id from this UUID</div>
+          </div>
+          <div class="node node-api">
+            <div class="node-title"><span class="method PATCH">PATCH</span>/transactions/:id — check-in payload</div>
+            <div class="node-sub">vehicle + driver_in + belongings + condition</div>
+          </div>
+          <div class="node node-api">
+            <div class="node-title"><span class="method PATCH">PATCH</span>/transactions/:id — checkout condition</div>
+            <div class="node-sub">driver_out + condition_checkout + status</div>
+          </div>
+          <div class="node node-api">
+            <div class="node-title"><span class="method POST">POST</span>/transactions/:id/pay</div>
+            <div class="node-sub">amount_paid → change (only if fee > 0)</div>
+          </div>
+          <div class="node node-local">
+            <div class="node-title"><span class="node-tag tag-local">Drift</span>All rows marked syncStatus: synced</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLOSE CASH -->
+    <div class="phase">
+      <div class="phase-label">Close Cash + Logout</div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <div class="node node-queue">
+            <div class="node-title"><span class="node-tag tag-queue">Queue</span>shifts/close → sync_queue (if still offline)</div>
+            <div class="node-sub">POST /cash-sessions/close fires when connectivity returns</div>
+          </div>
+          <div class="node node-action">
+            <div class="node-title"><span class="node-tag tag-screen">Screen</span>Session cleared locally — logout server call skipped if offline</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end offline panel -->
+
+</main>
+</div>
+
+<script>
+function switchTab(tab, btn) {
+  document.querySelectorAll('.flow-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (btn.classList.contains('tab-btn')) {
+    btn.classList.add('active');
+  } else {
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      if ((tab === 'online' && b.textContent.includes('Online')) ||
+          (tab === 'offline' && b.textContent.includes('Offline'))) {
+        b.classList.add('active');
+      }
+    });
+  }
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(i => {
+    if ((tab === 'online' && i.textContent.includes('Online')) ||
+        (tab === 'offline' && i.textContent.includes('Offline'))) {
+      i.classList.add('active');
+    }
+  });
+  return false;
+}
+</script>
+</body>
+</html>

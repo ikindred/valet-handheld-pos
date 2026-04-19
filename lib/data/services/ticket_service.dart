@@ -6,9 +6,11 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/connectivity/internet_reachability.dart';
 import '../../core/logging/valet_log.dart';
 import '../../features/check_in/domain/check_in_form_data.dart';
 import '../local/db/app_database.dart';
+import '../remote/transactions_api.dart';
 import 'ticket_sync_payload.dart';
 
 Object _decodeTicketJsonField(String raw, Object fallback) {
@@ -33,10 +35,11 @@ String? _normalizedDriverName(String? raw) {
 
 /// `tickets` + `sync_queue` persistence and best-effort REST.
 class TicketService {
-  TicketService(this._db, this._dio);
+  TicketService(this._db, this._dio, this._transactionsApi);
 
   final AppDatabase _db;
   final Dio _dio;
+  final TransactionsApi _transactionsApi;
 
   static const _uuid = Uuid();
 
@@ -402,6 +405,219 @@ WHERE shift_id = ? AND status = 'completed'
   Future<Ticket?> ticketById(String id) {
     return (_db.select(_db.tickets)..where((t) => t.id.equals(id)))
         .getSingleOrNull();
+  }
+
+  /// GET server transaction by UUID; upserts local [tickets] row (no sync_queue).
+  ///
+  /// Schema v5 has no `local_uuid` / `last_modified_at` columns; persistence uses
+  /// existing [Ticket] fields only.
+  Future<Ticket> getTransactionById(String serverId) async {
+    final token = await _activeBearer();
+    if (token == null || token.isEmpty) {
+      throw TransactionsApiException('No active bearer token.');
+    }
+    final map = await _transactionsApi.getTransactionById(
+      token: token,
+      id: serverId,
+    );
+    return _upsertFromServerTransactionJson(map);
+  }
+
+  /// GET server transaction by local ticket number (`TKT-…`); upserts local row.
+  Future<Ticket> getTransactionByTicketNumber(String ticketNumber) async {
+    final token = await _activeBearer();
+    if (token == null || token.isEmpty) {
+      throw TransactionsApiException('No active bearer token.');
+    }
+    final map = await _transactionsApi.getTransactionByTicketNumber(
+      token: token,
+      ticketNumber: ticketNumber,
+    );
+    return _upsertFromServerTransactionJson(map);
+  }
+
+  /// POST lost ticket (live only). Updates local row [status] and [fee] from response.
+  Future<Ticket> markTicketLost(String serverId, {String? notes}) async {
+    if (AppConfig.useStubApi) {
+      throw TransactionsApiException(
+        'Stub API: configure API_BASE_URL to mark a ticket lost.',
+      );
+    }
+    if (!await InternetReachability.hasInternet()) {
+      throw TransactionsApiException(
+        'Device is offline. Lost ticket requires a connection.',
+      );
+    }
+    final token = await _activeBearer();
+    if (token == null || token.isEmpty) {
+      throw TransactionsApiException('No active bearer token.');
+    }
+    final row = await _ticketByServerId(serverId.trim());
+    if (row == null) {
+      throw TransactionsApiException(
+        'No local ticket with server_ticket_id matching this transaction.',
+      );
+    }
+    final map = await _transactionsApi.markTicketLost(
+      token: token,
+      ticketId: serverId,
+      notes: notes,
+    );
+    final fee = _feeFromLostResponse(map);
+    final lostStatus =
+        _normalizeTicketStatus(map['status']?.toString() ?? 'lost');
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(row.id))).write(
+      TicketsCompanion(
+        status: Value(lostStatus),
+        fee: Value(fee),
+        syncStatus: const Value('synced'),
+      ),
+    );
+    return (await ticketById(row.id))!;
+  }
+
+  Future<Ticket?> _ticketByServerId(String serverUuid) async {
+    final u = serverUuid.trim();
+    if (u.isEmpty) return null;
+    return (_db.select(_db.tickets)..where((t) => t.serverTicketId.equals(u)))
+        .getSingleOrNull();
+  }
+
+  Future<({String shiftId, String userId, String branchId})?>
+      _ticketUpsertContext() async {
+    final session = await (_db.select(_db.sessions)
+          ..where((x) => x.isActive.equals(true))
+          ..limit(1))
+        .getSingleOrNull();
+    if (session == null) return null;
+    final account = await (_db.select(_db.offlineAccounts)
+          ..where((a) => a.id.equals(session.userId))
+          ..limit(1))
+        .getSingleOrNull();
+    if (account == null) return null;
+    final userIdStr = account.serverUserId.toString();
+    final shift = await (_db.select(_db.shifts)
+          ..where((s) => s.userId.equals(userIdStr) & s.status.equals('open'))
+          ..orderBy([(s) => OrderingTerm.desc(s.openedAt)])
+          ..limit(1))
+        .getSingleOrNull();
+    if (shift == null) return null;
+    return (
+      shiftId: shift.id,
+      userId: userIdStr,
+      branchId: shift.branchId,
+    );
+  }
+
+  Future<Ticket> _upsertFromServerTransactionJson(Map<String, dynamic> json) async {
+    final serverUuid = json['id']?.toString().trim() ?? '';
+    if (serverUuid.isEmpty) {
+      throw TransactionsApiException('Server response missing id.');
+    }
+    final ticketNum = json['ticket_number']?.toString().trim() ??
+        json['ticketNumber']?.toString().trim() ??
+        '';
+    if (ticketNum.isEmpty) {
+      throw TransactionsApiException('Server response missing ticket_number.');
+    }
+    final checkIn = _parseCheckInTime(json);
+    final vm = _vehicleMap(json);
+    final plate =
+        vm['plate_number']?.toString() ?? vm['plateNumber']?.toString() ?? '';
+    final brand = vm['brand']?.toString() ?? '';
+    final color = vm['color']?.toString() ?? '';
+    final vtype = vm['type']?.toString() ?? '';
+    final status = _normalizeTicketStatus(json['status']?.toString() ?? 'active');
+
+    final existing =
+        await _ticketByServerId(serverUuid) ?? await ticketById(ticketNum);
+    if (existing != null) {
+      await (_db.update(_db.tickets)..where((t) => t.id.equals(existing.id)))
+          .write(
+        TicketsCompanion(
+          serverTicketId: Value(serverUuid),
+          plateNumber: Value(plate),
+          vehicleBrand: Value(brand),
+          vehicleColor: Value(color),
+          vehicleType: Value(vtype),
+          checkInAt: Value(checkIn),
+          status: Value(status),
+          syncStatus: const Value('synced'),
+        ),
+      );
+      final out = await ticketById(existing.id);
+      if (out == null) {
+        throw TransactionsApiException('Upsert failed after update.');
+      }
+      return out;
+    }
+
+    final ctx = await _ticketUpsertContext();
+    if (ctx == null) {
+      throw TransactionsApiException(
+        'Open a cash shift before saving a ticket from the server.',
+      );
+    }
+    final now = DateTime.now().toIso8601String();
+    await _db.into(_db.tickets).insert(
+          TicketsCompanion.insert(
+            id: ticketNum,
+            shiftId: ctx.shiftId,
+            userId: ctx.userId,
+            branchId: ctx.branchId,
+            plateNumber: plate,
+            vehicleBrand: brand,
+            vehicleColor: color,
+            vehicleType: vtype,
+            cellphoneNumber: '',
+            damageMarkers: '[]',
+            personalBelongings: '[]',
+            checkInAt: checkIn,
+            status: status,
+            syncStatus: 'synced',
+            createdAt: now,
+            serverTicketId: Value(serverUuid),
+          ),
+        );
+    final out = await ticketById(ticketNum);
+    if (out == null) {
+      throw TransactionsApiException('Upsert failed after insert.');
+    }
+    return out;
+  }
+
+  static Map<String, dynamic> _vehicleMap(Map<String, dynamic> json) {
+    final vehicle = json['vehicle'];
+    if (vehicle is Map<String, dynamic>) return vehicle;
+    if (vehicle is Map) return Map<String, dynamic>.from(vehicle);
+    return const <String, dynamic>{};
+  }
+
+  static String _parseCheckInTime(Map<String, dynamic> json) {
+    final raw = json['check_in_time'] ??
+        json['checkInTime'] ??
+        json['check_in_at'] ??
+        json['checkInAt'];
+    if (raw == null) return DateTime.now().toIso8601String();
+    final s = raw.toString().trim();
+    if (s.isEmpty) return DateTime.now().toIso8601String();
+    final dt = DateTime.tryParse(s);
+    return dt?.toIso8601String() ?? DateTime.now().toIso8601String();
+  }
+
+  static String _normalizeTicketStatus(String raw) {
+    final s = raw.trim().toLowerCase();
+    if (s == 'lost') return 'lost';
+    if (s == 'completed' || s == 'complete') return 'completed';
+    if (s == 'draft') return 'draft';
+    return 'active';
+  }
+
+  static double? _feeFromLostResponse(Map<String, dynamic> m) {
+    final f = m['fee'];
+    if (f is num) return f.toDouble();
+    if (f != null) return double.tryParse(f.toString());
+    return null;
   }
 
   Map<String, dynamic> _checkInPatchBody(Ticket row) {
