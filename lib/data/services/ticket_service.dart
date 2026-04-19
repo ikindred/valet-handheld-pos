@@ -11,6 +11,20 @@ import '../../features/check_in/domain/check_in_form_data.dart';
 import '../local/db/app_database.dart';
 import 'ticket_sync_payload.dart';
 
+Object _decodeTicketJsonField(String raw, Object fallback) {
+  try {
+    return jsonDecode(raw);
+  } catch (_) {
+    return fallback;
+  }
+}
+
+Map<String, dynamic>? _asStringKeyedMap(dynamic data) {
+  if (data is Map<String, dynamic>) return data;
+  if (data is Map) return Map<String, dynamic>.from(data);
+  return null;
+}
+
 /// `tickets` + `sync_queue` persistence and best-effort REST.
 class TicketService {
   TicketService(this._db, this._dio);
@@ -380,24 +394,96 @@ WHERE shift_id = ? AND status = 'completed'
         .getSingleOrNull();
   }
 
+  Map<String, dynamic> _checkInPatchBody(Ticket row) {
+    return <String, dynamic>{
+      'vehicle': <String, dynamic>{
+        'plate_number': row.plateNumber,
+        'brand': row.vehicleBrand,
+        'color': row.vehicleColor,
+        'type': row.vehicleType,
+        'model': '',
+        'year': null,
+      },
+      'parking': <String, dynamic>{
+        'level': null,
+        'slot': null,
+      },
+      'belongings':
+          _decodeTicketJsonField(row.personalBelongings, const <dynamic>[]),
+      'condition': <String, dynamic>{
+        'damages': _decodeTicketJsonField(row.damageMarkers, const <dynamic>[]),
+        'signature': row.signaturePng,
+      },
+    };
+  }
+
   Future<void> _postTicketCreate(String ticketId) async {
     if (AppConfig.useStubApi) return;
     final token = await _activeBearer();
     if (token == null) return;
     try {
-      final row =
+      var row =
           await (_db.select(_db.tickets)..where((t) => t.id.equals(ticketId)))
               .getSingle();
-      await _dio.post<dynamic>(
-        AppConfig.ticketCreate,
-        data: ticketSyncPayload(row),
-        options: Options(
-          headers: {'Authorization': 'Bearer $token'},
-          validateStatus: (c) => c != null && c < 500,
-        ),
+
+      final opts = Options(
+        headers: {'Authorization': 'Bearer $token'},
+        validateStatus: (c) => c != null && c < 500,
+      );
+
+      var serverId = row.serverTicketId?.trim();
+      if (serverId == null || serverId.isEmpty) {
+        final createRes = await _dio.post<dynamic>(
+          AppConfig.ticketsRest,
+          data: <String, dynamic>{
+            'customer_name': null,
+            'contact_number': row.cellphoneNumber.trim().isEmpty
+                ? null
+                : row.cellphoneNumber,
+            'valet_type': 'standard_valet',
+            'notes': null,
+          },
+          options: opts,
+        );
+        if (createRes.statusCode != 201) return;
+        final m = _asStringKeyedMap(createRes.data);
+        serverId = m?['id']?.toString().trim();
+        if (serverId == null || serverId.isEmpty) {
+          ValetLog.warning(
+            'TicketService',
+            'create transaction: missing id in response for local $ticketId',
+          );
+          return;
+        }
+        final remoteNum = m?['ticket_number'] ?? m?['ticketNumber'];
+        if (remoteNum != null) {
+          final r = remoteNum.toString().trim();
+          if (r.isNotEmpty && r != row.id) {
+            ValetLog.warning(
+              'TicketService',
+              'server ticket_number $r != local id ${row.id} — keeping local id',
+            );
+          }
+        }
+        await (_db.update(_db.tickets)..where((t) => t.id.equals(ticketId)))
+            .write(TicketsCompanion(serverTicketId: Value(serverId)));
+        row =
+            await (_db.select(_db.tickets)..where((t) => t.id.equals(ticketId)))
+                .getSingle();
+      }
+
+      await _dio.patch<dynamic>(
+        AppConfig.ticketById(serverId),
+        data: _checkInPatchBody(row),
+        options: opts,
       );
     } catch (e, st) {
-      ValetLog.error('TicketService', 'POST tickets failed (queued)', e, st);
+      ValetLog.error(
+        'TicketService',
+        'transaction check-in sync failed (queued)',
+        e,
+        st,
+      );
     }
   }
 
@@ -410,18 +496,57 @@ WHERE shift_id = ? AND status = 'completed'
             ..where((t) => t.id.equals(ticketId)))
           .getSingleOrNull();
       if (row == null) return;
-      await _dio.patch<dynamic>(
-        AppConfig.ticketCheckout(ticketId),
-        data: ticketSyncPayload(row),
-        options: Options(
-          headers: {'Authorization': 'Bearer $token'},
-          validateStatus: (c) => c != null && c < 500,
-        ),
+      final serverId = row.serverTicketId?.trim() ?? '';
+      if (serverId.isEmpty) {
+        ValetLog.warning(
+          'TicketService',
+          'checkout sync skipped: missing server_ticket_id for $ticketId',
+        );
+        return;
+      }
+
+      final opts = Options(
+        headers: {'Authorization': 'Bearer $token'},
+        validateStatus: (c) => c != null && c < 500,
       );
+
+      final checkoutDamages = _decodeTicketJsonField(
+        row.damageMarkers,
+        const <dynamic>[],
+      );
+
+      await _dio.patch<dynamic>(
+        AppConfig.ticketById(serverId),
+        data: <String, dynamic>{
+          'condition_checkout': checkoutDamages,
+          'status': 'active',
+        },
+        options: opts,
+      );
+
+      final fee = row.fee ?? 0;
+      if (fee > 0) {
+        final payRes = await _dio.post<dynamic>(
+          AppConfig.transactionPayUrl(serverId),
+          data: <String, dynamic>{
+            'method': 'cash',
+            'amount_paid': fee,
+          },
+          options: opts,
+        );
+        if (payRes.statusCode == 200) {
+          final d = payRes.data;
+          final m = _asStringKeyedMap(d);
+          final change = m?['change'];
+          if (change != null) {
+            ValetLog.debug('TicketService', 'pay change: $change');
+          }
+        }
+      }
     } catch (e, st) {
       ValetLog.error(
         'TicketService',
-        'PATCH ticket checkout failed (queued)',
+        'transaction checkout sync failed (queued)',
         e,
         st,
       );

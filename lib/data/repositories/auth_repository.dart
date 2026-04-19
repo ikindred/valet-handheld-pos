@@ -15,6 +15,7 @@ import '../../core/session/standard_parking_rates.dart';
 import '../../core/time/unix_timestamp.dart';
 import '../local/db/app_database.dart';
 import '../remote/auth_api.dart';
+import '../services/rate_fetch_service.dart';
 import '../services/rate_service.dart';
 import '../services/shift_service.dart';
 import '../services/ticket_sync_payload.dart';
@@ -46,6 +47,7 @@ class AuthRepository {
     this._refresh,
     this._shifts,
     this._rates,
+    this._rateFetch,
   );
 
   final AppDatabase _db;
@@ -53,10 +55,11 @@ class AuthRepository {
   final RouterRefreshNotifier _refresh;
   final ShiftService _shifts;
   final RateService _rates;
+  final RateFetchService _rateFetch;
 
   static const _uuid = Uuid();
 
-  /// Seeds `rates` for [device_info.branch] when empty (offline defaults if API gave none).
+  /// Seeds `rates` for [device_info.branch] when empty (offline-only; [StandardParkingRates.offlineDefault]).
   Future<void> hydrateLocalRatesIfEmpty() async {
     final site = await branchAndAreaFromDb();
     await _rates.syncFromAuthIfEmpty(branchId: site.branch, rates: null);
@@ -84,7 +87,7 @@ class AuthRepository {
         .getSingleOrNull();
   }
 
-  Future<OfflineAccount?> offlineAccountByServerId(int serverUserId) {
+  Future<OfflineAccount?> offlineAccountByServerId(String serverUserId) {
     return (_db.select(_db.offlineAccounts)
           ..where((a) => a.serverUserId.equals(serverUserId))
           ..limit(1))
@@ -233,7 +236,7 @@ class AuthRepository {
   }
 
   Future<int> _upsertOfflineAccount({
-    required int serverUserId,
+    required String serverUserId,
     required String email,
     required String passwordHash,
     required String fullName,
@@ -314,10 +317,8 @@ class AuthRepository {
 
     _refresh.notifyAuthChanged();
     final site = await branchAndAreaFromDb();
-    await _rates.syncFromAuthIfEmpty(
-      branchId: site.branch,
-      rates: res.standardRates,
-    );
+    await _rateFetch.syncRatesForBranch(site.branch);
+    await _rates.syncFromAuthIfEmpty(branchId: site.branch, rates: null);
     ValetLog.debug(
       'AuthRepository.loginOnline',
       'success localUserId=$accountId',
@@ -366,7 +367,7 @@ class AuthRepository {
   }
 
   /// `UPDATE sessions SET last_verified_at = ?, auth_token = ? WHERE id = ?`
-  /// (token updated when API returns one).
+  /// ([authToken] only when validate-token returns a new JWT; otherwise unchanged.)
   ///
   /// Shift state is only synced from the revalidate response when a **real** API
   /// is configured. With [AppConfig.useStubApi] (`API_BASE_URL` unset in `.env`), we skip
@@ -402,7 +403,9 @@ class AuthRepository {
           .write(
         SessionsCompanion(
           lastVerifiedAt: Value(unixNowSeconds()),
-          authToken: Value(res.token),
+          authToken: res.token != null && res.token!.trim().isNotEmpty
+              ? Value(res.token)
+              : const Value.absent(),
         ),
       );
       if (!AppConfig.useStubApi) {
@@ -416,10 +419,8 @@ class AuthRepository {
 
     _refresh.notifyAuthChanged();
     final site = await branchAndAreaFromDb();
-    await _rates.syncFromAuthIfEmpty(
-      branchId: site.branch,
-      rates: res.standardRates,
-    );
+    await _rateFetch.syncRatesForBranch(site.branch);
+    await _rates.syncFromAuthIfEmpty(branchId: site.branch, rates: null);
     return res.standardRates;
   }
 

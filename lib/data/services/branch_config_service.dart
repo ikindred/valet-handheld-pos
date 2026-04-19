@@ -27,7 +27,7 @@ class BranchConfigService {
   /// ISO8601 timestamp string; device should use Asia/Manila wall time.
   static String _nowIso8601() => DateTime.now().toIso8601String();
 
-  /// GET branch config, upsert rows, swallow errors (cache stays valid).
+  /// GET branch detail + global settings; upserts [BranchConfigs] rows.
   Future<void> syncFromServer(String branchId) async {
     final id = branchId.trim();
     if (id.isEmpty) {
@@ -51,58 +51,123 @@ class BranchConfigService {
       return;
     }
 
+    final opts = Options(
+      headers: {'Authorization': 'Bearer $token'},
+      validateStatus: (s) => s != null && s < 500,
+    );
+
+    final entries = <({String key, String value})>[];
+
     try {
-      final url = AppConfig.branchConfigUrl(id);
-      final res = await _dio.get<dynamic>(
-        url,
-        options: Options(
-          headers: {'Authorization': 'Bearer $token'},
-          validateStatus: (s) => s != null && s < 500,
-        ),
-      );
+      final branchUrl = AppConfig.branchDetailUrl(id);
+      final res = await _dio.get<dynamic>(branchUrl, options: opts);
       final status = res.statusCode ?? 0;
-      if (status == 401 || status == 403) {
+      if (status >= 200 && status < 300) {
+        final root = _asStringKeyedMap(res.data);
+        final branch = _unwrapBranchMap(root);
+        if (branch != null) {
+          final open = _hhMmFromDynamic(
+            branch['opensAt'] ??
+                branch['opens_at'] ??
+                branch['openTime'] ??
+                branch['mall_open_time'],
+          );
+          final close = _hhMmFromDynamic(
+            branch['closesAt'] ??
+                branch['closes_at'] ??
+                branch['closeTime'] ??
+                branch['mall_close_time'],
+          );
+          if (open != null) {
+            entries.add((key: 'mall_open_time', value: open));
+          }
+          if (close != null) {
+            entries.add((key: 'mall_close_time', value: close));
+          }
+        }
+      } else if (status == 401 || status == 403) {
         ValetLog.warning(
           'BranchConfigService.syncFromServer',
-          'warn: HTTP $status for $url',
+          'warn: HTTP $status for $branchUrl',
         );
         return;
-      }
-      if (status < 200 || status >= 300) {
+      } else {
         ValetLog.warning(
           'BranchConfigService.syncFromServer',
-          'warn: HTTP $status for $url',
+          'warn: HTTP $status for $branchUrl',
         );
-        return;
       }
-      final list = _parseConfigList(res.data);
-      if (list.isEmpty) {
-        ValetLog.info(
+    } catch (e, st) {
+      ValetLog.error(
+        'BranchConfigService.syncFromServer',
+        'branch detail request failed — continuing with settings',
+        e,
+        st,
+      );
+    }
+
+    try {
+      final settingsUrl = AppConfig.config;
+      final res = await _dio.get<dynamic>(settingsUrl, options: opts);
+      final status = res.statusCode ?? 0;
+      if (status >= 200 && status < 300) {
+        final root = _asStringKeyedMap(res.data);
+        final settings = _unwrapSettingsMap(root);
+        if (settings != null) {
+          final cutoff = _hhMmFromDynamic(
+            settings['overnightCutoff'] ??
+                settings['overnight_cutoff'] ??
+                settings['overnightStart'] ??
+                settings['overnight_start_time'],
+          );
+          if (cutoff != null) {
+            entries.add((key: 'overnight_start_time', value: cutoff));
+          }
+        }
+        entries.add((key: 'overnight_end_time', value: '06:00'));
+      } else {
+        ValetLog.warning(
           'BranchConfigService.syncFromServer',
-          'empty config list for branch=$id',
+          'warn: HTTP $status for $settingsUrl',
         );
-        return;
       }
-      final updatedAt = _nowIso8601();
+    } catch (e, st) {
+      ValetLog.error(
+        'BranchConfigService.syncFromServer',
+        'settings request failed',
+        e,
+        st,
+      );
+    }
+
+    if (entries.isEmpty) {
+      ValetLog.info(
+        'BranchConfigService.syncFromServer',
+        'no branch/settings keys parsed for branch=$id',
+      );
+      return;
+    }
+
+    final updatedAt = _nowIso8601();
+    try {
       await _db.transaction(() async {
-        for (final item in list) {
-          final key = (item['configKey'] ?? item['config_key'] ?? '')
-              .toString()
-              .trim();
-          final value =
-              (item['configValue'] ?? item['config_value'] ?? '').toString();
-          if (key.isEmpty) continue;
-          await _upsertRow(branchId: id, configKey: key, configValue: value, updatedAt: updatedAt);
+        for (final e in entries) {
+          await _upsertRow(
+            branchId: id,
+            configKey: e.key,
+            configValue: e.value,
+            updatedAt: updatedAt,
+          );
         }
       });
       ValetLog.info(
         'BranchConfigService.syncFromServer',
-        'saved ${list.length} keys for branch=$id',
+        'saved ${entries.length} keys for branch=$id',
       );
     } catch (e, st) {
       ValetLog.error(
         'BranchConfigService.syncFromServer',
-        'network or parse failure — keeping cache',
+        'persist failure — keeping prior cache',
         e,
         st,
       );
@@ -115,23 +180,50 @@ class BranchConfigService {
     await syncFromServer(site.branch);
   }
 
-  static List<Map<String, dynamic>> _parseConfigList(dynamic data) {
-    if (data is List) {
-      return [
-        for (final e in data)
-          if (e is Map<String, dynamic>) e
-          else if (e is Map) Map<String, dynamic>.from(e),
-      ];
+  static Map<String, dynamic>? _asStringKeyedMap(dynamic data) {
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return null;
+  }
+
+  static Map<String, dynamic>? _unwrapBranchMap(Map<String, dynamic>? root) {
+    if (root == null) return null;
+    for (final key in const ['data', 'branch', 'result']) {
+      final v = root[key];
+      if (v is Map<String, dynamic>) return v;
+      if (v is Map) return Map<String, dynamic>.from(v);
     }
-    if (data is Map) {
-      final m = Map<String, dynamic>.from(data);
-      for (final key in const ['data', 'config', 'items', 'results']) {
-        final v = m[key];
-        final parsed = _parseConfigList(v);
-        if (parsed.isNotEmpty) return parsed;
-      }
+    return root;
+  }
+
+  static Map<String, dynamic>? _unwrapSettingsMap(Map<String, dynamic>? root) {
+    if (root == null) return null;
+    for (final key in const ['data', 'settings', 'result']) {
+      final v = root[key];
+      if (v is Map<String, dynamic>) return v;
+      if (v is Map) return Map<String, dynamic>.from(v);
     }
-    return const [];
+    return root;
+  }
+
+  /// Parses ISO datetime or `HH:mm` into `HH:mm` for [OvernightWindow.parseHhMm].
+  static String? _hhMmFromDynamic(dynamic v) {
+    if (v == null) return null;
+    final s = v.toString().trim();
+    if (s.isEmpty) return null;
+    final iso = DateTime.tryParse(s);
+    if (iso != null) {
+      return '${iso.hour.toString().padLeft(2, '0')}:'
+          '${iso.minute.toString().padLeft(2, '0')}';
+    }
+    final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
+    if (m != null) {
+      final h = int.tryParse(m.group(1)!) ?? 0;
+      final min = int.tryParse(m.group(2)!) ?? 0;
+      return '${h.toString().padLeft(2, '0')}:'
+          '${min.toString().padLeft(2, '0')}';
+    }
+    return null;
   }
 
   Future<void> _upsertRow({

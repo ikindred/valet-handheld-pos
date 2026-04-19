@@ -55,9 +55,10 @@ class AuthApi {
   }) async {
     if (AppConfig.useStubApi) {
       final uid = email.hashCode.abs();
+      final sid = uid == 0 ? '1' : 'stub-$uid';
       return LoginResponse(
         token: 'stub_jwt_$uid',
-        userId: uid == 0 ? 1 : uid,
+        userId: sid,
         fullName: 'Stub User',
         role: 'staff',
         isOpenCash: false,
@@ -89,7 +90,7 @@ class AuthApi {
     if (AppConfig.useStubApi) {
       return RevalidateResponse(
         token: token,
-        userId: 1,
+        userId: 'stub-1',
         valid: true,
         isOpenCash: false,
         standardRates: StandardParkingRates.fromLoginResponseJson(const {
@@ -160,12 +161,32 @@ class DeviceRegisterResult {
   final String? area;
 }
 
-int _parseUserId(dynamic v) {
-  if (v is int) return v;
-  if (v is num) return v.toInt();
-  final s = v?.toString().trim();
-  if (s == null || s.isEmpty) return 0;
-  return int.tryParse(s) ?? 0;
+String _parseAccessToken(Map<String, dynamic> json) {
+  final v = json['token'] ??
+      json['accessToken'] ??
+      json['access_token'] ??
+      '';
+  return v.toString();
+}
+
+/// Server user id from nested `user` or top-level keys; UUID string when present.
+String _parseServerUserId(Map<String, dynamic> json) {
+  final user = json['user'];
+  if (user is Map<String, dynamic>) {
+    final v = user['id'] ?? user['user_id'] ?? user['userId'];
+    if (v != null) return v.toString().trim();
+  }
+  final v = json['user_id'] ?? json['userId'];
+  return v?.toString().trim() ?? '';
+}
+
+String _fullNameFromUser(Map<String, dynamic> user) {
+  final direct = (user['full_name'] ?? user['fullName'])?.toString().trim();
+  if (direct != null && direct.isNotEmpty) return direct;
+  final a = (user['firstName'] ?? user['first_name'] ?? '').toString().trim();
+  final b = (user['lastName'] ?? user['last_name'] ?? '').toString().trim();
+  if (a.isEmpty && b.isEmpty) return '';
+  return '$a $b'.trim();
 }
 
 class LoginResponse {
@@ -189,17 +210,17 @@ class LoginResponse {
     }
 
     final user = json['user'];
-    int userId = _parseUserId(json['user_id'] ?? json['userId']);
     var fullName = '';
     var role = '';
+    var userId = _parseServerUserId(json);
     if (user is Map<String, dynamic>) {
-      userId = _parseUserId(user['id'] ?? user['user_id']);
-      fullName = (user['full_name'] ?? user['fullName'] ?? '').toString();
+      userId = _parseServerUserId({'user': user});
+      fullName = _fullNameFromUser(user);
       role = (user['role'] ?? '').toString();
     }
 
     return LoginResponse(
-      token: (json['token'] ?? json['access_token'] ?? '').toString(),
+      token: _parseAccessToken(json),
       userId: userId,
       fullName: fullName,
       role: role,
@@ -210,8 +231,8 @@ class LoginResponse {
 
   final String token;
 
-  /// Canonical server user id (INTEGER).
-  final int userId;
+  /// Server user id (UUID when returned by API).
+  final String userId;
 
   final String fullName;
 
@@ -223,7 +244,7 @@ class LoginResponse {
 
 class RevalidateResponse {
   RevalidateResponse({
-    required this.token,
+    this.token,
     required this.userId,
     required this.valid,
     required this.isOpenCash,
@@ -251,13 +272,20 @@ class RevalidateResponse {
     }
 
     final user = json['user'];
-    int userId = _parseUserId(json['user_id'] ?? json['userId']);
+    var userId = _parseServerUserId(json);
     if (user is Map<String, dynamic>) {
-      userId = _parseUserId(user['id'] ?? user['user_id']);
+      userId = _parseServerUserId({'user': user});
     }
 
+    final rawTok = json['token'] ??
+        json['accessToken'] ??
+        json['access_token'];
+    final String? rotated = rawTok == null
+        ? null
+        : (rawTok.toString().trim().isEmpty ? null : rawTok.toString().trim());
+
     return RevalidateResponse(
-      token: (json['token'] ?? json['access_token'] ?? '').toString(),
+      token: rotated,
       userId: userId,
       valid: valid,
       isOpenCash: isOpen,
@@ -265,8 +293,11 @@ class RevalidateResponse {
     );
   }
 
-  final String token;
-  final int userId;
+  /// New JWT when the server rotates the token; null means keep the existing session token.
+  final String? token;
+
+  final String userId;
+
   final bool valid;
   final bool isOpenCash;
   final StandardParkingRates? standardRates;

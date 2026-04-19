@@ -97,7 +97,7 @@ class ShiftService {
     return (_db.select(_db.shifts)..where((s) => s.id.equals(id))).getSingle();
   }
 
-  /// Closes a shift + enqueue update; best-effort PATCH.
+  /// Closes a shift + enqueue update; best-effort POST cash-session close.
   Future<Shift> closeShift({
     required String shiftId,
     required double closingCash,
@@ -176,16 +176,23 @@ class ShiftService {
       final row =
           await (_db.select(_db.shifts)..where((s) => s.id.equals(shiftId)))
               .getSingle();
-      await _dio.post<dynamic>(
-        AppConfig.shiftsRest,
-        data: shiftRowToJson(row),
+      final res = await _dio.post<dynamic>(
+        AppConfig.cashSessionsStart,
+        data: <String, dynamic>{
+          'opening_balance': row.openingFloat,
+          'notes': null,
+        },
         options: Options(
           headers: {'Authorization': 'Bearer $token'},
           validateStatus: (c) => c != null && c < 500,
         ),
       );
+      if (res.statusCode == 201) {
+        await (_db.update(_db.shifts)..where((s) => s.id.equals(shiftId)))
+            .write(const ShiftsCompanion(syncStatus: Value('synced')));
+      }
     } catch (e, st) {
-      ValetLog.error('ShiftService', 'POST shifts failed (queued)', e, st);
+      ValetLog.error('ShiftService', 'POST cash-sessions/start failed (queued)', e, st);
     }
   }
 
@@ -197,16 +204,29 @@ class ShiftService {
       final row =
           await (_db.select(_db.shifts)..where((s) => s.id.equals(shiftId)))
               .getSingle();
-      await _dio.patch<dynamic>(
-        AppConfig.shiftById(shiftId),
-        data: shiftRowToJson(row),
+      final res = await _dio.post<dynamic>(
+        AppConfig.cashSessionsClose,
+        data: <String, dynamic>{
+          'shift_id': shiftId,
+          'actual_cash': row.closingCash ?? 0,
+          'notes': null,
+        },
         options: Options(
           headers: {'Authorization': 'Bearer $token'},
           validateStatus: (c) => c != null && c < 500,
         ),
       );
+      if (res.statusCode == 200) {
+        await (_db.update(_db.shifts)..where((s) => s.id.equals(shiftId)))
+            .write(const ShiftsCompanion(syncStatus: Value('synced')));
+      }
     } catch (e, st) {
-      ValetLog.error('ShiftService', 'PATCH shift failed (queued)', e, st);
+      ValetLog.error(
+        'ShiftService',
+        'POST cash-sessions/close failed (queued)',
+        e,
+        st,
+      );
     }
   }
 }

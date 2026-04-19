@@ -759,9 +759,9 @@ class $OfflineAccountsTable extends OfflineAccounts
   static const VerificationMeta _serverUserIdMeta =
       const VerificationMeta('serverUserId');
   @override
-  late final GeneratedColumn<int> serverUserId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> serverUserId = GeneratedColumn<String>(
       'server_user_id', aliasedName, false,
-      type: DriftSqlType.int,
+      type: DriftSqlType.string,
       requiredDuringInsert: true,
       defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
   static const VerificationMeta _emailMeta = const VerificationMeta('email');
@@ -897,7 +897,7 @@ class $OfflineAccountsTable extends OfflineAccounts
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
       serverUserId: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}server_user_id'])!,
+          .read(DriftSqlType.string, data['${effectivePrefix}server_user_id'])!,
       email: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}email'])!,
       passwordHash: attachedDatabase.typeMapping
@@ -924,8 +924,8 @@ class $OfflineAccountsTable extends OfflineAccounts
 class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
   final int id;
 
-  /// Canonical user id from API.
-  final int serverUserId;
+  /// Server user id (UUID string from API).
+  final String serverUserId;
   final String email;
   final String passwordHash;
   final String fullName;
@@ -949,7 +949,7 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
-    map['server_user_id'] = Variable<int>(serverUserId);
+    map['server_user_id'] = Variable<String>(serverUserId);
     map['email'] = Variable<String>(email);
     map['password_hash'] = Variable<String>(passwordHash);
     map['full_name'] = Variable<String>(fullName);
@@ -979,7 +979,7 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return OfflineAccount(
       id: serializer.fromJson<int>(json['id']),
-      serverUserId: serializer.fromJson<int>(json['serverUserId']),
+      serverUserId: serializer.fromJson<String>(json['serverUserId']),
       email: serializer.fromJson<String>(json['email']),
       passwordHash: serializer.fromJson<String>(json['passwordHash']),
       fullName: serializer.fromJson<String>(json['fullName']),
@@ -994,7 +994,7 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
-      'serverUserId': serializer.toJson<int>(serverUserId),
+      'serverUserId': serializer.toJson<String>(serverUserId),
       'email': serializer.toJson<String>(email),
       'passwordHash': serializer.toJson<String>(passwordHash),
       'fullName': serializer.toJson<String>(fullName),
@@ -1007,7 +1007,7 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
 
   OfflineAccount copyWith(
           {int? id,
-          int? serverUserId,
+          String? serverUserId,
           String? email,
           String? passwordHash,
           String? fullName,
@@ -1082,7 +1082,7 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
 
 class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
   final Value<int> id;
-  final Value<int> serverUserId;
+  final Value<String> serverUserId;
   final Value<String> email;
   final Value<String> passwordHash;
   final Value<String> fullName;
@@ -1103,7 +1103,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
   });
   OfflineAccountsCompanion.insert({
     this.id = const Value.absent(),
-    required int serverUserId,
+    required String serverUserId,
     required String email,
     required String passwordHash,
     required String fullName,
@@ -1121,7 +1121,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
         updatedAt = Value(updatedAt);
   static Insertable<OfflineAccount> custom({
     Expression<int>? id,
-    Expression<int>? serverUserId,
+    Expression<String>? serverUserId,
     Expression<String>? email,
     Expression<String>? passwordHash,
     Expression<String>? fullName,
@@ -1145,7 +1145,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
 
   OfflineAccountsCompanion copyWith(
       {Value<int>? id,
-      Value<int>? serverUserId,
+      Value<String>? serverUserId,
       Value<String>? email,
       Value<String>? passwordHash,
       Value<String>? fullName,
@@ -1173,7 +1173,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
       map['id'] = Variable<int>(id.value);
     }
     if (serverUserId.present) {
-      map['server_user_id'] = Variable<int>(serverUserId.value);
+      map['server_user_id'] = Variable<String>(serverUserId.value);
     }
     if (email.present) {
       map['email'] = Variable<String>(email.value);
@@ -2290,6 +2290,12 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
   late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
       'created_at', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _serverTicketIdMeta =
+      const VerificationMeta('serverTicketId');
+  @override
+  late final GeneratedColumn<String> serverTicketId = GeneratedColumn<String>(
+      'server_ticket_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -2309,7 +2315,8 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
         fee,
         status,
         syncStatus,
-        createdAt
+        createdAt,
+        serverTicketId
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2444,6 +2451,12 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('server_ticket_id')) {
+      context.handle(
+          _serverTicketIdMeta,
+          serverTicketId.isAcceptableOrUnknown(
+              data['server_ticket_id']!, _serverTicketIdMeta));
+    }
     return context;
   }
 
@@ -2489,6 +2502,8 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
           .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}created_at'])!,
+      serverTicketId: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}server_ticket_id']),
     );
   }
 
@@ -2527,6 +2542,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
   /// `pending` | `synced`
   final String syncStatus;
   final String createdAt;
+
+  /// Server `transactions.id` (UUID) after draft POST; local [id] stays `TKT-…`.
+  final String? serverTicketId;
   const Ticket(
       {required this.id,
       required this.shiftId,
@@ -2545,7 +2563,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       this.fee,
       required this.status,
       required this.syncStatus,
-      required this.createdAt});
+      required this.createdAt,
+      this.serverTicketId});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -2573,6 +2592,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
     map['status'] = Variable<String>(status);
     map['sync_status'] = Variable<String>(syncStatus);
     map['created_at'] = Variable<String>(createdAt);
+    if (!nullToAbsent || serverTicketId != null) {
+      map['server_ticket_id'] = Variable<String>(serverTicketId);
+    }
     return map;
   }
 
@@ -2600,6 +2622,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       status: Value(status),
       syncStatus: Value(syncStatus),
       createdAt: Value(createdAt),
+      serverTicketId: serverTicketId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverTicketId),
     );
   }
 
@@ -2626,6 +2651,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       status: serializer.fromJson<String>(json['status']),
       syncStatus: serializer.fromJson<String>(json['syncStatus']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
+      serverTicketId: serializer.fromJson<String?>(json['serverTicketId']),
     );
   }
   @override
@@ -2650,6 +2676,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       'status': serializer.toJson<String>(status),
       'syncStatus': serializer.toJson<String>(syncStatus),
       'createdAt': serializer.toJson<String>(createdAt),
+      'serverTicketId': serializer.toJson<String?>(serverTicketId),
     };
   }
 
@@ -2671,7 +2698,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           Value<double?> fee = const Value.absent(),
           String? status,
           String? syncStatus,
-          String? createdAt}) =>
+          String? createdAt,
+          Value<String?> serverTicketId = const Value.absent()}) =>
       Ticket(
         id: id ?? this.id,
         shiftId: shiftId ?? this.shiftId,
@@ -2692,6 +2720,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
         status: status ?? this.status,
         syncStatus: syncStatus ?? this.syncStatus,
         createdAt: createdAt ?? this.createdAt,
+        serverTicketId:
+            serverTicketId.present ? serverTicketId.value : this.serverTicketId,
       );
   Ticket copyWithCompanion(TicketsCompanion data) {
     return Ticket(
@@ -2729,6 +2759,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       syncStatus:
           data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      serverTicketId: data.serverTicketId.present
+          ? data.serverTicketId.value
+          : this.serverTicketId,
     );
   }
 
@@ -2752,7 +2785,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           ..write('fee: $fee, ')
           ..write('status: $status, ')
           ..write('syncStatus: $syncStatus, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('serverTicketId: $serverTicketId')
           ..write(')'))
         .toString();
   }
@@ -2776,7 +2810,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       fee,
       status,
       syncStatus,
-      createdAt);
+      createdAt,
+      serverTicketId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2798,7 +2833,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           other.fee == this.fee &&
           other.status == this.status &&
           other.syncStatus == this.syncStatus &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.serverTicketId == this.serverTicketId);
 }
 
 class TicketsCompanion extends UpdateCompanion<Ticket> {
@@ -2820,6 +2856,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
   final Value<String> status;
   final Value<String> syncStatus;
   final Value<String> createdAt;
+  final Value<String?> serverTicketId;
   final Value<int> rowid;
   const TicketsCompanion({
     this.id = const Value.absent(),
@@ -2840,6 +2877,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     this.status = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.serverTicketId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TicketsCompanion.insert({
@@ -2861,6 +2899,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     required String status,
     required String syncStatus,
     required String createdAt,
+    this.serverTicketId = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         shiftId = Value(shiftId),
@@ -2896,6 +2935,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     Expression<String>? status,
     Expression<String>? syncStatus,
     Expression<String>? createdAt,
+    Expression<String>? serverTicketId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2917,6 +2957,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       if (status != null) 'status': status,
       if (syncStatus != null) 'sync_status': syncStatus,
       if (createdAt != null) 'created_at': createdAt,
+      if (serverTicketId != null) 'server_ticket_id': serverTicketId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2940,6 +2981,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       Value<String>? status,
       Value<String>? syncStatus,
       Value<String>? createdAt,
+      Value<String?>? serverTicketId,
       Value<int>? rowid}) {
     return TicketsCompanion(
       id: id ?? this.id,
@@ -2960,6 +3002,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       status: status ?? this.status,
       syncStatus: syncStatus ?? this.syncStatus,
       createdAt: createdAt ?? this.createdAt,
+      serverTicketId: serverTicketId ?? this.serverTicketId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3021,6 +3064,9 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
+    if (serverTicketId.present) {
+      map['server_ticket_id'] = Variable<String>(serverTicketId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3048,6 +3094,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
           ..write('status: $status, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('createdAt: $createdAt, ')
+          ..write('serverTicketId: $serverTicketId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4727,7 +4774,7 @@ class $$DeviceIdentityTableOrderingComposer
 typedef $$OfflineAccountsTableCreateCompanionBuilder = OfflineAccountsCompanion
     Function({
   Value<int> id,
-  required int serverUserId,
+  required String serverUserId,
   required String email,
   required String passwordHash,
   required String fullName,
@@ -4739,7 +4786,7 @@ typedef $$OfflineAccountsTableCreateCompanionBuilder = OfflineAccountsCompanion
 typedef $$OfflineAccountsTableUpdateCompanionBuilder = OfflineAccountsCompanion
     Function({
   Value<int> id,
-  Value<int> serverUserId,
+  Value<String> serverUserId,
   Value<String> email,
   Value<String> passwordHash,
   Value<String> fullName,
@@ -4768,7 +4815,7 @@ class $$OfflineAccountsTableTableManager extends RootTableManager<
               $$OfflineAccountsTableOrderingComposer(ComposerState(db, table)),
           updateCompanionCallback: ({
             Value<int> id = const Value.absent(),
-            Value<int> serverUserId = const Value.absent(),
+            Value<String> serverUserId = const Value.absent(),
             Value<String> email = const Value.absent(),
             Value<String> passwordHash = const Value.absent(),
             Value<String> fullName = const Value.absent(),
@@ -4790,7 +4837,7 @@ class $$OfflineAccountsTableTableManager extends RootTableManager<
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
-            required int serverUserId,
+            required String serverUserId,
             required String email,
             required String passwordHash,
             required String fullName,
@@ -4821,7 +4868,7 @@ class $$OfflineAccountsTableFilterComposer
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<int> get serverUserId => $state.composableBuilder(
+  ColumnFilters<String> get serverUserId => $state.composableBuilder(
       column: $state.table.serverUserId,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
@@ -4883,7 +4930,7 @@ class $$OfflineAccountsTableOrderingComposer
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<int> get serverUserId => $state.composableBuilder(
+  ColumnOrderings<String> get serverUserId => $state.composableBuilder(
       column: $state.table.serverUserId,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
@@ -5346,6 +5393,7 @@ typedef $$TicketsTableCreateCompanionBuilder = TicketsCompanion Function({
   required String status,
   required String syncStatus,
   required String createdAt,
+  Value<String?> serverTicketId,
   Value<int> rowid,
 });
 typedef $$TicketsTableUpdateCompanionBuilder = TicketsCompanion Function({
@@ -5367,6 +5415,7 @@ typedef $$TicketsTableUpdateCompanionBuilder = TicketsCompanion Function({
   Value<String> status,
   Value<String> syncStatus,
   Value<String> createdAt,
+  Value<String?> serverTicketId,
   Value<int> rowid,
 });
 
@@ -5405,6 +5454,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             Value<String> status = const Value.absent(),
             Value<String> syncStatus = const Value.absent(),
             Value<String> createdAt = const Value.absent(),
+            Value<String?> serverTicketId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TicketsCompanion(
@@ -5426,6 +5476,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             status: status,
             syncStatus: syncStatus,
             createdAt: createdAt,
+            serverTicketId: serverTicketId,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -5447,6 +5498,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             required String status,
             required String syncStatus,
             required String createdAt,
+            Value<String?> serverTicketId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TicketsCompanion.insert(
@@ -5468,6 +5520,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             status: status,
             syncStatus: syncStatus,
             createdAt: createdAt,
+            serverTicketId: serverTicketId,
             rowid: rowid,
           ),
         ));
@@ -5558,6 +5611,11 @@ class $$TicketsTableFilterComposer
 
   ColumnFilters<String> get createdAt => $state.composableBuilder(
       column: $state.table.createdAt,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get serverTicketId => $state.composableBuilder(
+      column: $state.table.serverTicketId,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -5659,6 +5717,11 @@ class $$TicketsTableOrderingComposer
 
   ColumnOrderings<String> get createdAt => $state.composableBuilder(
       column: $state.table.createdAt,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get serverTicketId => $state.composableBuilder(
+      column: $state.table.serverTicketId,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 

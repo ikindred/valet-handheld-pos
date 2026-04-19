@@ -71,26 +71,40 @@ class AppConfig {
   static String get shiftCurrent =>
       baseUrl + (_env('API_SHIFT_CURRENT') ?? '/api/v1/shifts/current');
 
-  /// REST collection for shifts (POST create, PATCH update).
+  /// POST start cash session (local "shift" open).
   static String get shiftsRest =>
-      baseUrl + (_env('API_SHIFTS_REST') ?? '/api/v1/shifts');
+      baseUrl + (_env('API_SHIFTS_REST') ?? '/api/v1/cash-sessions/start');
 
+  /// POST `/api/v1/cash-sessions/start` (prefer over [shiftsRest] in new code).
+  static String get cashSessionsStart =>
+      baseUrl +
+      (_env('API_CASH_SESSIONS_START') ??
+          _env('API_SHIFTS_REST') ??
+          '/api/v1/cash-sessions/start');
+
+  /// POST `/api/v1/cash-sessions/close`.
+  static String get cashSessionsClose =>
+      baseUrl +
+      (_env('API_CASH_SESSIONS_CLOSE') ?? '/api/v1/cash-sessions/close');
+
+  /// POST close cash session. [shiftId] is only used when `API_SHIFT_BY_ID` template contains `{id}`.
   static String shiftById(String shiftId) {
     final enc = Uri.encodeComponent(shiftId);
     final t = (_env('API_SHIFT_BY_ID') ?? '').trim();
     if (t.isNotEmpty) {
       return baseUrl + t.replaceAll('{id}', enc);
     }
-    return '$baseUrl/api/v1/shifts/$enc';
+    return baseUrl +
+        (_env('API_CASH_SESSIONS_CLOSE') ?? '/api/v1/cash-sessions/close');
   }
 
-  // ── TICKETS ───────────────────────────────
+  // ── TRANSACTIONS (tickets) ──────────────────
   static String get ticketCreate =>
-      baseUrl + (_env('API_TICKET_CREATE') ?? '/api/v1/tickets');
+      baseUrl + (_env('API_TICKET_CREATE') ?? '/api/v1/transactions');
 
-  /// REST collection for tickets (POST create, PATCH update by id).
+  /// POST create draft transaction; PATCH by [ticketById].
   static String get ticketsRest =>
-      baseUrl + (_env('API_TICKETS_REST') ?? '/api/v1/tickets');
+      baseUrl + (_env('API_TICKETS_REST') ?? '/api/v1/transactions');
 
   static String ticketById(String ticketId) {
     final enc = Uri.encodeComponent(ticketId);
@@ -98,16 +112,45 @@ class AppConfig {
     if (t.isNotEmpty) {
       return baseUrl + t.replaceAll('{id}', enc);
     }
-    return '$baseUrl/api/v1/tickets/$enc';
+    return '$baseUrl/api/v1/transactions/$enc';
+  }
+
+  /// GET `/api/v1/transactions/{id}` (server UUID).
+  static String transactionGetUrl(String transactionId) {
+    final enc = Uri.encodeComponent(transactionId.trim());
+    final t = (_env('API_TRANSACTION_GET') ?? '').trim();
+    if (t.isNotEmpty) return baseUrl + t.replaceAll('{id}', enc);
+    return '$baseUrl/api/v1/transactions/$enc';
+  }
+
+  /// GET `/api/v1/tickets/by-number/{ticketNumber}` (e.g. `TKT-0001`).
+  static String ticketByNumberUrl(String ticketNumber) {
+    final enc = Uri.encodeComponent(ticketNumber.trim());
+    final t = (_env('API_TICKET_BY_NUMBER') ?? '').trim();
+    if (t.isNotEmpty) return baseUrl + t.replaceAll('{ticket_number}', enc);
+    return '$baseUrl/api/v1/tickets/by-number/$enc';
+  }
+
+  /// POST `/api/v1/transactions/{id}/pay`.
+  static String transactionPayUrl(String transactionId) {
+    final enc = Uri.encodeComponent(transactionId.trim());
+    final t = (_env('API_TRANSACTION_PAY') ?? '').trim();
+    if (t.isNotEmpty) return baseUrl + t.replaceAll('{id}', enc);
+    return '$baseUrl/api/v1/transactions/$enc/pay';
   }
 
   static String get ticketScan =>
       baseUrl + (_env('API_TICKET_SCAN') ?? '/api/v1/tickets/scan');
 
-  static String ticketCheckout(String ticketId) =>
-      baseUrl + (_env('API_TICKET_CHECKOUT')
-          ?.replaceAll('{ticket_id}', ticketId) ??
-          '/api/v1/tickets/$ticketId/checkout');
+  /// Same resource as [ticketById] (checkout uses PATCH + `/pay` in services).
+  static String ticketCheckout(String ticketId) {
+    final enc = Uri.encodeComponent(ticketId.trim());
+    final t = (_env('API_TICKET_CHECKOUT') ?? '').trim();
+    if (t.isNotEmpty) {
+      return baseUrl + t.replaceAll('{ticket_id}', enc);
+    }
+    return '$baseUrl/api/v1/transactions/$enc';
+  }
 
   static String ticketLost(String ticketId) =>
       baseUrl + (_env('API_TICKET_LOST')
@@ -121,22 +164,54 @@ class AppConfig {
 
   // ── CONFIG ────────────────────────────────
   static String get config =>
-      baseUrl + (_env('API_CONFIG') ?? '/api/v1/config');
+      baseUrl + (_env('API_CONFIG') ?? '/api/v1/settings');
 
-  /// GET branch-level key/value settings (overnight window, mall hours, …).
-  /// [branchId] is URL-encoded as a single path segment.
-  static String branchConfigUrl(String branchId) {
+  /// GET branch record (hours, etc.). Prefer this over legacy [branchConfigUrl].
+  static String branchDetailUrl(String branchId) {
     final encoded = Uri.encodeComponent(branchId.trim());
-    final template = (_env('API_BRANCH_CONFIG') ?? '').trim();
+    final template = (_env('API_BRANCH_DETAIL') ?? '').trim();
     if (template.isNotEmpty) {
       return baseUrl + template.replaceAll('{branch_id}', encoded);
     }
-    return '$baseUrl/api/v1/branches/$encoded/config';
+    return '$baseUrl/api/v1/branches/$encoded';
   }
+
+  /// GET `/api/v1/branches/{branchId}/rates` (branch default flat/succeeding/overnight/lost).
+  static String branchStandardRatesUrl(String branchId) {
+    final encoded = Uri.encodeComponent(branchId.trim());
+    final template = (_env('API_BRANCH_STANDARD_RATES') ?? '').trim();
+    if (template.isNotEmpty) {
+      return baseUrl + template.replaceAll('{branch_id}', encoded);
+    }
+    return '$baseUrl/api/v1/branches/$encoded/rates';
+  }
+
+  /// GET branch-level standard rates object.
+  static String branchRatesUrl(String branchId) {
+    final encoded = Uri.encodeComponent(branchId.trim());
+    final template = (_env('API_BRANCH_RATES') ?? '').trim();
+    if (template.isNotEmpty) {
+      return baseUrl + template.replaceAll('{branch_id}', encoded);
+    }
+    return '$baseUrl/api/v1/rates/branches/$encoded';
+  }
+
+  /// Per-vehicle-type rate rows for [branchId].
+  static String branchVehicleTypeRatesUrl(String branchId) {
+    final encoded = Uri.encodeComponent(branchId.trim());
+    final template = (_env('API_BRANCH_VEHICLE_TYPE_RATES') ?? '').trim();
+    if (template.isNotEmpty) {
+      return baseUrl + template.replaceAll('{branch_id}', encoded);
+    }
+    return '$baseUrl/api/v1/rates/branches/$encoded/vehicle-types';
+  }
+
+  /// Interim: same as [branchDetailUrl] until callers use explicit getters.
+  static String branchConfigUrl(String branchId) => branchDetailUrl(branchId);
 
   // ── REPORTS ───────────────────────────────
   static String get reportsSales =>
-      baseUrl + (_env('API_REPORTS_SALES') ?? '/api/v1/reports/sales');
+      baseUrl + (_env('API_REPORTS_SALES') ?? '/api/v1/reports/summary');
 
   static String get reportsShifts =>
       baseUrl + (_env('API_REPORTS_SHIFTS') ?? '/api/v1/reports/shifts');
@@ -145,7 +220,8 @@ class AppConfig {
   static String get transactionsList =>
       baseUrl + (_env('API_TRANSACTIONS') ?? '/api/v1/transactions');
 
-  // ── SYNC ──────────────────────────────────
-  static String get syncFlush =>
-      baseUrl + (_env('API_SYNC_FLUSH') ?? '/api/v1/sync/flush');
+  // ── CASH SESSIONS ─────────────────────────
+  static String get cashSessionCurrent =>
+      baseUrl +
+      (_env('API_CASH_SESSION_CURRENT') ?? '/api/v1/cash-sessions/current');
 }

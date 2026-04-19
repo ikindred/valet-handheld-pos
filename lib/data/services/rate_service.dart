@@ -30,8 +30,8 @@ class RateService {
   }
 
   /// When there are no rows for [branchId], insert one **Standard** row.
-  /// Uses [rates] from the login API when present; otherwise [StandardParkingRates.offlineDefault]
-  /// so offline login and missing `standard_rates` still populate local Drift data.
+  /// Offline / fallback: uses [rates] when non-null, else [StandardParkingRates.offlineDefault].
+  /// Online refresh is done by [RateFetchService.syncRatesForBranch] after login.
   Future<void> syncFromAuthIfEmpty({
     required String branchId,
     StandardParkingRates? rates,

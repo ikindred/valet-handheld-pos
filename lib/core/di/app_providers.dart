@@ -10,6 +10,7 @@ import '../../data/remote/transactions_api.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../core/printing/valet_print_service.dart';
 import '../../data/services/branch_config_service.dart';
+import '../../data/services/rate_fetch_service.dart';
 import '../../data/services/rate_service.dart';
 import '../../data/services/shift_service.dart';
 import '../../data/services/ticket_service.dart';
@@ -42,6 +43,10 @@ class AppProviders extends StatelessWidget {
         Provider<RateService>(
           create: (c) => RateService(c.read<AppDatabase>()),
         ),
+        Provider<RateFetchService>(
+          create: (c) =>
+              RateFetchService(c.read<AppDatabase>(), c.read<Dio>()),
+        ),
         Provider<TicketService>(
           create: (c) => TicketService(c.read<AppDatabase>(), c.read<Dio>()),
         ),
@@ -63,6 +68,7 @@ class AppProviders extends StatelessWidget {
             c.read<RouterRefreshNotifier>(),
             c.read<ShiftService>(),
             c.read<RateService>(),
+            c.read<RateFetchService>(),
           ),
         ),
         Provider<DeviceConflictService>(

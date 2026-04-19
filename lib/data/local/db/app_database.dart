@@ -57,8 +57,8 @@ class DeviceIdentity extends Table {
 class OfflineAccounts extends Table {
   IntColumn get id => integer().autoIncrement()();
 
-  /// Canonical user id from API.
-  IntColumn get serverUserId => integer().unique()();
+  /// Server user id (UUID string from API).
+  TextColumn get serverUserId => text().unique()();
 
   TextColumn get email => text().unique()();
 
@@ -178,6 +178,9 @@ class Tickets extends Table {
   TextColumn get syncStatus => text()();
 
   TextColumn get createdAt => text()();
+
+  /// Server `transactions.id` (UUID) after draft POST; local [id] stays `TKT-…`.
+  TextColumn get serverTicketId => text().named('server_ticket_id').nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -301,7 +304,7 @@ class AppDatabase extends _$AppDatabase {
   final bool _skipDevOfflineSeed;
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -320,6 +323,32 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (Migrator m, int from, int to) async {
           if (from < 2) {
             await m.createTable(deviceIdentity);
+          }
+          if (from < 3) {
+            await customStatement('''
+CREATE TABLE offline_accounts_new (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  server_user_id TEXT NOT NULL UNIQUE,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  full_name TEXT NOT NULL,
+  role TEXT NOT NULL,
+  last_online_login INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+)''');
+            await customStatement('''
+INSERT INTO offline_accounts_new
+  (id, server_user_id, email, password_hash, full_name, role, last_online_login, created_at, updated_at)
+SELECT id, CAST(server_user_id AS TEXT), email, password_hash, full_name, role, last_online_login, created_at, updated_at
+FROM offline_accounts''');
+            await customStatement('DROP TABLE offline_accounts');
+            await customStatement(
+              'ALTER TABLE offline_accounts_new RENAME TO offline_accounts',
+            );
+          }
+          if (from < 4) {
+            await m.addColumn(tickets, tickets.serverTicketId);
           }
         },
       );
@@ -363,7 +392,7 @@ class AppDatabase extends _$AppDatabase {
   /// TODO(dev-seed): REMOVE before production — fake offline user for local dev.
   Future<void> _seedDevOfflineAccountIfAbsent() async {
     const email = '1@1.com';
-    const serverUserId = 1001;
+    const serverUserId = '1001';
     final existing = await (select(offlineAccounts)
           ..where(
             (a) => a.email.equals(email) | a.serverUserId.equals(serverUserId),
@@ -400,7 +429,6 @@ class AppDatabase extends _$AppDatabase {
       ('overnight_end_time', '06:00'),
       ('mall_open_time', '10:00'),
       ('mall_close_time', '21:00'),
-      ('grace_period_minutes', '15'),
     ];
     for (final e in entries) {
       await customStatement(

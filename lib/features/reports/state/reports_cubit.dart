@@ -142,13 +142,6 @@ class ReportsCubit extends Cubit<ReportsState> {
     );
   }
 
-  Future<int> _cashierIdForSession(Session session) async {
-    final acct = await _auth.offlineAccountById(session.userId);
-    final sid = acct?.serverUserId;
-    if (sid != null && sid > 0) return sid;
-    return session.userId;
-  }
-
   Future<ReportsTodaySnapshot> _buildTodaySnapshot(Session session) async {
     final shift = await _auth.getOpenShiftForUser(session.userId);
     if (shift == null) return ReportsTodaySnapshot.idle;
@@ -249,17 +242,15 @@ class ReportsCubit extends Cubit<ReportsState> {
       ),
     );
 
-    final dateFromUnix = effectiveRange.start.millisecondsSinceEpoch ~/ 1000;
-    final dateToUnix = effectiveRange.end.millisecondsSinceEpoch ~/ 1000;
+    final dateFromUnix =
+        effectiveRange.start.millisecondsSinceEpoch ~/ 1000;
+    final endInclusive =
+        effectiveRange.end.subtract(const Duration(seconds: 1));
+    final dateToUnix = endInclusive.millisecondsSinceEpoch ~/ 1000;
 
     try {
-      final cashierId = await _cashierIdForSession(session);
-      final site = await _auth.branchAndAreaFromDb();
       await _api.fetchTransactions(
         token: token,
-        cashierId: cashierId,
-        branch: site.branch,
-        area: site.area,
         dateFromUnix: dateFromUnix,
         dateToUnix: dateToUnix,
       );

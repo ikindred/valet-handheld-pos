@@ -8,7 +8,15 @@ import '../../../core/config/app_config.dart';
 import '../../../core/logging/valet_log.dart';
 import '../../../data/local/db/app_database.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/ticket_sync_payload.dart';
 import 'sync_state.dart';
+
+class _SyncHop {
+  const _SyncHop(this.method, this.url, this.body);
+  final String method;
+  final String url;
+  final Object? body;
+}
 
 class SyncCubit extends Cubit<SyncState> {
   SyncCubit({
@@ -79,21 +87,9 @@ class SyncCubit extends Cubit<SyncState> {
           ValetLog.debug('SyncCubit.flush', 'skip HTTP — no bearer token');
         } else {
           for (final row in pending) {
-            final routed = _route(row);
-            if (routed == null) {
-              ValetLog.error(
-                'SyncCubit.flush',
-                'unknown route table=${row.queueTableName} op=${row.operation} '
-                    'id=${row.id} recordId=${row.recordId} payload=${row.payload}',
-                StateError('SYNC_ROUTE'),
-              );
-              await _markQueueFailed(row);
-              continue;
-            }
-            final (method, url) = routed;
-            Object? body;
+            Object? rawPayload;
             try {
-              body = jsonDecode(row.payload);
+              rawPayload = jsonDecode(row.payload);
             } catch (e, st) {
               ValetLog.error(
                 'SyncCubit.flush',
@@ -104,28 +100,76 @@ class SyncCubit extends Cubit<SyncState> {
               await _markQueueFailed(row);
               continue;
             }
-
-            try {
-              final response = await _send(
-                method: method,
-                url: url,
-                token: token,
-                body: body,
+            final payloadMap = _asPayloadMap(rawPayload);
+            if (payloadMap == null) {
+              ValetLog.error(
+                'SyncCubit.flush',
+                'payload is not a JSON object queueId=${row.id}',
+                StateError('SYNC_PAYLOAD'),
               );
-              final code = response.statusCode ?? 0;
-              if (code == 200 || code == 201) {
+              await _markQueueFailed(row);
+              continue;
+            }
+
+            final hops = _syncHopsForRow(row, payloadMap);
+            if (hops == null) {
+              ValetLog.error(
+                'SyncCubit.flush',
+                'unknown route table=${row.queueTableName} op=${row.operation} '
+                    'id=${row.id} recordId=${row.recordId} payload=${row.payload}',
+                StateError('SYNC_ROUTE'),
+              );
+              await _markQueueFailed(row);
+              continue;
+            }
+            if (hops.isEmpty) {
+              ValetLog.error(
+                'SyncCubit.flush',
+                'cannot sync ticket ${row.operation} queueId=${row.id}: missing server_ticket_id '
+                    '(server transaction must exist first)',
+                StateError('SYNC_TICKET_NO_SERVER_ID'),
+              );
+              await _markQueueFailed(row);
+              continue;
+            }
+
+            var method = '';
+            var url = '';
+            Object? body;
+            try {
+              var allOk = true;
+              for (final h in hops) {
+                method = h.method;
+                url = h.url;
+                body = h.body;
+                final response = await _send(
+                  method: h.method,
+                  url: h.url,
+                  token: token,
+                  body: h.body,
+                );
+                final code = response.statusCode ?? 0;
+                if (code == 200 || code == 201) {
+                  continue;
+                }
+                if (code >= 400 && code < 500) {
+                  ValetLog.error(
+                    'SyncCubit.flush',
+                    'client error $code ${h.method} ${h.url} body=${h.body}',
+                    StateError('HTTP_$code'),
+                  );
+                  await _markQueueFailed(row);
+                  allOk = false;
+                  break;
+                }
+                await _incrementRetry(row);
+                allOk = false;
+                break;
+              }
+              if (allOk) {
                 await _markQueueSynced(row);
                 await _markEntitySynced(row);
                 syncedThisRun++;
-              } else if (code >= 400 && code < 500) {
-                ValetLog.error(
-                  'SyncCubit.flush',
-                  'client error $code $method $url body=$body',
-                  StateError('HTTP_$code'),
-                );
-                await _markQueueFailed(row);
-              } else {
-                await _incrementRetry(row);
               }
             } on DioException catch (e, st) {
               final status = e.response?.statusCode;
@@ -162,22 +206,119 @@ class SyncCubit extends Cubit<SyncState> {
     }
   }
 
-  (String method, String url)? _route(SyncQueueData row) {
+  Map<String, dynamic>? _asPayloadMap(Object? raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return null;
+  }
+
+  /// `null` = unknown table/op; empty = ticket create without `server_ticket_id`.
+  List<_SyncHop>? _syncHopsForRow(
+    SyncQueueData row,
+    Map<String, dynamic> body,
+  ) {
     final table = row.queueTableName;
     final op = row.operation;
+
     if (table == 'shifts' && op == 'create') {
-      return ('POST', AppConfig.shiftsRest);
+      final opening = body['opening_float'];
+      final balance = opening is num
+          ? opening.toDouble()
+          : double.tryParse('$opening') ?? 0.0;
+      return [
+        _SyncHop(
+          'POST',
+          AppConfig.cashSessionsStart,
+          <String, dynamic>{
+            'opening_balance': balance,
+            'notes': null,
+          },
+        ),
+      ];
     }
+
     if (table == 'shifts' && op == 'update') {
-      return ('PATCH', AppConfig.shiftById(row.recordId));
+      final closing = body['closing_cash'];
+      final cash = closing is num
+          ? closing.toDouble()
+          : double.tryParse('$closing') ?? 0.0;
+      return [
+        _SyncHop(
+          'POST',
+          AppConfig.cashSessionsClose,
+          <String, dynamic>{
+            'shift_id': row.recordId,
+            'actual_cash': cash,
+            'notes': null,
+          },
+        ),
+      ];
     }
+
     if (table == 'tickets' && op == 'create') {
-      return ('POST', AppConfig.ticketsRest);
+      final sid = body['server_ticket_id']?.toString().trim();
+      if (sid == null || sid.isEmpty) {
+        return const [];
+      }
+      return [
+        _SyncHop(
+          'PATCH',
+          AppConfig.ticketById(sid),
+          transactionCheckInPatchFromSyncPayload(body),
+        ),
+      ];
     }
+
     if (table == 'tickets' && op == 'update') {
-      return ('PATCH', AppConfig.ticketById(row.recordId));
+      final sid = body['server_ticket_id']?.toString().trim();
+      if (sid == null || sid.isEmpty) {
+        return const [];
+      }
+      final damages = _decodeJsonListField(body['damage_markers']);
+      final hops = <_SyncHop>[
+        _SyncHop(
+          'PATCH',
+          AppConfig.ticketById(sid),
+          <String, dynamic>{
+            'condition_checkout': damages,
+            'status': 'active',
+          },
+        ),
+      ];
+      final fee = body['fee'];
+      final feeVal =
+          fee is num ? fee.toDouble() : double.tryParse('$fee') ?? 0.0;
+      if (feeVal > 0) {
+        hops.add(
+          _SyncHop(
+            'POST',
+            AppConfig.transactionPayUrl(sid),
+            <String, dynamic>{
+              'method': 'cash',
+              'amount_paid': feeVal,
+            },
+          ),
+        );
+      }
+      return hops;
     }
+
     return null;
+  }
+
+  Object _decodeJsonListField(dynamic raw) {
+    if (raw == null) return const <dynamic>[];
+    if (raw is List) return raw;
+    if (raw is String) {
+      if (raw.trim().isEmpty) return const <dynamic>[];
+      try {
+        final v = jsonDecode(raw);
+        return v is List ? v : const <dynamic>[];
+      } catch (_) {
+        return const <dynamic>[];
+      }
+    }
+    return const <dynamic>[];
   }
 
   Future<Response<dynamic>> _send({
