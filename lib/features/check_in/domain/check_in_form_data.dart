@@ -5,6 +5,7 @@ class CheckInFormData {
     required this.vehicleBrand,
     required this.vehicleColor,
     this.vehicleType = '',
+    this.driverIn,
     required this.cellphoneNumber,
     required this.damageMarkersJson,
     required this.personalBelongingsJson,
@@ -16,6 +17,9 @@ class CheckInFormData {
 
   /// Optional; persisted on `tickets.vehicle_type` when set (per-vehicle-type rates TBD).
   final String vehicleType;
+
+  /// Valet attendant who received the vehicle (optional).
+  final String? driverIn;
   final String cellphoneNumber;
   final String damageMarkersJson;
   final String personalBelongingsJson;

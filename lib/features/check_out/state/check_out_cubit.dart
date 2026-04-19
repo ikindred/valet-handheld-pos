@@ -25,6 +25,8 @@ class CheckOutState extends Equatable {
     this.rates,
     this.breakdown,
     this.amountTenderedInput = '',
+    this.driverIn,
+    this.driverOut,
     this.scanError = '',
     this.isLookupBusy = false,
     this.flatBlockHours = CheckoutPricing.defaultFlatBlockHours,
@@ -44,6 +46,12 @@ class CheckOutState extends Equatable {
   final StandardParkingRates? rates;
   final CheckoutBreakdown? breakdown;
   final String amountTenderedInput;
+
+  /// Valet attendant who checked the vehicle in (from Drift row).
+  final String? driverIn;
+
+  /// Valet attendant returning the vehicle (optional).
+  final String? driverOut;
   final String scanError;
   final bool isLookupBusy;
 
@@ -71,6 +79,8 @@ class CheckOutState extends Equatable {
     CheckoutBreakdown? breakdown,
     bool clearBreakdown = false,
     String? amountTenderedInput,
+    String? driverIn,
+    String? driverOut,
     String? scanError,
     bool? isLookupBusy,
     int? flatBlockHours,
@@ -91,6 +101,8 @@ class CheckOutState extends Equatable {
       rates: rates ?? this.rates,
       breakdown: clearBreakdown ? null : (breakdown ?? this.breakdown),
       amountTenderedInput: amountTenderedInput ?? this.amountTenderedInput,
+      driverIn: driverIn ?? this.driverIn,
+      driverOut: driverOut ?? this.driverOut,
       scanError: scanError ?? this.scanError,
       isLookupBusy: isLookupBusy ?? this.isLookupBusy,
       flatBlockHours: flatBlockHours ?? this.flatBlockHours,
@@ -114,6 +126,8 @@ class CheckOutState extends Equatable {
         rates,
         breakdown,
         amountTenderedInput,
+        driverIn,
+        driverOut,
         scanError,
         isLookupBusy,
         flatBlockHours,
@@ -176,6 +190,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         rates: state.rates,
         flatBlockHours: state.flatBlockHours,
         ticket: t,
+        driverIn: t.driverIn,
         checkInDamage: checkIn,
         checkoutAddedDamage: const [],
         checkoutExitIssueSignatureAcknowledged: false,
@@ -234,6 +249,11 @@ class CheckOutCubit extends Cubit<CheckOutState> {
 
   void setAmountTenderedInput(String s) =>
       emit(state.copyWith(amountTenderedInput: s));
+
+  void setDriverOut(String raw) {
+    final t = raw.trim();
+    emit(state.copyWith(driverOut: t.isEmpty ? null : t));
+  }
 
   Future<void> lookupByTicketCode(String raw) async {
     final code = raw.trim();
@@ -380,6 +400,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         checkOutAtIso: checkOutIso,
         totalFee: b.totalPesos.toDouble(),
         damageMarkersJson: markersJson,
+        driverOut: state.driverOut,
       );
       final snapshot = CheckoutReceiptSnapshot.capture(
         ticket: t,

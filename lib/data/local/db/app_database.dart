@@ -182,6 +182,12 @@ class Tickets extends Table {
   /// Server `transactions.id` (UUID) after draft POST; local [id] stays `TKT-…`.
   TextColumn get serverTicketId => text().named('server_ticket_id').nullable()();
 
+  /// Valet attendant who received the vehicle at check-in.
+  TextColumn get driverIn => text().nullable()();
+
+  /// Valet attendant who returned the vehicle at check-out.
+  TextColumn get driverOut => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -304,7 +310,7 @@ class AppDatabase extends _$AppDatabase {
   final bool _skipDevOfflineSeed;
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -349,6 +355,10 @@ FROM offline_accounts''');
           }
           if (from < 4) {
             await m.addColumn(tickets, tickets.serverTicketId);
+          }
+          if (from < 5) {
+            await m.addColumn(tickets, tickets.driverIn);
+            await m.addColumn(tickets, tickets.driverOut);
           }
         },
       );

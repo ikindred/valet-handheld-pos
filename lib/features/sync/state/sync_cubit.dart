@@ -274,15 +274,11 @@ class SyncCubit extends Cubit<SyncState> {
       if (sid == null || sid.isEmpty) {
         return const [];
       }
-      final damages = _decodeJsonListField(body['damage_markers']);
       final hops = <_SyncHop>[
         _SyncHop(
           'PATCH',
           AppConfig.ticketById(sid),
-          <String, dynamic>{
-            'condition_checkout': damages,
-            'status': 'active',
-          },
+          checkoutPatchBodyFromTicket(ticketFromSyncQueuePayload(body)),
         ),
       ];
       final fee = body['fee'];
@@ -304,21 +300,6 @@ class SyncCubit extends Cubit<SyncState> {
     }
 
     return null;
-  }
-
-  Object _decodeJsonListField(dynamic raw) {
-    if (raw == null) return const <dynamic>[];
-    if (raw is List) return raw;
-    if (raw is String) {
-      if (raw.trim().isEmpty) return const <dynamic>[];
-      try {
-        final v = jsonDecode(raw);
-        return v is List ? v : const <dynamic>[];
-      } catch (_) {
-        return const <dynamic>[];
-      }
-    }
-    return const <dynamic>[];
   }
 
   Future<Response<dynamic>> _send({

@@ -2296,6 +2296,18 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
   late final GeneratedColumn<String> serverTicketId = GeneratedColumn<String>(
       'server_ticket_id', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _driverInMeta =
+      const VerificationMeta('driverIn');
+  @override
+  late final GeneratedColumn<String> driverIn = GeneratedColumn<String>(
+      'driver_in', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _driverOutMeta =
+      const VerificationMeta('driverOut');
+  @override
+  late final GeneratedColumn<String> driverOut = GeneratedColumn<String>(
+      'driver_out', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -2316,7 +2328,9 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
         status,
         syncStatus,
         createdAt,
-        serverTicketId
+        serverTicketId,
+        driverIn,
+        driverOut
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2457,6 +2471,14 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
           serverTicketId.isAcceptableOrUnknown(
               data['server_ticket_id']!, _serverTicketIdMeta));
     }
+    if (data.containsKey('driver_in')) {
+      context.handle(_driverInMeta,
+          driverIn.isAcceptableOrUnknown(data['driver_in']!, _driverInMeta));
+    }
+    if (data.containsKey('driver_out')) {
+      context.handle(_driverOutMeta,
+          driverOut.isAcceptableOrUnknown(data['driver_out']!, _driverOutMeta));
+    }
     return context;
   }
 
@@ -2504,6 +2526,10 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
           .read(DriftSqlType.string, data['${effectivePrefix}created_at'])!,
       serverTicketId: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}server_ticket_id']),
+      driverIn: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}driver_in']),
+      driverOut: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}driver_out']),
     );
   }
 
@@ -2545,6 +2571,12 @@ class Ticket extends DataClass implements Insertable<Ticket> {
 
   /// Server `transactions.id` (UUID) after draft POST; local [id] stays `TKT-…`.
   final String? serverTicketId;
+
+  /// Valet attendant who received the vehicle at check-in.
+  final String? driverIn;
+
+  /// Valet attendant who returned the vehicle at check-out.
+  final String? driverOut;
   const Ticket(
       {required this.id,
       required this.shiftId,
@@ -2564,7 +2596,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       required this.status,
       required this.syncStatus,
       required this.createdAt,
-      this.serverTicketId});
+      this.serverTicketId,
+      this.driverIn,
+      this.driverOut});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -2594,6 +2628,12 @@ class Ticket extends DataClass implements Insertable<Ticket> {
     map['created_at'] = Variable<String>(createdAt);
     if (!nullToAbsent || serverTicketId != null) {
       map['server_ticket_id'] = Variable<String>(serverTicketId);
+    }
+    if (!nullToAbsent || driverIn != null) {
+      map['driver_in'] = Variable<String>(driverIn);
+    }
+    if (!nullToAbsent || driverOut != null) {
+      map['driver_out'] = Variable<String>(driverOut);
     }
     return map;
   }
@@ -2625,6 +2665,12 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       serverTicketId: serverTicketId == null && nullToAbsent
           ? const Value.absent()
           : Value(serverTicketId),
+      driverIn: driverIn == null && nullToAbsent
+          ? const Value.absent()
+          : Value(driverIn),
+      driverOut: driverOut == null && nullToAbsent
+          ? const Value.absent()
+          : Value(driverOut),
     );
   }
 
@@ -2652,6 +2698,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       syncStatus: serializer.fromJson<String>(json['syncStatus']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       serverTicketId: serializer.fromJson<String?>(json['serverTicketId']),
+      driverIn: serializer.fromJson<String?>(json['driverIn']),
+      driverOut: serializer.fromJson<String?>(json['driverOut']),
     );
   }
   @override
@@ -2677,6 +2725,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       'syncStatus': serializer.toJson<String>(syncStatus),
       'createdAt': serializer.toJson<String>(createdAt),
       'serverTicketId': serializer.toJson<String?>(serverTicketId),
+      'driverIn': serializer.toJson<String?>(driverIn),
+      'driverOut': serializer.toJson<String?>(driverOut),
     };
   }
 
@@ -2699,7 +2749,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           String? status,
           String? syncStatus,
           String? createdAt,
-          Value<String?> serverTicketId = const Value.absent()}) =>
+          Value<String?> serverTicketId = const Value.absent(),
+          Value<String?> driverIn = const Value.absent(),
+          Value<String?> driverOut = const Value.absent()}) =>
       Ticket(
         id: id ?? this.id,
         shiftId: shiftId ?? this.shiftId,
@@ -2722,6 +2774,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
         createdAt: createdAt ?? this.createdAt,
         serverTicketId:
             serverTicketId.present ? serverTicketId.value : this.serverTicketId,
+        driverIn: driverIn.present ? driverIn.value : this.driverIn,
+        driverOut: driverOut.present ? driverOut.value : this.driverOut,
       );
   Ticket copyWithCompanion(TicketsCompanion data) {
     return Ticket(
@@ -2762,6 +2816,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       serverTicketId: data.serverTicketId.present
           ? data.serverTicketId.value
           : this.serverTicketId,
+      driverIn: data.driverIn.present ? data.driverIn.value : this.driverIn,
+      driverOut: data.driverOut.present ? data.driverOut.value : this.driverOut,
     );
   }
 
@@ -2786,32 +2842,37 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           ..write('status: $status, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('createdAt: $createdAt, ')
-          ..write('serverTicketId: $serverTicketId')
+          ..write('serverTicketId: $serverTicketId, ')
+          ..write('driverIn: $driverIn, ')
+          ..write('driverOut: $driverOut')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      id,
-      shiftId,
-      userId,
-      branchId,
-      plateNumber,
-      vehicleBrand,
-      vehicleColor,
-      vehicleType,
-      cellphoneNumber,
-      damageMarkers,
-      personalBelongings,
-      signaturePng,
-      checkInAt,
-      checkOutAt,
-      fee,
-      status,
-      syncStatus,
-      createdAt,
-      serverTicketId);
+  int get hashCode => Object.hashAll([
+        id,
+        shiftId,
+        userId,
+        branchId,
+        plateNumber,
+        vehicleBrand,
+        vehicleColor,
+        vehicleType,
+        cellphoneNumber,
+        damageMarkers,
+        personalBelongings,
+        signaturePng,
+        checkInAt,
+        checkOutAt,
+        fee,
+        status,
+        syncStatus,
+        createdAt,
+        serverTicketId,
+        driverIn,
+        driverOut
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2834,7 +2895,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           other.status == this.status &&
           other.syncStatus == this.syncStatus &&
           other.createdAt == this.createdAt &&
-          other.serverTicketId == this.serverTicketId);
+          other.serverTicketId == this.serverTicketId &&
+          other.driverIn == this.driverIn &&
+          other.driverOut == this.driverOut);
 }
 
 class TicketsCompanion extends UpdateCompanion<Ticket> {
@@ -2857,6 +2920,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
   final Value<String> syncStatus;
   final Value<String> createdAt;
   final Value<String?> serverTicketId;
+  final Value<String?> driverIn;
+  final Value<String?> driverOut;
   final Value<int> rowid;
   const TicketsCompanion({
     this.id = const Value.absent(),
@@ -2878,6 +2943,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     this.syncStatus = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.serverTicketId = const Value.absent(),
+    this.driverIn = const Value.absent(),
+    this.driverOut = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TicketsCompanion.insert({
@@ -2900,6 +2967,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     required String syncStatus,
     required String createdAt,
     this.serverTicketId = const Value.absent(),
+    this.driverIn = const Value.absent(),
+    this.driverOut = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         shiftId = Value(shiftId),
@@ -2936,6 +3005,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     Expression<String>? syncStatus,
     Expression<String>? createdAt,
     Expression<String>? serverTicketId,
+    Expression<String>? driverIn,
+    Expression<String>? driverOut,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2958,6 +3029,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       if (syncStatus != null) 'sync_status': syncStatus,
       if (createdAt != null) 'created_at': createdAt,
       if (serverTicketId != null) 'server_ticket_id': serverTicketId,
+      if (driverIn != null) 'driver_in': driverIn,
+      if (driverOut != null) 'driver_out': driverOut,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2982,6 +3055,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       Value<String>? syncStatus,
       Value<String>? createdAt,
       Value<String?>? serverTicketId,
+      Value<String?>? driverIn,
+      Value<String?>? driverOut,
       Value<int>? rowid}) {
     return TicketsCompanion(
       id: id ?? this.id,
@@ -3003,6 +3078,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       syncStatus: syncStatus ?? this.syncStatus,
       createdAt: createdAt ?? this.createdAt,
       serverTicketId: serverTicketId ?? this.serverTicketId,
+      driverIn: driverIn ?? this.driverIn,
+      driverOut: driverOut ?? this.driverOut,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3067,6 +3144,12 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     if (serverTicketId.present) {
       map['server_ticket_id'] = Variable<String>(serverTicketId.value);
     }
+    if (driverIn.present) {
+      map['driver_in'] = Variable<String>(driverIn.value);
+    }
+    if (driverOut.present) {
+      map['driver_out'] = Variable<String>(driverOut.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3095,6 +3178,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
           ..write('syncStatus: $syncStatus, ')
           ..write('createdAt: $createdAt, ')
           ..write('serverTicketId: $serverTicketId, ')
+          ..write('driverIn: $driverIn, ')
+          ..write('driverOut: $driverOut, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5394,6 +5479,8 @@ typedef $$TicketsTableCreateCompanionBuilder = TicketsCompanion Function({
   required String syncStatus,
   required String createdAt,
   Value<String?> serverTicketId,
+  Value<String?> driverIn,
+  Value<String?> driverOut,
   Value<int> rowid,
 });
 typedef $$TicketsTableUpdateCompanionBuilder = TicketsCompanion Function({
@@ -5416,6 +5503,8 @@ typedef $$TicketsTableUpdateCompanionBuilder = TicketsCompanion Function({
   Value<String> syncStatus,
   Value<String> createdAt,
   Value<String?> serverTicketId,
+  Value<String?> driverIn,
+  Value<String?> driverOut,
   Value<int> rowid,
 });
 
@@ -5455,6 +5544,8 @@ class $$TicketsTableTableManager extends RootTableManager<
             Value<String> syncStatus = const Value.absent(),
             Value<String> createdAt = const Value.absent(),
             Value<String?> serverTicketId = const Value.absent(),
+            Value<String?> driverIn = const Value.absent(),
+            Value<String?> driverOut = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TicketsCompanion(
@@ -5477,6 +5568,8 @@ class $$TicketsTableTableManager extends RootTableManager<
             syncStatus: syncStatus,
             createdAt: createdAt,
             serverTicketId: serverTicketId,
+            driverIn: driverIn,
+            driverOut: driverOut,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -5499,6 +5592,8 @@ class $$TicketsTableTableManager extends RootTableManager<
             required String syncStatus,
             required String createdAt,
             Value<String?> serverTicketId = const Value.absent(),
+            Value<String?> driverIn = const Value.absent(),
+            Value<String?> driverOut = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TicketsCompanion.insert(
@@ -5521,6 +5616,8 @@ class $$TicketsTableTableManager extends RootTableManager<
             syncStatus: syncStatus,
             createdAt: createdAt,
             serverTicketId: serverTicketId,
+            driverIn: driverIn,
+            driverOut: driverOut,
             rowid: rowid,
           ),
         ));
@@ -5616,6 +5713,16 @@ class $$TicketsTableFilterComposer
 
   ColumnFilters<String> get serverTicketId => $state.composableBuilder(
       column: $state.table.serverTicketId,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get driverIn => $state.composableBuilder(
+      column: $state.table.driverIn,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get driverOut => $state.composableBuilder(
+      column: $state.table.driverOut,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -5722,6 +5829,16 @@ class $$TicketsTableOrderingComposer
 
   ColumnOrderings<String> get serverTicketId => $state.composableBuilder(
       column: $state.table.serverTicketId,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get driverIn => $state.composableBuilder(
+      column: $state.table.driverIn,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get driverOut => $state.composableBuilder(
+      column: $state.table.driverOut,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 

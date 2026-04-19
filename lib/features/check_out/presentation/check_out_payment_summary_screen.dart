@@ -30,6 +30,35 @@ class _CheckOutPaymentSummaryScreenState
   var _submitting = false;
   var _seededTender = false;
 
+  late final TextEditingController _driverOutCtrl;
+  String? _driverOutFieldTicketId;
+
+  void _onDriverOutChanged() {
+    if (!mounted) return;
+    context.read<CheckOutCubit>().setDriverOut(_driverOutCtrl.text);
+  }
+
+  void _bindDriverOutFieldToTicket(CheckOutState state) {
+    final id = state.ticket?.id;
+    if (id == null) return;
+    if (_driverOutFieldTicketId != id) {
+      _driverOutFieldTicketId = id;
+      final text = state.driverOut ?? '';
+      if (_driverOutCtrl.text != text) {
+        _driverOutCtrl.removeListener(_onDriverOutChanged);
+        _driverOutCtrl.text = text;
+        _driverOutCtrl.addListener(_onDriverOutChanged);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _driverOutCtrl.removeListener(_onDriverOutChanged);
+    _driverOutCtrl.dispose();
+    super.dispose();
+  }
+
   static const _grey500 = Color(0xFF6C7688);
   static const _border = Color(0xFFC0C0BF);
   static const _plateBlue = Color(0xFF0068D3);
@@ -83,6 +112,8 @@ class _CheckOutPaymentSummaryScreenState
   @override
   void initState() {
     super.initState();
+    _driverOutCtrl = TextEditingController();
+    _driverOutCtrl.addListener(_onDriverOutChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final cubit = context.read<CheckOutCubit>();
@@ -183,7 +214,9 @@ class _CheckOutPaymentSummaryScreenState
       buildWhen: (a, b) =>
           a.ticket != b.ticket ||
           a.breakdown != b.breakdown ||
-          a.amountTenderedInput != b.amountTenderedInput,
+          a.amountTenderedInput != b.amountTenderedInput ||
+          a.driverIn != b.driverIn ||
+          a.driverOut != b.driverOut,
       builder: (context, state) {
         if (state.ticket == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -193,6 +226,7 @@ class _CheckOutPaymentSummaryScreenState
         }
 
         final row = state.ticket!;
+        _bindDriverOutFieldToTicket(state);
         final b = state.breakdown;
         final tendered = context.read<CheckOutCubit>().parsedTendered();
         final change = context.read<CheckOutCubit>().changeDue();
@@ -302,6 +336,11 @@ class _CheckOutPaymentSummaryScreenState
               : LayoutBuilder(
                   builder: (context, c) {
                     final wide = c.maxWidth >= 900;
+                    final checkInValet = state.driverIn?.trim();
+                    final checkInValetDisplay =
+                        (checkInValet == null || checkInValet.isEmpty)
+                            ? '—'
+                            : checkInValet;
 
                     final leftPane = SingleChildScrollView(
                       child: Column(
@@ -313,6 +352,58 @@ class _CheckOutPaymentSummaryScreenState
                             dateInLabel: dateInLabel,
                             timeOutLabel: timeOutLabel,
                             durationLabel: durationLabel,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'CHECK-IN VALET',
+                            style: _poppins(15, FontWeight.w500, _grey500),
+                          ),
+                          const SizedBox(height: 8),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              checkInValetDisplay,
+                              style: _poppins(
+                                15,
+                                FontWeight.w500,
+                                const Color(0xFF0A1B39),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'RETURNING VALET',
+                            style: _poppins(15, FontWeight.w500, _grey500),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _driverOutCtrl,
+                            textCapitalization: TextCapitalization.words,
+                            style: _poppins(15, FontWeight.w500, const Color(0xFF0A1B39)),
+                            decoration: InputDecoration(
+                              hintText: 'Attendant name (optional)',
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: _border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: _border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF0068D3),
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 16),
                           _rateBreakdownCard(b: b, peso2: peso2),

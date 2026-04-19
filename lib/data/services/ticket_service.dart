@@ -25,6 +25,12 @@ Map<String, dynamic>? _asStringKeyedMap(dynamic data) {
   return null;
 }
 
+String? _normalizedDriverName(String? raw) {
+  if (raw == null) return null;
+  final t = raw.trim();
+  return t.isEmpty ? null : t;
+}
+
 /// `tickets` + `sync_queue` persistence and best-effort REST.
 class TicketService {
   TicketService(this._db, this._dio);
@@ -117,6 +123,7 @@ class TicketService {
           checkInAt: Value(now),
           status: const Value('active'),
           syncStatus: const Value('pending'),
+          driverIn: Value(_normalizedDriverName(data.driverIn)),
         ),
       );
       final inserted = await (_db.select(_db.tickets)
@@ -180,6 +187,7 @@ class TicketService {
               status: 'active',
               syncStatus: 'pending',
               createdAt: now,
+              driverIn: Value(_normalizedDriverName(data.driverIn)),
             ),
           );
       final inserted =
@@ -240,6 +248,7 @@ LIMIT 1
     required String checkOutAtIso,
     required double totalFee,
     required String damageMarkersJson,
+    String? driverOut,
   }) async {
     final now = DateTime.now().toIso8601String();
     await _db.transaction(() async {
@@ -250,6 +259,7 @@ LIMIT 1
               status: const Value('completed'),
               damageMarkers: Value(damageMarkersJson),
               syncStatus: const Value('pending'),
+              driverOut: Value(_normalizedDriverName(driverOut)),
             ),
           );
       final updated = await (_db.select(_db.tickets)
@@ -396,6 +406,7 @@ WHERE shift_id = ? AND status = 'completed'
 
   Map<String, dynamic> _checkInPatchBody(Ticket row) {
     return <String, dynamic>{
+      'driver_in': row.driverIn,
       'vehicle': <String, dynamic>{
         'plate_number': row.plateNumber,
         'brand': row.vehicleBrand,
@@ -510,17 +521,9 @@ WHERE shift_id = ? AND status = 'completed'
         validateStatus: (c) => c != null && c < 500,
       );
 
-      final checkoutDamages = _decodeTicketJsonField(
-        row.damageMarkers,
-        const <dynamic>[],
-      );
-
       await _dio.patch<dynamic>(
         AppConfig.ticketById(serverId),
-        data: <String, dynamic>{
-          'condition_checkout': checkoutDamages,
-          'status': 'active',
-        },
+        data: checkoutPatchBodyFromTicket(row),
         options: opts,
       );
 

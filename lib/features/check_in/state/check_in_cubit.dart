@@ -254,11 +254,13 @@ class CheckInCubit extends Cubit<CheckInState> {
     final belongings = List<String>.from(state.selectedBelongings);
     final other = state.otherBelongings.trim();
     if (other.isNotEmpty) belongings.add('Other: $other');
+    final valet = state.assignedValetDriver.trim();
     return CheckInFormData(
       plateNumber: state.plateNumber.trim(),
       vehicleBrand: '${state.vehicleBrandMake} ${state.vehicleModel}'.trim(),
       vehicleColor: state.vehicleColor.trim(),
       vehicleType: '',
+      driverIn: valet.isEmpty ? null : valet,
       cellphoneNumber: state.contactNumber.trim(),
       damageMarkersJson: _damageMarkersJson(state.vehicleDamageEntries),
       personalBelongingsJson: jsonEncode(belongings),
