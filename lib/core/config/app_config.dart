@@ -178,6 +178,20 @@ class AppConfig {
   static String get config =>
       baseUrl + (_env('API_CONFIG') ?? '/api/v1/settings');
 
+  /// GET area detail (standard rates + `vehicleTypeRates`).
+  static String branchAreaDetailUrl(String branchId, String areaId) {
+    final branch = Uri.encodeComponent(branchId.trim());
+    final area = Uri.encodeComponent(areaId.trim());
+    final template = (_env('API_BRANCH_AREA_DETAIL') ?? '').trim();
+    if (template.isNotEmpty) {
+      return baseUrl +
+          template
+              .replaceAll('{branch_id}', branch)
+              .replaceAll('{area_id}', area);
+    }
+    return '$baseUrl/api/v1/branches/$branch/areas/$area';
+  }
+
   /// GET branch record (hours, etc.). Prefer this over legacy [branchConfigUrl].
   static String branchDetailUrl(String branchId) {
     final encoded = Uri.encodeComponent(branchId.trim());
@@ -236,4 +250,9 @@ class AppConfig {
   static String get cashSessionCurrent =>
       baseUrl +
       (_env('API_CASH_SESSION_CURRENT') ?? '/api/v1/cash-sessions/current');
+
+  /// GET shift-scoped dashboard KPIs + recent transactions.
+  static String get dashboardSummary =>
+      baseUrl +
+      (_env('API_DASHBOARD_SUMMARY') ?? '/api/v1/dashboard/summary');
 }

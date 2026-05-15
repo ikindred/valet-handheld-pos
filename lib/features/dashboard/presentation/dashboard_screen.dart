@@ -6,9 +6,9 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/formatting/peso_currency.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/branch_config_service.dart';
+import '../../../data/services/rate_fetch_service.dart';
 import '../../../data/services/rate_service.dart';
 import '../../../shared/widgets/branch_rates_dialog.dart';
 import '../../auth/state/auth_bloc.dart';
@@ -74,16 +74,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     return BlocBuilder<DashboardCubit, DashboardState>(
                       builder: (context, dash) {
                         return SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               const _DashboardHeaderRow(),
-                              const SizedBox(height: 28),
+                              const SizedBox(height: 12),
                               _StatsRow(wide: wide, dashboard: dash),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 12),
                               _ActionRow(wide: wide),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 12),
                               _RecentTransactionsCard(dashboard: dash),
                             ],
                           ),
@@ -197,19 +197,18 @@ class _HeaderRow extends StatelessWidget {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.only(right: 12),
+          padding: const EdgeInsets.only(right: 8),
           child: RatesOutlinePill(
             onPressed: () async {
               final auth = context.read<AuthRepository>();
-              final rateService = context.read<RateService>();
               final site = await auth.branchAndAreaFromDb();
-              final bid = site.branch.trim().isEmpty ? '_' : site.branch.trim();
               final name = branchRatesSubtitle(site);
               if (!context.mounted) return;
               await showBranchRatesDialog(
                 context,
-                rateService: rateService,
-                branchId: bid,
+                authRepository: auth,
+                rateFetchService: context.read<RateFetchService>(),
+                rateService: context.read<RateService>(),
                 branchName: name,
               );
             },
@@ -231,8 +230,8 @@ class _StatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     if (dashboard is DashboardLoading || dashboard is DashboardInitial) {
       return const SizedBox(
-        height: 160,
-        child: Center(child: CircularProgressIndicator()),
+        height: 88,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
       );
     }
     if (dashboard is DashboardError) {
@@ -245,7 +244,6 @@ class _StatsRow extends StatelessWidget {
       );
     }
     final d = dashboard as DashboardReady;
-    final peso = PesoCurrency.currency(decimalDigits: 0);
     final delta = d.checkInsLastHour > 0 ? '+${d.checkInsLastHour} this hour' : null;
     final cards = [
       DashboardStatCard(
@@ -264,12 +262,6 @@ class _StatsRow extends StatelessWidget {
         valueText: '${d.activeSlotsUsed}',
         subtitle: 'of ${d.activeSlotsTotal} Slots',
       ),
-      DashboardStatCard(
-        title: "Today's Revenue",
-        valueText: peso.format(d.todayRevenue),
-        subtitle: '${d.revenueCheckoutCount} Transactions',
-        valueColor: DashboardStyles.green,
-      ),
     ];
 
     if (wide) {
@@ -280,7 +272,7 @@ class _StatsRow extends StatelessWidget {
           children: [
             for (var i = 0; i < cards.length; i++) ...[
               Expanded(child: cards[i]),
-              if (i < cards.length - 1) const SizedBox(width: 16),
+              if (i < cards.length - 1) const SizedBox(width: 10),
             ],
           ],
         ),
@@ -291,9 +283,9 @@ class _StatsRow extends StatelessWidget {
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
-      childAspectRatio: 1.45,
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 1.75,
       children: cards,
     );
   }
@@ -311,13 +303,13 @@ class _ActionRow extends StatelessWidget {
       title: 'Check in Vehicle',
       subtitle: 'New parking Transaction',
       leading: Container(
-        width: 45,
-        height: 45,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.27),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
         ),
-        child: const Icon(Icons.add_rounded, color: Colors.white, size: 32),
+        child: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
       ),
       onTap: () {
         context.read<CheckInCubit>().resetSession();
@@ -328,18 +320,18 @@ class _ActionRow extends StatelessWidget {
     final checkOut = DashboardActionTile(
       primary: false,
       title: 'Checkout Vehicle',
-      subtitle: 'Scan QR Code or  Enter Plate Number',
+      subtitle: 'Scan QR Code or Enter Plate Number',
       leading: Container(
-        width: 45,
-        height: 45,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           color: DashboardStyles.railAccentBg,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
           Icons.sensor_door_outlined,
           color: DashboardStyles.orange,
-          size: 28,
+          size: 22,
         ),
       ),
       onTap: () => context.push('/check-out'),
@@ -350,7 +342,7 @@ class _ActionRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(child: checkIn),
-          const SizedBox(width: 16),
+          const SizedBox(width: 10),
           Expanded(child: checkOut),
         ],
       );
@@ -358,7 +350,7 @@ class _ActionRow extends StatelessWidget {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [checkIn, const SizedBox(height: 12), checkOut],
+      children: [checkIn, const SizedBox(height: 8), checkOut],
     );
   }
 }
@@ -383,17 +375,17 @@ class _RecentTransactionsCard extends StatelessWidget {
     };
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
       decoration: DashboardStyles.cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text('RECENT TRANSACTION', style: DashboardStyles.sectionTitle()),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           const Divider(height: 1, color: _dividerColor),
           if (rows.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
                 dashboard is DashboardLoading
                     ? 'Loading…'

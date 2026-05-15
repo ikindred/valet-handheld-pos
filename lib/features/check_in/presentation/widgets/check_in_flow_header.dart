@@ -3,13 +3,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../data/repositories/auth_repository.dart';
+import '../../../../data/services/rate_fetch_service.dart';
 import '../../../../data/services/rate_service.dart';
 import '../../../../shared/widgets/branch_rates_dialog.dart';
 import '../../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../../state/check_in_cubit.dart';
+import 'check_in_compact_tokens.dart';
 
-/// Top title bar for check-in — same container pattern as [CashPageHeader]
-/// (`open_cash_screen`): fixed 96px, `#FAFAFA`, **bottom border only**.
+/// Top title bar for check-in — compact header, `#FAFAFA`, **bottom border only**.
 /// **Left:** step caption + dot stepper. **Right:** [ticket] [Rates] [status] — one row, equal gaps.
 class CheckInFlowHeader extends StatelessWidget {
   const CheckInFlowHeader({
@@ -41,10 +42,10 @@ class CheckInFlowHeader extends StatelessWidget {
     final hairline = Colors.black.withValues(alpha: 0.13);
 
     return SizedBox(
-      height: 96,
+      height: CheckInCompactTokens.headerHeight,
       width: double.infinity,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
           color: _headerSurface,
           border: Border(bottom: BorderSide(width: 1, color: hairline)),
@@ -64,14 +65,9 @@ class CheckInFlowHeader extends StatelessWidget {
                     textAlign: TextAlign.left,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      height: 1.35,
-                      color: const Color(0xFF6C7688),
-                    ),
+                    style: CheckInCompactTokens.headerStep(),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
                   CheckInDotStepper(
                     currentIndex: safeStep,
                     total: totalSteps,
@@ -80,31 +76,30 @@ class CheckInFlowHeader extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             BlocBuilder<CheckInCubit, CheckInState>(
               buildWhen: (a, b) => a.ticketNumber != b.ticketNumber,
               builder: (context, state) {
                 return _TicketPill(ticketNumber: state.ticketNumber);
               },
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             RatesOutlinePill(
               onPressed: () async {
                 final auth = context.read<AuthRepository>();
-                final rates = context.read<RateService>();
                 final site = await auth.branchAndAreaFromDb();
-                final bid = site.branch.trim().isEmpty ? '_' : site.branch.trim();
                 final name = branchRatesSubtitle(site);
                 if (!context.mounted) return;
                 await showBranchRatesDialog(
                   context,
-                  rateService: rates,
-                  branchId: bid,
+                  authRepository: auth,
+                  rateFetchService: context.read<RateFetchService>(),
+                  rateService: context.read<RateService>(),
                   branchName: name,
                 );
               },
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             const DashboardStatusPillLive(),
           ],
         ),
@@ -127,7 +122,7 @@ class _TicketPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final display = ticketNumber.trim().isEmpty ? '…' : ticketNumber.trim();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: _bg,
         borderRadius: BorderRadius.circular(100),
@@ -140,7 +135,7 @@ class _TicketPill extends StatelessWidget {
           applyHeightToLastDescent: false,
         ),
         style: GoogleFonts.poppins(
-          fontSize: 15,
+          fontSize: 12,
           fontWeight: FontWeight.w700,
           height: 1.0,
           color: _orange,
@@ -174,10 +169,10 @@ class CheckInDotStepper extends StatelessWidget {
       mainAxisAlignment: mainAxisAlignment,
       children: [
         for (var i = 0; i < total; i++) ...[
-          if (i > 0) const SizedBox(width: 9),
+          if (i > 0) const SizedBox(width: 6),
           Container(
-            width: 13,
-            height: 13,
+            width: 10,
+            height: 10,
             decoration: BoxDecoration(
               color: i < currentIndex
                   ? _done

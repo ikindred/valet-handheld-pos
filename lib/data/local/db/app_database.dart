@@ -78,6 +78,10 @@ class OfflineAccounts extends Table {
   IntColumn get createdAt => integer()();
 
   IntColumn get updatedAt => integer()();
+
+  /// JSON array from login `user.shiftSchedule` (empty when unset).
+  TextColumn get shiftScheduleJson =>
+      text().withDefault(const Constant(''))();
 }
 
 /// Auth token and session flags (`is_active`). Device id + offline mode only in prefs.
@@ -314,7 +318,7 @@ class AppDatabase extends _$AppDatabase {
   final bool _skipDevOfflineSeed;
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -368,6 +372,12 @@ FROM offline_accounts''');
             await m.addColumn(deviceIdentity, deviceIdentity.branchId);
             await m.addColumn(deviceIdentity, deviceIdentity.areaId);
             await m.addColumn(deviceIdentity, deviceIdentity.serialNumber);
+          }
+          if (from < 7) {
+            await m.addColumn(
+              offlineAccounts,
+              offlineAccounts.shiftScheduleJson,
+            );
           }
         },
       );

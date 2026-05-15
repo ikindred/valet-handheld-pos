@@ -15,124 +15,126 @@ abstract final class CashFigmaStyles {
       base.copyWith(fontFamilyFallback: _pesoGlyphFallback);
 
   static TextStyle onlinePill() => GoogleFonts.poppins(
-        fontSize: 15,
+        fontSize: 12,
         fontWeight: FontWeight.w500,
         color: _onlineGreen,
       );
 
-  /// "OPEN CASH" — Poppins 20 w500
+  /// "OPEN CASH" — compact tablet layout
   static TextStyle pageTitle() => GoogleFonts.poppins(
-        fontSize: 20,
-        fontWeight: FontWeight.w500,
+        fontSize: 17,
+        fontWeight: FontWeight.w600,
         color: AppColors.textPrimary,
       );
 
-  /// Date · branch — Poppins 15 w400, #0A1B39 @ 60% (Inter not bundled offline).
+  /// Date · branch
   static TextStyle pageSubtitle() => GoogleFonts.poppins(
-        fontSize: 15,
+        fontSize: 11,
         fontWeight: FontWeight.w400,
         color: const Color(0x990A1B39),
-        height: 1.25,
+        height: 1.2,
       );
 
-  /// SHIFT INFORMATION, OPENING BALANCE — Poppins 15 w500 grey-500
+  /// SHIFT INFORMATION, OPENING BALANCE
   static TextStyle sectionCaps() => GoogleFonts.poppins(
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
-        color: AppColors.textSecondary,
-      );
-
-  /// Field label — Poppins 14 w500
-  static TextStyle fieldLabel() => GoogleFonts.poppins(
-        fontSize: 14,
-        fontWeight: FontWeight.w500,
-        height: 1.5,
-        color: AppColors.textPrimary,
-      );
-
-  /// Field value in white box — Poppins 14 w600
-  static TextStyle fieldValue() => GoogleFonts.poppins(
-        fontSize: 14,
+        fontSize: 11,
         fontWeight: FontWeight.w600,
-        height: 1.5,
-        color: AppColors.textPrimary,
-      );
-
-  /// NOTES (OPTIONAL) — Poppins 15 w500 grey-500
-  static TextStyle notesSectionLabel() => GoogleFonts.poppins(
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
+        letterSpacing: 0.4,
         color: AppColors.textSecondary,
       );
 
-  /// Notes hint — Poppins 14 w400
+  /// Field label
+  static TextStyle fieldLabel() => GoogleFonts.poppins(
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+        height: 1.2,
+        color: AppColors.textSecondary,
+      );
+
+  /// Field value in read-only box
+  static TextStyle fieldValue() => GoogleFonts.poppins(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        height: 1.25,
+        color: AppColors.textPrimary,
+      );
+
+  /// NOTES (OPTIONAL)
+  static TextStyle notesSectionLabel() => GoogleFonts.poppins(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.4,
+        color: AppColors.textSecondary,
+      );
+
+  /// Notes hint
   static TextStyle notesHint() => GoogleFonts.poppins(
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: FontWeight.w400,
-        height: 1.5,
+        height: 1.35,
         color: const Color(0x7F0A1B39),
       );
 
   /// Notes typed text
   static TextStyle notesInput() => GoogleFonts.poppins(
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: FontWeight.w400,
-        height: 1.5,
+        height: 1.35,
         color: AppColors.textPrimary,
       );
 
-  /// Total card caps / footer — Poppins 12 w500
+  /// Total card caps / footer
   static TextStyle totalCardLabel() => GoogleFonts.poppins(
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: FontWeight.w500,
         color: AppColors.textSecondary,
       );
 
-  /// Total card amount — Poppins 45 w700
+  /// Total card amount
   static TextStyle totalCardAmount() => _withPesoFallback(
         GoogleFonts.poppins(
-          fontSize: 45,
+          fontSize: 28,
           fontWeight: FontWeight.w700,
           color: _orange,
         ),
       );
 
-  /// Opening balance inline box — Poppins 30 w700
+  /// Opening balance inline box
   static TextStyle openingAmountInline() => _withPesoFallback(
         GoogleFonts.poppins(
-          fontSize: 30,
+          fontSize: 22,
           fontWeight: FontWeight.w700,
           color: _orange,
         ),
       );
 
-  /// SHIFT SUMMARY title — Poppins 15 w500
+  /// SHIFT SUMMARY title
   static TextStyle shiftSummaryTitle() => GoogleFonts.poppins(
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
         color: AppColors.textPrimary,
       );
 
-  /// Shift summary row — Poppins 12 w500 (label + value). Values may include peso (U+20B1).
+  /// Shift summary row (label + value). Values may include peso (U+20B1).
   static TextStyle shiftSummaryRow({required bool isLabel}) {
     final base = GoogleFonts.poppins(
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: FontWeight.w500,
       color: isLabel ? AppColors.textSecondary : AppColors.textPrimary,
     );
     return isLabel ? base : _withPesoFallback(base);
   }
 
-  /// Primary CTA — Poppins 15 w500 (use on orange button; color from theme)
+  /// Primary CTA (orange button)
   static TextStyle filledActionLabel() => GoogleFonts.poppins(
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
       );
 
-  /// Numpad digit — Poppins 15 w500
+  /// Numpad digit
   static TextStyle keypadDigit({required Color color}) => GoogleFonts.poppins(
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
         color: color,
       );
 }

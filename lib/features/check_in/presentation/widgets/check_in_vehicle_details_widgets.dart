@@ -8,6 +8,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_text_field.dart';
 import '../../domain/vehicle_body_type.dart';
 import '../../state/check_in_cubit.dart';
+import 'check_in_compact_tokens.dart';
 import 'check_in_form_fields.dart';
 
 /// Standalone plate input: light orange fill + orange border (no [AppTextField] / shadow).
@@ -27,19 +28,15 @@ class CheckInPlateNumberField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hintStyle = GoogleFonts.poppins(
-      fontSize: 26,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 2.4,
-      color: const Color(0x66F68D00),
-      height: 1.2,
-    );
+    final hintStyle = CheckInCompactTokens.plateHint();
 
     return Material(
       color: Colors.transparent,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 72),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        constraints: const BoxConstraints(
+          minHeight: CheckInCompactTokens.plateMinHeight,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: _lightOrange,
           borderRadius: BorderRadius.circular(10),
@@ -51,13 +48,7 @@ class CheckInPlateNumberField extends StatelessWidget {
           focusNode: focusNode,
           cursorColor: _orange,
           textCapitalization: TextCapitalization.characters,
-          style: GoogleFonts.poppins(
-            fontSize: 26,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 2.4,
-            color: _orange,
-            height: 1.2,
-          ),
+          style: CheckInCompactTokens.plateValue(),
           decoration: InputDecoration(
             isDense: true,
             filled: true,
@@ -104,7 +95,7 @@ class CheckInVehicleBodyTypeGrid extends StatelessWidget {
       builder: (context, state) {
         return LayoutBuilder(
           builder: (context, constraints) {
-            const gap = 12.0;
+            const gap = CheckInCompactTokens.bodyTypeGridGap;
             final w = constraints.maxWidth;
             final cellW = (w - 2 * gap) / 3;
 
@@ -177,8 +168,8 @@ class _VehicleTypeCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          height: 120,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          height: CheckInCompactTokens.bodyTypeCardHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(10),
@@ -190,19 +181,19 @@ class _VehicleTypeCard extends StatelessWidget {
               Text(
                 type.emoji,
                 style: GoogleFonts.poppins(
-                  fontSize: 30,
+                  fontSize: 22,
                   fontWeight: FontWeight.w500,
                   color: Colors.black,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 type.label,
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
-                  fontSize: 15,
+                  fontSize: 11,
                   fontWeight: FontWeight.w500,
                   color: labelColor,
                 ),
@@ -250,7 +241,7 @@ class CheckInBelongingsGrid extends StatelessWidget {
         return LayoutBuilder(
           builder: (context, constraints) {
             final w = constraints.maxWidth;
-            const gap = 12.0;
+            const gap = CheckInCompactTokens.bodyTypeGridGap;
             final cellW = (w - gap) / 2;
             return Wrap(
               spacing: gap,
@@ -361,9 +352,9 @@ class CheckInDropdownField extends StatelessWidget {
       child: AppTextFieldShadow(
         child: Container(
           constraints: const BoxConstraints(
-            minHeight: AppTextFieldTokens.minInputHeight,
+            minHeight: CheckInCompactTokens.inputMinHeight,
           ),
-          padding: AppTextFieldTokens.inputContentPadding,
+          padding: CheckInCompactTokens.inputPadding,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(6),
@@ -375,8 +366,7 @@ class CheckInDropdownField extends StatelessWidget {
               value: value.isEmpty ? null : value,
               hint: Text(
                 'Select',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
+                style: CheckInCompactTokens.fieldValue().copyWith(
                   fontWeight: FontWeight.w500,
                   color: AppTextFieldTokens.hintGrey,
                 ),
@@ -384,13 +374,9 @@ class CheckInDropdownField extends StatelessWidget {
               icon: const Icon(
                 Icons.keyboard_arrow_down_rounded,
                 color: Color(0xFF0A1B39),
+                size: 20,
               ),
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                height: 1.5,
-                color: AppColors.textPrimary,
-              ),
+              style: CheckInCompactTokens.fieldValue(),
               items: items
                   .map(
                     (s) => DropdownMenuItem<String>(value: s, child: Text(s)),

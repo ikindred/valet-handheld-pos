@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/branch/overnight_window.dart';
 import '../../core/config/app_config.dart';
 import '../../core/logging/valet_log.dart';
+import '../../core/storage/device_site_ids.dart';
 import '../local/db/app_database.dart';
 import '../repositories/auth_repository.dart';
 
@@ -58,9 +59,10 @@ class BranchConfigService {
 
     final entries = <({String key, String value})>[];
 
-    try {
-      final branchUrl = AppConfig.branchDetailUrl(id);
-      final res = await _dio.get<dynamic>(branchUrl, options: opts);
+    if (DeviceSiteIds.isUuid(id)) {
+      try {
+        final branchUrl = AppConfig.branchDetailUrl(id);
+        final res = await _dio.get<dynamic>(branchUrl, options: opts);
       final status = res.statusCode ?? 0;
       if (status >= 200 && status < 300) {
         final root = _asStringKeyedMap(res.data);
@@ -104,6 +106,7 @@ class BranchConfigService {
         e,
         st,
       );
+    }
     }
 
     try {
@@ -174,10 +177,18 @@ class BranchConfigService {
     }
   }
 
-  /// Uses [AuthRepository.branchAndAreaFromDb] branch string when non-empty.
+  /// Uses server branch UUID from prefs / [device_identity].
   Future<void> syncFromServerForDeviceBranch() async {
-    final site = await _auth.branchAndAreaFromDb();
-    await syncFromServer(site.branch);
+    final branchUuid = await _auth.branchUuidForApi();
+    if (branchUuid.isEmpty) {
+      ValetLog.warning(
+        'BranchConfigService.syncFromServerForDeviceBranch',
+        'skip branch detail — no branch UUID; syncing settings only',
+      );
+      await syncFromServer('settings-only');
+      return;
+    }
+    await syncFromServer(branchUuid);
   }
 
   static Map<String, dynamic>? _asStringKeyedMap(dynamic data) {

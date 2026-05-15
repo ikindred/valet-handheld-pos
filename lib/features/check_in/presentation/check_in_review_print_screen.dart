@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -9,12 +10,18 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/logging/valet_log.dart';
+import '../../../core/printing/check_in_receipt_data.dart';
+import '../../../core/printing/print_flow.dart';
+import '../../../core/printing/printer_connection_notifier.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/ticket_service.dart';
 import '../../sync/state/sync_cubit.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../domain/vehicle_body_type.dart';
 import '../domain/vehicle_damage.dart';
 import '../state/check_in_cubit.dart';
+import 'widgets/check_in_compact_tokens.dart';
 import 'widgets/check_in_step_body.dart';
 
 /// Step 5 — Review (confirm saves ticket, then `/check-in/print`).
@@ -30,7 +37,11 @@ class CheckInReviewPrintScreen extends StatefulWidget {
 class _CheckInReviewPrintScreenState extends State<CheckInReviewPrintScreen> {
   bool _saving = false;
 
-  static const double _wideBreakpoint = 960.0;
+  /// Three-column Figma grid (customer | condition+time | QR+print).
+  static const double _wideBreakpoint = 680.0;
+
+  /// Two-column fallback for narrow landscape.
+  static const double _mediumBreakpoint = 480.0;
 
   Future<void> _commitAndLeave() async {
     if (!mounted || _saving) return;
@@ -95,65 +106,22 @@ class _CheckInReviewPrintScreenState extends State<CheckInReviewPrintScreen> {
         builder: (context, state) {
           return LayoutBuilder(
             builder: (context, constraints) {
-              final wide = constraints.maxWidth >= _wideBreakpoint;
-              if (wide) {
-                // Stack top + bottom cards per column so row height isn't driven by
-                // the tallest card (QR), which left a large gap under shorter cards.
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _CustomerValetCard(state: state),
-                          const SizedBox(height: 16),
-                          _VehicleCard(state: state),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _ConditionLogCard(state: state),
-                          const SizedBox(height: 16),
-                          _TimeCard(state: state),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _QrCard(state: state),
-                          const SizedBox(height: 16),
-                          _PrintBluetoothCard(
-                            onTap: () => _onPrintTap(context),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+              final w = constraints.maxWidth;
+              if (w >= _wideBreakpoint) {
+                return _ReviewWideGrid(
+                  state: state,
+                  onPrintTap: () => unawaited(_onPrintTap(context)),
                 );
               }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _CustomerValetCard(state: state),
-                  const SizedBox(height: 16),
-                  _ConditionLogCard(state: state),
-                  const SizedBox(height: 16),
-                  _QrCard(state: state),
-                  const SizedBox(height: 16),
-                  _VehicleCard(state: state),
-                  const SizedBox(height: 16),
-                  _TimeCard(state: state),
-                  const SizedBox(height: 16),
-                  _PrintBluetoothCard(onTap: () => _onPrintTap(context)),
-                ],
+              if (w >= _mediumBreakpoint) {
+                return _ReviewMediumGrid(
+                  state: state,
+                  onPrintTap: () => unawaited(_onPrintTap(context)),
+                );
+              }
+              return _ReviewNarrowStack(
+                state: state,
+                onPrintTap: () => _onPrintTap(context),
               );
             },
           );
@@ -162,10 +130,39 @@ class _CheckInReviewPrintScreenState extends State<CheckInReviewPrintScreen> {
     );
   }
 
-  void _onPrintTap(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Bluetooth print is not connected yet.')),
+  Future<void> _onPrintTap(BuildContext context) async {
+    final cubit = context.read<CheckInCubit>();
+    final state = cubit.state;
+    final id = state.ticketNumber.trim();
+    if (id.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No ticket number yet.')),
+      );
+      return;
+    }
+    final row = await context.read<TicketService>().ticketById(id);
+    if (!context.mounted) return;
+    if (row == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Save the ticket before printing.')),
+      );
+      return;
+    }
+    final auth = context.read<AuthRepository>();
+    final base = CheckInReceiptData(
+      ticket: row,
+      branchName: '',
+      customerName: state.customerFullName,
+      contactNumber: state.contactNumber,
+      parkingLevel: state.parkingLevel,
+      parkingSlot: state.parkingSlot,
+      valetTypeLabel: _valetTypeLabel(state.valetServiceType),
+      specialRequest: state.specialInstructions,
+      hasSignature: state.hasCustomerSignature,
     );
+    final data = await withBranchName(auth, base);
+    if (!context.mounted) return;
+    await printCheckInFromContext(context, data: data);
   }
 }
 
@@ -211,42 +208,171 @@ String _timeInFormatted(DateTime? d) {
   return DateFormat('MMMM d, yyyy · h:mm a').format(dt);
 }
 
+// --- Layout grids (Figma: 3 columns on tablet) ---
+
+class _ReviewWideGrid extends StatelessWidget {
+  const _ReviewWideGrid({
+    required this.state,
+    required this.onPrintTap,
+  });
+
+  final CheckInState state;
+  final VoidCallback onPrintTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _CustomerValetCard(state: state),
+              const SizedBox(height: CheckInCompactTokens.fieldGap),
+              _VehicleCard(state: state),
+            ],
+          ),
+        ),
+        const SizedBox(width: CheckInCompactTokens.fieldGap),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _ConditionLogCard(state: state),
+              const SizedBox(height: CheckInCompactTokens.fieldGap),
+              _TimeCard(state: state),
+            ],
+          ),
+        ),
+        const SizedBox(width: CheckInCompactTokens.fieldGap),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _QrCard(state: state, compact: false),
+              const SizedBox(height: CheckInCompactTokens.fieldGap),
+              _PrintBluetoothCard(onTap: onPrintTap),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReviewMediumGrid extends StatelessWidget {
+  const _ReviewMediumGrid({
+    required this.state,
+    required this.onPrintTap,
+  });
+
+  final CheckInState state;
+  final VoidCallback onPrintTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                children: [
+                  _CustomerValetCard(state: state),
+                  const SizedBox(height: CheckInCompactTokens.fieldGap),
+                  _VehicleCard(state: state),
+                ],
+              ),
+            ),
+            const SizedBox(width: CheckInCompactTokens.fieldGap),
+            Expanded(
+              child: Column(
+                children: [
+                  _ConditionLogCard(state: state),
+                  const SizedBox(height: CheckInCompactTokens.fieldGap),
+                  _TimeCard(state: state),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: CheckInCompactTokens.fieldGap),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _QrCard(state: state, compact: true)),
+            const SizedBox(width: CheckInCompactTokens.fieldGap),
+            Expanded(child: _PrintBluetoothCard(onTap: onPrintTap)),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ReviewNarrowStack extends StatelessWidget {
+  const _ReviewNarrowStack({
+    required this.state,
+    required this.onPrintTap,
+  });
+
+  final CheckInState state;
+  final VoidCallback onPrintTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _CustomerValetCard(state: state),
+        const SizedBox(height: CheckInCompactTokens.fieldGap),
+        _ConditionLogCard(state: state),
+        const SizedBox(height: CheckInCompactTokens.fieldGap),
+        _VehicleCard(state: state),
+        const SizedBox(height: CheckInCompactTokens.fieldGap),
+        _TimeCard(state: state),
+        const SizedBox(height: CheckInCompactTokens.fieldGap),
+        _QrCard(state: state, compact: true),
+        const SizedBox(height: CheckInCompactTokens.fieldGap),
+        _PrintBluetoothCard(onTap: onPrintTap),
+      ],
+    );
+  }
+}
+
 // --- Shared styles ---
 
 class _ReviewTokens {
-  static const title = Color(0xFF0A1B39);
   static const hairline = Color(0x21000000);
+  static const cardRadius = 10.0;
 
-  static TextStyle sectionTitle() => GoogleFonts.poppins(
-    fontSize: 15,
-    fontWeight: FontWeight.w500,
-    color: title,
-  );
+  static TextStyle sectionTitle() => CheckInCompactTokens.pageHeading();
 
-  static TextStyle label() => GoogleFonts.poppins(
-    fontSize: 12,
-    fontWeight: FontWeight.w500,
-    color: DashboardStyles.grey500,
-  );
+  static TextStyle label() => CheckInCompactTokens.helperText().copyWith(
+        fontWeight: FontWeight.w500,
+        color: DashboardStyles.grey500,
+      );
 
-  static TextStyle value() => GoogleFonts.poppins(
-    fontSize: 12,
-    fontWeight: FontWeight.w500,
-    color: title,
-  );
+  static TextStyle value() => CheckInCompactTokens.fieldValue().copyWith(
+        fontWeight: FontWeight.w500,
+      );
 
-  static TextStyle plateValue() => GoogleFonts.poppins(
-    fontSize: 12,
-    fontWeight: FontWeight.w700,
-    color: DashboardStyles.plateBlue,
-  );
+  static TextStyle plateValue() => CheckInCompactTokens.fieldValue().copyWith(
+        fontWeight: FontWeight.w700,
+        color: DashboardStyles.plateBlue,
+      );
+
+  static TextStyle damageCount() => CheckInCompactTokens.bodyHint();
 }
 
 class _ReviewCard extends StatelessWidget {
   const _ReviewCard({
     required this.borderRadius,
     required this.child,
-    this.padding = const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+    this.padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
   });
 
   final double borderRadius;
@@ -303,7 +429,7 @@ class _ReviewRow extends StatelessWidget {
           ],
         ),
         if (showDivider) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Container(height: 1, color: _ReviewTokens.hairline),
         ],
       ],
@@ -320,46 +446,48 @@ class _CustomerValetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final special = state.specialInstructions.trim();
     return _ReviewCard(
-      borderRadius: 10,
+      borderRadius: _ReviewTokens.cardRadius,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('CUSTOMER & VALET', style: _ReviewTokens.sectionTitle()),
-          const SizedBox(height: 25),
+          const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(
             label: 'Name',
             value: state.customerFullName.trim().isEmpty
                 ? '—'
                 : state.customerFullName.trim(),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(
             label: 'Contact',
             value: state.contactNumber.trim().isEmpty
                 ? '—'
                 : state.contactNumber.trim(),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(
             label: 'Valet Type',
             value: _valetTypeLabel(state.valetServiceType),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(
             label: 'Valet Driver',
             value: state.assignedValetDriver.trim().isEmpty
                 ? '—'
                 : state.assignedValetDriver.trim(),
+            showDivider: special.isNotEmpty,
           ),
-          const SizedBox(height: 14),
-          _ReviewRow(
-            label: 'Special Request',
-            value: state.specialInstructions.trim().isEmpty
-                ? '—'
-                : state.specialInstructions.trim(),
-            showDivider: false,
-          ),
+          if (special.isNotEmpty) ...[
+            const SizedBox(height: CheckInCompactTokens.sectionGap),
+            _ReviewRow(
+              label: 'Special Request',
+              value: special,
+              showDivider: false,
+            ),
+          ],
         ],
       ),
     );
@@ -386,14 +514,15 @@ class _DamageChip extends StatelessWidget {
       DamageType.crack => (_crackFg, _crackBg),
     };
     final zone = entry.zoneLabel?.trim();
-    final suffix = (zone != null && zone.isNotEmpty) ? zone : '—';
-    final text = '${entry.type.label} · $suffix';
+    final text = (zone != null && zone.isNotEmpty)
+        ? '${entry.type.label} - $zone'
+        : entry.type.label;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(100),
         border: Border.all(color: fg),
       ),
       child: Text(
@@ -419,37 +548,40 @@ class _ConditionLogCard extends StatelessWidget {
     final countLabel = n == 1 ? '1 item marked' : '$n items marked';
 
     return _ReviewCard(
-      borderRadius: 20,
+      borderRadius: _ReviewTokens.cardRadius,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('CONDITION LOG', style: _ReviewTokens.sectionTitle()),
-          const SizedBox(height: 16),
-          _ReviewRow(label: 'Damage items', value: countLabel),
-          const SizedBox(height: 12),
-          if (state.vehicleDamageEntries.isEmpty)
-            Text('No damage logged.', style: _ReviewTokens.label())
-          else
+          const SizedBox(height: CheckInCompactTokens.sectionGap),
+          Text(countLabel, style: _ReviewTokens.damageCount()),
+          if (state.vehicleDamageEntries.isNotEmpty) ...[
+            const SizedBox(height: CheckInCompactTokens.sectionGap),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 6,
+              runSpacing: 6,
               children: [
                 for (final e in state.vehicleDamageEntries)
                   _DamageChip(entry: e),
               ],
             ),
-          const SizedBox(height: 20),
+          ] else ...[
+            const SizedBox(height: 4),
+            Text('No damage logged.', style: _ReviewTokens.label()),
+          ],
+          const SizedBox(height: CheckInCompactTokens.blockGap),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text('Customer signature', style: _ReviewTokens.label()),
+                child: Text(
+                  'Customer signature',
+                  style: _ReviewTokens.label(),
+                ),
               ),
               Text(
                 state.hasCustomerSignature ? 'Signed ✓' : 'Not signed',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                style: _ReviewTokens.value().copyWith(
                   color: state.hasCustomerSignature
                       ? DashboardStyles.green
                       : DashboardStyles.grey500,
@@ -464,24 +596,26 @@ class _ConditionLogCard extends StatelessWidget {
 }
 
 class _QrCard extends StatelessWidget {
-  const _QrCard({required this.state});
+  const _QrCard({required this.state, this.compact = false});
 
   final CheckInState state;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final ticket = state.ticketNumber.trim().isEmpty
         ? '—'
         : state.ticketNumber.trim();
+    final qrSize = compact ? 160.0 : 200.0;
 
     return _ReviewCard(
-      borderRadius: 10,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      borderRadius: _ReviewTokens.cardRadius,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       child: Column(
         children: [
           SizedBox(
-            width: 254,
-            height: 254,
+            width: qrSize,
+            height: qrSize,
             child: state.ticketNumber.trim().isEmpty
                 ? Center(
                     child: Text(
@@ -497,24 +631,20 @@ class _QrCard extends StatelessWidget {
                     backgroundColor: Colors.white,
                   ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: CheckInCompactTokens.sectionGap),
           Text(
             ticket,
-            style: GoogleFonts.poppins(
-              fontSize: 20,
+            style: CheckInCompactTokens.fieldValue().copyWith(
+              fontSize: compact ? 14 : 16,
               fontWeight: FontWeight.w700,
               color: DashboardStyles.orange,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             'Customer scans this QR at check-out',
             textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-              color: Colors.black,
-            ),
+            style: _ReviewTokens.label().copyWith(color: AppColors.textPrimary),
           ),
         ],
       ),
@@ -534,13 +664,12 @@ class _VehicleCard extends StatelessWidget {
         : state.plateNumber.trim();
 
     return _ReviewCard(
-      borderRadius: 20,
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 15),
+      borderRadius: _ReviewTokens.cardRadius,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('VEHICLE', style: _ReviewTokens.sectionTitle()),
-          const SizedBox(height: 25),
+          const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(
             label: 'Plate No.',
             value: plate,
@@ -548,16 +677,16 @@ class _VehicleCard extends StatelessWidget {
                 ? _ReviewTokens.value()
                 : _ReviewTokens.plateValue(),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(label: 'Vehicle', value: _vehicleLine(state)),
-          const SizedBox(height: 14),
+          const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(
             label: 'Type',
             value: state.vehicleBodyType.label,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(label: 'Slot', value: _slotLine(state)),
-          const SizedBox(height: 14),
+          const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(
             label: 'Belongings',
             value: _belongingsLine(state),
@@ -581,17 +710,17 @@ class _TimeCard extends StatelessWidget {
         : state.ticketNumber.trim();
 
     return _ReviewCard(
-      borderRadius: 10,
+      borderRadius: _ReviewTokens.cardRadius,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('TIME', style: _ReviewTokens.sectionTitle()),
-          const SizedBox(height: 25),
+          const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(
             label: 'Time In',
             value: _timeInFormatted(state.dateTimeIn),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(label: 'Ticket No.', value: ticket, showDivider: false),
         ],
       ),
@@ -606,6 +735,11 @@ class _PrintBluetoothCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final printer = context.watch<PrinterConnectionNotifier>();
+    final subtitle = printer.isConnected
+        ? printer.statusSubtitle
+        : 'Tap to pair Bluetooth printer';
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -625,25 +759,25 @@ class _PrintBluetoothCard extends StatelessWidget {
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
-                  width: 45,
-                  height: 45,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.27),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   alignment: Alignment.center,
                   child: Icon(
                     LucideIcons.printer,
                     color: Colors.white.withValues(alpha: 0.95),
-                    size: 22,
+                    size: 18,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -651,19 +785,18 @@ class _PrintBluetoothCard extends StatelessWidget {
                     children: [
                       Text(
                         'Print Via Bluetooth',
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
+                        style: CheckInCompactTokens.fieldValue().copyWith(
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
                         ),
                       ),
-                      const SizedBox(height: 2),
                       Text(
-                        'Valet Master Printer · Connected',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white.withValues(alpha: 0.70),
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: CheckInCompactTokens.helperText().copyWith(
+                          color: Colors.white.withValues(alpha: 0.75),
                         ),
                       ),
                     ],

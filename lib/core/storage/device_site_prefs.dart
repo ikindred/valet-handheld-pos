@@ -53,6 +53,22 @@ abstract final class DeviceSitePrefs {
     return AppConfig.defaultDeviceArea;
   }
 
+  /// Persists branch/area from login `user.branch` / `user.area` (names + UUIDs).
+  static Future<void> applyLoginUserSite(
+    SharedPreferences prefs, {
+    String? branchName,
+    String? areaName,
+    String? branchId,
+    String? areaId,
+  }) =>
+      applyValidateDeviceAssignment(
+        prefs,
+        branchName: branchName ?? '',
+        areaName: areaName ?? '',
+        branchId: branchId ?? '',
+        areaId: areaId ?? '',
+      );
+
   /// Persists branch/area/ids from `POST /devices/validate` when assignment changed.
   static Future<void> applyValidateDeviceAssignment(
     SharedPreferences prefs, {

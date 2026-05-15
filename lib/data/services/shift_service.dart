@@ -8,7 +8,18 @@ import 'package:uuid/uuid.dart';
 import '../../core/config/app_config.dart';
 import '../../core/logging/valet_log.dart';
 import '../local/db/app_database.dart';
+import '../remote/api_error_message.dart';
+import 'cash_session_start_payload.dart';
 import 'ticket_service.dart';
+
+/// Thrown when online `POST /cash-sessions/start` fails after local shift row exists.
+class CashSessionStartException implements Exception {
+  CashSessionStartException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
 
 /// Local `shifts` + `sync_queue` lifecycle with best-effort REST sync.
 class ShiftService {
@@ -50,6 +61,8 @@ class ShiftService {
     required String userId,
     required String branchId,
     required double openingFloat,
+    String? notes,
+    bool awaitRemoteStart = false,
   }) async {
     final existing = await getActiveShift(userId);
     if (existing != null) {
@@ -57,7 +70,8 @@ class ShiftService {
     }
     final bid = branchId.trim().isEmpty ? '_' : branchId.trim();
     final id = _uuid.v4();
-    final now = DateTime.now().toIso8601String();
+    final nowUtc = DateTime.now().toUtc().toIso8601String();
+    final trimmedNotes = notes?.trim();
 
     await _db.transaction(() async {
       await _db.into(_db.shifts).insert(
@@ -65,32 +79,46 @@ class ShiftService {
               id: id,
               userId: userId,
               branchId: bid,
-              openedAt: now,
+              openedAt: nowUtc,
               openingFloat: openingFloat,
               status: 'open',
               syncStatus: 'pending',
-              createdAt: now,
+              createdAt: nowUtc,
             ),
           );
       final inserted =
           await (_db.select(_db.shifts)..where((s) => s.id.equals(id)))
               .getSingle();
-      final payload = jsonEncode(shiftRowToJson(inserted));
+      final payloadMap = shiftRowToJson(inserted);
+      if (trimmedNotes != null && trimmedNotes.isNotEmpty) {
+        payloadMap['notes'] = trimmedNotes;
+      }
       await _db.into(_db.syncQueue).insert(
             SyncQueueCompanion.insert(
               id: _uuid.v4(),
               operation: 'create',
               queueTableName: 'shifts',
               recordId: id,
-              payload: payload,
+              payload: jsonEncode(payloadMap),
               syncStatus: 'pending',
-              createdAt: now,
+              createdAt: nowUtc,
             ),
           );
     });
 
     onShiftMutated?.call();
-    unawaited(_postShiftCreate(id));
+    final remote = _postShiftCreate(
+      shiftId: id,
+      openingBalance: openingFloat,
+      timestampUtcIso: nowUtc,
+      notes: trimmedNotes,
+      throwOnFailure: awaitRemoteStart,
+    );
+    if (awaitRemoteStart) {
+      await remote;
+    } else {
+      unawaited(remote);
+    }
     unawaited(
       _tickets.purgeOrphanedDrafts(id).catchError((_, __) {}),
     );
@@ -168,32 +196,75 @@ class ShiftService {
     return t;
   }
 
-  Future<void> _postShiftCreate(String shiftId) async {
+  Future<void> _postShiftCreate({
+    required String shiftId,
+    required double openingBalance,
+    required String timestampUtcIso,
+    String? notes,
+    bool throwOnFailure = false,
+  }) async {
     if (AppConfig.useStubApi) return;
     final token = await _activeBearer();
     if (token == null) return;
     try {
-      final row =
-          await (_db.select(_db.shifts)..where((s) => s.id.equals(shiftId)))
-              .getSingle();
       final res = await _dio.post<dynamic>(
         AppConfig.cashSessionsStart,
-        data: <String, dynamic>{
-          'opening_balance': row.openingFloat,
-          'notes': null,
-        },
+        data: buildCashSessionStartBody(
+          openingBalance: openingBalance,
+          timestampUtcIso: timestampUtcIso,
+          notes: notes,
+        ),
         options: Options(
           headers: {'Authorization': 'Bearer $token'},
           validateStatus: (c) => c != null && c < 500,
         ),
       );
       if (res.statusCode == 201) {
-        await (_db.update(_db.shifts)..where((s) => s.id.equals(shiftId)))
-            .write(const ShiftsCompanion(syncStatus: Value('synced')));
+        final openedAt = _openedAtFromStartResponse(res.data);
+        await (_db.update(_db.shifts)..where((s) => s.id.equals(shiftId))).write(
+          ShiftsCompanion(
+            syncStatus: const Value('synced'),
+            openedAt: openedAt != null ? Value(openedAt) : const Value.absent(),
+          ),
+        );
+        return;
+      }
+      final msg = messageFromResponseData(res.data) ??
+          'Could not start shift (HTTP ${res.statusCode ?? 0}).';
+      if (throwOnFailure) throw CashSessionStartException(msg);
+      ValetLog.warning('ShiftService', 'POST cash-sessions/start: $msg');
+    } on CashSessionStartException {
+      rethrow;
+    } on DioException catch (e, st) {
+      ValetLog.error(
+        'ShiftService',
+        'POST cash-sessions/start failed',
+        e,
+        st,
+      );
+      if (throwOnFailure) {
+        throw CashSessionStartException(
+          parseApiErrorUserMessage(e) ??
+              'Could not start shift. Check your connection and try again.',
+        );
       }
     } catch (e, st) {
-      ValetLog.error('ShiftService', 'POST cash-sessions/start failed (queued)', e, st);
+      ValetLog.error(
+        'ShiftService',
+        'POST cash-sessions/start failed (queued)',
+        e,
+        st,
+      );
     }
+  }
+
+  static String? _openedAtFromStartResponse(dynamic data) {
+    if (data is! Map) return null;
+    final map = Map<String, dynamic>.from(data);
+    final raw = map['opened_at'] ?? map['openedAt'];
+    if (raw == null) return null;
+    final s = raw.toString().trim();
+    return s.isEmpty ? null : s;
   }
 
   Future<void> _patchShift(String shiftId) async {

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/session/cashier_shift_schedule.dart';
 import '../../core/session/standard_parking_rates.dart';
 
 /// Remote auth + device registration. Uses stubs when [AppConfig.useStubApi] is true.
@@ -62,6 +63,7 @@ class AuthApi {
         fullName: 'Stub User',
         role: 'staff',
         isOpenCash: false,
+        shiftSchedule: const [],
         standardRates: const StandardParkingRates(
           flatRatePesos: 150,
           succeedingHourPesos: 30,
@@ -252,12 +254,19 @@ class DeviceRegisterResult {
   final String? area;
 }
 
+/// JWT from auth responses — prefer [accessToken] (current API), then legacy keys.
 String _parseAccessToken(Map<String, dynamic> json) {
-  final v = json['token'] ??
-      json['accessToken'] ??
+  final v = json['accessToken'] ??
       json['access_token'] ??
+      json['token'] ??
       '';
-  return v.toString();
+  return v.toString().trim();
+}
+
+/// Rotated JWT from validate-token; null when the server omits a new token.
+String? _parseRotatedAccessToken(Map<String, dynamic> json) {
+  final t = _parseAccessToken(json);
+  return t.isEmpty ? null : t;
 }
 
 /// Server user id from nested `user` or top-level keys; UUID string when present.
@@ -280,6 +289,59 @@ String _fullNameFromUser(Map<String, dynamic> user) {
   return '$a $b'.trim();
 }
 
+List<ShiftScheduleEntry> _parseShiftScheduleFromLoginJson(
+  Map<String, dynamic> json,
+) {
+  final user = json['user'];
+  if (user is Map<String, dynamic>) {
+    return CashierShiftSchedule.parseList(user['shiftSchedule']);
+  }
+  return CashierShiftSchedule.parseList(json['shiftSchedule']);
+}
+
+/// Branch/area from login `user` object (UUIDs for API paths, names for UI).
+class LoginUserSite {
+  const LoginUserSite({
+    required this.branchId,
+    required this.areaId,
+    required this.branchName,
+    required this.areaName,
+  });
+
+  final String branchId;
+  final String areaId;
+  final String branchName;
+  final String areaName;
+
+  static LoginUserSite? fromUserJson(Map<String, dynamic>? user) {
+    if (user == null) return null;
+    final branch = user['branch'];
+    final area = user['area'];
+    return LoginUserSite(
+      branchId: _idFromNested(branch),
+      areaId: _idFromNested(area),
+      branchName: _nameFromNested(branch),
+      areaName: _nameFromNested(area),
+    );
+  }
+
+  static String _idFromNested(dynamic node) {
+    if (node is Map) {
+      return (node['id'] ?? node['branch_id'] ?? node['area_id'] ?? '')
+          .toString()
+          .trim();
+    }
+    return '';
+  }
+
+  static String _nameFromNested(dynamic node) {
+    if (node is Map) {
+      return (node['name'] ?? node['code'] ?? '').toString().trim();
+    }
+    return '';
+  }
+}
+
 class LoginResponse {
   LoginResponse({
     required this.token,
@@ -287,7 +349,9 @@ class LoginResponse {
     required this.fullName,
     required this.role,
     required this.isOpenCash,
+    required this.shiftSchedule,
     this.standardRates,
+    this.userSite,
   });
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
@@ -304,10 +368,12 @@ class LoginResponse {
     var fullName = '';
     var role = '';
     var userId = _parseServerUserId(json);
+    LoginUserSite? userSite;
     if (user is Map<String, dynamic>) {
       userId = _parseServerUserId({'user': user});
       fullName = _fullNameFromUser(user);
       role = (user['role'] ?? '').toString();
+      userSite = LoginUserSite.fromUserJson(user);
     }
 
     return LoginResponse(
@@ -316,10 +382,13 @@ class LoginResponse {
       fullName: fullName,
       role: role,
       isOpenCash: isOpen,
+      shiftSchedule: _parseShiftScheduleFromLoginJson(json),
       standardRates: rates,
+      userSite: userSite,
     );
   }
 
+  /// JWT from `accessToken` (stored in session as bearer token).
   final String token;
 
   /// Server user id (UUID when returned by API).
@@ -330,7 +399,12 @@ class LoginResponse {
   final String role;
 
   final bool isOpenCash;
+
+  final List<ShiftScheduleEntry> shiftSchedule;
+
   final StandardParkingRates? standardRates;
+
+  final LoginUserSite? userSite;
 }
 
 class RevalidateResponse {
@@ -368,15 +442,8 @@ class RevalidateResponse {
       userId = _parseServerUserId({'user': user});
     }
 
-    final rawTok = json['token'] ??
-        json['accessToken'] ??
-        json['access_token'];
-    final String? rotated = rawTok == null
-        ? null
-        : (rawTok.toString().trim().isEmpty ? null : rawTok.toString().trim());
-
     return RevalidateResponse(
-      token: rotated,
+      token: _parseRotatedAccessToken(json),
       userId: userId,
       valid: valid,
       isOpenCash: isOpen,

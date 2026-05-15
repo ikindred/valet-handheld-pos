@@ -28,94 +28,106 @@ abstract final class DashboardStyles {
 
   static const List<String> _pesoFallback = ['Noto Sans', 'Roboto'];
 
+  /// Compact tablet layout (aligned with login / open cash).
   static TextStyle greeting() => GoogleFonts.poppins(
-    fontSize: 25,
-    fontWeight: FontWeight.w700,
+    fontSize: 17,
+    fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
+    height: 1.2,
   );
 
   static TextStyle headerSubtitle() => GoogleFonts.poppins(
-    fontSize: 15,
+    fontSize: 11,
     fontWeight: FontWeight.w400,
-    color: AppColors.textPrimary,
+    color: const Color(0x990A1B39),
+    height: 1.2,
   );
 
   static TextStyle statTitle() => GoogleFonts.poppins(
-    fontSize: 15,
-    fontWeight: FontWeight.w500,
-    color: grey500,
+    fontSize: 10,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.35,
+    color: AppColors.textSecondary,
   );
 
   static TextStyle statValue({Color? color}) => GoogleFonts.poppins(
-    fontSize: 30,
-    fontWeight: FontWeight.w500,
-    height: 0.96,
+    fontSize: 22,
+    fontWeight: FontWeight.w600,
+    height: 1.05,
     color: color ?? AppColors.textPrimary,
   ).copyWith(fontFamilyFallback: _pesoFallback);
 
   static TextStyle statHint() => GoogleFonts.poppins(
-    fontSize: 14,
-    fontWeight: FontWeight.w300,
+    fontSize: 11,
+    fontWeight: FontWeight.w400,
     color: grey500,
-    height: 1.5,
+    height: 1.25,
   );
 
   static TextStyle statDeltaGreen() => GoogleFonts.poppins(
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: FontWeight.w600,
     color: green,
-    height: 1.5,
+    height: 1.25,
   );
 
   static TextStyle actionTitle({required bool primary}) => GoogleFonts.poppins(
-    fontSize: 20,
+    fontSize: 15,
     fontWeight: FontWeight.w600,
     color: primary ? Colors.white : orange,
+    height: 1.2,
   );
 
   static TextStyle actionSubtitlePrimary() => GoogleFonts.poppins(
-    fontSize: 15,
+    fontSize: 11,
     fontWeight: FontWeight.w500,
-    color: Colors.white.withValues(alpha: 0.7),
+    color: Colors.white.withValues(alpha: 0.75),
+    height: 1.25,
   );
 
   static TextStyle actionSubtitleCheckout() => GoogleFonts.poppins(
-    fontSize: 15,
+    fontSize: 11,
     fontWeight: FontWeight.w500,
     color: checkoutSubtitle,
+    height: 1.25,
   );
 
   static TextStyle sectionTitle() => GoogleFonts.poppins(
-    fontSize: 15,
-    fontWeight: FontWeight.w500,
-    color: grey500,
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.4,
+    color: AppColors.textSecondary,
   );
 
   static TextStyle plateBadge() => GoogleFonts.poppins(
-    fontSize: 15,
-    fontWeight: FontWeight.w500,
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
     color: plateBlue,
-    height: 1.3,
+    height: 1.2,
   );
 
-  /// Vehicle + detail lines use `Colors.black` in the Figma export.
   static TextStyle transactionLine() => GoogleFonts.poppins(
-    fontSize: 15,
+    fontSize: 12,
     fontWeight: FontWeight.w500,
-    color: Colors.black,
-    height: 1.3,
+    color: AppColors.textPrimary,
+    height: 1.25,
   );
 
   static TextStyle statusParked() => GoogleFonts.poppins(
-    fontSize: 15,
+    fontSize: 11,
     fontWeight: FontWeight.w600,
     color: green,
   );
 
   static TextStyle statusCheckedOut() => GoogleFonts.poppins(
-    fontSize: 15,
+    fontSize: 11,
     fontWeight: FontWeight.w600,
-    color: Color(0xFF6E7584),
+    color: const Color(0xFF6E7584),
+  );
+
+  static TextStyle headerPillLabel() => GoogleFonts.poppins(
+    fontSize: 12,
+    fontWeight: FontWeight.w500,
   );
 
   static BoxDecoration cardDecoration({Color? color}) {
@@ -137,7 +149,7 @@ abstract final class DashboardStyles {
 class DashboardLeftRail extends StatelessWidget {
   const DashboardLeftRail({super.key});
 
-  static const _width = 112.0;
+  static const _width = 72.0;
 
   @override
   Widget build(BuildContext context) {
@@ -155,22 +167,22 @@ class DashboardLeftRail extends StatelessWidget {
         left: false,
         right: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 20, 12, 20),
+          padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
           child: Column(
             children: [
               Container(
-                width: 58,
-                height: 52,
+                width: 44,
+                height: 40,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: Colors.black.withValues(alpha: 0.13),
                   ),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Padding(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(4),
                   child: Image.asset(
                     'assets/images/app_logo.png',
                     fit: BoxFit.contain,
@@ -178,35 +190,35 @@ class DashboardLeftRail extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 16),
               _RailIcon(
                 selected: path == '/dashboard',
                 icon: Icons.space_dashboard_rounded,
                 onTap: () => context.go('/dashboard'),
                 accentSelection: true,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               _RailIcon(
                 selected: path == '/reports',
                 icon: Icons.bar_chart_rounded,
                 onTap: () => context.go('/reports'),
                 accentSelection: false,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               _RailIcon(
                 selected: path == '/cash/activity',
                 icon: Icons.payments_rounded,
                 onTap: () => context.go('/cash/activity'),
                 accentSelection: false,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               _RailIcon(
                 selected: path == '/settings',
                 icon: Icons.settings_rounded,
                 onTap: () => context.go('/settings'),
                 accentSelection: false,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               _RailIcon(
                 selected: false,
                 icon: Icons.logout_rounded,
@@ -254,9 +266,9 @@ class _RailIcon extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: SizedBox(
-          width: 59,
-          height: 59,
-          child: Icon(icon, size: 28, color: fg),
+          width: 44,
+          height: 44,
+          child: Icon(icon, size: 22, color: fg),
         ),
       ),
     );
@@ -347,7 +359,7 @@ class DashboardStatusPill extends StatelessWidget {
     final (label, color, bg) = _presentation();
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(100),
@@ -357,18 +369,14 @@ class DashboardStatusPill extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 10,
-            height: 10,
+            width: 8,
+            height: 8,
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Text(
             label,
-            style: GoogleFonts.poppins(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              color: color,
-            ),
+            style: DashboardStyles.headerPillLabel().copyWith(color: color),
           ),
         ],
       ),
@@ -425,19 +433,20 @@ class DashboardStatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: DashboardStyles.cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(title.toUpperCase(), style: DashboardStyles.statTitle()),
-          const SizedBox(height: 32),
+          const SizedBox(height: 8),
           Text(valueText, style: DashboardStyles.statValue(color: valueColor)),
           if (deltaText != null) ...[
-            const SizedBox(height: 7),
+            const SizedBox(height: 4),
             Text(deltaText!, style: DashboardStyles.statDeltaGreen()),
           ] else if (subtitle != null) ...[
-            const SizedBox(height: 7),
+            const SizedBox(height: 4),
             Text(subtitle!, style: DashboardStyles.statHint()),
           ],
         ],
@@ -484,25 +493,27 @@ class DashboardActionTile extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(10),
           child: Container(
-            padding: const EdgeInsets.all(20),
+            constraints: const BoxConstraints(minHeight: 56),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: Colors.black.withValues(alpha: 0.13)),
             ),
             child: Row(
               children: [
-                SizedBox(width: 45, height: 45, child: Center(child: leading)),
-                const SizedBox(width: 8),
+                SizedBox(width: 36, height: 36, child: Center(child: leading)),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         title,
                         textAlign: TextAlign.center,
                         style: DashboardStyles.actionTitle(primary: primary),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         subtitle,
                         textAlign: TextAlign.center,
@@ -548,17 +559,17 @@ class DashboardTransactionRow extends StatelessWidget {
     final lineStyle = DashboardStyles.transactionLine();
 
     final plateBadge = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: DashboardStyles.plateBg,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: DashboardStyles.plateBlue),
       ),
       child: Text(plate, style: DashboardStyles.plateBadge()),
     );
 
     final statusPill = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: isParked ? const Color(0xFFF4FBF7) : const Color(0xFFF8F9FB),
         borderRadius: BorderRadius.circular(100),
@@ -595,7 +606,7 @@ class DashboardTransactionRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           plateBadge,
-          const SizedBox(width: 30),
+          const SizedBox(width: 16),
           Expanded(
             flex: 3,
             child: Text(
@@ -605,7 +616,7 @@ class DashboardTransactionRow extends StatelessWidget {
               style: lineStyle,
             ),
           ),
-          const SizedBox(width: 30),
+          const SizedBox(width: 16),
           Expanded(
             flex: 3,
             child: Text(
@@ -622,7 +633,7 @@ class DashboardTransactionRow extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final child = body(constraints);

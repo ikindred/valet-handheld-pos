@@ -5,9 +5,13 @@ import 'package:provider/provider.dart';
 
 import '../../data/local/db/app_database.dart';
 import '../../data/remote/auth_api.dart';
+import '../../data/remote/dashboard_api.dart';
 import '../../data/remote/dio_client.dart';
 import '../../data/remote/transactions_api.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../../core/printing/bluetooth_pos_printer.dart';
+import '../../core/printing/bluetooth_valet_print_service.dart';
+import '../../core/printing/printer_connection_notifier.dart';
 import '../../core/printing/valet_print_service.dart';
 import '../../data/services/branch_config_service.dart';
 import '../../data/services/rate_fetch_service.dart';
@@ -40,6 +44,7 @@ class AppProviders extends StatelessWidget {
         Provider<Dio>(create: (_) => createAppDio()),
         Provider<AuthApi>(create: (c) => AuthApi(c.read<Dio>())),
         Provider<TransactionsApi>(create: (c) => TransactionsApi(c.read<Dio>())),
+        Provider<DashboardApi>(create: (c) => DashboardApi(c.read<Dio>())),
         Provider<RateService>(
           create: (c) => RateService(c.read<AppDatabase>()),
         ),
@@ -62,8 +67,18 @@ class AppProviders extends StatelessWidget {
             onShiftMutated: () => c.read<RouterRefreshNotifier>().notifyAuthChanged(),
           ),
         ),
+        Provider<BluetoothPosPrinter>(
+          create: (_) => BluetoothPosPrinter(),
+        ),
+        ChangeNotifierProvider<PrinterConnectionNotifier>(
+          create: (c) => PrinterConnectionNotifier(
+            printer: c.read<BluetoothPosPrinter>(),
+          ),
+        ),
         Provider<ValetPrintService>(
-          create: (_) => NoopValetPrintService(),
+          create: (c) => BluetoothValetPrintService(
+            c.read<BluetoothPosPrinter>(),
+          ),
         ),
         Provider<AuthRepository>(
           create: (c) => AuthRepository(
@@ -104,6 +119,8 @@ class AppProviders extends StatelessWidget {
           create: (c) => DashboardCubit(
             authRepository: c.read<AuthRepository>(),
             ticketService: c.read<TicketService>(),
+            dashboardApi: c.read<DashboardApi>(),
+            rateFetchService: c.read<RateFetchService>(),
           ),
         ),
         BlocProvider(

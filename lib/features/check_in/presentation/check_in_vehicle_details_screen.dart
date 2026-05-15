@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
-
-import '../../../core/theme/app_theme.dart';
-import '../../../core/ui/app_text_field.dart';
+import '../../../data/remote/area_detail.dart';
+import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/rate_fetch_service.dart';
 import '../state/check_in_cubit.dart';
+import 'widgets/check_in_compact_tokens.dart';
 import 'widgets/check_in_footer_actions.dart';
 import 'widgets/check_in_form_fields.dart';
 import 'widgets/check_in_vehicle_details_widgets.dart';
@@ -17,8 +17,8 @@ import 'widgets/check_in_vehicle_details_widgets.dart';
 class CheckInVehicleDetailsScreen extends StatefulWidget {
   const CheckInVehicleDetailsScreen({super.key});
 
-  static const _parkingLevels = ['Level 1', 'Level 2', 'Level 3', 'Basement'];
-  static const _parkingSlots = [
+  static const _fallbackLevels = ['Level 1', 'Level 2', 'Level 3', 'Basement'];
+  static const _fallbackSlots = [
     'Slot #1',
     'Slot #2',
     'Slot #3',
@@ -33,6 +33,9 @@ class CheckInVehicleDetailsScreen extends StatefulWidget {
 
 class _CheckInVehicleDetailsScreenState
     extends State<CheckInVehicleDetailsScreen> {
+  List<AreaParkingLevel> _areaLevels = [];
+  bool _areaLevelsLoading = true;
+
   late final TextEditingController _plateCtrl;
   late final TextEditingController _modelCtrl;
   late final TextEditingController _brandCtrl;
@@ -48,6 +51,49 @@ class _CheckInVehicleDetailsScreenState
     _brandCtrl = TextEditingController(text: s.vehicleBrandMake);
     _colorCtrl = TextEditingController(text: s.vehicleColor);
     _yearCtrl = TextEditingController(text: s.vehicleYear);
+    _loadAreaLevels();
+  }
+
+  Future<void> _loadAreaLevels() async {
+    final auth = context.read<AuthRepository>();
+    final rateFetch = context.read<RateFetchService>();
+    final branchUuid = await auth.branchUuidForApi();
+    final areaUuid = await auth.areaUuidForApi();
+    if (!mounted) return;
+    if (branchUuid.isEmpty || areaUuid.isEmpty) {
+      setState(() {
+        _areaLevels = [];
+        _areaLevelsLoading = false;
+      });
+      return;
+    }
+    final detail = await rateFetch.fetchAreaDetail(
+      branchId: branchUuid,
+      areaId: areaUuid,
+    );
+    if (!mounted) return;
+    setState(() {
+      _areaLevels = detail?.levels ?? [];
+      _areaLevelsLoading = false;
+    });
+  }
+
+  List<String> get _levelItems {
+    if (_areaLevels.isNotEmpty) {
+      return _areaLevels.map((l) => l.name).toList();
+    }
+    return CheckInVehicleDetailsScreen._fallbackLevels;
+  }
+
+  List<String> _slotItemsForLevel(String levelName) {
+    if (_areaLevels.isNotEmpty) {
+      final match = _areaLevels.where((l) => l.name == levelName);
+      if (match.isNotEmpty) {
+        return match.first.availableSlots.map((s) => s.label).toList();
+      }
+      return const [];
+    }
+    return CheckInVehicleDetailsScreen._fallbackSlots;
   }
 
   @override
@@ -84,12 +130,6 @@ class _CheckInVehicleDetailsScreenState
     context.go('/dashboard');
   }
 
-  static final _helperStyle = GoogleFonts.poppins(
-    fontSize: 12,
-    fontWeight: FontWeight.w400,
-    height: 1.4,
-    color: AppColors.textSecondary,
-  );
 
   Widget _plateBlock() {
     return Column(
@@ -100,7 +140,10 @@ class _CheckInVehicleDetailsScreenState
           child: CheckInPlateNumberField(controller: _plateCtrl),
         ),
         const SizedBox(height: 6),
-        Text('Philippine format — 3 letters + 4 digits', style: _helperStyle),
+        Text(
+          'Philippine format — 3 letters + 4 digits',
+          style: CheckInCompactTokens.helperText(),
+        ),
       ],
     );
   }
@@ -115,7 +158,7 @@ class _CheckInVehicleDetailsScreenState
             child: CheckInTextField(controller: _modelCtrl, hint: 'e.g. Camry'),
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: CheckInCompactTokens.fieldGap),
         Expanded(
           child: CheckInFormField(
             label: 'YEAR',
@@ -123,13 +166,7 @@ class _CheckInVehicleDetailsScreenState
               controller: _yearCtrl,
               hint: '2024',
               keyboardType: TextInputType.number,
-              valueStyle: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                height: 1.5,
-                color: AppColors.textPrimary,
-              ),
-              minHeight: AppTextFieldTokens.minInputHeight,
+              valueStyle: CheckInCompactTokens.fieldValue(),
             ),
           ),
         ),
@@ -150,7 +187,7 @@ class _CheckInVehicleDetailsScreenState
             ),
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: CheckInCompactTokens.fieldGap),
         Expanded(
           child: CheckInFormField(
             label: 'COLOR',
@@ -165,41 +202,57 @@ class _CheckInVehicleDetailsScreenState
   }
 
   Widget _parkingDropdowns() {
+    if (_areaLevelsLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
     return BlocBuilder<CheckInCubit, CheckInState>(
       buildWhen: (a, b) =>
           a.parkingLevel != b.parkingLevel || a.parkingSlot != b.parkingSlot,
       builder: (context, state) {
         final level = state.parkingLevel;
         final slot = state.parkingSlot;
+        final levelItems = _levelItems;
+        final slotItems = level.isEmpty ? const <String>[] : _slotItemsForLevel(level);
+
         final levelValue =
-            level.isEmpty ||
-                !CheckInVehicleDetailsScreen._parkingLevels.contains(level)
-            ? null
-            : level;
+            level.isEmpty || !levelItems.contains(level) ? null : level;
         final slotValue =
-            slot.isEmpty ||
-                !CheckInVehicleDetailsScreen._parkingSlots.contains(slot)
-            ? null
-            : slot;
+            slot.isEmpty || !slotItems.contains(slot) ? null : slot;
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             CheckInDropdownField(
               label: 'LEVEL',
               value: levelValue ?? '',
-              items: CheckInVehicleDetailsScreen._parkingLevels,
-              onChanged: (v) => context.read<CheckInCubit>().updateVehicleStep(
-                parkingLevel: v ?? '',
-              ),
+              items: levelItems,
+              onChanged: (v) {
+                final cubit = context.read<CheckInCubit>();
+                final nextLevel = v ?? '';
+                final slotsForLevel = nextLevel.isEmpty
+                    ? const <String>[]
+                    : _slotItemsForLevel(nextLevel);
+                final keepSlot = slotsForLevel.contains(state.parkingSlot);
+                cubit.updateVehicleStep(
+                  parkingLevel: nextLevel,
+                  parkingSlot: keepSlot ? state.parkingSlot : '',
+                );
+              },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: CheckInCompactTokens.fieldGap),
             CheckInDropdownField(
               label: 'SLOT',
               value: slotValue ?? '',
-              items: CheckInVehicleDetailsScreen._parkingSlots,
-              onChanged: (v) => context.read<CheckInCubit>().updateVehicleStep(
-                parkingSlot: v ?? '',
-              ),
+              items: slotItems,
+              onChanged: levelValue == null || slotItems.isEmpty
+                  ? (_) {}
+                  : (v) => context.read<CheckInCubit>().updateVehicleStep(
+                        parkingSlot: v ?? '',
+                      ),
             ),
           ],
         );
@@ -212,15 +265,15 @@ class _CheckInVehicleDetailsScreenState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const CheckInSectionTitle(text: 'VEHICLE IDENTIFICATION'),
-        const SizedBox(height: 12),
+        const SizedBox(height: CheckInCompactTokens.sectionGap),
         _plateBlock(),
-        const SizedBox(height: 16),
+        const SizedBox(height: CheckInCompactTokens.fieldGap),
         _modelYearRow(),
-        const SizedBox(height: 16),
+        const SizedBox(height: CheckInCompactTokens.fieldGap),
         _brandColorRow(),
-        const SizedBox(height: 20),
+        const SizedBox(height: CheckInCompactTokens.blockGap),
         const CheckInSectionTitle(text: 'VEHICLE TYPE'),
-        const SizedBox(height: 12),
+        const SizedBox(height: CheckInCompactTokens.sectionGap),
         const CheckInVehicleBodyTypeGrid(),
       ],
     );
@@ -231,7 +284,7 @@ class _CheckInVehicleDetailsScreenState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const CheckInSectionTitle(text: 'PARKING'),
-        const SizedBox(height: 12),
+        const SizedBox(height: CheckInCompactTokens.sectionGap),
         _parkingDropdowns(),
       ],
     );
@@ -242,7 +295,7 @@ class _CheckInVehicleDetailsScreenState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _columnVehicleId(),
-        const SizedBox(height: 24),
+        const SizedBox(height: CheckInCompactTokens.blockGap),
         _columnParkingOnly(),
       ],
     );
@@ -251,7 +304,12 @@ class _CheckInVehicleDetailsScreenState
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      padding: const EdgeInsets.fromLTRB(
+        CheckInCompactTokens.screenPaddingH,
+        CheckInCompactTokens.screenPaddingTop,
+        CheckInCompactTokens.screenPaddingH,
+        CheckInCompactTokens.screenPaddingBottom,
+      ),
       child: TextFieldTapRegion(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -275,7 +333,7 @@ class _CheckInVehicleDetailsScreenState
                       children: [
                         Expanded(child: _columnVehicleId()),
                         VerticalDivider(
-                          width: 41,
+                          width: CheckInCompactTokens.columnDividerWidth,
                           thickness: 1,
                           color: Colors.black.withValues(alpha: 0.13),
                         ),
@@ -286,7 +344,7 @@ class _CheckInVehicleDetailsScreenState
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: CheckInCompactTokens.footerGap),
             CheckInFooterActions(
               onCancel: _onCancel,
               showBack: true,

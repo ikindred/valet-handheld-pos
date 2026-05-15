@@ -10,9 +10,12 @@ import 'package:uuid/uuid.dart';
 import '../../core/config/app_config.dart';
 import '../../core/logging/valet_log.dart';
 import '../../core/services/device_id_service.dart';
+import '../../core/storage/device_site_ids.dart';
 import '../../core/storage/device_site_prefs.dart';
+import '../../core/storage/prefs_keys.dart';
 import '../../core/storage/site_display_name.dart';
 import '../../core/routing/router_refresh_notifier.dart';
+import '../../core/session/cashier_shift_schedule.dart';
 import '../../core/session/standard_parking_rates.dart';
 import '../../core/time/unix_timestamp.dart';
 import '../local/db/app_database.dart';
@@ -185,6 +188,34 @@ class AuthRepository {
         );
   }
 
+  /// Server area UUID for REST paths (`/branches/:id/areas/:areaId`). Empty when unknown.
+  Future<String> areaUuidForApi() async {
+    final prefs = await SharedPreferences.getInstance();
+    final fromPrefs = prefs.getString(PrefsKeys.deviceAreaId)?.trim() ?? '';
+    if (DeviceSiteIds.isUuid(fromPrefs)) return fromPrefs;
+
+    final identity = await (_db.select(_db.deviceIdentity)..limit(1))
+        .getSingleOrNull();
+    if (identity != null && DeviceSiteIds.isUuid(identity.areaId)) {
+      return identity.areaId.trim();
+    }
+    return '';
+  }
+
+  /// Server branch UUID for REST paths (`/branches/:id`, rates). Empty when unknown.
+  Future<String> branchUuidForApi() async {
+    final prefs = await SharedPreferences.getInstance();
+    final fromPrefs = prefs.getString(PrefsKeys.deviceBranchId)?.trim() ?? '';
+    if (DeviceSiteIds.isUuid(fromPrefs)) return fromPrefs;
+
+    final identity = await (_db.select(_db.deviceIdentity)..limit(1))
+        .getSingleOrNull();
+    if (identity != null && DeviceSiteIds.isUuid(identity.branchId)) {
+      return identity.branchId.trim();
+    }
+    return '';
+  }
+
   /// Branch/area display names: cached prefs (claim) → [device_identity] → legacy [device_info].
   Future<({String branch, String area})> branchAndAreaFromDb() async {
     final prefs = await SharedPreferences.getInstance();
@@ -255,12 +286,20 @@ class AuthRepository {
     return '$dateLine · ${p.branch} : ${p.area}';
   }
 
+  /// Weekly shift from login, keyed by local [OfflineAccounts.id].
+  Future<CashierShiftSchedule?> shiftScheduleForLocalUser(int localUserId) async {
+    final row = await offlineAccountById(localUserId);
+    if (row == null) return null;
+    return CashierShiftSchedule.fromJsonString(row.shiftScheduleJson);
+  }
+
   Future<int> _upsertOfflineAccount({
     required String serverUserId,
     required String email,
     required String passwordHash,
     required String fullName,
     required String role,
+    String shiftScheduleJson = '',
   }) async {
     final now = unixNowSeconds();
     final existing = await offlineAccountByServerId(serverUserId);
@@ -273,6 +312,7 @@ class AuthRepository {
           passwordHash: Value(passwordHash),
           fullName: Value(fullName),
           role: Value(role),
+          shiftScheduleJson: Value(shiftScheduleJson),
           lastOnlineLogin: Value(now),
           updatedAt: Value(now),
         ),
@@ -286,6 +326,7 @@ class AuthRepository {
             passwordHash: passwordHash,
             fullName: fullName,
             role: role,
+            shiftScheduleJson: Value(shiftScheduleJson),
             lastOnlineLogin: now,
             createdAt: now,
             updatedAt: now,
@@ -333,6 +374,8 @@ class AuthRepository {
       passwordHash: hash,
       fullName: res.fullName,
       role: res.role,
+      shiftScheduleJson:
+          CashierShiftSchedule.encodeToJsonString(res.shiftSchedule),
     );
 
     await _db.transaction(() async {
@@ -355,15 +398,51 @@ class AuthRepository {
       );
     });
 
+    if (res.userSite != null) {
+      final prefs = await SharedPreferences.getInstance();
+      final site = res.userSite!;
+      await DeviceSitePrefs.applyLoginUserSite(
+        prefs,
+        branchName: site.branchName,
+        areaName: site.areaName,
+        branchId: site.branchId,
+        areaId: site.areaId,
+      );
+    }
+
     _refresh.notifyAuthChanged();
-    final site = await branchAndAreaFromDb();
-    await _rateFetch.syncRatesForBranch(site.branch);
-    await _rates.syncFromAuthIfEmpty(branchId: site.branch, rates: null);
+    await _syncRatesForCurrentBranch(res.standardRates);
     ValetLog.debug(
       'AuthRepository.loginOnline',
       'success localUserId=$accountId',
     );
     return res.standardRates;
+  }
+
+  Future<void> _syncRatesForCurrentBranch(StandardParkingRates? fromLogin) async {
+    final branchUuid = await branchUuidForApi();
+    final areaUuid = await areaUuidForApi();
+    if (branchUuid.isEmpty) {
+      ValetLog.warning(
+        'AuthRepository',
+        'skip rate sync — no branch UUID (login/validate must set device_branch_id)',
+      );
+      final site = await branchAndAreaFromDb();
+      await _rates.syncFromAuthIfEmpty(branchId: site.branch, rates: fromLogin);
+      return;
+    }
+    if (areaUuid.isNotEmpty) {
+      await _rateFetch.syncRatesForBranchArea(
+        branchId: branchUuid,
+        areaId: areaUuid,
+      );
+    } else {
+      await _rateFetch.syncRatesForBranch(branchUuid);
+    }
+    await _rates.syncFromAuthIfEmpty(
+      branchId: branchUuid,
+      rates: fromLogin,
+    );
   }
 
   /// `SELECT * FROM offline_accounts WHERE email = ?` then verify bcrypt.
@@ -458,9 +537,7 @@ class AuthRepository {
     });
 
     _refresh.notifyAuthChanged();
-    final site = await branchAndAreaFromDb();
-    await _rateFetch.syncRatesForBranch(site.branch);
-    await _rates.syncFromAuthIfEmpty(branchId: site.branch, rates: null);
+    await _syncRatesForCurrentBranch(res.standardRates);
     return res.standardRates;
   }
 
@@ -589,6 +666,8 @@ class AuthRepository {
       userId: uid,
       branchId: bid.isEmpty ? '_' : bid,
       openingFloat: openingFloat,
+      notes: openingNotes,
+      awaitRemoteStart: true,
     );
     _refresh.notifyAuthChanged();
     return shift.id;

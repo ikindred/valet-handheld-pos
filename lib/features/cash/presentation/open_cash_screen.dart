@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/formatting/peso_currency.dart';
+import '../../../core/session/cashier_shift_schedule.dart';
+import '../../../core/time/philippine_time.dart';
 import '../../../core/logging/valet_log.dart';
 import '../../../core/storage/offline_mode_prefs.dart';
 import '../../../core/ui/app_text_field.dart';
@@ -96,6 +98,7 @@ class _OpenCashViewState extends State<_OpenCashView> {
   String? _staffName;
   String _branchName = '';
   String _areaName = '';
+  CashierShiftSchedule? _shiftSchedule;
   bool _online = true;
 
   static final _pesoFmt =
@@ -118,11 +121,13 @@ class _OpenCashViewState extends State<_OpenCashView> {
     final acct = await repo.offlineAccountById(session.userId);
     if (!mounted) return;
     final site = await repo.branchAndAreaFromDb();
+    final schedule = await repo.shiftScheduleForLocalUser(session.userId);
     setState(() {
       _online = !OfflineModePrefs.read(prefs);
       _staffName = acct?.fullName ?? acct?.email ?? '—';
       _branchName = site.branch;
       _areaName = site.area;
+      _shiftSchedule = schedule;
     });
     if (mounted) {
       unawaited(context.read<BranchConfigService>().syncFromServerForDeviceBranch());
@@ -175,6 +180,18 @@ class _OpenCashViewState extends State<_OpenCashView> {
     return _pesoFmt.format(n);
   }
 
+  String get _shiftTodayLabel {
+    final schedule = _shiftSchedule;
+    if (schedule == null) return 'No shift today';
+    return schedule.todayShiftLabel(DateTime.now());
+  }
+
+  bool get _hasShiftToday {
+    final schedule = _shiftSchedule;
+    if (schedule == null) return false;
+    return schedule.hasShiftOnDate(DateTime.now());
+  }
+
   Future<void> _submit(OpenCashCubit cubit) async {
     final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated) return;
@@ -224,10 +241,10 @@ class _OpenCashViewState extends State<_OpenCashView> {
                           subtitle: headerSub,
                           online: _online,
                         ),
-                        const SizedBox(height: 22),
+                        const SizedBox(height: 12),
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
@@ -242,7 +259,7 @@ class _OpenCashViewState extends State<_OpenCashView> {
                                           'SHIFT INFORMATION',
                                           style: CashFigmaStyles.sectionCaps(),
                                         ),
-                                        const SizedBox(height: 14),
+                                        const SizedBox(height: 8),
                                         Row(
                                           children: [
                                             Expanded(
@@ -251,16 +268,18 @@ class _OpenCashViewState extends State<_OpenCashView> {
                                                 value: _staffName ?? '—',
                                               ),
                                             ),
-                                            const SizedBox(width: 16),
+                                            const SizedBox(width: 10),
                                             Expanded(
                                               child: _ReadOnlyField(
-                                                label: 'SHIFT DATE',
-                                                value: _longDate.format(now),
+                                                label: 'SHIFT TODAY',
+                                                value: _shiftTodayLabel,
+                                                emphasizeNoShift:
+                                                    !_hasShiftToday,
                                               ),
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 12),
+                                        const SizedBox(height: 8),
                                         Row(
                                           children: [
                                             Expanded(
@@ -271,7 +290,7 @@ class _OpenCashViewState extends State<_OpenCashView> {
                                                     : _branchName,
                                               ),
                                             ),
-                                            const SizedBox(width: 16),
+                                            const SizedBox(width: 10),
                                             Expanded(
                                               child: _ReadOnlyField(
                                                 label: 'AREA',
@@ -282,14 +301,14 @@ class _OpenCashViewState extends State<_OpenCashView> {
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 22),
+                                        const SizedBox(height: 14),
                                         Text(
                                           'OPENING BALANCE',
                                           style: CashFigmaStyles.sectionCaps(),
                                         ),
-                                        const SizedBox(height: 10),
+                                        const SizedBox(height: 6),
                                         CashAmountBox(text: _displayAmount),
-                                        const SizedBox(height: 12),
+                                        const SizedBox(height: 8),
                                         CashKeypad(
                                           onKey: busy ? (_) {} : _tapKey,
                                         ),
@@ -299,7 +318,7 @@ class _OpenCashViewState extends State<_OpenCashView> {
                                 ),
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
+                                    horizontal: 8,
                                   ),
                                   child: Container(
                                     width: 1,
@@ -310,7 +329,7 @@ class _OpenCashViewState extends State<_OpenCashView> {
                                   flex: 2,
                                   child: ConstrainedBox(
                                     constraints:
-                                        const BoxConstraints(maxWidth: 420),
+                                        const BoxConstraints(maxWidth: 360),
                                     child: TextFieldTapRegion(
                                       child: Column(
                                         crossAxisAlignment:
@@ -329,25 +348,22 @@ class _OpenCashViewState extends State<_OpenCashView> {
                                                     subtitle:
                                                         'Counted & Verified by staff',
                                                   ),
-                                                  const SizedBox(height: 16),
+                                                  const SizedBox(height: 10),
                                                   _NotesCard(
                                                     controller: _notesCtrl,
                                                   ),
-                                                  const SizedBox(height: 16),
+                                                  const SizedBox(height: 10),
                                                   _ShiftSummaryCard(
                                                     staff: _staffName ?? '—',
-                                                    date: _longDate.format(now),
-                                                    time: DateFormat.jm()
-                                                        .format(now),
                                                   ),
                                                 ],
                                               ),
                                             ),
                                           ),
-                                          const SizedBox(height: 16),
+                                          const SizedBox(height: 10),
                                           SizedBox(
                                             width: double.infinity,
-                                            height: 54,
+                                            height: 44,
                                             child: FilledButton(
                                               style: FilledButton.styleFrom(
                                                 textStyle: CashFigmaStyles
@@ -398,18 +414,37 @@ class _OpenCashViewState extends State<_OpenCashView> {
 }
 
 class _ReadOnlyField extends StatelessWidget {
-  const _ReadOnlyField({required this.label, required this.value});
+  const _ReadOnlyField({
+    required this.label,
+    required this.value,
+    this.emphasizeNoShift = false,
+  });
 
   final String label;
   final String value;
+  final bool emphasizeNoShift;
 
   @override
   Widget build(BuildContext context) {
     return LabeledAppTextField(
       label: label,
+      labelStyle: CashFigmaStyles.fieldLabel(),
+      gap: 3,
       child: AppReadOnlyField(
-        minHeight: 40,
-        child: Text(value, style: CashFigmaStyles.fieldValue()),
+        minHeight: 32,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Text(
+          value,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: CashFigmaStyles.fieldValue().copyWith(
+            color: emphasizeNoShift
+                ? const Color(0xFF6B7280)
+                : const Color(0xFF0A1B39),
+            fontStyle:
+                emphasizeNoShift ? FontStyle.italic : FontStyle.normal,
+          ),
+        ),
       ),
     );
   }
@@ -429,15 +464,15 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         children: [
           Text(title, style: CashFigmaStyles.totalCardLabel()),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
@@ -446,7 +481,7 @@ class _SummaryCard extends StatelessWidget {
               style: CashFigmaStyles.totalCardAmount(),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             subtitle,
             textAlign: TextAlign.center,
@@ -466,20 +501,20 @@ class _NotesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('NOTES (OPTIONAL)', style: CashFigmaStyles.notesSectionLabel()),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           AppTextField(
             controller: controller,
-            maxLines: 4,
-            minHeight: 88,
+            maxLines: 3,
+            minHeight: 64,
             hint: 'e.g. received balance from supervisor. . .',
             style: CashFigmaStyles.notesInput(),
           ),
@@ -489,16 +524,47 @@ class _NotesCard extends StatelessWidget {
   }
 }
 
-class _ShiftSummaryCard extends StatelessWidget {
-  const _ShiftSummaryCard({
-    required this.staff,
-    required this.date,
-    required this.time,
-  });
+class _ShiftSummaryCard extends StatefulWidget {
+  const _ShiftSummaryCard({required this.staff});
 
   final String staff;
-  final String date;
-  final String time;
+
+  @override
+  State<_ShiftSummaryCard> createState() => _ShiftSummaryCardState();
+}
+
+class _ShiftSummaryCardState extends State<_ShiftSummaryCard> {
+  static final _phDate = DateFormat('EEEE, MMMM d, y');
+  static final _phTime = DateFormat('h:mm:ss a');
+
+  Timer? _clock;
+  late String _dateLabel;
+  late String _timeLabel;
+
+  @override
+  void initState() {
+    super.initState();
+    _applyPhClock();
+    _clock = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) {
+        if (!mounted) return;
+        setState(_applyPhClock);
+      },
+    );
+  }
+
+  void _applyPhClock() {
+    final phNow = PhilippineTime.now();
+    _dateLabel = _phDate.format(phNow);
+    _timeLabel = _phTime.format(phNow);
+  }
+
+  @override
+  void dispose() {
+    _clock?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -507,35 +573,41 @@ class _ShiftSummaryCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(left, style: CashFigmaStyles.shiftSummaryRow(isLabel: true)),
-          Text(right, style: CashFigmaStyles.shiftSummaryRow(isLabel: false)),
+          Flexible(
+            child: Text(
+              right,
+              textAlign: TextAlign.end,
+              style: CashFigmaStyles.shiftSummaryRow(isLabel: false),
+            ),
+          ),
         ],
       );
     }
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('SHIFT SUMMARY', style: CashFigmaStyles.shiftSummaryTitle()),
-          const SizedBox(height: 14),
-          row('Staff', staff),
+          const SizedBox(height: 8),
+          row('Staff', widget.staff),
           Container(
             height: 1,
-            margin: const EdgeInsets.symmetric(vertical: 8),
+            margin: const EdgeInsets.symmetric(vertical: 6),
             color: Colors.black.withValues(alpha: 0.13),
           ),
-          row('Date', date),
+          row('Date', _dateLabel),
           Container(
             height: 1,
-            margin: const EdgeInsets.symmetric(vertical: 8),
+            margin: const EdgeInsets.symmetric(vertical: 6),
             color: Colors.black.withValues(alpha: 0.13),
           ),
-          row('Time', time),
+          row('Time', _timeLabel),
         ],
       ),
     );

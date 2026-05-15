@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-
-import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_text_field.dart';
+import 'check_in_compact_tokens.dart';
 
 /// [LabeledAppTextField] + check-in value weight (semibold) on [CheckInTextField].
 class CheckInFormField extends StatelessWidget {
@@ -13,7 +11,12 @@ class CheckInFormField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LabeledAppTextField(label: label, child: child);
+    return LabeledAppTextField(
+      label: label,
+      labelStyle: CheckInCompactTokens.fieldLabel(),
+      gap: 3,
+      child: child,
+    );
   }
 }
 
@@ -27,7 +30,7 @@ class CheckInTextField extends StatelessWidget {
     this.maxLines = 1,
     this.hint,
     this.valueStyle,
-    this.minHeight = AppTextFieldTokens.minInputHeight,
+    this.minHeight = CheckInCompactTokens.inputMinHeight,
   });
 
   final TextEditingController controller;
@@ -49,14 +52,7 @@ class CheckInTextField extends StatelessWidget {
       maxLines: maxLines,
       minHeight: minHeight,
       hint: hint ?? '',
-      style:
-          valueStyle ??
-          GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            height: 1.5,
-            color: AppColors.textPrimary,
-          ),
+      style: valueStyle ?? CheckInCompactTokens.fieldValue(),
     );
   }
 }
@@ -68,13 +64,6 @@ class CheckInSectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: GoogleFonts.poppins(
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
-        color: AppColors.textSecondary,
-      ),
-    );
+    return Text(text, style: CheckInCompactTokens.sectionTitle());
   }
 }

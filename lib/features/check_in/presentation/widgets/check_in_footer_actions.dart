@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-
 import '../../../../core/theme/app_theme.dart';
 import '../../../dashboard/presentation/widgets/dashboard_widgets.dart';
+import 'check_in_compact_tokens.dart';
 
 /// Horizontal space after **Cancel** so it’s visually separated from Back / Done.
-const double kCheckInFooterCancelGap = 40;
+const double kCheckInFooterCancelGap = 24;
 
 class CheckInFooterActions extends StatelessWidget {
   const CheckInFooterActions({
@@ -57,7 +56,7 @@ class _OutlinedFooterButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 54,
+      height: CheckInCompactTokens.footerButtonHeight,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
@@ -70,9 +69,7 @@ class _OutlinedFooterButton extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: GoogleFonts.poppins(
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
+          style: CheckInCompactTokens.footerLabel().copyWith(
             color: AppColors.textPrimary,
           ),
         ),
@@ -90,7 +87,7 @@ class _PrimaryFooterButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 54,
+      height: CheckInCompactTokens.footerButtonHeight,
       child: FilledButton(
         onPressed: onPressed,
         style: FilledButton.styleFrom(
@@ -102,9 +99,7 @@ class _PrimaryFooterButton extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: GoogleFonts.poppins(
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
+          style: CheckInCompactTokens.footerLabel().copyWith(
             color: Colors.white,
           ),
         ),
@@ -133,7 +128,7 @@ class CheckInVehicleConditionFooter extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onNext;
 
-  static const _gap = 12.0;
+  static const _gap = CheckInCompactTokens.bodyTypeGridGap;
 
   @override
   Widget build(BuildContext context) {
@@ -189,7 +184,7 @@ class _CustomerSignatureFooterButton extends StatelessWidget {
 
     if (hasSignature) {
       return SizedBox(
-        height: 54,
+        height: CheckInCompactTokens.footerButtonHeight,
         child: Material(
           color: Colors.transparent,
           clipBehavior: Clip.antiAlias,
@@ -233,7 +228,7 @@ class _CustomerSignatureFooterButton extends StatelessWidget {
     }
 
     return SizedBox(
-      height: 54,
+      height: CheckInCompactTokens.footerButtonHeight,
       child: Material(
         color: Colors.transparent,
         clipBehavior: Clip.antiAlias,
@@ -260,15 +255,14 @@ class _CustomerSignatureFooterButton extends StatelessWidget {
                       textAlign: TextAlign.center,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        fontSize: 15,
+                      style: CheckInCompactTokens.footerLabel().copyWith(
                         fontWeight: FontWeight.w700,
                         color: _negativeRed,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  const Icon(Icons.draw, color: _negativeRed, size: 22),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.draw, color: _negativeRed, size: 18),
                 ],
               ),
             ),

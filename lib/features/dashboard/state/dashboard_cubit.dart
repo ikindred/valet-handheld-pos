@@ -1,10 +1,18 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/formatting/peso_currency.dart';
+import '../../../core/logging/valet_log.dart';
+import '../../../core/storage/offline_mode_prefs.dart';
 import '../../../data/local/db/app_database.dart';
+import '../../../data/remote/area_detail.dart';
+import '../../../data/remote/dashboard_api.dart';
+import '../../../data/remote/dashboard_summary.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/rate_fetch_service.dart';
 import '../../../data/services/ticket_service.dart';
 
 /// Parked vs checked out for recent-transaction rows (UI maps to [TransactionStatusKind]).
@@ -25,14 +33,12 @@ final class DashboardLoading extends DashboardState {
   const DashboardLoading();
 }
 
-/// Tier 1 dashboard metrics — **local SQLite only** (no HTTP).
+/// Dashboard metrics from `GET /dashboard/summary` when online, else local SQLite.
 final class DashboardReady extends DashboardState {
   const DashboardReady({
     required this.vehiclesIn,
     required this.checkedOut,
     required this.checkInsLastHour,
-    required this.todayRevenue,
-    required this.revenueCheckoutCount,
     required this.activeSlotsUsed,
     required this.activeSlotsTotal,
     required this.recent,
@@ -41,16 +47,13 @@ final class DashboardReady extends DashboardState {
   final int vehiclesIn;
   final int checkedOut;
 
-  /// Check-ins on this shift in the last rolling hour (`check_in_at`).
+  /// Check-ins on this shift in the last rolling hour (`check_in_at`), local only.
   final int checkInsLastHour;
 
-  final double todayRevenue;
-  final int revenueCheckoutCount;
-
-  /// Occupied slots (here: same as [vehiclesIn]).
+  /// Occupied slots (from API `active_slots` or local active ticket count).
   final int activeSlotsUsed;
 
-  /// Total capacity — not on `device_info` yet; default until area config exists.
+  /// Area capacity (`total_slots` from API, or default offline).
   final int activeSlotsTotal;
 
   final List<DashboardRecentTx> recent;
@@ -60,8 +63,6 @@ final class DashboardReady extends DashboardState {
         vehiclesIn,
         checkedOut,
         checkInsLastHour,
-        todayRevenue,
-        revenueCheckoutCount,
         activeSlotsUsed,
         activeSlotsTotal,
         recent,
@@ -77,7 +78,7 @@ final class DashboardError extends DashboardState {
   List<Object?> get props => [message];
 }
 
-/// One row for [DashboardTransactionRow] (derived from [Ticket] locally).
+/// One row for [DashboardTransactionRow] (API summary or local [Ticket]).
 final class DashboardRecentTx extends Equatable {
   const DashboardRecentTx({
     required this.ticketId,
@@ -87,12 +88,23 @@ final class DashboardRecentTx extends Equatable {
     required this.status,
   });
 
-  /// Drift `tickets.id` (e.g. `TKT-0001`).
   final String ticketId;
   final String plate;
   final String line1;
   final String line2;
   final DashboardRecentStatus status;
+
+  factory DashboardRecentTx.fromSummaryRow(DashboardRecentRow row) {
+    return DashboardRecentTx(
+      ticketId: row.ticketId,
+      plate: row.plate,
+      line1: row.line1,
+      line2: row.line2,
+      status: row.isCheckedOut
+          ? DashboardRecentStatus.checkedOut
+          : DashboardRecentStatus.parked,
+    );
+  }
 
   @override
   List<Object?> get props => [ticketId, plate, line1, line2, status];
@@ -102,17 +114,23 @@ class DashboardCubit extends Cubit<DashboardState> {
   DashboardCubit({
     required AuthRepository authRepository,
     required TicketService ticketService,
+    required DashboardApi dashboardApi,
+    required RateFetchService rateFetchService,
   })  : _auth = authRepository,
         _tickets = ticketService,
+        _dashboardApi = dashboardApi,
+        _rateFetch = rateFetchService,
         super(const DashboardInitial());
 
   final AuthRepository _auth;
   final TicketService _tickets;
+  final DashboardApi _dashboardApi;
+  final RateFetchService _rateFetch;
 
-  /// Default slot capacity until branch/area config exposes a real total (cached at login).
-  static const int defaultAreaSlotCapacity = 30;
+  /// Default slot capacity when API / area config is unavailable offline.
+  static const int defaultAreaSlotCapacity = kDefaultDashboardTotalSlots;
 
-  /// Reload all dashboard metrics from Drift (no network).
+  /// Reload dashboard: remote summary when online, else Drift.
   Future<void> refresh() async {
     emit(const DashboardLoading());
     try {
@@ -121,56 +139,142 @@ class DashboardCubit extends Cubit<DashboardState> {
         emit(const DashboardError('No active session.'));
         return;
       }
-      final shift = await _auth.getOpenShiftForUser(session.userId);
-      if (shift == null) {
-        emit(
-          const DashboardReady(
-            vehiclesIn: 0,
-            checkedOut: 0,
-            checkInsLastHour: 0,
-            todayRevenue: 0,
-            revenueCheckoutCount: 0,
-            activeSlotsUsed: 0,
-            activeSlotsTotal: defaultAreaSlotCapacity,
-            recent: [],
-          ),
-        );
-        return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final offline = OfflineModePrefs.read(prefs);
+      final token = session.authToken?.trim() ?? '';
+
+      if (!offline && !AppConfig.useStubApi && token.isNotEmpty) {
+        try {
+          final summary = await _dashboardApi.fetchSummary(bearerToken: token);
+          if (summary != null) {
+            final checkInsLastHour = await _checkInsLastHourForActiveShift(
+              session.userId,
+            );
+            final areaSlots = await _slotCountsFromArea();
+            emit(_readyFromSummary(
+              summary,
+              checkInsLastHour,
+              areaSlots: areaSlots,
+            ));
+            return;
+          }
+        } catch (e, st) {
+          ValetLog.error(
+            'DashboardCubit.refresh',
+            'dashboard/summary failed — using local',
+            e,
+            st,
+          );
+        }
       }
-      final shiftId = shift.id;
-      final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      final since = now - 3600;
-      final sinceIso =
-          DateTime.fromMillisecondsSinceEpoch(since * 1000).toIso8601String();
 
-      final vehiclesIn = await _tickets.countActiveTicketsForShift(shiftId);
-      final checkedOut =
-          await _tickets.countCompletedCheckoutsForShift(shiftId);
-      final checkInsLastHour = await _tickets.countCheckInsOnShiftSince(
-        shiftId: shiftId,
-        sinceIso8601: sinceIso,
-      );
-      final todayRevenue = await _auth.sumSalesForCheckoutShift(shiftId);
-      final revenueCheckoutCount =
-          await _auth.countCompletedForCheckoutShift(shiftId);
-      final rawRecent = await _tickets.recentTicketsForShift(shiftId, limit: 10);
-      final recent = rawRecent.map(_recentFromTicket).toList();
-
-      emit(
-        DashboardReady(
-          vehiclesIn: vehiclesIn,
-          checkedOut: checkedOut,
-          checkInsLastHour: checkInsLastHour,
-          todayRevenue: todayRevenue,
-          revenueCheckoutCount: revenueCheckoutCount,
-          activeSlotsUsed: vehiclesIn,
-          activeSlotsTotal: defaultAreaSlotCapacity,
-          recent: recent,
-        ),
-      );
+      await _refreshLocal(session.userId);
     } catch (e) {
       emit(DashboardError('Could not load dashboard: $e'));
     }
+  }
+
+  DashboardReady _readyFromSummary(
+    DashboardSummary summary,
+    int checkInsLastHour, {
+    AreaSlotCounts? areaSlots,
+  }) {
+    var activeUsed = summary.activeSlots;
+    var activeTotal = summary.totalSlots;
+    if (areaSlots != null && areaSlots.total > 0) {
+      activeUsed = areaSlots.occupied;
+      activeTotal = areaSlots.total;
+    }
+    return DashboardReady(
+      vehiclesIn: summary.totalVehiclesIn,
+      checkedOut: summary.checkedOutTotal,
+      checkInsLastHour: checkInsLastHour,
+      activeSlotsUsed: activeUsed,
+      activeSlotsTotal: activeTotal,
+      recent: summary.recent
+          .map((r) => DashboardRecentTx.fromSummaryRow(r.toRecentRow()))
+          .toList(),
+    );
+  }
+
+  /// Slot capacity from area `levels[]` when branch/area UUIDs are set.
+  Future<AreaSlotCounts?> _slotCountsFromArea() async {
+    try {
+      final branchUuid = await _auth.branchUuidForApi();
+      final areaUuid = await _auth.areaUuidForApi();
+      if (branchUuid.isEmpty || areaUuid.isEmpty) return null;
+      final detail = await _rateFetch.fetchAreaDetail(
+        branchId: branchUuid,
+        areaId: areaUuid,
+      );
+      if (detail == null || detail.levels.isEmpty) return null;
+      return detail.slotCounts;
+    } catch (e, st) {
+      ValetLog.error(
+        'DashboardCubit._slotCountsFromArea',
+        'area detail slots failed',
+        e,
+        st,
+      );
+      return null;
+    }
+  }
+
+  Future<int> _checkInsLastHourForActiveShift(int localUserId) async {
+    final shift = await _auth.getOpenShiftForUser(localUserId);
+    if (shift == null) return 0;
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final since = now - 3600;
+    final sinceIso =
+        DateTime.fromMillisecondsSinceEpoch(since * 1000).toIso8601String();
+    return _tickets.countCheckInsOnShiftSince(
+      shiftId: shift.id,
+      sinceIso8601: sinceIso,
+    );
+  }
+
+  Future<void> _refreshLocal(int localUserId) async {
+    final shift = await _auth.getOpenShiftForUser(localUserId);
+    if (shift == null) {
+      emit(
+        const DashboardReady(
+          vehiclesIn: 0,
+          checkedOut: 0,
+          checkInsLastHour: 0,
+          activeSlotsUsed: 0,
+          activeSlotsTotal: defaultAreaSlotCapacity,
+          recent: [],
+        ),
+      );
+      return;
+    }
+    final shiftId = shift.id;
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final since = now - 3600;
+    final sinceIso =
+        DateTime.fromMillisecondsSinceEpoch(since * 1000).toIso8601String();
+
+    final vehiclesIn = await _tickets.countActiveTicketsForShift(shiftId);
+    final checkedOut =
+        await _tickets.countCompletedCheckoutsForShift(shiftId);
+    final checkInsLastHour = await _tickets.countCheckInsOnShiftSince(
+      shiftId: shiftId,
+      sinceIso8601: sinceIso,
+    );
+    final rawRecent = await _tickets.recentTicketsForShift(shiftId, limit: 10);
+    final recent = rawRecent.map(_recentFromTicket).toList();
+
+    emit(
+      DashboardReady(
+        vehiclesIn: vehiclesIn,
+        checkedOut: checkedOut,
+        checkInsLastHour: checkInsLastHour,
+        activeSlotsUsed: vehiclesIn,
+        activeSlotsTotal: defaultAreaSlotCapacity,
+        recent: recent,
+      ),
+    );
   }
 
   static DashboardRecentTx _recentFromTicket(Ticket t) {

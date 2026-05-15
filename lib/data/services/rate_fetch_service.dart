@@ -7,6 +7,7 @@ import '../../core/logging/valet_log.dart';
 import '../../core/session/standard_parking_rates.dart';
 import '../../features/check_out/domain/checkout_pricing.dart';
 import '../local/db/app_database.dart';
+import '../remote/area_detail.dart';
 
 /// Pulls branch standard + per-vehicle-type rates from the API into Drift [rates].
 class RateFetchService {
@@ -25,6 +26,97 @@ class RateFetchService {
     final t = s?.authToken;
     if (t == null || t.isEmpty) return null;
     return t;
+  }
+
+  /// `GET /branches/{branchId}/areas/{areaId}` — standard + vehicle-type rates.
+  Future<AreaDetail?> fetchAreaDetail({
+    required String branchId,
+    required String areaId,
+  }) async {
+    if (AppConfig.useStubApi) return null;
+    final token = await _bearer();
+    if (token == null) return null;
+
+    try {
+      final res = await _dio.get<dynamic>(
+        AppConfig.branchAreaDetailUrl(branchId, areaId),
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      if (res.statusCode != 200) {
+        ValetLog.warning(
+          'RateFetchService',
+          'GET area detail HTTP ${res.statusCode}',
+        );
+        return null;
+      }
+      return AreaDetail.fromResponseData(res.data);
+    } catch (e, st) {
+      ValetLog.error('RateFetchService', 'GET area detail failed', e, st);
+      return null;
+    }
+  }
+
+  /// Preferred sync: area detail API → local [rates] table.
+  Future<void> syncRatesForBranchArea({
+    required String branchId,
+    required String areaId,
+  }) async {
+    final detail = await fetchAreaDetail(
+      branchId: branchId,
+      areaId: areaId,
+    );
+    if (detail == null) {
+      await syncRatesForBranch(branchId);
+      return;
+    }
+    await _persistAreaRatesDetail(branchId: branchId, detail: detail);
+  }
+
+  Future<void> _persistAreaRatesDetail({
+    required String branchId,
+    required AreaDetail detail,
+  }) async {
+    final flatHours = CheckoutPricing.defaultFlatBlockHours;
+    if (detail.standard.hasAny) {
+      await _upsertRateRow(
+        branchId: branchId,
+        vehicleType: 'Standard',
+        flatHours: flatHours,
+        flat: detail.standard.flatRate.toDouble(),
+        succeeding: detail.standard.succeedingRate.toDouble(),
+        overnight: detail.standard.overnightFee.toDouble(),
+        lost: detail.standard.lostTicketFee.toDouble(),
+      );
+    }
+
+    final lostFallback = detail.standard.lostTicketFee > 0
+        ? detail.standard.lostTicketFee.toDouble()
+        : StandardParkingRates.offlineDefault.lostTicketFeePesos.toDouble();
+
+    for (final row in detail.vehicleTypeRates) {
+      final vt = _mapServerVehicleTypeName(row.name) ?? _vehicleTypeKey(row.name);
+      if (vt == null) continue;
+      var lost = row.fees.lostTicketFee.toDouble();
+      if (lost <= 0) lost = lostFallback;
+      await _upsertRateRow(
+        branchId: branchId,
+        vehicleType: vt,
+        flatHours: flatHours,
+        flat: row.fees.flatRate.toDouble(),
+        succeeding: row.fees.succeedingRate.toDouble(),
+        overnight: row.fees.overnightFee.toDouble(),
+        lost: lost,
+      );
+    }
+  }
+
+  static String? _vehicleTypeKey(String displayName) {
+    final n = displayName.trim().toLowerCase();
+    if (n.isEmpty) return null;
+    return n.replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'_+'), '_');
   }
 
   /// GET branch `/rates` then vehicle-types; on partial failure keeps whatever succeeded.

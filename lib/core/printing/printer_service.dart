@@ -27,6 +27,6 @@ abstract interface class PrinterService {
 
   Future<void> printBytes(List<int> bytes);
 
-  CapabilityProfile get profile;
+  Future<CapabilityProfile> loadProfile();
 }
 

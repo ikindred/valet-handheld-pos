@@ -936,6 +936,14 @@ class $OfflineAccountsTable extends OfflineAccounts
   late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
       'updated_at', aliasedName, false,
       type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _shiftScheduleJsonMeta =
+      const VerificationMeta('shiftScheduleJson');
+  @override
+  late final GeneratedColumn<String> shiftScheduleJson =
+      GeneratedColumn<String>('shift_schedule_json', aliasedName, false,
+          type: DriftSqlType.string,
+          requiredDuringInsert: false,
+          defaultValue: const Constant(''));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -946,7 +954,8 @@ class $OfflineAccountsTable extends OfflineAccounts
         role,
         lastOnlineLogin,
         createdAt,
-        updatedAt
+        updatedAt,
+        shiftScheduleJson
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1015,6 +1024,12 @@ class $OfflineAccountsTable extends OfflineAccounts
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('shift_schedule_json')) {
+      context.handle(
+          _shiftScheduleJsonMeta,
+          shiftScheduleJson.isAcceptableOrUnknown(
+              data['shift_schedule_json']!, _shiftScheduleJsonMeta));
+    }
     return context;
   }
 
@@ -1042,6 +1057,8 @@ class $OfflineAccountsTable extends OfflineAccounts
           .read(DriftSqlType.int, data['${effectivePrefix}created_at'])!,
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}updated_at'])!,
+      shiftScheduleJson: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}shift_schedule_json'])!,
     );
   }
 
@@ -1065,6 +1082,9 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
   final int lastOnlineLogin;
   final int createdAt;
   final int updatedAt;
+
+  /// JSON array from login `user.shiftSchedule` (empty when unset).
+  final String shiftScheduleJson;
   const OfflineAccount(
       {required this.id,
       required this.serverUserId,
@@ -1074,7 +1094,8 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
       required this.role,
       required this.lastOnlineLogin,
       required this.createdAt,
-      required this.updatedAt});
+      required this.updatedAt,
+      required this.shiftScheduleJson});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1087,6 +1108,7 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
     map['last_online_login'] = Variable<int>(lastOnlineLogin);
     map['created_at'] = Variable<int>(createdAt);
     map['updated_at'] = Variable<int>(updatedAt);
+    map['shift_schedule_json'] = Variable<String>(shiftScheduleJson);
     return map;
   }
 
@@ -1101,6 +1123,7 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
       lastOnlineLogin: Value(lastOnlineLogin),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      shiftScheduleJson: Value(shiftScheduleJson),
     );
   }
 
@@ -1117,6 +1140,7 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
       lastOnlineLogin: serializer.fromJson<int>(json['lastOnlineLogin']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
+      shiftScheduleJson: serializer.fromJson<String>(json['shiftScheduleJson']),
     );
   }
   @override
@@ -1132,6 +1156,7 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
       'lastOnlineLogin': serializer.toJson<int>(lastOnlineLogin),
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
+      'shiftScheduleJson': serializer.toJson<String>(shiftScheduleJson),
     };
   }
 
@@ -1144,7 +1169,8 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
           String? role,
           int? lastOnlineLogin,
           int? createdAt,
-          int? updatedAt}) =>
+          int? updatedAt,
+          String? shiftScheduleJson}) =>
       OfflineAccount(
         id: id ?? this.id,
         serverUserId: serverUserId ?? this.serverUserId,
@@ -1155,6 +1181,7 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
         lastOnlineLogin: lastOnlineLogin ?? this.lastOnlineLogin,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
+        shiftScheduleJson: shiftScheduleJson ?? this.shiftScheduleJson,
       );
   OfflineAccount copyWithCompanion(OfflineAccountsCompanion data) {
     return OfflineAccount(
@@ -1173,6 +1200,9 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
           : this.lastOnlineLogin,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      shiftScheduleJson: data.shiftScheduleJson.present
+          ? data.shiftScheduleJson.value
+          : this.shiftScheduleJson,
     );
   }
 
@@ -1187,14 +1217,15 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
           ..write('role: $role, ')
           ..write('lastOnlineLogin: $lastOnlineLogin, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('shiftScheduleJson: $shiftScheduleJson')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode => Object.hash(id, serverUserId, email, passwordHash,
-      fullName, role, lastOnlineLogin, createdAt, updatedAt);
+      fullName, role, lastOnlineLogin, createdAt, updatedAt, shiftScheduleJson);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1207,7 +1238,8 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
           other.role == this.role &&
           other.lastOnlineLogin == this.lastOnlineLogin &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.shiftScheduleJson == this.shiftScheduleJson);
 }
 
 class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
@@ -1220,6 +1252,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
   final Value<int> lastOnlineLogin;
   final Value<int> createdAt;
   final Value<int> updatedAt;
+  final Value<String> shiftScheduleJson;
   const OfflineAccountsCompanion({
     this.id = const Value.absent(),
     this.serverUserId = const Value.absent(),
@@ -1230,6 +1263,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
     this.lastOnlineLogin = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.shiftScheduleJson = const Value.absent(),
   });
   OfflineAccountsCompanion.insert({
     this.id = const Value.absent(),
@@ -1241,6 +1275,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
     required int lastOnlineLogin,
     required int createdAt,
     required int updatedAt,
+    this.shiftScheduleJson = const Value.absent(),
   })  : serverUserId = Value(serverUserId),
         email = Value(email),
         passwordHash = Value(passwordHash),
@@ -1259,6 +1294,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
     Expression<int>? lastOnlineLogin,
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
+    Expression<String>? shiftScheduleJson,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1270,6 +1306,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
       if (lastOnlineLogin != null) 'last_online_login': lastOnlineLogin,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (shiftScheduleJson != null) 'shift_schedule_json': shiftScheduleJson,
     });
   }
 
@@ -1282,7 +1319,8 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
       Value<String>? role,
       Value<int>? lastOnlineLogin,
       Value<int>? createdAt,
-      Value<int>? updatedAt}) {
+      Value<int>? updatedAt,
+      Value<String>? shiftScheduleJson}) {
     return OfflineAccountsCompanion(
       id: id ?? this.id,
       serverUserId: serverUserId ?? this.serverUserId,
@@ -1293,6 +1331,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
       lastOnlineLogin: lastOnlineLogin ?? this.lastOnlineLogin,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      shiftScheduleJson: shiftScheduleJson ?? this.shiftScheduleJson,
     );
   }
 
@@ -1326,6 +1365,9 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<int>(updatedAt.value);
     }
+    if (shiftScheduleJson.present) {
+      map['shift_schedule_json'] = Variable<String>(shiftScheduleJson.value);
+    }
     return map;
   }
 
@@ -1340,7 +1382,8 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
           ..write('role: $role, ')
           ..write('lastOnlineLogin: $lastOnlineLogin, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('shiftScheduleJson: $shiftScheduleJson')
           ..write(')'))
         .toString();
   }
@@ -5045,6 +5088,7 @@ typedef $$OfflineAccountsTableCreateCompanionBuilder = OfflineAccountsCompanion
   required int lastOnlineLogin,
   required int createdAt,
   required int updatedAt,
+  Value<String> shiftScheduleJson,
 });
 typedef $$OfflineAccountsTableUpdateCompanionBuilder = OfflineAccountsCompanion
     Function({
@@ -5057,6 +5101,7 @@ typedef $$OfflineAccountsTableUpdateCompanionBuilder = OfflineAccountsCompanion
   Value<int> lastOnlineLogin,
   Value<int> createdAt,
   Value<int> updatedAt,
+  Value<String> shiftScheduleJson,
 });
 
 class $$OfflineAccountsTableTableManager extends RootTableManager<
@@ -5086,6 +5131,7 @@ class $$OfflineAccountsTableTableManager extends RootTableManager<
             Value<int> lastOnlineLogin = const Value.absent(),
             Value<int> createdAt = const Value.absent(),
             Value<int> updatedAt = const Value.absent(),
+            Value<String> shiftScheduleJson = const Value.absent(),
           }) =>
               OfflineAccountsCompanion(
             id: id,
@@ -5097,6 +5143,7 @@ class $$OfflineAccountsTableTableManager extends RootTableManager<
             lastOnlineLogin: lastOnlineLogin,
             createdAt: createdAt,
             updatedAt: updatedAt,
+            shiftScheduleJson: shiftScheduleJson,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -5108,6 +5155,7 @@ class $$OfflineAccountsTableTableManager extends RootTableManager<
             required int lastOnlineLogin,
             required int createdAt,
             required int updatedAt,
+            Value<String> shiftScheduleJson = const Value.absent(),
           }) =>
               OfflineAccountsCompanion.insert(
             id: id,
@@ -5119,6 +5167,7 @@ class $$OfflineAccountsTableTableManager extends RootTableManager<
             lastOnlineLogin: lastOnlineLogin,
             createdAt: createdAt,
             updatedAt: updatedAt,
+            shiftScheduleJson: shiftScheduleJson,
           ),
         ));
 }
@@ -5168,6 +5217,11 @@ class $$OfflineAccountsTableFilterComposer
 
   ColumnFilters<int> get updatedAt => $state.composableBuilder(
       column: $state.table.updatedAt,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get shiftScheduleJson => $state.composableBuilder(
+      column: $state.table.shiftScheduleJson,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -5230,6 +5284,11 @@ class $$OfflineAccountsTableOrderingComposer
 
   ColumnOrderings<int> get updatedAt => $state.composableBuilder(
       column: $state.table.updatedAt,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get shiftScheduleJson => $state.composableBuilder(
+      column: $state.table.shiftScheduleJson,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 }

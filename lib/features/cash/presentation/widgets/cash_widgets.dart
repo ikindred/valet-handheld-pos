@@ -11,7 +11,7 @@ class CashLeftRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 96,
+      width: 72,
       decoration: BoxDecoration(
         color: const Color(0xFFFAFAFA),
         border: Border(
@@ -22,7 +22,7 @@ class CashLeftRail extends StatelessWidget {
         left: false,
         right: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 20, 10, 20),
+          padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
           child: Column(
             children: [
               const _LogoMark(),
@@ -59,10 +59,10 @@ class CashPageHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 96,
+      height: 68,
       width: double.infinity,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
           color: const Color(0xFFFAFAFA),
           border: Border(
@@ -111,12 +111,12 @@ class CashAmountBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = color ?? const Color(0xFFF68D00);
     return Container(
-      height: 74,
+      height: 50,
       alignment: Alignment.centerRight,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: const Color(0xFFFFF7EC),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: accent),
       ),
       child: FittedBox(
@@ -154,7 +154,7 @@ class CashKeypad extends StatelessWidget {
               for (final k in row)
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(4),
                     child: _KeyButton(label: k, onTap: () => onKey(k)),
                   ),
                 ),
@@ -172,16 +172,16 @@ class _LogoMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 56,
-      height: 56,
+      width: 44,
+      height: 44,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.black.withValues(alpha: 0.13)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(6),
         child: Image.asset(
           'assets/images/app_logo.png',
           fit: BoxFit.contain,
@@ -203,7 +203,7 @@ class _OnlinePill extends StatelessWidget {
     final bg = online ? const Color(0xFFF4FBF7) : const Color(0xFFFFF7EC);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(100),
@@ -255,7 +255,7 @@ class _KeyButton extends StatelessWidget {
     }
 
     return SizedBox(
-      height: 48,
+      height: 38,
       child: OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
@@ -267,7 +267,7 @@ class _KeyButton extends StatelessWidget {
           ),
         ),
         child: isDelete
-            ? Icon(Icons.backspace_outlined, color: fg, size: 22)
+            ? Icon(Icons.backspace_outlined, color: fg, size: 18)
             : Text(label, style: CashFigmaStyles.keypadDigit(color: fg)),
       ),
     );

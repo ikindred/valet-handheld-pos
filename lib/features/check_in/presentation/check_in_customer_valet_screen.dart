@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../state/check_in_cubit.dart';
+import 'widgets/check_in_compact_tokens.dart';
 import 'widgets/check_in_footer_actions.dart';
 import 'widgets/check_in_form_fields.dart';
 import 'widgets/check_in_valet_type_cards.dart';
@@ -78,13 +77,6 @@ class _CheckInCustomerValetScreenState
     context.go('/dashboard');
   }
 
-  static final _valetTypeLabelStyle = GoogleFonts.poppins(
-    fontSize: 14,
-    fontWeight: FontWeight.w500,
-    height: 1.5,
-    color: AppColors.textPrimary,
-  );
-
   Widget _dateTimeField() {
     return CheckInFormField(
       label: 'DATE & TIME IN',
@@ -102,8 +94,8 @@ class _CheckInCustomerValetScreenState
       label: 'SPECIAL REQUEST (OPTIONAL)',
       child: CheckInTextField(
         controller: _instructionsCtrl,
-        maxLines: 4,
-        minHeight: 88,
+        maxLines: 3,
+        minHeight: 64,
         hint: 'e.g fragile items inside, handle with care...',
       ),
     );
@@ -115,7 +107,7 @@ class _CheckInCustomerValetScreenState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const CheckInSectionTitle(text: 'CUSTOMER INFORMATION'),
-        const SizedBox(height: 12),
+        const SizedBox(height: CheckInCompactTokens.sectionGap),
         CheckInFormField(
           label: 'FULL NAME',
           child: CheckInTextField(
@@ -123,7 +115,7 @@ class _CheckInCustomerValetScreenState
             hint: 'Juan dela Cruz',
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: CheckInCompactTokens.fieldGap),
         CheckInFormField(
           label: 'CONTACT NUMBER',
           child: CheckInTextField(
@@ -132,9 +124,9 @@ class _CheckInCustomerValetScreenState
             hint: '09171234567',
           ),
         ),
-        const SizedBox(height: 20),
-        Text('VALET TYPE', style: _valetTypeLabelStyle),
-        const SizedBox(height: 8),
+        const SizedBox(height: CheckInCompactTokens.blockGap),
+        Text('VALET TYPE', style: CheckInCompactTokens.inlineLabel()),
+        const SizedBox(height: 6),
         const CheckInValetTypeCards(),
       ],
     );
@@ -146,7 +138,7 @@ class _CheckInCustomerValetScreenState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const CheckInSectionTitle(text: 'VALET ASSIGNMENT'),
-        const SizedBox(height: 12),
+        const SizedBox(height: CheckInCompactTokens.sectionGap),
         CheckInFormField(
           label: 'ASSIGNED VALET DRIVER',
           child: CheckInTextField(
@@ -154,7 +146,7 @@ class _CheckInCustomerValetScreenState
             hint: 'Carlos Mendoza',
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: CheckInCompactTokens.fieldGap),
         _dateTimeField(),
         const SizedBox(height: 20),
         _specialRequestField(),
@@ -168,7 +160,7 @@ class _CheckInCustomerValetScreenState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const CheckInSectionTitle(text: 'CUSTOMER INFORMATION'),
-        const SizedBox(height: 12),
+        const SizedBox(height: CheckInCompactTokens.sectionGap),
         CheckInFormField(
           label: 'FULL NAME',
           child: CheckInTextField(
@@ -176,7 +168,7 @@ class _CheckInCustomerValetScreenState
             hint: 'Juan dela Cruz',
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: CheckInCompactTokens.fieldGap),
         CheckInFormField(
           label: 'CONTACT NUMBER',
           child: CheckInTextField(
@@ -185,9 +177,9 @@ class _CheckInCustomerValetScreenState
             hint: '09171234567',
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: CheckInCompactTokens.blockGap),
         const CheckInSectionTitle(text: 'VALET ASSIGNMENT'),
-        const SizedBox(height: 12),
+        const SizedBox(height: CheckInCompactTokens.sectionGap),
         CheckInFormField(
           label: 'ASSIGNED VALET DRIVER',
           child: CheckInTextField(
@@ -195,13 +187,13 @@ class _CheckInCustomerValetScreenState
             hint: 'Carlos Mendoza',
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: CheckInCompactTokens.fieldGap),
         _dateTimeField(),
-        const SizedBox(height: 20),
-        Text('VALET TYPE', style: _valetTypeLabelStyle),
-        const SizedBox(height: 8),
+        const SizedBox(height: CheckInCompactTokens.blockGap),
+        Text('VALET TYPE', style: CheckInCompactTokens.inlineLabel()),
+        const SizedBox(height: 6),
         const CheckInValetTypeCards(),
-        const SizedBox(height: 16),
+        const SizedBox(height: CheckInCompactTokens.fieldGap),
         _specialRequestField(),
       ],
     );
@@ -210,7 +202,12 @@ class _CheckInCustomerValetScreenState
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      padding: const EdgeInsets.fromLTRB(
+        CheckInCompactTokens.screenPaddingH,
+        CheckInCompactTokens.screenPaddingTop,
+        CheckInCompactTokens.screenPaddingH,
+        CheckInCompactTokens.screenPaddingBottom,
+      ),
       child: TextFieldTapRegion(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -234,7 +231,7 @@ class _CheckInCustomerValetScreenState
                       children: [
                         Expanded(child: _columnCustomerAndValetType()),
                         VerticalDivider(
-                          width: 41,
+                          width: CheckInCompactTokens.columnDividerWidth,
                           thickness: 1,
                           color: Colors.black.withValues(alpha: 0.13),
                         ),
@@ -245,7 +242,7 @@ class _CheckInCustomerValetScreenState
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: CheckInCompactTokens.footerGap),
             CheckInFooterActions(
               onCancel: _onCancel,
               primaryLabel: 'Next: Vehicle Details',
@@ -266,15 +263,9 @@ class _DateTimeReadOnly extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppReadOnlyField(
-      child: Text(
-        text,
-        style: GoogleFonts.poppins(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          height: 1.5,
-          color: const Color(0xFFF68D00),
-        ),
-      ),
+      minHeight: CheckInCompactTokens.inputMinHeight,
+      padding: CheckInCompactTokens.inputPadding,
+      child: Text(text, style: CheckInCompactTokens.dateTimeAccent()),
     );
   }
 }

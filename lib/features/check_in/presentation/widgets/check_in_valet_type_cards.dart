@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../state/check_in_cubit.dart';
+import 'check_in_compact_tokens.dart';
 
 class CheckInValetTypeCards extends StatelessWidget {
   const CheckInValetTypeCards({super.key});
@@ -27,7 +28,7 @@ class CheckInValetTypeCards extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 10),
             Expanded(
               child: _TypeCard(
                 emoji: '🅿️',
@@ -77,8 +78,8 @@ class _TypeCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          height: 180,
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+          height: CheckInCompactTokens.valetCardHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(10),
@@ -90,17 +91,17 @@ class _TypeCard extends StatelessWidget {
               Text(
                 emoji,
                 style: GoogleFonts.poppins(
-                  fontSize: 30,
+                  fontSize: 22,
                   fontWeight: FontWeight.w500,
                   color: Colors.black,
                 ),
               ),
-              const SizedBox(height: 11),
+              const SizedBox(height: 6),
               Text(
                 label,
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
-                  fontSize: 15,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: labelColor,
                 ),

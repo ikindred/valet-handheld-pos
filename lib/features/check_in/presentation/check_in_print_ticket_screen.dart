@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/printing/valet_print_service.dart';
+import '../../../core/printing/check_in_receipt_data.dart';
+import '../../../core/printing/print_flow.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/ticket_service.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../state/check_in_cubit.dart';
@@ -28,12 +30,33 @@ class CheckInPrintTicketScreen extends StatelessWidget {
       messenger.showSnackBar(const SnackBar(content: Text('Ticket not found locally.')));
       return;
     }
-    await context.read<ValetPrintService>().printCheckInTicket(row);
+    final state = context.read<CheckInCubit>().state;
+    final auth = context.read<AuthRepository>();
+    final base = CheckInReceiptData(
+      ticket: row,
+      branchName: '',
+      customerName: state.customerFullName,
+      contactNumber: state.contactNumber,
+      parkingLevel: state.parkingLevel,
+      parkingSlot: state.parkingSlot,
+      valetTypeLabel: _valetTypeLabel(state.valetServiceType),
+      specialRequest: state.specialInstructions,
+      hasSignature: state.hasCustomerSignature,
+    );
+    final data = await withBranchName(auth, base);
     if (!context.mounted) return;
-    messenger.showSnackBar(SnackBar(content: Text('Ticket $id created')));
+    final printed = await printCheckInFromContext(context, data: data);
+    if (!printed || !context.mounted) return;
     context.read<CheckInCubit>().resetSession();
     if (!context.mounted) return;
     context.go('/dashboard');
+  }
+
+  static String _valetTypeLabel(ValetServiceType t) {
+    return switch (t) {
+      ValetServiceType.standardValet => 'Standard Valet',
+      ValetServiceType.selfPark => 'Self Park',
+    };
   }
 
   void _leave(BuildContext context) {

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../state/check_in_cubit.dart';
+import 'check_in_compact_tokens.dart';
 import 'check_in_footer_actions.dart';
 
 /// Scrollable body + standard footer for check-in steps 2–6.
@@ -54,14 +55,19 @@ class CheckInStepBody extends StatelessWidget {
         );
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      padding: const EdgeInsets.fromLTRB(
+        CheckInCompactTokens.screenPaddingH,
+        CheckInCompactTokens.screenPaddingTop,
+        CheckInCompactTokens.screenPaddingH,
+        CheckInCompactTokens.screenPaddingBottom,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
             child: scrollable ? SingleChildScrollView(child: child) : child,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: CheckInCompactTokens.footerGap),
           bottom,
         ],
       ),

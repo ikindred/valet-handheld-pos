@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../state/check_in_cubit.dart';
+import 'widgets/check_in_compact_tokens.dart';
 import 'widgets/check_in_form_fields.dart';
 import 'widgets/check_in_step_body.dart';
 
@@ -63,24 +63,13 @@ class _CheckInValuablesScreenState extends State<CheckInValuablesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'PERSONAL BELONGINGS',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
+          Text('PERSONAL BELONGINGS', style: CheckInCompactTokens.pageHeading()),
+          const SizedBox(height: 4),
           Text(
             'Select any items the customer left in the vehicle (optional).',
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              height: 1.4,
-              color: AppColors.textSecondary,
-            ),
+            style: CheckInCompactTokens.bodyHint(),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: CheckInCompactTokens.blockGap),
           Expanded(
             child: BlocBuilder<CheckInCubit, CheckInState>(
               buildWhen: (a, b) =>
@@ -95,7 +84,8 @@ class _CheckInValuablesScreenState extends State<CheckInValuablesScreen> {
                     Expanded(
                       child: ListView.separated(
                         itemCount: _options.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 6),
                         itemBuilder: (context, i) {
                           final label = _options[i];
                           final on = selected.contains(label);
@@ -103,9 +93,14 @@ class _CheckInValuablesScreenState extends State<CheckInValuablesScreen> {
                             color: on
                                 ? AppColors.accent.withValues(alpha: 0.12)
                                 : Colors.white,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(8),
                             child: CheckboxListTile(
                               value: on,
+                              dense: true,
+                              visualDensity: VisualDensity.compact,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
                               onChanged: (v) {
                                 final next =
                                     List<String>.from(state.selectedBelongings);
@@ -137,15 +132,12 @@ class _CheckInValuablesScreenState extends State<CheckInValuablesScreen> {
                               },
                               title: Text(
                                 label,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.textPrimary,
-                                ),
+                                style: CheckInCompactTokens.fieldValue()
+                                    .copyWith(fontWeight: FontWeight.w500),
                               ),
                               controlAffinity: ListTileControlAffinity.leading,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(8),
                                 side: BorderSide(
                                   color: Colors.black.withValues(alpha: 0.08),
                                 ),
@@ -156,13 +148,13 @@ class _CheckInValuablesScreenState extends State<CheckInValuablesScreen> {
                       ),
                     ),
                     if (otherChecked) ...[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: CheckInCompactTokens.fieldGap),
                       CheckInFormField(
                         label: 'OTHER (SPECIFY)',
                         child: CheckInTextField(
                           controller: _otherBelongingsCtrl,
-                          maxLines: 3,
-                          minHeight: 88,
+                          maxLines: 2,
+                          minHeight: 56,
                           hint: 'e.g. wallet, documents, jewelry…',
                         ),
                       ),

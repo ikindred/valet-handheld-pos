@@ -1,13 +1,23 @@
-import '../../data/local/db/app_database.dart';
+import 'check_in_receipt_data.dart';
 
-/// Stub until Bluetooth printer SDK is provided.
+/// Thermal print entry point (Bluetooth ESC/POS).
 abstract interface class ValetPrintService {
-  Future<void> printCheckInTicket(Ticket ticket);
+  Future<void> printCheckIn(CheckInReceiptData data);
+
+  Future<void> printTestReceipt({
+    required String branchName,
+    String staffLabel,
+  });
 }
 
+/// No-op when printing is unavailable (desktop / tests).
 class NoopValetPrintService implements ValetPrintService {
   @override
-  Future<void> printCheckInTicket(Ticket ticket) async {
-    // TODO: Implement when client provides Bluetooth printer device and SDK
-  }
+  Future<void> printCheckIn(CheckInReceiptData data) async {}
+
+  @override
+  Future<void> printTestReceipt({
+    required String branchName,
+    String staffLabel = 'Test print',
+  }) async {}
 }

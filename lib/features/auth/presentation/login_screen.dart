@@ -13,13 +13,17 @@ import '../../../data/remote/api_error_message.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../auth_session_sync.dart';
 
-/// Figma node `30:401` — Valet Parking login (dev mode colors; Poppins).
+/// Figma node `30:401` — Valet Parking login (compact tablet layout).
 abstract final class _LoginTokens {
   static const titleOrange = Color(0xFFF68D00);
   static const subtitleGrey = Color(0xFFAEAEAE);
   static const hintGrey300 = Color(0xFF9DA4B0);
   static const offlineBg = Color(0xFFFAFAFA);
   static const footerGrey = Color(0xFFAFAFAF);
+
+  static const double cardMaxWidth = 440;
+  static const double fieldMinHeight = 40;
+  static const double buttonHeight = 40;
 }
 
 class LoginScreen extends StatefulWidget {
@@ -72,6 +76,20 @@ class _LoginScreenState extends State<LoginScreen> {
       height: height,
     );
   }
+
+  TextStyle get _fieldLabelStyle => _poppins(
+        11,
+        FontWeight.w600,
+        const Color(0xFF0A1B39),
+        height: 1.2,
+      );
+
+  TextStyle get _fieldValueStyle => _poppins(
+        12,
+        FontWeight.w400,
+        const Color(0xFF0A1B39),
+        height: 1.35,
+      );
 
   Future<void> _onlineLogin() async {
     setState(() {
@@ -171,29 +189,31 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final compact = constraints.maxHeight < 560;
-              final hPad = compact ? 32.0 : 48.0;
-              final vPad = compact ? 28.0 : 50.0;
+              final compact = constraints.maxHeight < 520;
+              final hPad = compact ? 20.0 : 28.0;
+              final vPad = compact ? 18.0 : 28.0;
               return SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minHeight: constraints.maxHeight - 24),
                   child: Center(
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 520),
+                      constraints: const BoxConstraints(
+                        maxWidth: _LoginTokens.cardMaxWidth,
+                      ),
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: Colors.black.withValues(alpha: 0.13),
-                            width: 2,
+                            width: 1,
                           ),
                           boxShadow: const [
                             BoxShadow(
-                              color: Color(0x19000000),
-                              blurRadius: 19.3,
-                              offset: Offset(0, 0),
+                              color: Color(0x14000000),
+                              blurRadius: 12,
+                              offset: Offset(0, 2),
                             ),
                           ],
                         ),
@@ -209,59 +229,68 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(
                         'Valet Master',
                         style: _poppins(
-                          35,
+                          26,
                           FontWeight.w700,
                           _LoginTokens.titleOrange,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Text(
                         'SMART PARKING TECHNOLOGIES',
                         style: _poppins(
-                          12,
+                          10,
                           FontWeight.w500,
                           _LoginTokens.subtitleGrey,
+                          height: 1.2,
                         ),
                       ),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 22),
                       LabeledAppTextField(
                         label: 'Email Address',
+                        labelStyle: _fieldLabelStyle,
+                        gap: 3,
                         child: AppTextField(
                           controller: _emailCtrl,
                           focusNode: _emailFocus,
                           keyboardType: TextInputType.emailAddress,
+                          minHeight: _LoginTokens.fieldMinHeight,
                           hint: 'Enter Email Address',
+                          style: _fieldValueStyle,
                           prefixIcon: const Padding(
                             padding: EdgeInsets.only(left: 4),
                             child: Icon(
                               LucideIcons.user,
-                              size: 14,
+                              size: 12,
                               color: _LoginTokens.hintGrey300,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                       LabeledAppTextField(
                         label: 'Password',
+                        labelStyle: _fieldLabelStyle,
+                        gap: 3,
                         child: AppTextField(
                           controller: _passwordCtrl,
                           focusNode: _passwordFocus,
                           obscureText: _obscure,
+                          minHeight: _LoginTokens.fieldMinHeight,
                           hint: '************',
+                          style: _fieldValueStyle,
                           prefixIcon: const Padding(
                             padding: EdgeInsets.only(left: 4),
                             child: Icon(
                               LucideIcons.lock,
-                              size: 14,
+                              size: 12,
                               color: _LoginTokens.hintGrey300,
                             ),
                           ),
                           suffixIcon: IconButton(
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
-                              minWidth: 36,
-                              minHeight: 36,
+                              minWidth: 32,
+                              minHeight: 32,
                             ),
                             onPressed: () =>
                                 setState(() => _obscure = !_obscure),
@@ -269,19 +298,19 @@ class _LoginScreenState extends State<LoginScreen> {
                               _obscure
                                   ? LucideIcons.eyeOff
                                   : LucideIcons.eye,
-                              size: 14,
+                              size: 12,
                               color: _LoginTokens.hintGrey300,
                             ),
                           ),
                         ),
                       ),
                       if (_error != null) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
+                            horizontal: 10,
+                            vertical: 8,
                           ),
                           decoration: BoxDecoration(
                             color: Colors.red.shade50,
@@ -292,15 +321,15 @@ class _LoginScreenState extends State<LoginScreen> {
                             _error!,
                             textAlign: TextAlign.center,
                             style: _poppins(
-                              12,
+                              11,
                               FontWeight.w500,
                               Colors.red.shade800,
-                              height: 1.35,
+                              height: 1.3,
                             ),
                           ),
                         ),
                       ],
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 22),
                       FutureBuilder<({bool canLogin, String footerLine})>(
                         future: _loginGateFuture,
                         builder: (context, snap) {
@@ -317,7 +346,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             children: [
                               SizedBox(
                                 width: double.infinity,
-                                height: 38,
+                                height: _LoginTokens.buttonHeight,
                                 child: FilledButton(
                                   style: FilledButton.styleFrom(
                                     backgroundColor: _LoginTokens.titleOrange,
@@ -327,14 +356,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 12,
-                                      vertical: 8,
+                                      vertical: 6,
                                     ),
                                   ),
                                   onPressed: loginEnabled ? _onlineLogin : null,
                                   child: _loading
                                       ? const SizedBox(
-                                          width: 20,
-                                          height: 20,
+                                          width: 18,
+                                          height: 18,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
                                             color: Colors.white,
@@ -343,18 +372,18 @@ class _LoginScreenState extends State<LoginScreen> {
                                       : Text(
                                           'Login',
                                           style: _poppins(
-                                            14,
-                                            FontWeight.w500,
+                                            13,
+                                            FontWeight.w600,
                                             Colors.white,
-                                            height: 1.5,
+                                            height: 1.2,
                                           ),
                                         ),
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 10),
                               SizedBox(
                                 width: double.infinity,
-                                height: 38,
+                                height: _LoginTokens.buttonHeight,
                                 child: OutlinedButton(
                                   style: OutlinedButton.styleFrom(
                                     backgroundColor: _LoginTokens.offlineBg,
@@ -368,7 +397,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 12,
-                                      vertical: 8,
+                                      vertical: 6,
                                     ),
                                   ),
                                   onPressed:
@@ -376,22 +405,23 @@ class _LoginScreenState extends State<LoginScreen> {
                                   child: Text(
                                     'Offline Mode',
                                     style: _poppins(
-                                      14,
-                                      FontWeight.w500,
+                                      13,
+                                      FontWeight.w600,
                                       _LoginTokens.titleOrange,
-                                      height: 1.5,
+                                      height: 1.2,
                                     ),
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 30),
+                              const SizedBox(height: 16),
                               Text(
                                 footer,
                                 textAlign: TextAlign.center,
                                 style: _poppins(
-                                  10,
+                                  9,
                                   FontWeight.w500,
                                   _LoginTokens.footerGrey,
+                                  height: 1.25,
                                 ),
                               ),
                             ],

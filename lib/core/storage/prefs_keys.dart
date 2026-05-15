@@ -23,4 +23,16 @@ abstract final class PrefsKeys {
 
   /// Server-claimed POS terminal identity key; splash routes to login only when set.
   static const deviceIdentityKey = 'device_identity_key';
+
+  /// Paired Bluetooth thermal printer (MAC / address).
+  static const printerAddress = 'spid_printer_bt_address';
+
+  /// Display name of paired printer.
+  static const printerName = 'spid_printer_bt_name';
+
+  /// Receipt width: `mm58` or `mm80`.
+  static const printerPaperWidth = 'spid_printer_paper_width';
+
+  /// `true` when the saved printer uses Bluetooth Low Energy.
+  static const printerUseBle = 'spid_printer_use_ble';
 }

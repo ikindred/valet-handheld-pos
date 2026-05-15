@@ -8,6 +8,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/logging/valet_log.dart';
 import '../../../data/local/db/app_database.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/cash_session_start_payload.dart';
 import '../../../data/services/ticket_sync_payload.dart';
 import 'sync_state.dart';
 
@@ -225,14 +226,18 @@ class SyncCubit extends Cubit<SyncState> {
       final balance = opening is num
           ? opening.toDouble()
           : double.tryParse('$opening') ?? 0.0;
+      final notes = body['notes']?.toString();
       return [
         _SyncHop(
           'POST',
           AppConfig.cashSessionsStart,
-          <String, dynamic>{
-            'opening_balance': balance,
-            'notes': null,
-          },
+          buildCashSessionStartBody(
+            openingBalance: balance,
+            timestampUtcIso: cashSessionStartTimestamp(
+              openedAtIso: body['opened_at']?.toString(),
+            ),
+            notes: notes,
+          ),
         ),
       ];
     }

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
-
 import '../../../core/theme/app_theme.dart';
 import '../domain/vehicle_damage.dart';
 import '../state/check_in_cubit.dart';
+import 'widgets/check_in_compact_tokens.dart';
 import 'widgets/check_in_footer_actions.dart';
 import 'widgets/check_in_step_body.dart';
 import 'widgets/customer_signature_modal.dart';
@@ -52,7 +51,7 @@ class CheckInVehicleConditionScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(flex: 5, child: _DiagramPanel()),
-                const SizedBox(width: 24),
+                const SizedBox(width: CheckInCompactTokens.fieldGap),
                 Expanded(flex: 4, child: _DamageSidePanel()),
               ],
             );
@@ -60,8 +59,8 @@ class CheckInVehicleConditionScreen extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(flex: 5, child: _DiagramPanel()),
-              const SizedBox(height: 20),
+              Expanded(flex: 6, child: _DiagramPanel()),
+              const SizedBox(height: CheckInCompactTokens.blockGap),
               Expanded(flex: 4, child: _DamageSidePanel()),
             ],
           );
@@ -84,49 +83,43 @@ class _DiagramPanel extends StatelessWidget {
           children: [
             Text(
               'TAP DIAGRAM TO MARK DAMAGE',
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
+              style: CheckInCompactTokens.sectionTitle().copyWith(
                 color: _kGrey500,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text.rich(
               TextSpan(
                 children: [
                   TextSpan(
                     text: 'Selected: ',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
+                    style: CheckInCompactTokens.bodyHint().copyWith(
                       color: const Color(0x936C7688),
                     ),
                   ),
                   TextSpan(
                     text: state.selectedDamageType.label,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                    style: CheckInCompactTokens.fieldValue().copyWith(
                       color: _selectedTypeAccent(state.selectedDamageType),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: CheckInCompactTokens.sectionGap),
             Expanded(
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: Colors.black.withValues(alpha: 0.13),
                   ),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     child: VehicleConditionDiagram(
                       entries: state.vehicleDamageEntries,
                       onImageTap: (nx, ny) {
@@ -196,15 +189,13 @@ class _DamageSidePanel extends StatelessWidget {
           children: [
             Text(
               'MARK DAMAGE TYPE',
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
+              style: CheckInCompactTokens.sectionTitle().copyWith(
                 color: _kGrey500,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: CheckInCompactTokens.sectionGap),
             SizedBox(
-              height: 88,
+              height: CheckInCompactTokens.damageTypeButtonHeight,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -217,7 +208,7 @@ class _DamageSidePanel extends StatelessWidget {
                           .selectDamageType(DamageType.crack),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: CheckInCompactTokens.bodyTypeGridGap),
                   Expanded(
                     child: _DamageTypeButton(
                       type: DamageType.scratch,
@@ -227,7 +218,7 @@ class _DamageSidePanel extends StatelessWidget {
                           .selectDamageType(DamageType.scratch),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: CheckInCompactTokens.bodyTypeGridGap),
                   Expanded(
                     child: _DamageTypeButton(
                       type: DamageType.dent,
@@ -240,16 +231,14 @@ class _DamageSidePanel extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: CheckInCompactTokens.blockGap),
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
                   child: Text(
                     'LOGGED DAMAGE (${state.vehicleDamageEntries.length})',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
+                    style: CheckInCompactTokens.sectionTitle().copyWith(
                       color: _kGrey500,
                     ),
                   ),
@@ -261,35 +250,31 @@ class _DamageSidePanel extends StatelessWidget {
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.textPrimary,
                     disabledForegroundColor: AppColors.textSecondary,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   child: Text(
                     'Clear logged damage',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                    style: CheckInCompactTokens.bodyHint().copyWith(
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: CheckInCompactTokens.sectionGap),
             Expanded(
               child: state.vehicleDamageEntries.isEmpty
                   ? Center(
                       child: Text(
                         'No damage logged yet.',
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                        ),
+                        style: CheckInCompactTokens.bodyHint(),
                       ),
                     )
                   : ListView.separated(
                       itemCount: state.vehicleDamageEntries.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      separatorBuilder: (_, __) => const SizedBox(height: 6),
                       itemBuilder: (context, i) {
                         final e = state.vehicleDamageEntries[i];
                         return _LoggedDamageRow(
@@ -343,8 +328,7 @@ class _DamageTypeButton extends StatelessWidget {
             child: Text(
               type.label,
               textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: 15,
+              style: CheckInCompactTokens.fieldValue().copyWith(
                 fontWeight: FontWeight.w500,
                 color: fg,
               ),
@@ -380,49 +364,45 @@ class _LoggedDamageRow extends StatelessWidget {
         '${(entry.normalizedX * 100).round()}%, ${(entry.normalizedY * 100).round()}%';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: _kBorder),
       ),
       child: Row(
         children: [
           Container(
-            width: 15,
-            height: 15,
+            width: 12,
+            height: 12,
             decoration: BoxDecoration(
               color: _dot(entry.type),
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 15),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   entry.type.label,
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
+                  style: CheckInCompactTokens.fieldValue().copyWith(
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
                   ),
                 ),
                 Text(
                   subtitle,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0x7F0A1B39),
-                  ),
+                  style: CheckInCompactTokens.helperText(),
                 ),
               ],
             ),
           ),
           IconButton(
             onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline, size: 22),
+            icon: const Icon(Icons.delete_outline, size: 20),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
             color: AppColors.textSecondary,
             tooltip: 'Remove',
           ),
