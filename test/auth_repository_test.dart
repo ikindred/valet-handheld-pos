@@ -57,7 +57,6 @@ void main() {
       await repo.loginOnline(
         email: 'a@test.com',
         password: 'secret',
-        deviceId: 'dev-1',
       );
       final s = await repo.getActiveSession();
       expect(s, isNotNull);
@@ -72,7 +71,6 @@ void main() {
       await repo.loginOnline(
         email: 'b@test.com',
         password: 'secret',
-        deviceId: 'dev-1',
       );
       await repo.logoutOnly(deviceId: 'dev-1');
       expect(await repo.getActiveSession(), isNull);
@@ -87,7 +85,6 @@ void main() {
       await repo.loginOnline(
         email: 'c@test.com',
         password: 'secret',
-        deviceId: 'dev-1',
       );
       final session = await repo.getActiveSession();
       expect(session, isNotNull);

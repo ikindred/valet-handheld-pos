@@ -15,6 +15,12 @@ abstract final class PrefsKeys {
   /// Site area from device register (response or defaults).
   static const deviceArea = 'spid_device_area';
 
+  /// Server branch id from device claim (UUID/slug).
+  static const deviceBranchId = 'spid_device_branch_id';
+
+  /// Server area id from device claim (UUID/slug).
+  static const deviceAreaId = 'spid_device_area_id';
+
   /// Server-claimed POS terminal identity key; splash routes to login only when set.
   static const deviceIdentityKey = 'device_identity_key';
 }

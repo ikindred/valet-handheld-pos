@@ -1,14 +1,9 @@
 import 'dart:io';
 
-import 'package:bcrypt/bcrypt.dart';
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:uuid/uuid.dart';
-
-import '../../../core/database/seeders/rates_seeder.dart';
 
 part 'app_database.g.dart';
 
@@ -46,6 +41,15 @@ class DeviceIdentity extends Table {
   TextColumn get branch => text()();
 
   TextColumn get area => text()();
+
+  /// Server branch id (UUID/slug) from claim / device list.
+  TextColumn get branchId => text().withDefault(const Constant(''))();
+
+  /// Server area id (UUID/slug) from claim / device list.
+  TextColumn get areaId => text().withDefault(const Constant(''))();
+
+  /// Hardware / portal serial when provided by API.
+  TextColumn get serialNumber => text().withDefault(const Constant(''))();
 
   BoolColumn get isActive =>
       boolean().withDefault(const Constant(false))();
@@ -310,21 +314,21 @@ class AppDatabase extends _$AppDatabase {
   final bool _skipDevOfflineSeed;
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (Migrator m) async {
           await m.createAll();
           await _createIndexes();
-          // TODO(dev-seed): REMOVE before production — fake offline user for local dev.
-          if (!_skipDevOfflineSeed) {
-            await _seedDevOfflineAccountIfAbsent();
-            await _seedDevBranchConfig();
-            if (kDebugMode) {
-              await RatesSeeder().seed(this);
-            }
-          }
+          // Sample dev seeders disabled — server/API deployed; data comes from backend + device setup.
+          // if (!_skipDevOfflineSeed) {
+          //   await _seedDevOfflineAccountIfAbsent();
+          //   await _seedDevBranchConfig();
+          //   if (kDebugMode) {
+          //     await RatesSeeder().seed(this);
+          //   }
+          // }
         },
         onUpgrade: (Migrator m, int from, int to) async {
           if (from < 2) {
@@ -359,6 +363,11 @@ FROM offline_accounts''');
           if (from < 5) {
             await m.addColumn(tickets, tickets.driverIn);
             await m.addColumn(tickets, tickets.driverOut);
+          }
+          if (from < 6) {
+            await m.addColumn(deviceIdentity, deviceIdentity.branchId);
+            await m.addColumn(deviceIdentity, deviceIdentity.areaId);
+            await m.addColumn(deviceIdentity, deviceIdentity.serialNumber);
           }
         },
       );
@@ -398,8 +407,8 @@ FROM offline_accounts''');
     );
   }
 
+  /*
   /// Dev-only: 1@1.com / 1, server id 1001, Kindred Inocencio, cashier.
-  /// TODO(dev-seed): REMOVE before production — fake offline user for local dev.
   Future<void> _seedDevOfflineAccountIfAbsent() async {
     const email = '1@1.com';
     const serverUserId = '1001';
@@ -427,8 +436,7 @@ FROM offline_accounts''');
     );
   }
 
-  /// TODO(dev-seed): REMOVE before production — sample branch_config for dev branch.
-  /// Idempotent: [BranchConfigs.uniqueKeys] on `(branch_id, config_key)` + `INSERT OR IGNORE`.
+  /// Sample branch_config for dev branch.
   Future<void> _seedDevBranchConfig() async {
     if (_skipDevOfflineSeed) return;
     const branch = 'jazz-mall';
@@ -449,42 +457,16 @@ FROM offline_accounts''');
       );
     }
   }
+  */
 
-  /// TODO(dev-seed): REMOVE before production — fills `device_info` for the real [deviceId] when missing or empty.
-  /// Skipped when [_skipDevOfflineSeed] (tests).
+  /// Fills `device_info` from local dev defaults — disabled while server/API is source of truth.
+  /// Kept as a no-op so [AuthRepository.seedDevDeviceSiteIfNeeded] call sites stay stable.
   Future<void> seedDevDeviceInfoIfNeeded({
     required String deviceId,
     required String branch,
     required String area,
   }) async {
     if (_skipDevOfflineSeed) return;
-    if (branch.isEmpty || area.isEmpty) return;
-    final existing = await (select(deviceInfo)
-          ..where((d) => d.deviceId.equals(deviceId))
-          ..limit(1))
-        .getSingleOrNull();
-    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    if (existing == null) {
-      await into(deviceInfo).insert(
-        DeviceInfoCompanion.insert(
-          deviceId: deviceId,
-          branch: Value(branch),
-          area: Value(area),
-          registeredAt: now,
-        ),
-      );
-      return;
-    }
-    if (existing.branch.trim().isEmpty && existing.area.trim().isEmpty) {
-      await (update(deviceInfo)..where((d) => d.id.equals(existing.id)))
-          .write(
-        DeviceInfoCompanion(
-          branch: Value(branch),
-          area: Value(area),
-          registeredAt: Value(now),
-        ),
-      );
-    }
   }
 }
 

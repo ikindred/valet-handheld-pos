@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:bcrypt/bcrypt.dart';
+import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -10,10 +11,12 @@ import '../../core/config/app_config.dart';
 import '../../core/logging/valet_log.dart';
 import '../../core/services/device_id_service.dart';
 import '../../core/storage/device_site_prefs.dart';
+import '../../core/storage/site_display_name.dart';
 import '../../core/routing/router_refresh_notifier.dart';
 import '../../core/session/standard_parking_rates.dart';
 import '../../core/time/unix_timestamp.dart';
 import '../local/db/app_database.dart';
+import '../remote/api_error_message.dart';
 import '../remote/auth_api.dart';
 import '../services/rate_fetch_service.dart';
 import '../services/rate_service.dart';
@@ -182,15 +185,34 @@ class AuthRepository {
         );
   }
 
-  /// Branch/area from local `device_info` only (set after a successful `device/register` response).
+  /// Branch/area display names: cached prefs (claim) → [device_identity] → legacy [device_info].
   Future<({String branch, String area})> branchAndAreaFromDb() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = DeviceSitePrefs.readSiteNames(prefs);
+    if (cached.branch.isNotEmpty && cached.area.isNotEmpty) {
+      return cached;
+    }
+
+    final identity = await (_db.select(_db.deviceIdentity)..limit(1))
+        .getSingleOrNull();
+    if (identity != null) {
+      final b = SiteDisplayName.sanitizeStored(identity.branch);
+      final a = SiteDisplayName.sanitizeStored(identity.area);
+      if (b.isNotEmpty && a.isNotEmpty) {
+        return (branch: b, area: a);
+      }
+    }
+
     final deviceId = await DeviceIdService.getOrCreate();
     final row = await (_db.select(_db.deviceInfo)
           ..where((d) => d.deviceId.equals(deviceId))
           ..limit(1))
         .getSingleOrNull();
     if (row == null) return (branch: '', area: '');
-    return (branch: row.branch.trim(), area: row.area.trim());
+    return (
+      branch: SiteDisplayName.sanitizeStored(row.branch),
+      area: SiteDisplayName.sanitizeStored(row.area),
+    );
   }
 
   /// True when both branch and area are non-empty in `device_info` for this device.
@@ -213,16 +235,14 @@ class AuthRepository {
     if (!ok) {
       return (
         canLogin: false,
-        footerLine:
-            'This device is not yet assigned to a branch and area.',
+        footerLine: DeviceSitePrefs.valetAttendantFooterLine(prefs),
       );
     }
     final p = await branchAndAreaFromDb();
-    final b = p.branch.toUpperCase();
-    final a = p.area.toUpperCase();
     return (
       canLogin: true,
-      footerLine: '$b : $a — VALET ATTENDANT',
+      footerLine:
+          '${p.branch.toUpperCase()} : ${p.area.toUpperCase()} — VALET ATTENDANT',
     );
   }
 
@@ -276,14 +296,34 @@ class AuthRepository {
   Future<StandardParkingRates?> loginOnline({
     required String email,
     required String password,
-    required String deviceId,
+    String? serverDeviceId,
   }) async {
     ValetLog.debug('AuthRepository.loginOnline', 'begin');
     await requireDeviceSiteAssigned();
+    try {
+      return await _loginOnlineImpl(
+        email: email,
+        password: password,
+        serverDeviceId: serverDeviceId,
+      );
+    } on LoginApiFailure {
+      rethrow;
+    } on DioException catch (e) {
+      throw LoginApiFailure(
+        parseApiErrorUserMessage(e) ?? 'Login failed. Please try again.',
+      );
+    }
+  }
+
+  Future<StandardParkingRates?> _loginOnlineImpl({
+    required String email,
+    required String password,
+    String? serverDeviceId,
+  }) async {
     final res = await _api.login(
       email: email,
       password: password,
-      deviceId: deviceId,
+      serverDeviceId: serverDeviceId,
     );
 
     final hash = BCrypt.hashpw(password, BCrypt.gensalt());
@@ -422,6 +462,93 @@ class AuthRepository {
     await _rateFetch.syncRatesForBranch(site.branch);
     await _rates.syncFromAuthIfEmpty(branchId: site.branch, rates: null);
     return res.standardRates;
+  }
+
+  /// `POST /devices/validate` after [revalidateActiveSession] succeeds.
+  ///
+  /// Returns **true** if splash should continue (valid, or network/parse failure
+  /// treated as valid). Returns **false** after [logoutOnly] when the server
+  /// reports `valid: false` (cashier must re-login).
+  Future<bool> validateDeviceAssignmentAfterTokenOk({
+    required SharedPreferences prefs,
+    required String deviceId,
+    required String serverDeviceId,
+    required String authToken,
+  }) async {
+    if (AppConfig.useStubApi) return true;
+    final sid = serverDeviceId.trim();
+    final tok = authToken.trim();
+    if (sid.isEmpty || tok.isEmpty) return true;
+
+    final DeviceValidateResponse res;
+    try {
+      res = await _api.validateDevice(token: tok, serverDeviceId: sid);
+    } on DioException catch (e) {
+      ValetLog.debug(
+        'AuthRepository.validateDeviceAssignmentAfterTokenOk',
+        'devices/validate skipped (network): ${e.message}',
+      );
+      return true;
+    } catch (e) {
+      ValetLog.debug(
+        'AuthRepository.validateDeviceAssignmentAfterTokenOk',
+        'devices/validate skipped: $e',
+      );
+      return true;
+    }
+
+    if (res.valid) return true;
+
+    if (res.device != null) {
+      final d = res.device!;
+      await DeviceSitePrefs.applyValidateDeviceAssignment(
+        prefs,
+        branchName: d.branchName,
+        areaName: d.areaName,
+        branchId: d.branchId,
+        areaId: d.areaId,
+      );
+      await _updateDeviceIdentitySiteFromValidate(
+        serverDeviceId: sid,
+        branchName: d.branchName,
+        areaName: d.areaName,
+        branchId: d.branchId,
+        areaId: d.areaId,
+      );
+      final branchCol = d.branchName.trim().isNotEmpty
+          ? d.branchName.trim()
+          : d.branchId.trim();
+      final areaCol = d.areaName.trim().isNotEmpty
+          ? d.areaName.trim()
+          : d.areaId.trim();
+      await _upsertDeviceInfoRow(
+        deviceId: deviceId,
+        branch: branchCol,
+        area: areaCol,
+      );
+    }
+
+    await logoutOnly(deviceId: deviceId);
+    return false;
+  }
+
+  Future<void> _updateDeviceIdentitySiteFromValidate({
+    required String serverDeviceId,
+    required String branchName,
+    required String areaName,
+    required String branchId,
+    required String areaId,
+  }) async {
+    await (_db.update(_db.deviceIdentity)
+          ..where((d) => d.serverDeviceId.equals(serverDeviceId)))
+        .write(
+      DeviceIdentityCompanion(
+        branch: Value(branchName.trim()),
+        area: Value(areaName.trim()),
+        branchId: Value(branchId.trim()),
+        areaId: Value(areaId.trim()),
+      ),
+    );
   }
 
   /// Confirms password before navigating to Close Cash from the logout flow.

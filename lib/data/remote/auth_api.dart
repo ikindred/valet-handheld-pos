@@ -47,11 +47,11 @@ class AuthApi {
     }
   }
 
-  /// POST [AppConfig.authLogin]
+  /// POST [AppConfig.authLogin] — body: `email`, `password`, `server_device_id` (no legacy `device_id`).
   Future<LoginResponse> login({
     required String email,
     required String password,
-    required String deviceId,
+    String? serverDeviceId,
   }) async {
     if (AppConfig.useStubApi) {
       final uid = email.hashCode.abs();
@@ -70,12 +70,13 @@ class AuthApi {
         ),
       );
     }
+    final sid = serverDeviceId?.trim();
     final res = await _dio.post<Map<String, dynamic>>(
       AppConfig.authLogin,
       data: {
         'email': email,
         'password': password,
-        'device_id': deviceId,
+        'server_device_id': (sid == null || sid.isEmpty) ? null : sid,
       },
     );
     final data = res.data ?? {};
@@ -114,6 +115,25 @@ class AuthApi {
     return RevalidateResponse.fromJson(data);
   }
 
+  /// POST [AppConfig.devicesValidateUrl] — `Authorization: Bearer <token>`,
+  /// body `{ "server_device_id": "<uuid>" }`.
+  Future<DeviceValidateResponse> validateDevice({
+    required String token,
+    required String serverDeviceId,
+  }) async {
+    if (AppConfig.useStubApi) {
+      return const DeviceValidateResponse(valid: true);
+    }
+    final res = await _dio.post<Map<String, dynamic>>(
+      AppConfig.devicesValidateUrl,
+      data: <String, dynamic>{'server_device_id': serverDeviceId},
+      options: Options(
+        headers: <String, dynamic>{'Authorization': 'Bearer $token'},
+      ),
+    );
+    return DeviceValidateResponse.fromJson(res.data ?? <String, dynamic>{});
+  }
+
   /// POST [AppConfig.authLogout] — fire-and-forget; swallow errors.
   Future<void> logout({
     required String token,
@@ -130,6 +150,77 @@ class AuthApi {
       );
     } catch (_) {}
   }
+}
+
+/// Parsed body from `POST /api/v1/devices/validate`.
+class DeviceValidateResponse {
+  const DeviceValidateResponse({
+    required this.valid,
+    this.reason,
+    this.device,
+  });
+
+  factory DeviceValidateResponse.fromJson(Map<String, dynamic> json) {
+    var valid = true;
+    if (json.containsKey('valid')) {
+      final v = json['valid'];
+      if (v is bool) {
+        valid = v;
+      } else if (v != null) {
+        valid =
+            v.toString().toLowerCase() == 'true' || v.toString().trim() == '1';
+      }
+    }
+    final reason = json['reason']?.toString().trim();
+    final raw = json['device'];
+    DeviceValidateDevicePayload? device;
+    if (raw is Map<String, dynamic>) {
+      device = DeviceValidateDevicePayload.fromJson(raw);
+    } else if (raw is Map) {
+      device = DeviceValidateDevicePayload.fromJson(
+        Map<String, dynamic>.from(raw),
+      );
+    }
+    return DeviceValidateResponse(
+      valid: valid,
+      reason: reason != null && reason.isEmpty ? null : reason,
+      device: device,
+    );
+  }
+
+  final bool valid;
+  final String? reason;
+  final DeviceValidateDevicePayload? device;
+}
+
+class DeviceValidateDevicePayload {
+  const DeviceValidateDevicePayload({
+    required this.branchId,
+    required this.branchName,
+    required this.areaId,
+    required this.areaName,
+  });
+
+  factory DeviceValidateDevicePayload.fromJson(Map<String, dynamic> json) {
+    String s(String a, String b) {
+      final v = json[a] ?? json[b];
+      if (v == null) return '';
+      final t = v.toString().trim();
+      return t;
+    }
+
+    return DeviceValidateDevicePayload(
+      branchId: s('branchId', 'branch_id'),
+      branchName: s('branchName', 'branch_name'),
+      areaId: s('areaId', 'area_id'),
+      areaName: s('areaName', 'area_name'),
+    );
+  }
+
+  final String branchId;
+  final String branchName;
+  final String areaId;
+  final String areaName;
 }
 
 class DeviceRegisterResult {

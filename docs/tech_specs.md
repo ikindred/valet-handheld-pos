@@ -288,12 +288,12 @@ Used for **small flags and cached site strings** — not for the auth session to
 
 ### API (via `AppConfig` + `flutter_dotenv`)
 
-Base URL: `API_BASE_URL`. Device endpoints (defaults under `/api/v1/…`):
+Base URL: `API_BASE_URL`. Device endpoints (defaults under `/api/v1/…`). **Contract:** see `docs/MOBILE_INTEGRATION_GUIDE.md` (backend team).
 
 | Getter / env override   | Method | Purpose |
 | ----------------------- | ------ | ------- |
 | `devicesActiveUrl` (`API_DEVICES_ACTIVE`) | GET | List claimable terminals |
-| `devicesClaimUrl` (`API_DEVICES_CLAIM`)   | POST | Claim with `server_device_id` + `android_id_hash` |
+| `devicesClaimUrl` (`API_DEVICES_CLAIM`)   | POST | Claim per guide: `server_device_id`, `device_id`, `android_id_hash`, `device_model`, `os_version`; optional `DEVICE_CLAIM_BEARER_TOKEN` (ADMIN JWT) |
 
 Stub mode: when `API_BASE_URL` is unset, `AppConfig.useStubApi` is true and device setup uses in-memory stubs.
 

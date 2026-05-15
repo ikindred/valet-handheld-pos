@@ -351,6 +351,29 @@ class $DeviceIdentityTable extends DeviceIdentity
   late final GeneratedColumn<String> area = GeneratedColumn<String>(
       'area', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _branchIdMeta =
+      const VerificationMeta('branchId');
+  @override
+  late final GeneratedColumn<String> branchId = GeneratedColumn<String>(
+      'branch_id', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _areaIdMeta = const VerificationMeta('areaId');
+  @override
+  late final GeneratedColumn<String> areaId = GeneratedColumn<String>(
+      'area_id', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _serialNumberMeta =
+      const VerificationMeta('serialNumber');
+  @override
+  late final GeneratedColumn<String> serialNumber = GeneratedColumn<String>(
+      'serial_number', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
   static const VerificationMeta _isActiveMeta =
       const VerificationMeta('isActive');
   @override
@@ -375,6 +398,9 @@ class $DeviceIdentityTable extends DeviceIdentity
         androidIdHash,
         branch,
         area,
+        branchId,
+        areaId,
+        serialNumber,
         isActive,
         claimedAt
       ];
@@ -427,6 +453,20 @@ class $DeviceIdentityTable extends DeviceIdentity
     } else if (isInserting) {
       context.missing(_areaMeta);
     }
+    if (data.containsKey('branch_id')) {
+      context.handle(_branchIdMeta,
+          branchId.isAcceptableOrUnknown(data['branch_id']!, _branchIdMeta));
+    }
+    if (data.containsKey('area_id')) {
+      context.handle(_areaIdMeta,
+          areaId.isAcceptableOrUnknown(data['area_id']!, _areaIdMeta));
+    }
+    if (data.containsKey('serial_number')) {
+      context.handle(
+          _serialNumberMeta,
+          serialNumber.isAcceptableOrUnknown(
+              data['serial_number']!, _serialNumberMeta));
+    }
     if (data.containsKey('is_active')) {
       context.handle(_isActiveMeta,
           isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta));
@@ -456,6 +496,12 @@ class $DeviceIdentityTable extends DeviceIdentity
           .read(DriftSqlType.string, data['${effectivePrefix}branch'])!,
       area: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}area'])!,
+      branchId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}branch_id'])!,
+      areaId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}area_id'])!,
+      serialNumber: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}serial_number'])!,
       isActive: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_active'])!,
       claimedAt: attachedDatabase.typeMapping
@@ -479,6 +525,15 @@ class DeviceIdentityData extends DataClass
   final String androidIdHash;
   final String branch;
   final String area;
+
+  /// Server branch id (UUID/slug) from claim / device list.
+  final String branchId;
+
+  /// Server area id (UUID/slug) from claim / device list.
+  final String areaId;
+
+  /// Hardware / portal serial when provided by API.
+  final String serialNumber;
   final bool isActive;
   final DateTime? claimedAt;
   const DeviceIdentityData(
@@ -488,6 +543,9 @@ class DeviceIdentityData extends DataClass
       required this.androidIdHash,
       required this.branch,
       required this.area,
+      required this.branchId,
+      required this.areaId,
+      required this.serialNumber,
       required this.isActive,
       this.claimedAt});
   @override
@@ -499,6 +557,9 @@ class DeviceIdentityData extends DataClass
     map['android_id_hash'] = Variable<String>(androidIdHash);
     map['branch'] = Variable<String>(branch);
     map['area'] = Variable<String>(area);
+    map['branch_id'] = Variable<String>(branchId);
+    map['area_id'] = Variable<String>(areaId);
+    map['serial_number'] = Variable<String>(serialNumber);
     map['is_active'] = Variable<bool>(isActive);
     if (!nullToAbsent || claimedAt != null) {
       map['claimed_at'] = Variable<DateTime>(claimedAt);
@@ -514,6 +575,9 @@ class DeviceIdentityData extends DataClass
       androidIdHash: Value(androidIdHash),
       branch: Value(branch),
       area: Value(area),
+      branchId: Value(branchId),
+      areaId: Value(areaId),
+      serialNumber: Value(serialNumber),
       isActive: Value(isActive),
       claimedAt: claimedAt == null && nullToAbsent
           ? const Value.absent()
@@ -531,6 +595,9 @@ class DeviceIdentityData extends DataClass
       androidIdHash: serializer.fromJson<String>(json['androidIdHash']),
       branch: serializer.fromJson<String>(json['branch']),
       area: serializer.fromJson<String>(json['area']),
+      branchId: serializer.fromJson<String>(json['branchId']),
+      areaId: serializer.fromJson<String>(json['areaId']),
+      serialNumber: serializer.fromJson<String>(json['serialNumber']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       claimedAt: serializer.fromJson<DateTime?>(json['claimedAt']),
     );
@@ -545,6 +612,9 @@ class DeviceIdentityData extends DataClass
       'androidIdHash': serializer.toJson<String>(androidIdHash),
       'branch': serializer.toJson<String>(branch),
       'area': serializer.toJson<String>(area),
+      'branchId': serializer.toJson<String>(branchId),
+      'areaId': serializer.toJson<String>(areaId),
+      'serialNumber': serializer.toJson<String>(serialNumber),
       'isActive': serializer.toJson<bool>(isActive),
       'claimedAt': serializer.toJson<DateTime?>(claimedAt),
     };
@@ -557,6 +627,9 @@ class DeviceIdentityData extends DataClass
           String? androidIdHash,
           String? branch,
           String? area,
+          String? branchId,
+          String? areaId,
+          String? serialNumber,
           bool? isActive,
           Value<DateTime?> claimedAt = const Value.absent()}) =>
       DeviceIdentityData(
@@ -566,6 +639,9 @@ class DeviceIdentityData extends DataClass
         androidIdHash: androidIdHash ?? this.androidIdHash,
         branch: branch ?? this.branch,
         area: area ?? this.area,
+        branchId: branchId ?? this.branchId,
+        areaId: areaId ?? this.areaId,
+        serialNumber: serialNumber ?? this.serialNumber,
         isActive: isActive ?? this.isActive,
         claimedAt: claimedAt.present ? claimedAt.value : this.claimedAt,
       );
@@ -582,6 +658,11 @@ class DeviceIdentityData extends DataClass
           : this.androidIdHash,
       branch: data.branch.present ? data.branch.value : this.branch,
       area: data.area.present ? data.area.value : this.area,
+      branchId: data.branchId.present ? data.branchId.value : this.branchId,
+      areaId: data.areaId.present ? data.areaId.value : this.areaId,
+      serialNumber: data.serialNumber.present
+          ? data.serialNumber.value
+          : this.serialNumber,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       claimedAt: data.claimedAt.present ? data.claimedAt.value : this.claimedAt,
     );
@@ -596,6 +677,9 @@ class DeviceIdentityData extends DataClass
           ..write('androidIdHash: $androidIdHash, ')
           ..write('branch: $branch, ')
           ..write('area: $area, ')
+          ..write('branchId: $branchId, ')
+          ..write('areaId: $areaId, ')
+          ..write('serialNumber: $serialNumber, ')
           ..write('isActive: $isActive, ')
           ..write('claimedAt: $claimedAt')
           ..write(')'))
@@ -603,8 +687,18 @@ class DeviceIdentityData extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(id, deviceLabel, serverDeviceId,
-      androidIdHash, branch, area, isActive, claimedAt);
+  int get hashCode => Object.hash(
+      id,
+      deviceLabel,
+      serverDeviceId,
+      androidIdHash,
+      branch,
+      area,
+      branchId,
+      areaId,
+      serialNumber,
+      isActive,
+      claimedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -615,6 +709,9 @@ class DeviceIdentityData extends DataClass
           other.androidIdHash == this.androidIdHash &&
           other.branch == this.branch &&
           other.area == this.area &&
+          other.branchId == this.branchId &&
+          other.areaId == this.areaId &&
+          other.serialNumber == this.serialNumber &&
           other.isActive == this.isActive &&
           other.claimedAt == this.claimedAt);
 }
@@ -626,6 +723,9 @@ class DeviceIdentityCompanion extends UpdateCompanion<DeviceIdentityData> {
   final Value<String> androidIdHash;
   final Value<String> branch;
   final Value<String> area;
+  final Value<String> branchId;
+  final Value<String> areaId;
+  final Value<String> serialNumber;
   final Value<bool> isActive;
   final Value<DateTime?> claimedAt;
   const DeviceIdentityCompanion({
@@ -635,6 +735,9 @@ class DeviceIdentityCompanion extends UpdateCompanion<DeviceIdentityData> {
     this.androidIdHash = const Value.absent(),
     this.branch = const Value.absent(),
     this.area = const Value.absent(),
+    this.branchId = const Value.absent(),
+    this.areaId = const Value.absent(),
+    this.serialNumber = const Value.absent(),
     this.isActive = const Value.absent(),
     this.claimedAt = const Value.absent(),
   });
@@ -645,6 +748,9 @@ class DeviceIdentityCompanion extends UpdateCompanion<DeviceIdentityData> {
     required String androidIdHash,
     required String branch,
     required String area,
+    this.branchId = const Value.absent(),
+    this.areaId = const Value.absent(),
+    this.serialNumber = const Value.absent(),
     this.isActive = const Value.absent(),
     this.claimedAt = const Value.absent(),
   })  : deviceLabel = Value(deviceLabel),
@@ -659,6 +765,9 @@ class DeviceIdentityCompanion extends UpdateCompanion<DeviceIdentityData> {
     Expression<String>? androidIdHash,
     Expression<String>? branch,
     Expression<String>? area,
+    Expression<String>? branchId,
+    Expression<String>? areaId,
+    Expression<String>? serialNumber,
     Expression<bool>? isActive,
     Expression<DateTime>? claimedAt,
   }) {
@@ -669,6 +778,9 @@ class DeviceIdentityCompanion extends UpdateCompanion<DeviceIdentityData> {
       if (androidIdHash != null) 'android_id_hash': androidIdHash,
       if (branch != null) 'branch': branch,
       if (area != null) 'area': area,
+      if (branchId != null) 'branch_id': branchId,
+      if (areaId != null) 'area_id': areaId,
+      if (serialNumber != null) 'serial_number': serialNumber,
       if (isActive != null) 'is_active': isActive,
       if (claimedAt != null) 'claimed_at': claimedAt,
     });
@@ -681,6 +793,9 @@ class DeviceIdentityCompanion extends UpdateCompanion<DeviceIdentityData> {
       Value<String>? androidIdHash,
       Value<String>? branch,
       Value<String>? area,
+      Value<String>? branchId,
+      Value<String>? areaId,
+      Value<String>? serialNumber,
       Value<bool>? isActive,
       Value<DateTime?>? claimedAt}) {
     return DeviceIdentityCompanion(
@@ -690,6 +805,9 @@ class DeviceIdentityCompanion extends UpdateCompanion<DeviceIdentityData> {
       androidIdHash: androidIdHash ?? this.androidIdHash,
       branch: branch ?? this.branch,
       area: area ?? this.area,
+      branchId: branchId ?? this.branchId,
+      areaId: areaId ?? this.areaId,
+      serialNumber: serialNumber ?? this.serialNumber,
       isActive: isActive ?? this.isActive,
       claimedAt: claimedAt ?? this.claimedAt,
     );
@@ -716,6 +834,15 @@ class DeviceIdentityCompanion extends UpdateCompanion<DeviceIdentityData> {
     if (area.present) {
       map['area'] = Variable<String>(area.value);
     }
+    if (branchId.present) {
+      map['branch_id'] = Variable<String>(branchId.value);
+    }
+    if (areaId.present) {
+      map['area_id'] = Variable<String>(areaId.value);
+    }
+    if (serialNumber.present) {
+      map['serial_number'] = Variable<String>(serialNumber.value);
+    }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
@@ -734,6 +861,9 @@ class DeviceIdentityCompanion extends UpdateCompanion<DeviceIdentityData> {
           ..write('androidIdHash: $androidIdHash, ')
           ..write('branch: $branch, ')
           ..write('area: $area, ')
+          ..write('branchId: $branchId, ')
+          ..write('areaId: $areaId, ')
+          ..write('serialNumber: $serialNumber, ')
           ..write('isActive: $isActive, ')
           ..write('claimedAt: $claimedAt')
           ..write(')'))
@@ -4693,6 +4823,9 @@ typedef $$DeviceIdentityTableCreateCompanionBuilder = DeviceIdentityCompanion
   required String androidIdHash,
   required String branch,
   required String area,
+  Value<String> branchId,
+  Value<String> areaId,
+  Value<String> serialNumber,
   Value<bool> isActive,
   Value<DateTime?> claimedAt,
 });
@@ -4704,6 +4837,9 @@ typedef $$DeviceIdentityTableUpdateCompanionBuilder = DeviceIdentityCompanion
   Value<String> androidIdHash,
   Value<String> branch,
   Value<String> area,
+  Value<String> branchId,
+  Value<String> areaId,
+  Value<String> serialNumber,
   Value<bool> isActive,
   Value<DateTime?> claimedAt,
 });
@@ -4732,6 +4868,9 @@ class $$DeviceIdentityTableTableManager extends RootTableManager<
             Value<String> androidIdHash = const Value.absent(),
             Value<String> branch = const Value.absent(),
             Value<String> area = const Value.absent(),
+            Value<String> branchId = const Value.absent(),
+            Value<String> areaId = const Value.absent(),
+            Value<String> serialNumber = const Value.absent(),
             Value<bool> isActive = const Value.absent(),
             Value<DateTime?> claimedAt = const Value.absent(),
           }) =>
@@ -4742,6 +4881,9 @@ class $$DeviceIdentityTableTableManager extends RootTableManager<
             androidIdHash: androidIdHash,
             branch: branch,
             area: area,
+            branchId: branchId,
+            areaId: areaId,
+            serialNumber: serialNumber,
             isActive: isActive,
             claimedAt: claimedAt,
           ),
@@ -4752,6 +4894,9 @@ class $$DeviceIdentityTableTableManager extends RootTableManager<
             required String androidIdHash,
             required String branch,
             required String area,
+            Value<String> branchId = const Value.absent(),
+            Value<String> areaId = const Value.absent(),
+            Value<String> serialNumber = const Value.absent(),
             Value<bool> isActive = const Value.absent(),
             Value<DateTime?> claimedAt = const Value.absent(),
           }) =>
@@ -4762,6 +4907,9 @@ class $$DeviceIdentityTableTableManager extends RootTableManager<
             androidIdHash: androidIdHash,
             branch: branch,
             area: area,
+            branchId: branchId,
+            areaId: areaId,
+            serialNumber: serialNumber,
             isActive: isActive,
             claimedAt: claimedAt,
           ),
@@ -4798,6 +4946,21 @@ class $$DeviceIdentityTableFilterComposer
 
   ColumnFilters<String> get area => $state.composableBuilder(
       column: $state.table.area,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get branchId => $state.composableBuilder(
+      column: $state.table.branchId,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get areaId => $state.composableBuilder(
+      column: $state.table.areaId,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get serialNumber => $state.composableBuilder(
+      column: $state.table.serialNumber,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -4842,6 +5005,21 @@ class $$DeviceIdentityTableOrderingComposer
 
   ColumnOrderings<String> get area => $state.composableBuilder(
       column: $state.table.area,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get branchId => $state.composableBuilder(
+      column: $state.table.branchId,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get areaId => $state.composableBuilder(
+      column: $state.table.areaId,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get serialNumber => $state.composableBuilder(
+      column: $state.table.serialNumber,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 

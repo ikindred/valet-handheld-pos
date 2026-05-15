@@ -3,9 +3,13 @@ import 'package:logger/logger.dart';
 
 /// Structured app logging with scoped identifiers.
 ///
-/// Format: `valet_log-[scope]: message` where [scope] is a page or function label.
+/// Every line starts with `valet_logger: ` so log output can be filtered (e.g.
+/// Android Studio / `adb logcat | grep valet_logger`). After that:
+/// `valet_log-[scope]: message` where [scope] is a page or function label.
 abstract final class ValetLog {
   ValetLog._();
+
+  static const String _prefix = 'valet_logger:';
 
   static final Logger _logger = Logger(
     level: kDebugMode ? Level.trace : Level.off,
@@ -20,7 +24,7 @@ abstract final class ValetLog {
   );
 
   static String _line(String scope, String message) =>
-      'valet_log-[$scope]: $message';
+      '$_prefix valet_log-[$scope]: $message';
 
   static void trace(String scope, String message) {
     _logger.t(_line(scope, message));
@@ -46,5 +50,4 @@ abstract final class ValetLog {
   ]) {
     _logger.e(_line(scope, message), error: err, stackTrace: stackTrace);
   }
-
 }

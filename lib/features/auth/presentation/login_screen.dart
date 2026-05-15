@@ -5,10 +5,11 @@ import 'package:internet_connection_checker_plus/internet_connection_checker_plu
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/services/device_id_service.dart';
 import '../../../core/storage/offline_mode_prefs.dart';
+import '../../../core/storage/prefs_keys.dart';
 import '../../../core/ui/app_background.dart';
 import '../../../core/ui/app_text_field.dart';
+import '../../../data/remote/api_error_message.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../auth_session_sync.dart';
 
@@ -89,12 +90,12 @@ class _LoginScreenState extends State<LoginScreen> {
     final repo = context.read<AuthRepository>();
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
-    final deviceId = await DeviceIdService.getOrCreate();
+    final serverDeviceId = prefs.getString(PrefsKeys.deviceIdentityKey);
     try {
       final rates = await repo.loginOnline(
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
-        deviceId: deviceId,
+        serverDeviceId: serverDeviceId,
       );
       await OfflineModePrefs.write(prefs, false);
       final session = await repo.getActiveSession();
@@ -106,27 +107,12 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailCtrl.text.trim(),
         standardRates: rates,
       );
-    } on StateError catch (e) {
+    } catch (e) {
       if (!mounted) return;
-      if (e.message == 'DEVICE_NOT_ASSIGNED') {
-        setState(() {
-          _error =
-              'This device is not yet assigned to a branch and area.';
-          _loading = false;
-        });
-        return;
-      }
       setState(() {
-        _error = 'Login failed. Check your credentials and try again.';
+        _error = loginErrorMessage(e);
         _loading = false;
       });
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _error = 'Login failed. Check your credentials and try again.';
-          _loading = false;
-        });
-      }
     }
   }
 
@@ -182,34 +168,44 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: AppBackground(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.black.withValues(alpha: 0.13),
-                  width: 2,
-                ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x19000000),
-                    blurRadius: 19.3,
-                    offset: Offset(0, 0),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 48,
-                  vertical: 50,
-                ),
-                child: TextFieldTapRegion(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxHeight < 560;
+              final hPad = compact ? 32.0 : 48.0;
+              final vPad = compact ? 28.0 : 50.0;
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight - 24),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.black.withValues(alpha: 0.13),
+                            width: 2,
+                          ),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x19000000),
+                              blurRadius: 19.3,
+                              offset: Offset(0, 0),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: hPad,
+                            vertical: vPad,
+                          ),
+                          child: TextFieldTapRegion(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
                       Text(
                         'Valet Master',
                         style: _poppins(
@@ -281,12 +277,26 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       if (_error != null) ...[
                         const SizedBox(height: 12),
-                        Text(
-                          _error!,
-                          style: _poppins(
-                            12,
-                            FontWeight.w500,
-                            Colors.red.shade700,
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.red.shade200),
+                          ),
+                          child: Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: _poppins(
+                              12,
+                              FontWeight.w500,
+                              Colors.red.shade800,
+                              height: 1.35,
+                            ),
                           ),
                         ),
                       ],
@@ -341,17 +351,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ),
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Online login checks the server. Local / dev accounts (e.g. seeded offline) — use Offline Mode.',
-                                textAlign: TextAlign.center,
-                                style: _poppins(
-                                  10,
-                                  FontWeight.w400,
-                                  _LoginTokens.footerGrey,
-                                  height: 1.35,
-                                ),
-                              ),
                               const SizedBox(height: 12),
                               SizedBox(
                                 width: double.infinity,
@@ -399,11 +398,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           );
                         },
                       ),
-                    ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),

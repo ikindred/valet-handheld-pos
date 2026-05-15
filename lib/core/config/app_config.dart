@@ -37,8 +37,7 @@ class AppConfig {
   static String get devSeedBranch =>
       (_env('DEV_SEED_BRANCH') ?? 'Ayala Circuit').trim();
 
-  static String get devSeedArea =>
-      (_env('DEV_SEED_AREA') ?? 'Area B').trim();
+  static String get devSeedArea => (_env('DEV_SEED_AREA') ?? 'Area B').trim();
 
   // ── AUTH ──────────────────────────────────
   static String get deviceRegister =>
@@ -48,7 +47,8 @@ class AppConfig {
       baseUrl + (_env('API_AUTH_LOGIN') ?? '/api/v1/auth/login');
 
   static String get authValidateToken =>
-      baseUrl + (_env('API_AUTH_VALIDATE_TOKEN') ?? '/api/v1/auth/validate-token');
+      baseUrl +
+      (_env('API_AUTH_VALIDATE_TOKEN') ?? '/api/v1/auth/validate-token');
 
   static String get authLogout =>
       baseUrl + (_env('API_AUTH_LOGOUT') ?? '/api/v1/auth/logout');
@@ -60,6 +60,18 @@ class AppConfig {
   /// POST claim a terminal identity for this physical device.
   static String get devicesClaimUrl =>
       baseUrl + (_env('API_DEVICES_CLAIM') ?? '/api/v1/devices/claim');
+
+  /// POST verify server branch/area assignment for this claimed device (Bearer).
+  static String get devicesValidateUrl =>
+      baseUrl + (_env('API_DEVICES_VALIDATE') ?? '/api/v1/devices/validate');
+
+  /// Optional `Authorization: Bearer …` for [devicesClaimUrl] only.
+  /// Per `docs/MOBILE_INTEGRATION_GUIDE.md`, claim expects an ADMIN JWT; use
+  /// during provisioning when the app has no admin sign-in on this screen.
+  static String? get deviceClaimBearerToken {
+    final t = (_env('DEVICE_CLAIM_BEARER_TOKEN') ?? '').trim();
+    return t.isEmpty ? null : t;
+  }
 
   // ── SHIFT ─────────────────────────────────
   static String get shiftOpen =>
@@ -153,13 +165,13 @@ class AppConfig {
   }
 
   static String ticketLost(String ticketId) =>
-      baseUrl + (_env('API_TICKET_LOST')
-          ?.replaceAll('{ticket_id}', ticketId) ??
+      baseUrl +
+      (_env('API_TICKET_LOST')?.replaceAll('{ticket_id}', ticketId) ??
           '/api/v1/tickets/$ticketId/lost');
 
   static String ticketGet(String ticketNumber) =>
-      baseUrl + (_env('API_TICKET_GET')
-          ?.replaceAll('{ticket_number}', ticketNumber) ??
+      baseUrl +
+      (_env('API_TICKET_GET')?.replaceAll('{ticket_number}', ticketNumber) ??
           '/api/v1/tickets/$ticketNumber');
 
   // ── CONFIG ────────────────────────────────

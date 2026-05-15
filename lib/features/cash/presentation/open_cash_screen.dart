@@ -89,13 +89,13 @@ class _OpenCashView extends StatefulWidget {
 
 class _OpenCashViewState extends State<_OpenCashView> {
   final _notesCtrl = TextEditingController();
-  final _branchCtrl = TextEditingController();
-  final _areaCtrl = TextEditingController();
 
   /// Whole peso digits only (no decimal point). "0" means zero pesos.
   String _digits = '0';
 
   String? _staffName;
+  String _branchName = '';
+  String _areaName = '';
   bool _online = true;
 
   static final _pesoFmt =
@@ -103,18 +103,13 @@ class _OpenCashViewState extends State<_OpenCashView> {
   static final _longDate = DateFormat('EEEE, MMMM d, y');
   static final _shiftDate = DateFormat('yyyy-MM-dd');
 
-  void _onBranchAreaChanged() {
-    setState(() {});
-  }
-
   @override
   void initState() {
     super.initState();
-    _branchCtrl.addListener(_onBranchAreaChanged);
-    _areaCtrl.addListener(_onBranchAreaChanged);
     SchedulerBinding.instance.addPostFrameCallback((_) => _loadContext());
   }
 
+  /// Staff from active session; branch/area from cached device site (prefs / claim).
   Future<void> _loadContext() async {
     final repo = context.read<AuthRepository>();
     final prefs = await SharedPreferences.getInstance();
@@ -123,11 +118,11 @@ class _OpenCashViewState extends State<_OpenCashView> {
     final acct = await repo.offlineAccountById(session.userId);
     if (!mounted) return;
     final site = await repo.branchAndAreaFromDb();
-    _branchCtrl.text = site.branch;
-    _areaCtrl.text = site.area;
     setState(() {
       _online = !OfflineModePrefs.read(prefs);
       _staffName = acct?.fullName ?? acct?.email ?? '—';
+      _branchName = site.branch;
+      _areaName = site.area;
     });
     if (mounted) {
       unawaited(context.read<BranchConfigService>().syncFromServerForDeviceBranch());
@@ -136,11 +131,7 @@ class _OpenCashViewState extends State<_OpenCashView> {
 
   @override
   void dispose() {
-    _branchCtrl.removeListener(_onBranchAreaChanged);
-    _areaCtrl.removeListener(_onBranchAreaChanged);
     _notesCtrl.dispose();
-    _branchCtrl.dispose();
-    _areaCtrl.dispose();
     super.dispose();
   }
 
@@ -201,8 +192,8 @@ class _OpenCashViewState extends State<_OpenCashView> {
       localUserId: localUserId,
       sessionId: session.id,
       openingFloat: pesos.toDouble(),
-      branch: _branchCtrl.text.trim(),
-      area: _areaCtrl.text.trim(),
+      branch: _branchName,
+      area: _areaName,
       shiftDate: _shiftDate.format(now),
       openingNotes: notes.isEmpty ? null : notes,
     );
@@ -212,10 +203,8 @@ class _OpenCashViewState extends State<_OpenCashView> {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final nowLabel = _longDate.format(now);
-    final b = _branchCtrl.text.trim();
-    final a = _areaCtrl.text.trim();
-    final headerSub = (b.isNotEmpty && a.isNotEmpty)
-        ? '$nowLabel · $b : $a'
+    final headerSub = (_branchName.isNotEmpty && _areaName.isNotEmpty)
+        ? '$nowLabel · $_branchName : $_areaName'
         : '$nowLabel · ${AppConfig.defaultDeviceBranch} : ${AppConfig.defaultDeviceArea}';
 
     final busy = widget.busy;
@@ -275,28 +264,20 @@ class _OpenCashViewState extends State<_OpenCashView> {
                                         Row(
                                           children: [
                                             Expanded(
-                                              child: LabeledAppTextField(
+                                              child: _ReadOnlyField(
                                                 label: 'BRANCH',
-                                                child: AppTextField(
-                                                  controller: _branchCtrl,
-                                                  minHeight: 40,
-                                                  hint: 'Branch name',
-                                                  style: CashFigmaStyles
-                                                      .fieldValue(),
-                                                ),
+                                                value: _branchName.isEmpty
+                                                    ? '—'
+                                                    : _branchName,
                                               ),
                                             ),
                                             const SizedBox(width: 16),
                                             Expanded(
-                                              child: LabeledAppTextField(
+                                              child: _ReadOnlyField(
                                                 label: 'AREA',
-                                                child: AppTextField(
-                                                  controller: _areaCtrl,
-                                                  minHeight: 40,
-                                                  hint: 'Area',
-                                                  style: CashFigmaStyles
-                                                      .fieldValue(),
-                                                ),
+                                                value: _areaName.isEmpty
+                                                    ? '—'
+                                                    : _areaName,
                                               ),
                                             ),
                                           ],

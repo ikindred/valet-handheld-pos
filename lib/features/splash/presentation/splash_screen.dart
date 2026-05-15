@@ -8,7 +8,6 @@ import 'package:internet_connection_checker_plus/internet_connection_checker_plu
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/logging/valet_log.dart';
-import '../../../core/platform/device_info_payload.dart';
 import '../../../core/services/device_id_service.dart';
 import '../../../core/storage/offline_mode_prefs.dart';
 import '../../../core/storage/prefs_keys.dart';
@@ -24,6 +23,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   bool _started = false;
+  bool _bootstrapped = false;
 
   @override
   void didChangeDependencies() {
@@ -35,6 +35,8 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _bootstrap() async {
+    if (_bootstrapped) return;
+    _bootstrapped = true;
     final repo = context.read<AuthRepository>();
     final prefs = await SharedPreferences.getInstance();
     try {
@@ -50,7 +52,6 @@ class _SplashScreenState extends State<SplashScreen> {
       }
 
       final deviceId = await DeviceIdService.getOrCreate();
-      final deviceInfo = await buildDeviceInfoPayload();
 
       bool online = false;
       try {
@@ -61,13 +62,6 @@ class _SplashScreenState extends State<SplashScreen> {
         online = false;
       }
       ValetLog.debug('splash/_bootstrap', 'online=$online');
-      if (online) {
-        await repo.registerDevice(
-          deviceId: deviceId,
-          deviceInfo: deviceInfo,
-          prefs: prefs,
-        );
-      }
       await repo.seedDevDeviceSiteIfNeeded(deviceId);
 
       final session = await repo.getActiveSession();
@@ -110,13 +104,31 @@ class _SplashScreenState extends State<SplashScreen> {
         }
         try {
           final rates = await repo.revalidateActiveSession(deviceId: deviceId);
+          final sessionAfter = await repo.getActiveSession();
+          if (sessionAfter == null) {
+            await OfflineModePrefs.write(prefs, false);
+            if (mounted) context.go('/login');
+            return;
+          }
+          final proceed = await repo.validateDeviceAssignmentAfterTokenOk(
+            prefs: prefs,
+            deviceId: deviceId,
+            serverDeviceId: deviceIdentityKey,
+            authToken: sessionAfter.authToken ?? '',
+          );
+          if (!proceed) {
+            await OfflineModePrefs.write(prefs, false);
+            if (mounted) context.go('/login');
+            return;
+          }
           await OfflineModePrefs.write(prefs, false);
-          final email = await repo.emailForOfflineAccountId(session.userId);
+          final email =
+              await repo.emailForOfflineAccountId(sessionAfter.userId);
           if (!mounted) return;
           await syncAuthBlocAndNavigate(
             context,
             repo: repo,
-            localUserId: session.userId,
+            localUserId: sessionAfter.userId,
             email: email,
             standardRates: rates,
           );
