@@ -736,9 +736,9 @@ class _PrintBluetoothCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final printer = context.watch<PrinterConnectionNotifier>();
-    final subtitle = printer.isConnected
+    final subtitle = printer.hasPairedPrinter
         ? printer.statusSubtitle
-        : 'Tap to pair Bluetooth printer';
+        : 'Tap to set up Bluetooth printer in Settings';
 
     return Material(
       color: Colors.transparent,

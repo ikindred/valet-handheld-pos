@@ -4,6 +4,7 @@ import 'package:flutter_esc_pos_utils_image_3/flutter_esc_pos_utils_image_3.dart
 import 'package:intl/intl.dart';
 
 import 'check_in_receipt_data.dart';
+import 'esc_pos_text_sanitize.dart';
 
 class EscPosReceiptBuilder {
   EscPosReceiptBuilder(this.profile, {this.paperSize = PaperSize.mm58});
@@ -23,7 +24,7 @@ class EscPosReceiptBuilder {
     bytes.addAll(gen.reset());
     bytes.addAll(
       gen.text(
-        branchName,
+        sanitizeEscPosText(branchName),
         styles: const PosStyles(align: PosAlign.center, bold: true),
       ),
     );
@@ -110,9 +111,10 @@ class EscPosReceiptBuilder {
   }
 
   List<int> _header(Generator gen, String branchName) {
+    final branch = sanitizeEscPosText(branchName);
     return [
       ...gen.text(
-        branchName,
+        branch,
         styles: const PosStyles(
           align: PosAlign.center,
           bold: true,
@@ -147,12 +149,12 @@ class EscPosReceiptBuilder {
   }) {
     final out = <int>[
       ...gen.text(
-        title,
+        sanitizeEscPosText(title),
         styles: const PosStyles(align: PosAlign.center, bold: true),
       ),
       ...gen.feed(1),
       ..._row(gen, 'Ticket', ticketId),
-      ..._row(gen, 'Plate', plate.isEmpty ? '—' : plate),
+      ..._row(gen, 'Plate', plate.isEmpty ? 'N/A' : plate),
       if (vehicleLine.isNotEmpty) ..._row(gen, 'Vehicle', vehicleLine),
       if (valetType != null && valetType.trim().isNotEmpty)
         ..._row(gen, 'Type', valetType.trim()),
@@ -169,7 +171,7 @@ class EscPosReceiptBuilder {
       ..._row(
         gen,
         'Signature',
-        signatureSigned ? 'Signed' : '—',
+        signatureSigned ? 'Signed' : 'N/A',
       ),
     ];
 
@@ -206,7 +208,7 @@ class EscPosReceiptBuilder {
       ),
       ...gen.feed(1),
       ...gen.text(
-        ticketId,
+        sanitizeEscPosText(ticketId),
         styles: const PosStyles(
           align: PosAlign.center,
           bold: true,
@@ -214,15 +216,21 @@ class EscPosReceiptBuilder {
         ),
       ),
       if (plate.isNotEmpty)
-        ...gen.text(plate, styles: const PosStyles(align: PosAlign.center)),
+        ...gen.text(
+          sanitizeEscPosText(plate),
+          styles: const PosStyles(align: PosAlign.center),
+        ),
       if (slotLine.isNotEmpty)
-        ...gen.text(slotLine, styles: const PosStyles(align: PosAlign.center)),
+        ...gen.text(
+          sanitizeEscPosText(slotLine),
+          styles: const PosStyles(align: PosAlign.center),
+        ),
     ];
   }
 
   List<int> _row(Generator gen, String label, String value) {
     return gen.text(
-      '$label: $value',
+      sanitizeEscPosText('$label: $value'),
       styles: const PosStyles(),
     );
   }
@@ -234,7 +242,7 @@ class EscPosReceiptBuilder {
       if (data.ticket.vehicleType.trim().isNotEmpty)
         data.ticket.vehicleType.trim(),
     ]..removeWhere((s) => s.isEmpty);
-    return parts.join(' · ');
+    return parts.join(' / ');
   }
 
   static String _slotLine(CheckInReceiptData data) {
@@ -243,7 +251,7 @@ class EscPosReceiptBuilder {
     if (a.isEmpty && b.isEmpty) return '';
     if (a.isEmpty) return b;
     if (b.isEmpty) return a;
-    return '$a · $b';
+    return '$a / $b';
   }
 
   static String _belongingsLine(String jsonRaw) {
@@ -266,7 +274,7 @@ class EscPosReceiptBuilder {
         final type = (item['type'] ?? '').toString();
         final zone = (item['zone'] ?? '').toString().trim();
         if (type.isEmpty) continue;
-        parts.add(zone.isEmpty ? type : '$type · $zone');
+        parts.add(zone.isEmpty ? type : '$type / $zone');
       }
       return parts.join('; ');
     } catch (_) {
@@ -277,6 +285,6 @@ class EscPosReceiptBuilder {
   static String _formatCheckIn(String iso) {
     final dt = DateTime.tryParse(iso);
     if (dt == null) return iso;
-    return DateFormat('MMM d, yyyy · h:mm a').format(dt.toLocal());
+    return DateFormat('MMM d, yyyy - h:mm a').format(dt.toLocal());
   }
 }

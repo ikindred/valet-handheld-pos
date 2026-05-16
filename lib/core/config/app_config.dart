@@ -39,6 +39,15 @@ class AppConfig {
 
   static String get devSeedArea => (_env('DEV_SEED_AREA') ?? 'Area B').trim();
 
+  /// Pre-fill all check-in fields for faster QA (e.g. printer testing).
+  /// On in debug builds; set `CHECK_IN_PREFILL=false` to disable.
+  static bool get checkInPrefillEnabled {
+    final v = (_env('CHECK_IN_PREFILL') ?? '').trim().toLowerCase();
+    if (v == 'true' || v == '1') return true;
+    if (v == 'false' || v == '0') return false;
+    return kDebugMode;
+  }
+
   // ── AUTH ──────────────────────────────────
   static String get deviceRegister =>
       baseUrl + (_env('API_DEVICE_REGISTER') ?? '/api/v1/device/register');

@@ -165,6 +165,7 @@ class BluetoothPosPrinter implements PrinterService {
           name: device.name,
           useBle: isBle,
         );
+        _prefs = prefs;
         return;
       }
     }
@@ -191,11 +192,24 @@ class BluetoothPosPrinter implements PrinterService {
         ),
         useBle: prefs.useBle,
       );
-      return true;
+      return await waitUntilConnected();
     } catch (e, st) {
       ValetLog.error('BluetoothPosPrinter.connectPaired', 'failed', e, st);
       return false;
     }
+  }
+
+  /// Waits until [isConnected] or [timeout] elapses.
+  Future<bool> waitUntilConnected({
+    Duration timeout = const Duration(seconds: 4),
+  }) async {
+    if (isConnected) return true;
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      if (isConnected) return true;
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    }
+    return isConnected;
   }
 
   /// Ensures a connection before sending bytes.
@@ -203,7 +217,7 @@ class BluetoothPosPrinter implements PrinterService {
     if (isConnected) return;
     if ((await _prefsAsync).hasPairedPrinter) {
       final ok = await connectPaired();
-      if (ok && isConnected) return;
+      if (ok) return;
     }
     throw StateError(
       'No Bluetooth printer connected. Pair a printer in Settings.',

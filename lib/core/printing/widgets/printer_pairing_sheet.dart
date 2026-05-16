@@ -43,18 +43,41 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
   @override
   void initState() {
     super.initState();
-    _loadPrefs();
-    _scan();
+    _loadPrefsAndMaybeScan();
   }
 
-  Future<void> _loadPrefs() async {
+  Future<void> _loadPrefsAndMaybeScan() async {
     final prefs = await PrinterPrefs.load();
     if (!mounted) return;
+
+    PrinterDevice? savedDevice;
+    if (prefs.hasPairedPrinter) {
+      final addr = prefs.address!.trim();
+      final name = prefs.name?.trim();
+      savedDevice = PrinterDevice(
+        id: addr,
+        name: name != null && name.isNotEmpty ? name : addr,
+        connection: PrinterConnection.bluetooth,
+      );
+    }
+
     setState(() {
       _prefs = prefs;
       _paperWidth = prefs.paperWidth;
       _preferBle = prefs.useBle;
+      _selected = savedDevice;
+      if (savedDevice != null && !(_devices.any((d) => d.id == savedDevice!.id))) {
+        _devices = [savedDevice, ..._devices];
+      }
     });
+
+    if (!mounted) return;
+    final connected = context.read<PrinterConnectionNotifier>().isConnected;
+    if (connected && savedDevice != null) {
+      return;
+    }
+    if (!mounted) return;
+    await _scan();
   }
 
   Future<void> _scan() async {
@@ -117,7 +140,9 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
             useBle: _preferBle,
           );
       if (!mounted) return;
-      context.read<PrinterConnectionNotifier>().refresh();
+      final notifier = context.read<PrinterConnectionNotifier>();
+      await notifier.tryConnectPaired();
+      notifier.refresh();
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;

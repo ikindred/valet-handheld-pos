@@ -10,7 +10,7 @@ import 'printer_connection_notifier.dart';
 import 'valet_print_service.dart';
 import 'widgets/printer_pairing_sheet.dart';
 
-/// Pair if needed, then run a print job. Returns false when cancelled or failed.
+/// Uses the saved printer when paired; opens the pairing sheet only on first setup.
 Future<bool> runBluetoothPrint(
   BuildContext context, {
   required Future<void> Function() printJob,
@@ -20,12 +20,8 @@ Future<bool> runBluetoothPrint(
     return false;
   }
 
-  final notifier = context.read<PrinterConnectionNotifier>();
-  if (!notifier.isConnected) {
-    final paired = await showPrinterPairingSheet(context);
-    if (paired != true || !context.mounted) return false;
-  } else {
-    await context.read<BluetoothPosPrinter>().ensureConnected();
+  if (!await _ensurePrinterReady(context)) {
+    return false;
   }
 
   try {
@@ -37,10 +33,42 @@ Future<bool> runBluetoothPrint(
   } catch (e) {
     if (context.mounted) {
       _snack(context, 'Print failed: $e');
-      await showPrinterPairingSheet(context);
     }
     return false;
   }
+}
+
+/// Reconnects to the default printer saved in Settings.
+///
+/// The pairing sheet is shown only when no printer has been saved yet.
+Future<bool> _ensurePrinterReady(BuildContext context) async {
+  final notifier = context.read<PrinterConnectionNotifier>();
+  final printer = context.read<BluetoothPosPrinter>();
+
+  if (!notifier.hasPairedPrinter) {
+    if (!context.mounted) return false;
+    final paired = await showPrinterPairingSheet(context);
+    if (paired != true || !context.mounted) return false;
+    notifier.refresh();
+    return printer.isConnected;
+  }
+
+  if (!printer.isConnected) {
+    await notifier.tryConnectPaired();
+  }
+
+  if (printer.isConnected) {
+    return true;
+  }
+
+  if (context.mounted) {
+    _snack(
+      context,
+      'Could not reach ${notifier.pairedDisplayName ?? 'your printer'}. '
+      'Open Settings → Bluetooth printer to reconnect.',
+    );
+  }
+  return false;
 }
 
 Future<bool> printCheckInFromContext(
@@ -63,7 +91,7 @@ Future<CheckInReceiptData> withBranchName(
   final area = site.area.trim();
   final label = branch.isEmpty && area.isEmpty
       ? 'Valet Master'
-      : (area.isEmpty ? branch : '$branch · $area');
+      : (area.isEmpty ? branch : '$branch / $area');
   return CheckInReceiptData(
     ticket: data.ticket,
     branchName: label,

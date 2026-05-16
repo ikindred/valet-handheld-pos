@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/config/app_config.dart';
 import '../../../data/remote/area_detail.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/rate_fetch_service.dart';
@@ -76,6 +77,28 @@ class _CheckInVehicleDetailsScreenState
       _areaLevels = detail?.levels ?? [];
       _areaLevelsLoading = false;
     });
+    if (AppConfig.checkInPrefillEnabled && mounted) {
+      _applyDemoParking();
+    }
+  }
+
+  void _applyDemoParking() {
+    final cubit = context.read<CheckInCubit>();
+    if (_areaLevels.isNotEmpty) {
+      final level = _areaLevels.first;
+      final slot = level.availableSlots.isNotEmpty
+          ? level.availableSlots.first.label
+          : '';
+      cubit.updateVehicleStep(
+        parkingLevel: level.name,
+        parkingSlot: slot,
+      );
+    } else {
+      cubit.updateVehicleStep(
+        parkingLevel: CheckInVehicleDetailsScreen._fallbackLevels.first,
+        parkingSlot: CheckInVehicleDetailsScreen._fallbackSlots.first,
+      );
+    }
   }
 
   List<String> get _levelItems {

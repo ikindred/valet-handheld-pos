@@ -10,6 +10,7 @@ import '../../../core/time/unix_timestamp.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/shift_service.dart';
 import '../../../data/services/ticket_service.dart';
+import '../domain/check_in_demo_defaults.dart';
 import '../domain/check_in_form_data.dart';
 import '../domain/vehicle_body_type.dart';
 import '../domain/vehicle_damage.dart';
@@ -169,7 +170,11 @@ class CheckInCubit extends Cubit<CheckInState> {
   })  : _ticketService = ticketService,
         _authRepository = authRepository,
         _shiftService = shiftService,
-        super(const CheckInState());
+        super(
+          CheckInDemoDefaults.enabled
+              ? CheckInDemoDefaults.initial()
+              : const CheckInState(),
+        );
 
   static const _uuid = Uuid();
 
@@ -283,7 +288,11 @@ class CheckInCubit extends Cubit<CheckInState> {
     if (id.isNotEmpty) {
       unawaited(_ticketService?.deleteDraftTicket(id) ?? Future.value());
     }
-    emit(const CheckInState());
+    emit(
+      CheckInDemoDefaults.enabled
+          ? CheckInDemoDefaults.initial()
+          : const CheckInState(),
+    );
   }
 
   void updateCustomerStep({
