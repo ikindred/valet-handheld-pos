@@ -10,6 +10,7 @@ import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/branch_config_service.dart';
 import '../../../data/services/rate_fetch_service.dart';
 import '../../../data/services/rate_service.dart';
+import '../../../shared/widgets/area_parking_slots_dialog.dart';
 import '../../../shared/widgets/branch_rates_dialog.dart';
 import '../../auth/state/auth_bloc.dart';
 import '../../check_in/state/check_in_cubit.dart';
@@ -171,6 +172,35 @@ class _DashboardHeaderRowState extends State<_DashboardHeaderRow> {
   }
 }
 
+Future<void> _openBranchAreaDialog(
+  BuildContext context, {
+  required bool ratesOnly,
+}) async {
+  final auth = context.read<AuthRepository>();
+  final site = await auth.branchAndAreaFromDb();
+  final name = branchRatesSubtitle(site);
+  if (!context.mounted) return;
+  final rateFetch = context.read<RateFetchService>();
+  final rateService = context.read<RateService>();
+  if (ratesOnly) {
+    await showBranchRatesDialog(
+      context,
+      authRepository: auth,
+      rateFetchService: rateFetch,
+      rateService: rateService,
+      branchName: name,
+    );
+  } else {
+    await showAreaParkingSlotsDialog(
+      context,
+      authRepository: auth,
+      rateFetchService: rateFetch,
+      rateService: rateService,
+      branchName: name,
+    );
+  }
+}
+
 class _HeaderRow extends StatelessWidget {
   const _HeaderRow({
     required this.greeting,
@@ -197,21 +227,21 @@ class _HeaderRow extends StatelessWidget {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.only(right: 6),
           child: RatesOutlinePill(
-            onPressed: () async {
-              final auth = context.read<AuthRepository>();
-              final site = await auth.branchAndAreaFromDb();
-              final name = branchRatesSubtitle(site);
-              if (!context.mounted) return;
-              await showBranchRatesDialog(
-                context,
-                authRepository: auth,
-                rateFetchService: context.read<RateFetchService>(),
-                rateService: context.read<RateService>(),
-                branchName: name,
-              );
-            },
+            onPressed: () => _openBranchAreaDialog(
+              context,
+              ratesOnly: true,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: ParkingSlotsOutlinePill(
+            onPressed: () => _openBranchAreaDialog(
+              context,
+              ratesOnly: false,
+            ),
           ),
         ),
         const DashboardStatusPillLive(),

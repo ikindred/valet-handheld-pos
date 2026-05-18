@@ -1,41 +1,35 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../core/session/standard_parking_rates.dart';
+import '../models/checkout_preview_rates.dart';
 
-/// Billable parking breakdown for an exit (offline-first; uses [StandardParkingRates]).
-///
-/// Assumes the flat rate covers the first [flatBlockHours] **ceiling** hours; each
-/// additional started hour bills [StandardParkingRates.succeedingHourPesos].
-/// Overnight applies when calendar day of exit is after calendar day of entry.
+/// On-device parking fee breakdown for checkout.
 class CheckoutBreakdown extends Equatable {
   const CheckoutBreakdown({
     required this.durationMinutes,
-    required this.billedHoursAfterFlat,
-    required this.flatPortionPesos,
-    required this.succeedingPortionPesos,
-    required this.overnightApplied,
-    required this.overnightPortionPesos,
-    required this.totalPesos,
+    required this.flatRateAmount,
+    required this.succeedingAmount,
+    required this.overnightAmount,
+    required this.total,
+    this.overnightApplied = false,
   });
 
   final int durationMinutes;
-  final int billedHoursAfterFlat;
-  final int flatPortionPesos;
-  final int succeedingPortionPesos;
+  final double flatRateAmount;
+  final double succeedingAmount;
+  final double overnightAmount;
+  final double total;
   final bool overnightApplied;
-  final int overnightPortionPesos;
-  final int totalPesos;
 
   @override
   List<Object?> get props => [
-    durationMinutes,
-    billedHoursAfterFlat,
-    flatPortionPesos,
-    succeedingPortionPesos,
-    overnightApplied,
-    overnightPortionPesos,
-    totalPesos,
-  ];
+        durationMinutes,
+        flatRateAmount,
+        succeedingAmount,
+        overnightAmount,
+        total,
+        overnightApplied,
+      ];
 }
 
 class CheckoutPricing {
@@ -44,46 +38,111 @@ class CheckoutPricing {
   /// Hours included in the flat block when the API does not send a per-branch value.
   static const int defaultFlatBlockHours = 3;
 
+  static CheckoutBreakdown computeFromPreviewRates({
+    required DateTime timeIn,
+    required DateTime timeOut,
+    required CheckoutPreviewRates rates,
+    int flatBlockHours = defaultFlatBlockHours,
+  }) =>
+      computeFees(
+        timeIn: timeIn,
+        timeOut: timeOut,
+        flatRate: rates.flatRate,
+        succeedingRate: rates.succeedingRate,
+        overnightFee: rates.overnightFee,
+        overnightCutoff: rates.overnightCutoff,
+        flatBlockHours: flatBlockHours,
+      );
+
+  /// Offline / Drift rates (optional [overnightCutoff] when cached locally).
   static CheckoutBreakdown compute({
-    required int timeInUnix,
-    required int timeOutUnix,
+    required DateTime timeIn,
+    required DateTime timeOut,
     required StandardParkingRates rates,
     int flatBlockHours = defaultFlatBlockHours,
+    String overnightCutoff = '',
+  }) =>
+      computeFees(
+        timeIn: timeIn,
+        timeOut: timeOut,
+        flatRate: rates.flatRatePesos.toDouble(),
+        succeedingRate: rates.succeedingHourPesos.toDouble(),
+        overnightFee: rates.overnightFeePesos.toDouble(),
+        overnightCutoff: overnightCutoff,
+        flatBlockHours: flatBlockHours,
+      );
+
+  static CheckoutBreakdown computeFees({
+    required DateTime timeIn,
+    required DateTime timeOut,
+    required double flatRate,
+    required double succeedingRate,
+    required double overnightFee,
+    required String overnightCutoff,
+    int flatBlockHours = defaultFlatBlockHours,
   }) {
-    final durationMinutes =
-        ((timeOutUnix - timeInUnix) / 60).floor().clamp(0, 1 << 30);
+    final durationMinutes = durationMinutesCeil(timeIn, timeOut);
+    final flatMinutes = flatBlockHours * 60;
 
-    final timeIn = DateTime.fromMillisecondsSinceEpoch(timeInUnix * 1000);
-    final timeOut = DateTime.fromMillisecondsSinceEpoch(timeOutUnix * 1000);
-    final overnightApplied = _isOvernightStay(timeIn, timeOut);
+    final double flatPortion;
+    final double succeedingPortion;
+    if (durationMinutes <= flatMinutes) {
+      flatPortion = flatRate;
+      succeedingPortion = 0;
+    } else {
+      final extraMinutes = durationMinutes - flatMinutes;
+      final extraHours = (extraMinutes / 60).ceil();
+      flatPortion = flatRate;
+      succeedingPortion = extraHours * succeedingRate;
+    }
 
-    final totalHoursCeil = durationMinutes <= 0
-        ? 0
-        : ((durationMinutes + 59) ~/ 60);
-
-    final billedAfterFlat =
-        totalHoursCeil <= flatBlockHours ? 0 : totalHoursCeil - flatBlockHours;
-
-    final flatPortion = rates.flatRatePesos;
-    final succeedingPortion = billedAfterFlat * rates.succeedingHourPesos;
-    final overnightPortion = overnightApplied ? rates.overnightFeePesos : 0;
-
+    final overnightApplied =
+        crossesOvernightCutoff(timeIn, timeOut, overnightCutoff);
+    final overnightPortion = overnightApplied ? overnightFee : 0.0;
     final total = flatPortion + succeedingPortion + overnightPortion;
 
     return CheckoutBreakdown(
       durationMinutes: durationMinutes,
-      billedHoursAfterFlat: billedAfterFlat,
-      flatPortionPesos: flatPortion,
-      succeedingPortionPesos: succeedingPortion,
+      flatRateAmount: flatPortion,
+      succeedingAmount: succeedingPortion,
+      overnightAmount: overnightPortion,
+      total: total,
       overnightApplied: overnightApplied,
-      overnightPortionPesos: overnightPortion,
-      totalPesos: total,
     );
   }
 
-  static bool _isOvernightStay(DateTime timeIn, DateTime timeOut) {
-    final a = DateTime(timeIn.year, timeIn.month, timeIn.day);
-    final b = DateTime(timeOut.year, timeOut.month, timeOut.day);
-    return b.isAfter(a);
+  /// Wall-clock minutes between [timeIn] and [timeOut], rounded up.
+  static int durationMinutesCeil(DateTime timeIn, DateTime timeOut) {
+    final ms = timeOut.difference(timeIn).inMilliseconds;
+    if (ms <= 0) return 0;
+    return ((ms + 59999) ~/ 60000).clamp(0, 1 << 30);
+  }
+
+  /// `true` when stay crosses [overnightCutoff] (`HH:mm` local) with entry before
+  /// cutoff and exit after the same cutoff instant.
+  static bool crossesOvernightCutoff(
+    DateTime timeIn,
+    DateTime timeOut,
+    String overnightCutoff,
+  ) {
+    final trimmed = overnightCutoff.trim();
+    if (trimmed.isEmpty) return false;
+    final parts = trimmed.split(':');
+    if (parts.length < 2) return false;
+    final ch = int.tryParse(parts[0].trim());
+    final cm = int.tryParse(parts[1].trim());
+    if (ch == null || cm == null) return false;
+
+    var day = DateTime(timeIn.year, timeIn.month, timeIn.day);
+    final lastDay = DateTime(timeOut.year, timeOut.month, timeOut.day);
+
+    while (!day.isAfter(lastDay)) {
+      final cutoff = DateTime(day.year, day.month, day.day, ch, cm);
+      if (timeIn.isBefore(cutoff) && timeOut.isAfter(cutoff)) {
+        return true;
+      }
+      day = day.add(const Duration(days: 1));
+    }
+    return false;
   }
 }

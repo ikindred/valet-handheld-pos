@@ -6,12 +6,12 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/formatting/peso_currency.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/remote/area_detail.dart';
-import 'area_parking_layout_section.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/services/rate_fetch_service.dart';
 import '../../data/services/rate_service.dart';
-import '../../features/check_out/domain/checkout_pricing.dart';
 import '../../features/dashboard/presentation/widgets/dashboard_widgets.dart';
+import 'area_dialog_loader.dart';
+import 'area_dialog_shell.dart';
 
 /// SPiD orange for rate amounts (design spec).
 const Color kSpidOrange = Color(0xFFE87722);
@@ -24,6 +24,32 @@ String branchRatesSubtitle(({String branch, String area}) site) {
   if (b.isEmpty) return a;
   return '$b · $a';
 }
+
+TextStyle branchRatesDialogTitleStyle() => GoogleFonts.poppins(
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textPrimary,
+    );
+
+TextStyle branchRatesDialogSubtitleStyle() => GoogleFonts.poppins(
+      fontSize: 11,
+      fontWeight: FontWeight.w400,
+      color: DashboardStyles.grey500,
+      height: 1.25,
+    );
+
+TextStyle branchRatesSectionCapsStyle() => GoogleFonts.poppins(
+      fontSize: 10,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.4,
+      color: AppColors.textSecondary,
+    );
+
+TextStyle branchRatesDialogCloseStyle() => GoogleFonts.poppins(
+      fontWeight: FontWeight.w600,
+      fontSize: 12,
+      color: DashboardStyles.orange,
+    );
 
 /// Outlined pill matching [DashboardStatusPill] height and corner radius.
 class RatesOutlinePill extends StatelessWidget {
@@ -66,7 +92,7 @@ class RatesOutlinePill extends StatelessWidget {
   }
 }
 
-/// Loads area rates from API when UUIDs are available; falls back to local Drift.
+/// Branch + vehicle-type rates — refreshes `GET /branches/{id}/areas/{areaId}` each open.
 Future<void> showBranchRatesDialog(
   BuildContext context, {
   required AuthRepository authRepository,
@@ -78,167 +104,57 @@ Future<void> showBranchRatesDialog(
     context: context,
     barrierDismissible: true,
     builder: (ctx) {
-      return Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440, maxHeight: 520),
-          child: Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            clipBehavior: Clip.antiAlias,
-            elevation: 12,
-            shadowColor: Colors.black.withValues(alpha: 0.18),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-              child: FutureBuilder<_RatesDialogData?>(
-                future: _loadRatesData(
-                  authRepository: authRepository,
-                  rateFetchService: rateFetchService,
-                  rateService: rateService,
-                ),
-                builder: (context, snap) {
-                  if (snap.connectionState == ConnectionState.waiting) {
-                    return const SizedBox(
-                      height: 140,
-                      child: Center(
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    );
-                  }
-                  final data = snap.data;
-                  if (data == null) {
-                    return _EmptyRates(branchName: branchName);
-                  }
-                  return _RatesDialogContent(
-                    branchName: branchName,
-                    flatBlockHours: data.flatBlockHours,
-                    standard: data.standard,
-                    vehicleTypeRates: data.vehicleTypeRates,
-                    levels: data.levels,
-                  );
-                },
-              ),
-            ),
-          ),
+      return AreaDialogShell(
+        child: AreaDialogLoader(
+          authRepository: authRepository,
+          rateFetchService: rateFetchService,
+          rateService: rateService,
+          allowOfflineFallback: true,
+          builder: (context, result, retry) {
+            if (result.hasError) {
+              return AreaDialogErrorBody(
+                title: 'Branch Rates',
+                branchName: branchName,
+                message: result.errorMessage!,
+                onRetry: retry,
+              );
+            }
+            final data = result.data!;
+            return _RatesOnlyDialogContent(
+              branchName: branchName,
+              flatBlockHours: data.flatBlockHours,
+              standard: data.standard,
+              vehicleTypeRates: data.vehicleTypeRates,
+              offlineCache: result.offlineCache,
+            );
+          },
         ),
       );
     },
   );
 }
 
-class _RatesDialogData {
-  const _RatesDialogData({
-    required this.flatBlockHours,
-    required this.standard,
-    required this.vehicleTypeRates,
-    required this.levels,
-  });
-
-  final int flatBlockHours;
-  final ParkingRateFees standard;
-  final List<VehicleTypeRateRow> vehicleTypeRates;
-  final List<AreaParkingLevel> levels;
-}
-
-Future<_RatesDialogData?> _loadRatesData({
-  required AuthRepository authRepository,
-  required RateFetchService rateFetchService,
-  required RateService rateService,
-}) async {
-  final branchUuid = await authRepository.branchUuidForApi();
-  final areaUuid = await authRepository.areaUuidForApi();
-  final flatHours = CheckoutPricing.defaultFlatBlockHours;
-
-  if (branchUuid.isNotEmpty && areaUuid.isNotEmpty) {
-    final detail = await rateFetchService.fetchAreaDetail(
-      branchId: branchUuid,
-      areaId: areaUuid,
-    );
-    if (detail != null) {
-      return _RatesDialogData(
-        flatBlockHours: flatHours,
-        standard: detail.standard,
-        vehicleTypeRates: detail.vehicleTypeRates,
-        levels: detail.levels,
-      );
-    }
-  }
-
-  final branchKey =
-      branchUuid.isNotEmpty ? branchUuid : (await authRepository.branchAndAreaFromDb()).branch;
-  final resolved = await rateService.checkoutRatesResolved(
-    branchId: branchKey.trim().isEmpty ? '_' : branchKey.trim(),
-    vehicleType: 'Standard',
-  );
-  if (resolved == null) return null;
-  final r = resolved.rates;
-  return _RatesDialogData(
-    flatBlockHours: resolved.flatBlockHours,
-    standard: ParkingRateFees(
-      flatRate: r.flatRatePesos,
-      succeedingRate: r.succeedingHourPesos,
-      overnightFee: r.overnightFeePesos,
-      lostTicketFee: r.lostTicketFeePesos,
-    ),
-    vehicleTypeRates: const [],
-    levels: const [],
-  );
-}
-
-class _EmptyRates extends StatelessWidget {
-  const _EmptyRates({required this.branchName});
-
-  final String branchName;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('Branch Rates', style: _dialogTitle()),
-        const SizedBox(height: 2),
-        Text(branchName, style: _dialogSubtitle()),
-        const SizedBox(height: 12),
-        Text(
-          'No rates are available yet. Sign in online with branch and area assigned.',
-          style: _dialogSubtitle(),
-        ),
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Close', style: _closeLabel()),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RatesDialogContent extends StatefulWidget {
-  const _RatesDialogContent({
+class _RatesOnlyDialogContent extends StatefulWidget {
+  const _RatesOnlyDialogContent({
     required this.branchName,
     required this.flatBlockHours,
     required this.standard,
     required this.vehicleTypeRates,
-    required this.levels,
+    this.offlineCache = false,
   });
 
   final String branchName;
   final int flatBlockHours;
   final ParkingRateFees standard;
   final List<VehicleTypeRateRow> vehicleTypeRates;
-  final List<AreaParkingLevel> levels;
+  final bool offlineCache;
 
   @override
-  State<_RatesDialogContent> createState() => _RatesDialogContentState();
+  State<_RatesOnlyDialogContent> createState() =>
+      _RatesOnlyDialogContentState();
 }
 
-class _RatesDialogContentState extends State<_RatesDialogContent> {
+class _RatesOnlyDialogContentState extends State<_RatesOnlyDialogContent> {
   String? _selectedVehicleTypeId;
 
   @override
@@ -264,21 +180,29 @@ class _RatesDialogContentState extends State<_RatesDialogContent> {
     final hasVehicleTypes = widget.vehicleTypeRates.isNotEmpty;
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Branch Rates', style: _dialogTitle()),
+        Text('Branch Rates', style: branchRatesDialogTitleStyle()),
         const SizedBox(height: 2),
-        Text(widget.branchName, style: _dialogSubtitle()),
+        Text(widget.branchName, style: branchRatesDialogSubtitleStyle()),
+        if (widget.offlineCache) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Offline — showing last saved rates.',
+            style: branchRatesDialogSubtitleStyle().copyWith(
+              color: DashboardStyles.orange,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 380),
+        Expanded(
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (widget.standard.hasAny) ...[
-                  Text('BASE RATE', style: _sectionCaps()),
+                  Text('BASE RATE', style: branchRatesSectionCapsStyle()),
                   const SizedBox(height: 6),
                   _RateFeeBlock(
                     fees: widget.standard,
@@ -287,7 +211,7 @@ class _RatesDialogContentState extends State<_RatesDialogContent> {
                 ],
                 if (hasVehicleTypes) ...[
                   if (widget.standard.hasAny) const SizedBox(height: 14),
-                  Text('VEHICLE TYPE', style: _sectionCaps()),
+                  Text('VEHICLE TYPE', style: branchRatesSectionCapsStyle()),
                   const SizedBox(height: 8),
                   _VehicleTypeSelector(
                     rows: widget.vehicleTypeRates,
@@ -299,7 +223,7 @@ class _RatesDialogContentState extends State<_RatesDialogContent> {
                     const SizedBox(height: 14),
                     Text(
                       'RATES — ${selected.name.toUpperCase()}',
-                      style: _sectionCaps(),
+                      style: branchRatesSectionCapsStyle(),
                     ),
                     const SizedBox(height: 6),
                     _RateFeeBlock(
@@ -311,13 +235,8 @@ class _RatesDialogContentState extends State<_RatesDialogContent> {
                   const SizedBox(height: 8),
                   Text(
                     'No vehicle-specific rates configured. Base rate applies to all types.',
-                    style: _dialogSubtitle(),
+                    style: branchRatesDialogSubtitleStyle(),
                   ),
-                ],
-                if (widget.levels.isNotEmpty) ...[
-                  if (widget.standard.hasAny || hasVehicleTypes)
-                    const SizedBox(height: 14),
-                  AreaParkingLayoutSection(levels: widget.levels),
                 ],
               ],
             ),
@@ -328,7 +247,7 @@ class _RatesDialogContentState extends State<_RatesDialogContent> {
           alignment: Alignment.centerRight,
           child: TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text('Close', style: _closeLabel()),
+            child: Text('Close', style: branchRatesDialogCloseStyle()),
           ),
         ),
       ],
@@ -336,7 +255,6 @@ class _RatesDialogContentState extends State<_RatesDialogContent> {
   }
 }
 
-/// Dropdown to pick a vehicle type; updates the rate block below.
 class _VehicleTypeSelector extends StatelessWidget {
   const _VehicleTypeSelector({
     required this.rows,
@@ -448,7 +366,9 @@ class _AmountRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: Text(label, style: _rowLabel())),
+        Expanded(
+          child: Text(label, style: _rowLabel()),
+        ),
         const SizedBox(width: 8),
         Text(
           amt,
@@ -464,35 +384,9 @@ class _AmountRow extends StatelessWidget {
   }
 }
 
-TextStyle _dialogTitle() => GoogleFonts.poppins(
-      fontSize: 16,
-      fontWeight: FontWeight.w600,
-      color: AppColors.textPrimary,
-    );
-
-TextStyle _dialogSubtitle() => GoogleFonts.poppins(
-      fontSize: 11,
-      fontWeight: FontWeight.w400,
-      color: DashboardStyles.grey500,
-      height: 1.25,
-    );
-
-TextStyle _sectionCaps() => GoogleFonts.poppins(
-      fontSize: 10,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.4,
-      color: AppColors.textSecondary,
-    );
-
 TextStyle _rowLabel() => GoogleFonts.poppins(
       fontSize: 12,
       fontWeight: FontWeight.w500,
       color: DashboardStyles.grey500,
       height: 1.25,
-    );
-
-TextStyle _closeLabel() => GoogleFonts.poppins(
-      fontWeight: FontWeight.w600,
-      fontSize: 12,
-      color: DashboardStyles.orange,
     );

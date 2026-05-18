@@ -2,10 +2,10 @@
 Map<String, dynamic> checkInSyncQueuePayload({
   required String localTicketId,
   required String signaturePath,
+  required String slotId,
   required String contactNumber,
   required String valetType,
   required Map<String, dynamic> vehicle,
-  required Map<String, dynamic> parking,
   required List<String> belongings,
   required List<Map<String, dynamic>> damages,
   String? customerName,
@@ -15,10 +15,10 @@ Map<String, dynamic> checkInSyncQueuePayload({
   return <String, dynamic>{
     'local_ticket_id': localTicketId,
     'signature_path': signaturePath,
+    'slot_id': slotId.trim(),
     'contact_number': contactNumber,
     'valet_type': valetType,
     'vehicle': vehicle,
-    'parking': parking,
     'belongings': belongings,
     'damages': damages,
     if (customerName != null && customerName.trim().isNotEmpty)

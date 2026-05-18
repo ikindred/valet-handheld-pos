@@ -153,6 +153,47 @@ class SyncCubit extends Cubit<SyncState> {
               continue;
             }
 
+            if (row.queueTableName == 'tickets' &&
+                row.operation == 'checkout/finalize') {
+              try {
+                await _ticketService.syncQueuedCheckoutFinalize(
+                  payloadMap,
+                  token,
+                );
+                await _markQueueSynced(row);
+                await _markEntitySynced(row);
+                syncedThisRun++;
+              } on DioException catch (e, st) {
+                final status = e.response?.statusCode;
+                if (status != null && status >= 400 && status < 500) {
+                  ValetLog.error(
+                    'SyncCubit.flush',
+                    'checkout/finalize client error $status recordId=${row.recordId}',
+                    e,
+                    st,
+                  );
+                  await _markQueueFailed(row);
+                } else {
+                  ValetLog.error(
+                    'SyncCubit.flush',
+                    'checkout/finalize retry recordId=${row.recordId}',
+                    e,
+                    st,
+                  );
+                  await _incrementRetry(row);
+                }
+              } catch (e, st) {
+                ValetLog.error(
+                  'SyncCubit.flush',
+                  'checkout/finalize failed recordId=${row.recordId}',
+                  e,
+                  st,
+                );
+                await _markQueueFailed(row);
+              }
+              continue;
+            }
+
             final hops = _syncHopsForRow(row, payloadMap);
             if (hops == null) {
               ValetLog.error(
@@ -296,51 +337,6 @@ class SyncCubit extends Cubit<SyncState> {
             'shift_id': row.recordId,
             'actual_cash': cash,
             'notes': null,
-          },
-        ),
-      ];
-    }
-
-    if (table == 'tickets' && op == 'checkout/finalize') {
-      final ticketNumber =
-          body['ticket_number']?.toString().trim() ?? row.recordId.trim();
-      final serverId =
-          body['server_ticket_id']?.toString().trim() ?? ticketNumber;
-      if (serverId.isEmpty) {
-        return const [];
-      }
-      final driverOut = body['driver_out']?.toString() ?? '';
-      final condition = body['condition_checkout'];
-      final conditionList = condition is List
-          ? [
-              for (final e in condition)
-                if (e is Map) Map<String, dynamic>.from(e),
-            ]
-          : <Map<String, dynamic>>[];
-      final amountPaid = body['amount_paid'];
-      final change = body['change'];
-      final paymentMethod = body['payment_method']?.toString() ?? 'cash';
-      return [
-        _SyncHop(
-          'POST',
-          AppConfig.checkoutPreviewUrl(serverId),
-          <String, dynamic>{
-            'driver_out': driverOut,
-            'condition_checkout': conditionList,
-            'status': 'active',
-          },
-        ),
-        _SyncHop(
-          'POST',
-          AppConfig.checkOutUrl(serverId),
-          <String, dynamic>{
-            'amount_paid': amountPaid is num
-                ? amountPaid.toDouble()
-                : double.tryParse('$amountPaid') ?? 0,
-            'change': change is num
-                ? change.toDouble()
-                : double.tryParse('$change') ?? 0,
-            'payment_method': paymentMethod,
           },
         ),
       ];

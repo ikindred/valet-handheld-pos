@@ -86,19 +86,37 @@ class _CheckInVehicleDetailsScreenState
     final cubit = context.read<CheckInCubit>();
     if (_areaLevels.isNotEmpty) {
       final level = _areaLevels.first;
-      final slot = level.availableSlots.isNotEmpty
-          ? level.availableSlots.first.label
-          : '';
+      final first = level.availableSlots.isNotEmpty
+          ? level.availableSlots.first
+          : null;
       cubit.updateVehicleStep(
         parkingLevel: level.name,
-        parkingSlot: slot,
+        parkingSlot: first?.label ?? '',
+        parkingSlotId: first?.id ?? '',
       );
     } else {
       cubit.updateVehicleStep(
         parkingLevel: CheckInVehicleDetailsScreen._fallbackLevels.first,
         parkingSlot: CheckInVehicleDetailsScreen._fallbackSlots.first,
+        parkingSlotId: '',
       );
     }
+  }
+
+  AreaParkingLevel? _levelForName(String levelName) {
+    for (final l in _areaLevels) {
+      if (l.name == levelName) return l;
+    }
+    return null;
+  }
+
+  AreaParkingSlot? _slotForLabel(String levelName, String slotLabel) {
+    final level = _levelForName(levelName);
+    if (level == null) return null;
+    for (final s in level.availableSlots) {
+      if (s.label == slotLabel) return s;
+    }
+    return null;
   }
 
   List<String> get _levelItems {
@@ -138,6 +156,13 @@ class _CheckInVehicleDetailsScreenState
       );
       return;
     }
+    if (_areaLevels.isNotEmpty && cubit.state.parkingSlotId.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a parking slot before continuing.')),
+      );
+      return;
+    }
+
     cubit.updateVehicleStep(
       plateNumber: _plateCtrl.text.trim(),
       vehicleModel: _modelCtrl.text.trim(),
@@ -145,6 +170,10 @@ class _CheckInVehicleDetailsScreenState
       vehicleColor: _colorCtrl.text.trim(),
       vehicleYear: _yearCtrl.text.trim(),
     );
+    final normalizedPlate = cubit.state.plateNumber;
+    if (_plateCtrl.text != normalizedPlate) {
+      _plateCtrl.text = normalizedPlate;
+    }
     context.go('/check-in/step-3');
   }
 
@@ -234,7 +263,9 @@ class _CheckInVehicleDetailsScreenState
 
     return BlocBuilder<CheckInCubit, CheckInState>(
       buildWhen: (a, b) =>
-          a.parkingLevel != b.parkingLevel || a.parkingSlot != b.parkingSlot,
+          a.parkingLevel != b.parkingLevel ||
+          a.parkingSlot != b.parkingSlot ||
+          a.parkingSlotId != b.parkingSlotId,
       builder: (context, state) {
         final level = state.parkingLevel;
         final slot = state.parkingSlot;
@@ -263,6 +294,7 @@ class _CheckInVehicleDetailsScreenState
                 cubit.updateVehicleStep(
                   parkingLevel: nextLevel,
                   parkingSlot: keepSlot ? state.parkingSlot : '',
+                  parkingSlotId: keepSlot ? state.parkingSlotId : '',
                 );
               },
             ),
@@ -273,9 +305,14 @@ class _CheckInVehicleDetailsScreenState
               items: slotItems,
               onChanged: levelValue == null || slotItems.isEmpty
                   ? (_) {}
-                  : (v) => context.read<CheckInCubit>().updateVehicleStep(
-                        parkingSlot: v ?? '',
-                      ),
+                  : (v) {
+                      final label = v ?? '';
+                      final picked = _slotForLabel(levelValue, label);
+                      context.read<CheckInCubit>().updateVehicleStep(
+                            parkingSlot: label,
+                            parkingSlotId: picked?.id ?? '',
+                          );
+                    },
             ),
           ],
         );

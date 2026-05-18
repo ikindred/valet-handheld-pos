@@ -75,7 +75,8 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
         final cubit = context.read<CheckOutCubit>();
         final preview = state.preview;
         final peso2 = PesoCurrency.currency(decimalDigits: 2);
-        final total = state.serverTotal ?? preview?.ticket.totalAmount ?? 0;
+        final total =
+            state.receiptTotalPesos ?? state.authoritativeTotal ?? 0;
         final tendered = cubit.parsedTendered() ?? total;
         final change = cubit.changeDue() ?? 0;
         final branch = (state.branchName ?? '').trim();

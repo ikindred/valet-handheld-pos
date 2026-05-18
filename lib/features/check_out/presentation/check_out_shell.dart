@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -23,10 +25,12 @@ class _CheckOutShellState extends State<CheckOutShell> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      final cubit = context.read<CheckOutCubit>();
       final auth = context.read<AuthBloc>().state;
       if (auth is AuthAuthenticated) {
-        context.read<CheckOutCubit>().setRates(auth.standardRates);
+        cubit.setRates(auth.standardRates);
       }
+      unawaited(cubit.hydrateBranchRatesFromDrift());
     });
   }
 

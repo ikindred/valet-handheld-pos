@@ -1,15 +1,17 @@
 import 'dart:convert';
 
+import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/session/standard_parking_rates.dart';
 import '../../features/check_out/domain/checkout_pricing.dart';
 import '../local/db/app_database.dart';
 
-/// Resolved checkout fees from `rates` + flat block length.
+/// Resolved checkout fees from `rates` + flat block length + overnight cutoff.
 typedef CheckoutRatesResolved = ({
   StandardParkingRates rates,
   int flatBlockHours,
+  String overnightCutoff,
 });
 
 /// Reads `rates` (Drift). Other services must not query `rates` directly.
@@ -71,6 +73,63 @@ class RateService {
           ..where((r) => r.branchId.equals(bid)))
         .get();
     if (rows.isEmpty) return null;
+    final pick = _pickRateRow(rows, vehicleType);
+    if (pick == null) return null;
+    final hours = pick.flatRateHours <= 0
+        ? CheckoutPricing.defaultFlatBlockHours
+        : pick.flatRateHours;
+    final cutoff = await _resolveOvernightCutoff(
+      branchId: bid,
+      driftRate: pick,
+    );
+    return (
+      rates: _ratesFromRow(pick),
+      flatBlockHours: hours,
+      overnightCutoff: cutoff,
+    );
+  }
+
+  /// Offline checkout — always resolves fees (never null).
+  ///
+  /// Fallback chain:
+  /// 1. Drift rates: exact `(branchId, vehicleType)`
+  /// 2. Drift rates: `(branchId, 'Standard')`
+  /// 3. Drift rates: first row for `branchId`
+  /// 4. [StandardParkingRates.offlineDefault]
+  Future<CheckoutRatesResolved> checkoutRatesForOffline({
+    required String branchId,
+    String? vehicleType,
+  }) async {
+    final bid = branchId.trim().isEmpty ? '_' : branchId.trim();
+    final rows = await (_db.select(_db.rates)
+          ..where((r) => r.branchId.equals(bid)))
+        .get();
+
+    if (rows.isNotEmpty) {
+      final pick = _pickRateRow(rows, vehicleType)!;
+      final hours = pick.flatRateHours <= 0
+          ? CheckoutPricing.defaultFlatBlockHours
+          : pick.flatRateHours;
+      final cutoff = await _resolveOvernightCutoff(
+        branchId: bid,
+        driftRate: pick,
+      );
+      return (
+        rates: _ratesFromRow(pick),
+        flatBlockHours: hours,
+        overnightCutoff: cutoff,
+      );
+    }
+
+    final cutoff = await _resolveOvernightCutoff(branchId: bid);
+    return (
+      rates: StandardParkingRates.offlineDefault,
+      flatBlockHours: CheckoutPricing.defaultFlatBlockHours,
+      overnightCutoff: cutoff,
+    );
+  }
+
+  static Rate? _pickRateRow(List<Rate> rows, String? vehicleType) {
     final want = (vehicleType ?? '').trim().toLowerCase();
     Rate? pick;
     if (want.isNotEmpty) {
@@ -81,19 +140,41 @@ class RateService {
         }
       }
     }
-    pick ??= _firstWhereIgnoreCase(rows, 'standard') ?? rows.first;
-    final hours = pick.flatRateHours <= 0
-        ? CheckoutPricing.defaultFlatBlockHours
-        : pick.flatRateHours;
-    return (
-      rates: StandardParkingRates(
+    return pick ?? _firstWhereIgnoreCase(rows, 'standard') ?? rows.first;
+  }
+
+  static StandardParkingRates _ratesFromRow(Rate pick) => StandardParkingRates(
         flatRatePesos: pick.flatRateFee.round(),
         succeedingHourPesos: pick.succeedingHourFee.round(),
         overnightFeePesos: pick.overnightFee.round(),
         lostTicketFeePesos: pick.lostTicketFee.round(),
-      ),
-      flatBlockHours: hours,
-    );
+      );
+
+  /// Overnight cutoff resolution:
+  /// 0. Drift `rates.overnight_cutoff` on [driftRate] when non-null
+  /// 1. `branch_config.overnight_start_time`
+  /// 2. `"01:30"`
+  Future<String> _resolveOvernightCutoff({
+    required String branchId,
+    Rate? driftRate,
+  }) async {
+    final fromDrift = driftRate?.overnightCutoff?.trim() ?? '';
+    if (fromDrift.isNotEmpty) return fromDrift;
+
+    final bid = branchId.trim();
+    if (bid.isNotEmpty) {
+      final row = await (_db.select(_db.branchConfigs)
+            ..where(
+              (c) =>
+                  c.branchId.equals(bid) &
+                  c.configKey.equals('overnight_start_time'),
+            )
+            ..limit(1))
+          .getSingleOrNull();
+      final fromConfig = row?.configValue.trim() ?? '';
+      if (fromConfig.isNotEmpty) return fromConfig;
+    }
+    return '01:30';
   }
 
   static Rate? _firstWhereIgnoreCase(List<Rate> rows, String vehicleType) {
@@ -120,6 +201,8 @@ class RateService {
           'succeeding_hour_fee': r.succeedingHourFee,
           'overnight_fee': r.overnightFee,
           'lost_ticket_fee': r.lostTicketFee,
+          if (r.overnightCutoff != null)
+            'overnight_cutoff': r.overnightCutoff,
         },
     ]);
   }

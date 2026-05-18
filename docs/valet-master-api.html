@@ -521,7 +521,7 @@
 
   <div class="sidebar-stats">
     <div class="stat-pill">
-      <div class="num" style="color:var(--green)">18</div>
+      <div class="num" style="color:var(--green)">19</div>
       <div class="lbl">Total</div>
     </div>
     <div class="stat-pill">
@@ -645,31 +645,93 @@
         <div class="flow-step-num">3</div>
         <div class="flow-step-content">
           <div class="flow-step-title">Customer presents ticket — look up the transaction</div>
-          <div class="flow-step-desc">Customer returns and presents their stub. Cashier scans the QR code, types TKT-XXXX, or searches by plate. The app calls checkout-preview online (Drift first when offline).</div>
-          <div class="flow-ep-tag">
-            <span class="method-badge GET" style="font-size:10px;padding:2px 8px;">GET</span>
-            <code>/transactions/:id/checkout-preview</code>
-            <span style="font-size:11px;color:var(--text3);">:id = UUID, TKT-XXXX, or plate</span>
-          </div>
-          <div class="flow-payload-label">Response 200</div>
-          <pre>{
-  <span class="key">"id"</span>: <span class="str">"550e8400-e29b-41d4-a716-446655440000"</span>,
-  <span class="key">"ticket_number"</span>: <span class="str">"TKT-0001"</span>,
-  <span class="key">"check_in_time"</span>: <span class="str">"2024-01-01T10:00:00.000Z"</span>,
-  <span class="key">"vehicle"</span>: {
-    <span class="key">"plate_number"</span>: <span class="str">"ABC 1234"</span>,
-    <span class="key">"brand"</span>: <span class="str">"Toyota Camry"</span>,
-    <span class="key">"color"</span>: <span class="str">"Silver"</span>,
-    <span class="key">"type"</span>: <span class="str">"sedan"</span>
-  },
-  <span class="key">"status"</span>: <span class="str">"active"</span>
-}</pre>
-          <div class="flow-note">Returns transaction + preview + compute. App resolves from local Drift first when offline. <code>GET /tickets/by-number</code> is not used by the mobile app.</div>
+          <div class="flow-step-desc">Customer returns and presents their stub. Cashier scans the QR code, types TKT-XXXX, or searches by plate. App resolves the active ticket from local Drift and the <code>server_ticket_id</code> UUID for API calls. When offline, lookup is local-only — no remote fallback.</div>
+          <div class="flow-note"><code>GET /tickets/by-number/:ticketNumber</code> is not used by the mobile app.</div>
         </div>
       </div>
 
       <div class="flow-step">
         <div class="flow-step-num">4</div>
+        <div class="flow-step-content">
+          <div class="flow-step-title">Fetch checkout preview — get rates for on-device computation</div>
+          <div class="flow-step-desc">App calls checkout-preview with the server ticket UUID. Response returns the transaction record, a rates block resolved for this ticket's vehicle type and branch area, and a preview block for display. The app uses the rates block to compute the fee on-device from <code>time_in</code> to now. No server-side fee computation.</div>
+          <div class="flow-ep-tag">
+            <span class="method-badge GET" style="font-size:10px;padding:2px 8px;">GET</span>
+            <code>/transactions/:id/checkout-preview</code>
+          </div>
+          <div class="flow-payload-label">Request</div>
+          <pre>Authorization: Bearer &lt;token&gt;</pre>
+          <div class="flow-payload-label">Response 200</div>
+          <pre>{
+  <span class="key">"transaction"</span>: {
+    <span class="key">"id"</span>: <span class="str">"550e8400-..."</span>,
+    <span class="key">"ticket_number"</span>: <span class="str">"TKT-0123"</span>,
+    <span class="key">"status"</span>: <span class="str">"active"</span>,
+    <span class="key">"time_in"</span>: <span class="str">"2026-05-08T01:00:00.000Z"</span>,
+    <span class="key">"duration_minutes"</span>: <span class="num">135</span>,
+    <span class="key">"vehicle"</span>: {
+      <span class="key">"plate_number"</span>: <span class="str">"ABC1234"</span>,
+      <span class="key">"brand"</span>: <span class="str">"Toyota"</span>,
+      <span class="key">"model"</span>: <span class="str">"Vios"</span>,
+      <span class="key">"color"</span>: <span class="str">"White"</span>,
+      <span class="key">"type"</span>: <span class="str">"Sedan"</span>
+    },
+    <span class="key">"customer"</span>: { <span class="key">"name"</span>: <span class="null">null</span>, <span class="key">"contact_number"</span>: <span class="null">null</span> },
+    <span class="key">"belongings"</span>: [<span class="str">"iPad"</span>],
+    <span class="key">"condition_checkin"</span>: {
+      <span class="key">"damages"</span>: [
+        { <span class="key">"zone"</span>: <span class="str">"Front Bumper"</span>, <span class="key">"type"</span>: <span class="str">"scratch"</span>, <span class="key">"x"</span>: <span class="num">0.52</span>, <span class="key">"y"</span>: <span class="num">0.08</span> }
+      ],
+      <span class="key">"signature"</span>: <span class="str">"/uploads/signatures/a1b2c3d4.png"</span>
+    },
+    <span class="key">"condition_checkout"</span>: [],
+    <span class="key">"driver_in"</span>: <span class="null">null</span>,
+    <span class="key">"driver_out"</span>: <span class="null">null</span>
+  },
+  <span class="key">"rates"</span>: {
+    <span class="key">"flat_rate"</span>: <span class="num">150</span>,
+    <span class="key">"succeeding_rate"</span>: <span class="num">30</span>,
+    <span class="key">"overnight_fee"</span>: <span class="num">500</span>,
+    <span class="key">"lost_ticket_fee"</span>: <span class="num">200</span>,
+    <span class="key">"overnight_cutoff"</span>: <span class="str">"01:30"</span>
+  },
+  <span class="key">"preview"</span>: {
+    <span class="key">"release_summary"</span>: {
+      <span class="key">"plate"</span>: <span class="str">"ABC1234"</span>,
+      <span class="key">"customer"</span>: <span class="str">"Juan dela Cruz"</span>,
+      <span class="key">"duration"</span>: <span class="str">"2h 15m"</span>
+    },
+    <span class="key">"ticket"</span>: {
+      <span class="key">"ticket_number"</span>: <span class="str">"TKT-0123"</span>,
+      <span class="key">"plate"</span>: <span class="str">"ABC1234"</span>,
+      <span class="key">"vehicle_make"</span>: <span class="str">"Toyota"</span>,
+      <span class="key">"vehicle_model"</span>: <span class="str">"Vios"</span>,
+      <span class="key">"vehicle_color"</span>: <span class="str">"White"</span>,
+      <span class="key">"vehicle_type"</span>: <span class="str">"Sedan"</span>,
+      <span class="key">"time_in"</span>: <span class="str">"2026-05-08T01:00:00.000Z"</span>,
+      <span class="key">"time_out"</span>: <span class="str">"2026-05-08T03:15:00.000Z"</span>,
+      <span class="key">"duration"</span>: <span class="str">"2h 15m"</span>,
+      <span class="key">"parking_slot"</span>: <span class="str">"A-12"</span>,
+      <span class="key">"valet_in"</span>: <span class="str">"Juan dela Cruz"</span>,
+      <span class="key">"valet_out"</span>: <span class="str">"Pedro Santos"</span>
+    },
+    <span class="key">"condition_comparison"</span>: [
+      {
+        <span class="key">"zone"</span>: <span class="str">"Front bumper"</span>,
+        <span class="key">"type"</span>: <span class="str">"scratch"</span>,
+        <span class="key">"x"</span>: <span class="num">0.05</span>,
+        <span class="key">"y"</span>: <span class="num">0.5</span>,
+        <span class="key">"is_new"</span>: true
+      }
+    ]
+  }
+}</pre>
+          <div class="flow-note">The <code>rates</code> block is resolved server-side for this ticket's vehicle type and branch area. App uses <code>rates</code> + <code>transaction.time_in</code> to compute fee on-device. <code>preview.ticket</code> contains display fields only — no rate amounts or total. Offline path uses Drift cached rates instead of this block.</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-step-num">5</div>
         <div class="flow-step-content">
           <div class="flow-step-title">Record checkout condition before releasing the car</div>
           <div class="flow-step-desc">Before the car is handed back, the attendant checks the vehicle condition and records any damage on the diagram. This is your dispute protection — if a customer claims damage happened during valet, you have both check-in and checkout condition on record. This must succeed before payment is collected.</div>
@@ -695,7 +757,7 @@
       </div>
 
       <div class="flow-step">
-        <div class="flow-step-num">5</div>
+        <div class="flow-step-num">6</div>
         <div class="flow-step-content">
           <div class="flow-step-title">Collect payment — finalize transaction</div>
           <div class="flow-step-desc">Customer pays the computed fee. App sends the amount collected. Server returns the change amount. Receipt prints, car is released to the customer.</div>
@@ -715,6 +777,7 @@
           <div class="flow-note">Only called when <code>fee &gt; 0</code>. App displays the change amount to the cashier. Transaction is marked closed locally. Car is released.</div>
         </div>
       </div>
+
 
     </div>
 
@@ -1204,17 +1267,82 @@ Response 200
         <span class="method-badge GET">GET</span>
         <span class="ep-path">/transactions/:id/checkout-preview</span>
         <span class="status-badge badge-ok">in swagger</span>
-        <span class="ep-desc">Checkout lookup — wired</span>
+        <span class="ep-desc">Checkout preview — rates + transaction for on-device compute</span>
         <span class="chevron">›</span>
       </div>
       <div class="ep-body">
         <div class="ep-grid single">
           <div class="block">
-            <div class="block-label">Header</div>
+            <div class="block-label">Request header</div>
             <pre>Authorization: Bearer &lt;token&gt;</pre>
+            <div class="block-label" style="margin-top:12px">Response 200</div>
+            <pre>{
+  <span class="key">"transaction"</span>: {
+    <span class="key">"id"</span>: <span class="str">"550e8400-..."</span>,
+    <span class="key">"ticket_number"</span>: <span class="str">"TKT-0123"</span>,
+    <span class="key">"status"</span>: <span class="str">"active"</span>,
+    <span class="key">"time_in"</span>: <span class="str">"2026-05-08T01:00:00.000Z"</span>,
+    <span class="key">"duration_minutes"</span>: <span class="num">135</span>,
+    <span class="key">"vehicle"</span>: {
+      <span class="key">"plate_number"</span>: <span class="str">"ABC1234"</span>,
+      <span class="key">"brand"</span>: <span class="str">"Toyota"</span>,
+      <span class="key">"model"</span>: <span class="str">"Vios"</span>,
+      <span class="key">"color"</span>: <span class="str">"White"</span>,
+      <span class="key">"type"</span>: <span class="str">"Sedan"</span>
+    },
+    <span class="key">"customer"</span>: { <span class="key">"name"</span>: <span class="null">null</span>, <span class="key">"contact_number"</span>: <span class="null">null</span> },
+    <span class="key">"belongings"</span>: [<span class="str">"iPad"</span>],
+    <span class="key">"condition_checkin"</span>: {
+      <span class="key">"damages"</span>: [
+        { <span class="key">"zone"</span>: <span class="str">"Front Bumper"</span>, <span class="key">"type"</span>: <span class="str">"scratch"</span>, <span class="key">"x"</span>: <span class="num">0.52</span>, <span class="key">"y"</span>: <span class="num">0.08</span> }
+      ],
+      <span class="key">"signature"</span>: <span class="str">"/uploads/signatures/a1b2c3d4.png"</span>
+    },
+    <span class="key">"condition_checkout"</span>: [],
+    <span class="key">"driver_in"</span>: <span class="null">null</span>,
+    <span class="key">"driver_out"</span>: <span class="null">null</span>
+  },
+  <span class="key">"rates"</span>: {
+    <span class="key">"flat_rate"</span>: <span class="num">150</span>,
+    <span class="key">"succeeding_rate"</span>: <span class="num">30</span>,
+    <span class="key">"overnight_fee"</span>: <span class="num">500</span>,
+    <span class="key">"lost_ticket_fee"</span>: <span class="num">200</span>,
+    <span class="key">"overnight_cutoff"</span>: <span class="str">"01:30"</span>
+  },
+  <span class="key">"preview"</span>: {
+    <span class="key">"release_summary"</span>: {
+      <span class="key">"plate"</span>: <span class="str">"ABC1234"</span>,
+      <span class="key">"customer"</span>: <span class="str">"Juan dela Cruz"</span>,
+      <span class="key">"duration"</span>: <span class="str">"2h 15m"</span>
+    },
+    <span class="key">"ticket"</span>: {
+      <span class="key">"ticket_number"</span>: <span class="str">"TKT-0123"</span>,
+      <span class="key">"plate"</span>: <span class="str">"ABC1234"</span>,
+      <span class="key">"vehicle_make"</span>: <span class="str">"Toyota"</span>,
+      <span class="key">"vehicle_model"</span>: <span class="str">"Vios"</span>,
+      <span class="key">"vehicle_color"</span>: <span class="str">"White"</span>,
+      <span class="key">"vehicle_type"</span>: <span class="str">"Sedan"</span>,
+      <span class="key">"time_in"</span>: <span class="str">"2026-05-08T01:00:00.000Z"</span>,
+      <span class="key">"time_out"</span>: <span class="str">"2026-05-08T03:15:00.000Z"</span>,
+      <span class="key">"duration"</span>: <span class="str">"2h 15m"</span>,
+      <span class="key">"parking_slot"</span>: <span class="str">"A-12"</span>,
+      <span class="key">"valet_in"</span>: <span class="str">"Juan dela Cruz"</span>,
+      <span class="key">"valet_out"</span>: <span class="str">"Pedro Santos"</span>
+    },
+    <span class="key">"condition_comparison"</span>: [
+      {
+        <span class="key">"zone"</span>: <span class="str">"Front bumper"</span>,
+        <span class="key">"type"</span>: <span class="str">"scratch"</span>,
+        <span class="key">"x"</span>: <span class="num">0.05</span>,
+        <span class="key">"y"</span>: <span class="num">0.5</span>,
+        <span class="key">"is_new"</span>: true
+      }
+    ]
+  }
+}</pre>
           </div>
         </div>
-        <div class="note">Wired via <code>AppConfig.checkoutPreviewUrl()</code>. Used for QR scan, manual TKT-XXXX, and plate search at check-out. <code>GET /tickets/by-number/:ticketNumber</code> is not used.</div>
+        <div class="note">Called at checkout start. <code>:id</code> is the <code>server_ticket_id</code> UUID. App uses the <code>rates</code> block (vehicle-type-specific, area-resolved) to compute the fee on-device using <code>time_in</code> → now. <code>preview.ticket</code> is for display only — no server totals. If offline, app skips this call and resolves rates from local Drift <code>rates</code> table by <code>(branchId, vehicleType)</code>, falling back to Standard row → offlineDefault (₱150/₱30/₱200/₱200).</div>
       </div>
     </div>
 

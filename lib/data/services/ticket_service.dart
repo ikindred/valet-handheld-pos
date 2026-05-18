@@ -10,6 +10,8 @@ import '../../core/config/app_config.dart';
 import '../../core/services/device_id_service.dart';
 import '../../core/time/philippine_time.dart';
 import '../../features/check_out/domain/checkout_ticket_display.dart';
+import '../../features/check_out/models/check_out_response.dart';
+import '../../features/dashboard/domain/ticket_parking_info.dart';
 import '../../features/check_in/models/check_in_response.dart';
 import '../../core/connectivity/internet_reachability.dart';
 import '../../core/logging/valet_log.dart';
@@ -274,6 +276,7 @@ class TicketService {
     String? valetType,
     String? parkingLevel,
     String? parkingSlot,
+    String? slotId,
   }) async {
     final tid = ticketId.trim();
     final existing = await ticketById(tid);
@@ -291,6 +294,11 @@ class TicketService {
       parkingLevel: parkingLevel,
       parkingSlot: parkingSlot,
     );
+    final parkingJson = TicketService._encodeParkingInfoColumn(
+      level: parkingLevel,
+      slot: parkingSlot,
+    );
+    final slotUuid = slotId?.trim() ?? '';
 
     await (_db.update(_db.tickets)..where((t) => t.id.equals(tid))).write(
       TicketsCompanion(
@@ -307,7 +315,9 @@ class TicketService {
         status: const Value('active'),
         syncStatus: const Value('pending'),
         driverIn: Value(_normalizedDriverName(driverIn)),
+        parkingInfo: Value(parkingJson),
         driverOut: Value(metaDriverOut),
+        slotId: slotUuid.isNotEmpty ? Value(slotUuid) : const Value.absent(),
       ),
     );
 
@@ -362,7 +372,6 @@ class TicketService {
     }
 
     final vehicle = _mapField(body['vehicle']);
-    final parking = _mapField(body['parking']);
     final belongings = _stringListField(body['belongings']);
     final damages = _damageListField(body['damages']);
 
@@ -371,14 +380,19 @@ class TicketService {
         body['ticket_id']?.toString().trim() ??
         '';
 
+    final slotId = body['slot_id']?.toString().trim() ?? '';
+    if (slotId.isEmpty) {
+      throw StateError('Queued check-in missing slot_id');
+    }
+
     final response = await _transactionsApi.submitCheckIn(
       token: token,
       ticketNumber: localId,
+      slotId: slotId,
       contactNumber: body['contact_number']?.toString() ?? '',
       valetType: body['valet_type']?.toString() ?? 'standard_valet',
       signatureFile: file,
       vehicle: vehicle,
-      parking: parking,
       belongings: belongings,
       damages: damages,
       customerName: body['customer_name']?.toString(),
@@ -388,8 +402,45 @@ class TicketService {
 
     if (localId.isNotEmpty) {
       await updateServerTicketId(localId, response.id);
+      final queuedSlotId = body['slot_id']?.toString().trim() ?? '';
+      if (queuedSlotId.isNotEmpty) {
+        final row = await ticketById(localId);
+        if (row != null && (row.slotId?.trim().isEmpty ?? true)) {
+          await (_db.update(_db.tickets)..where((t) => t.id.equals(localId)))
+              .write(TicketsCompanion(slotId: Value(queuedSlotId)));
+        }
+      }
     }
     return response;
+  }
+
+  static String? _encodeParkingInfoColumn({
+    String? area,
+    String? level,
+    String? slot,
+  }) {
+    final info = TicketParkingInfo(area: area, level: level, slot: slot);
+    return info.toJsonString();
+  }
+
+  static TicketParkingInfo? _parkingFromTransactionJson(
+    Map<String, dynamic> json,
+  ) {
+    final parking = _mapField(json['parking']);
+    if (parking.isEmpty) return null;
+    final info = TicketParkingInfo.fromParkingMap(parking);
+    return info.hasAny ? info : null;
+  }
+
+  static TicketParkingInfo? _parkingFromTicketRow(Ticket ticket) {
+    final stored = ticket.parkingInfo?.trim() ?? '';
+    if (stored.isNotEmpty) {
+      final info = TicketParkingInfo.fromJsonString(stored);
+      if (info.hasAny) return info;
+    }
+    final meta = TicketParkingInfo.fromDriverOutMeta(ticket.driverOut);
+    if (meta.hasAny) return meta;
+    return null;
   }
 
   static Map<String, dynamic> _mapField(dynamic raw) {
@@ -532,6 +583,7 @@ LIMIT 1
     required double totalFee,
     required String damageMarkersJson,
     String? driverOut,
+    String status = 'completed',
   }) async {
     ValetLog.info(
       'TicketService.completeTicketCheckout',
@@ -542,7 +594,7 @@ LIMIT 1
             TicketsCompanion(
               checkOutAt: Value(checkOutAtIso),
               fee: Value(totalFee),
-              status: const Value('completed'),
+              status: Value(status),
               damageMarkers: Value(damageMarkersJson),
               syncStatus: const Value('pending'),
               driverOut: Value(_normalizedDriverName(driverOut)),
@@ -551,15 +603,17 @@ LIMIT 1
     });
   }
 
-  /// Queues checkout-preview + check-out for offline finalize (`operation: checkout/finalize`).
+  /// Queues unified check-out for offline finalize (`operation: checkout/finalize`).
   Future<void> enqueueCheckoutFinalize({
     required String ticketId,
     required String? serverTicketId,
-    required String driverOut,
+    required double amount,
+    required String timeOut,
+    required bool isOvernight,
+    required bool ticketLost,
+    required Map<String, dynamic> preview,
     required List<Map<String, dynamic>> conditionCheckout,
-    required double amountPaid,
-    required double change,
-    String paymentMethod = 'cash',
+    String? driverOut,
   }) async {
     final tid = ticketId.trim();
     if (tid.isEmpty) return;
@@ -567,11 +621,14 @@ LIMIT 1
     final payload = jsonEncode(<String, dynamic>{
       'ticket_number': tid,
       'server_ticket_id': serverTicketId?.trim(),
-      'driver_out': driverOut,
+      'amount': amount,
+      'time_out': timeOut,
+      'is_overnight': isOvernight,
+      'ticket_lost': ticketLost,
+      'preview': preview,
       'condition_checkout': conditionCheckout,
-      'amount_paid': amountPaid,
-      'change': change,
-      'payment_method': paymentMethod,
+      if (driverOut != null && driverOut.trim().isNotEmpty)
+        'driver_out': driverOut.trim(),
     });
     await _db.into(_db.syncQueue).insert(
           SyncQueueCompanion.insert(
@@ -587,6 +644,58 @@ LIMIT 1
     ValetLog.info(
       'TicketService.enqueueCheckoutFinalize',
       'queued ticket=$tid',
+    );
+  }
+
+  /// Processes a queued checkout/finalize row via `POST /transactions/{id}/check-out`.
+  Future<CheckOutResponse> syncQueuedCheckoutFinalize(
+    Map<String, dynamic> body,
+    String token,
+  ) async {
+    final serverId = body['server_ticket_id']?.toString().trim() ?? '';
+    if (serverId.isEmpty) {
+      throw StateError('Queued checkout/finalize missing server_ticket_id');
+    }
+
+    final amountRaw = body['amount'] ?? body['amount_paid'];
+    final amount = amountRaw is num
+        ? amountRaw.toDouble()
+        : double.tryParse('$amountRaw') ?? 0.0;
+
+    final timeOut = body['time_out']?.toString().trim() ?? '';
+    if (timeOut.isEmpty) {
+      throw StateError('Queued checkout/finalize missing time_out');
+    }
+
+    final previewRaw = body['preview'];
+    if (previewRaw is! Map) {
+      throw StateError('Queued checkout/finalize missing preview');
+    }
+    final preview = Map<String, dynamic>.from(previewRaw);
+
+    final isOvernight = body['is_overnight'] == true;
+    final ticketLost = body['ticket_lost'] == true;
+
+    final condition = body['condition_checkout'];
+    final conditionList = condition is List
+        ? [
+            for (final e in condition)
+              if (e is Map) Map<String, dynamic>.from(e),
+          ]
+        : <Map<String, dynamic>>[];
+
+    final driverOut = body['driver_out']?.toString();
+
+    return _transactionsApi.submitCheckOut(
+      token: token,
+      ticketId: serverId,
+      amount: amount,
+      timeOut: timeOut,
+      isOvernight: isOvernight,
+      ticketLost: ticketLost,
+      preview: preview,
+      driverOut: driverOut,
+      conditionCheckout: conditionList,
     );
   }
 
@@ -716,7 +825,9 @@ WHERE shift_id = ? AND status = 'completed'
   /// Recent-transaction detail: `GET /transactions/{id}` when online, else local Drift.
   ///
   /// [idOrTicketNumber] is the server UUID or `TKT-XXXX` from the dashboard list.
-  Future<Ticket?> loadTicketForDetail(String idOrTicketNumber) async {
+  Future<TicketDetailSnapshot?> loadTicketForDetail(
+    String idOrTicketNumber,
+  ) async {
     final key = idOrTicketNumber.trim();
     if (key.isEmpty) return null;
 
@@ -725,7 +836,16 @@ WHERE shift_id = ? AND status = 'completed'
       final token = await _activeBearer();
       if (token != null && token.isNotEmpty) {
         try {
-          return await getTransactionById(key);
+          final map = await _transactionsApi.getTransactionById(
+            token: token,
+            id: key,
+          );
+          final parking = TicketService._parkingFromTransactionJson(map);
+          final ticket = await _upsertFromServerTransactionJson(map);
+          return TicketDetailSnapshot(
+            ticket: ticket,
+            parking: parking ?? TicketService._parkingFromTicketRow(ticket),
+          );
         } on TransactionsApiException catch (e, st) {
           ValetLog.error(
             'TicketService.loadTicketForDetail',
@@ -744,7 +864,39 @@ WHERE shift_id = ? AND status = 'completed'
       }
     }
 
-    return _localTicketByKey(key);
+    return _localDetailSnapshot(key);
+  }
+
+  Future<TicketDetailSnapshot?> _localDetailSnapshot(String key) async {
+    final ticket = await _localTicketByKey(key);
+    if (ticket == null) return null;
+    var parking = TicketService._parkingFromTicketRow(ticket);
+    parking ??= await _parkingFromSyncQueue(ticket.id);
+    return TicketDetailSnapshot(ticket: ticket, parking: parking);
+  }
+
+  Future<TicketParkingInfo?> _parkingFromSyncQueue(String ticketId) async {
+    final row = await (_db.select(_db.syncQueue)
+          ..where(
+            (q) =>
+                q.recordId.equals(ticketId.trim()) &
+                q.queueTableName.equals('tickets'),
+          )
+          ..orderBy([(q) => OrderingTerm.desc(q.createdAt)])
+          ..limit(1))
+        .getSingleOrNull();
+    if (row == null) return null;
+    try {
+      final body = jsonDecode(row.payload);
+      if (body is! Map) return null;
+      final map = Map<String, dynamic>.from(body);
+      final parking = _mapField(map['parking']);
+      if (parking.isEmpty) return null;
+      final info = TicketParkingInfo.fromParkingMap(parking);
+      return info.hasAny ? info : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<Ticket?> _localTicketByKey(String key) async {
@@ -884,6 +1036,7 @@ WHERE shift_id = ? AND status = 'completed'
           status: Value(fields.status),
           driverIn: Value(fields.driverIn),
           driverOut: Value(fields.driverOut),
+          parkingInfo: Value(fields.parkingInfo),
           syncStatus: const Value('synced'),
         ),
       );
@@ -924,6 +1077,7 @@ WHERE shift_id = ? AND status = 'completed'
             serverTicketId: Value(serverUuid),
             driverIn: Value(fields.driverIn),
             driverOut: Value(fields.driverOut),
+            parkingInfo: Value(fields.parkingInfo),
           ),
         );
     final out = await ticketById(ticketNum);
@@ -955,6 +1109,10 @@ WHERE shift_id = ? AND status = 'completed'
       status = 'completed';
     }
 
+    final parkingMap = _mapField(json['parking']);
+    final parkingJson =
+        TicketParkingInfo.fromParkingMap(parkingMap).toJsonString();
+
     return _ServerTicketFields(
       plateNumber: plate,
       vehicleBrand: brand,
@@ -970,6 +1128,7 @@ WHERE shift_id = ? AND status = 'completed'
       status: status,
       driverIn: _normalizedDriverName(_scalarString(json['driver_in'])),
       driverOut: _normalizedDriverName(_scalarString(json['driver_out'])),
+      parkingInfo: parkingJson,
     );
   }
 
@@ -1106,6 +1265,7 @@ class _ServerTicketFields {
     required this.status,
     required this.driverIn,
     required this.driverOut,
+    this.parkingInfo,
   });
 
   final String plateNumber;
@@ -1122,4 +1282,5 @@ class _ServerTicketFields {
   final String status;
   final String? driverIn;
   final String? driverOut;
+  final String? parkingInfo;
 }

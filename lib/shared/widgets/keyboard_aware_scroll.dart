@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 
-/// True when the soft keyboard (or IME) is reducing the viewport.
-bool isKeyboardVisible(BuildContext context) =>
-    MediaQuery.viewInsetsOf(context).bottom > 0;
+/// True when the soft keyboard (or IME) is open.
+///
+/// With [Scaffold.resizeToAvoidBottomInset] + Android `adjustResize`, the scaffold
+/// may consume insets so [MediaQuery.viewInsets] is zero while the viewport still
+/// shrinks — also consult [View.viewInsets].
+bool isKeyboardVisible(BuildContext context) {
+  if (MediaQuery.viewInsetsOf(context).bottom > 0) return true;
+  final view = View.maybeOf(context);
+  return view != null && view.viewInsets.bottom > 0;
+}
 
 /// Wraps [child] in a [SingleChildScrollView] when the keyboard is open so forms
 /// do not overflow. No-op when the keyboard is hidden.

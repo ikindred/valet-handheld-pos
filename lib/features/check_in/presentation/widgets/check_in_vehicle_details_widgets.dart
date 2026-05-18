@@ -66,7 +66,6 @@ class CheckInPlateNumberField extends StatelessWidget {
           ),
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9 ]')),
-            LengthLimitingTextInputFormatter(8),
           ],
         ),
       ),

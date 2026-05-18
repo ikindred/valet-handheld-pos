@@ -1,11 +1,14 @@
 import 'package:equatable/equatable.dart';
 
+import 'checkout_preview_rates.dart';
+
 /// GET `/transactions/{id}/checkout-preview` payload.
 class CheckoutPreviewResponse extends Equatable {
   const CheckoutPreviewResponse({
     required this.transactionId,
     this.customerContact,
     this.belongings = const [],
+    this.rates,
     required this.releaseSummary,
     required this.ticket,
     this.checkInConditions = const [],
@@ -15,6 +18,10 @@ class CheckoutPreviewResponse extends Equatable {
   final String transactionId;
   final String? customerContact;
   final List<String> belongings;
+
+  /// Server-resolved fees for this transaction; null when absent (offline).
+  final CheckoutPreviewRates? rates;
+
   final ReleaseSummary releaseSummary;
   final CheckoutPreviewTicket ticket;
 
@@ -50,6 +57,7 @@ class CheckoutPreviewResponse extends Equatable {
       transactionId: txMeta.id,
       customerContact: txMeta.contact,
       belongings: txMeta.belongings,
+      rates: CheckoutPreviewRates.fromJson(json['rates']),
       releaseSummary: ReleaseSummary.fromJson(summaryJson),
       ticket: CheckoutPreviewTicket.fromJson(ticketJson),
       checkInConditions: _parseConditionCheckin(txMap['condition_checkin']),
@@ -205,6 +213,7 @@ class CheckoutPreviewResponse extends Equatable {
         transactionId,
         customerContact,
         belongings,
+        rates,
         releaseSummary,
         ticket,
         checkInConditions,

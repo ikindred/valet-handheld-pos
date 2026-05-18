@@ -2481,6 +2481,17 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
   late final GeneratedColumn<String> driverOut = GeneratedColumn<String>(
       'driver_out', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _parkingInfoMeta =
+      const VerificationMeta('parkingInfo');
+  @override
+  late final GeneratedColumn<String> parkingInfo = GeneratedColumn<String>(
+      'parking_info', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _slotIdMeta = const VerificationMeta('slotId');
+  @override
+  late final GeneratedColumn<String> slotId = GeneratedColumn<String>(
+      'slot_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -2503,7 +2514,9 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
         createdAt,
         serverTicketId,
         driverIn,
-        driverOut
+        driverOut,
+        parkingInfo,
+        slotId
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2652,6 +2665,16 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
       context.handle(_driverOutMeta,
           driverOut.isAcceptableOrUnknown(data['driver_out']!, _driverOutMeta));
     }
+    if (data.containsKey('parking_info')) {
+      context.handle(
+          _parkingInfoMeta,
+          parkingInfo.isAcceptableOrUnknown(
+              data['parking_info']!, _parkingInfoMeta));
+    }
+    if (data.containsKey('slot_id')) {
+      context.handle(_slotIdMeta,
+          slotId.isAcceptableOrUnknown(data['slot_id']!, _slotIdMeta));
+    }
     return context;
   }
 
@@ -2703,6 +2726,10 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
           .read(DriftSqlType.string, data['${effectivePrefix}driver_in']),
       driverOut: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}driver_out']),
+      parkingInfo: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}parking_info']),
+      slotId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}slot_id']),
     );
   }
 
@@ -2750,6 +2777,12 @@ class Ticket extends DataClass implements Insertable<Ticket> {
 
   /// Valet attendant who returned the vehicle at check-out.
   final String? driverOut;
+
+  /// JSON: `{"area","level","slot"}` from server or check-in.
+  final String? parkingInfo;
+
+  /// Parking slot UUID from area detail (`levels[].slots[].id`).
+  final String? slotId;
   const Ticket(
       {required this.id,
       required this.shiftId,
@@ -2771,7 +2804,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       required this.createdAt,
       this.serverTicketId,
       this.driverIn,
-      this.driverOut});
+      this.driverOut,
+      this.parkingInfo,
+      this.slotId});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -2807,6 +2842,12 @@ class Ticket extends DataClass implements Insertable<Ticket> {
     }
     if (!nullToAbsent || driverOut != null) {
       map['driver_out'] = Variable<String>(driverOut);
+    }
+    if (!nullToAbsent || parkingInfo != null) {
+      map['parking_info'] = Variable<String>(parkingInfo);
+    }
+    if (!nullToAbsent || slotId != null) {
+      map['slot_id'] = Variable<String>(slotId);
     }
     return map;
   }
@@ -2844,6 +2885,11 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       driverOut: driverOut == null && nullToAbsent
           ? const Value.absent()
           : Value(driverOut),
+      parkingInfo: parkingInfo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parkingInfo),
+      slotId:
+          slotId == null && nullToAbsent ? const Value.absent() : Value(slotId),
     );
   }
 
@@ -2873,6 +2919,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       serverTicketId: serializer.fromJson<String?>(json['serverTicketId']),
       driverIn: serializer.fromJson<String?>(json['driverIn']),
       driverOut: serializer.fromJson<String?>(json['driverOut']),
+      parkingInfo: serializer.fromJson<String?>(json['parkingInfo']),
+      slotId: serializer.fromJson<String?>(json['slotId']),
     );
   }
   @override
@@ -2900,6 +2948,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       'serverTicketId': serializer.toJson<String?>(serverTicketId),
       'driverIn': serializer.toJson<String?>(driverIn),
       'driverOut': serializer.toJson<String?>(driverOut),
+      'parkingInfo': serializer.toJson<String?>(parkingInfo),
+      'slotId': serializer.toJson<String?>(slotId),
     };
   }
 
@@ -2924,7 +2974,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           String? createdAt,
           Value<String?> serverTicketId = const Value.absent(),
           Value<String?> driverIn = const Value.absent(),
-          Value<String?> driverOut = const Value.absent()}) =>
+          Value<String?> driverOut = const Value.absent(),
+          Value<String?> parkingInfo = const Value.absent(),
+          Value<String?> slotId = const Value.absent()}) =>
       Ticket(
         id: id ?? this.id,
         shiftId: shiftId ?? this.shiftId,
@@ -2949,6 +3001,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
             serverTicketId.present ? serverTicketId.value : this.serverTicketId,
         driverIn: driverIn.present ? driverIn.value : this.driverIn,
         driverOut: driverOut.present ? driverOut.value : this.driverOut,
+        parkingInfo: parkingInfo.present ? parkingInfo.value : this.parkingInfo,
+        slotId: slotId.present ? slotId.value : this.slotId,
       );
   Ticket copyWithCompanion(TicketsCompanion data) {
     return Ticket(
@@ -2991,6 +3045,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           : this.serverTicketId,
       driverIn: data.driverIn.present ? data.driverIn.value : this.driverIn,
       driverOut: data.driverOut.present ? data.driverOut.value : this.driverOut,
+      parkingInfo:
+          data.parkingInfo.present ? data.parkingInfo.value : this.parkingInfo,
+      slotId: data.slotId.present ? data.slotId.value : this.slotId,
     );
   }
 
@@ -3017,7 +3074,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           ..write('createdAt: $createdAt, ')
           ..write('serverTicketId: $serverTicketId, ')
           ..write('driverIn: $driverIn, ')
-          ..write('driverOut: $driverOut')
+          ..write('driverOut: $driverOut, ')
+          ..write('parkingInfo: $parkingInfo, ')
+          ..write('slotId: $slotId')
           ..write(')'))
         .toString();
   }
@@ -3044,7 +3103,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
         createdAt,
         serverTicketId,
         driverIn,
-        driverOut
+        driverOut,
+        parkingInfo,
+        slotId
       ]);
   @override
   bool operator ==(Object other) =>
@@ -3070,7 +3131,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           other.createdAt == this.createdAt &&
           other.serverTicketId == this.serverTicketId &&
           other.driverIn == this.driverIn &&
-          other.driverOut == this.driverOut);
+          other.driverOut == this.driverOut &&
+          other.parkingInfo == this.parkingInfo &&
+          other.slotId == this.slotId);
 }
 
 class TicketsCompanion extends UpdateCompanion<Ticket> {
@@ -3095,6 +3158,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
   final Value<String?> serverTicketId;
   final Value<String?> driverIn;
   final Value<String?> driverOut;
+  final Value<String?> parkingInfo;
+  final Value<String?> slotId;
   final Value<int> rowid;
   const TicketsCompanion({
     this.id = const Value.absent(),
@@ -3118,6 +3183,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     this.serverTicketId = const Value.absent(),
     this.driverIn = const Value.absent(),
     this.driverOut = const Value.absent(),
+    this.parkingInfo = const Value.absent(),
+    this.slotId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TicketsCompanion.insert({
@@ -3142,6 +3209,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     this.serverTicketId = const Value.absent(),
     this.driverIn = const Value.absent(),
     this.driverOut = const Value.absent(),
+    this.parkingInfo = const Value.absent(),
+    this.slotId = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         shiftId = Value(shiftId),
@@ -3180,6 +3249,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     Expression<String>? serverTicketId,
     Expression<String>? driverIn,
     Expression<String>? driverOut,
+    Expression<String>? parkingInfo,
+    Expression<String>? slotId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3204,6 +3275,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       if (serverTicketId != null) 'server_ticket_id': serverTicketId,
       if (driverIn != null) 'driver_in': driverIn,
       if (driverOut != null) 'driver_out': driverOut,
+      if (parkingInfo != null) 'parking_info': parkingInfo,
+      if (slotId != null) 'slot_id': slotId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3230,6 +3303,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       Value<String?>? serverTicketId,
       Value<String?>? driverIn,
       Value<String?>? driverOut,
+      Value<String?>? parkingInfo,
+      Value<String?>? slotId,
       Value<int>? rowid}) {
     return TicketsCompanion(
       id: id ?? this.id,
@@ -3253,6 +3328,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       serverTicketId: serverTicketId ?? this.serverTicketId,
       driverIn: driverIn ?? this.driverIn,
       driverOut: driverOut ?? this.driverOut,
+      parkingInfo: parkingInfo ?? this.parkingInfo,
+      slotId: slotId ?? this.slotId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3323,6 +3400,12 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     if (driverOut.present) {
       map['driver_out'] = Variable<String>(driverOut.value);
     }
+    if (parkingInfo.present) {
+      map['parking_info'] = Variable<String>(parkingInfo.value);
+    }
+    if (slotId.present) {
+      map['slot_id'] = Variable<String>(slotId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3353,6 +3436,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
           ..write('serverTicketId: $serverTicketId, ')
           ..write('driverIn: $driverIn, ')
           ..write('driverOut: $driverOut, ')
+          ..write('parkingInfo: $parkingInfo, ')
+          ..write('slotId: $slotId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3857,6 +3942,12 @@ class $RatesTable extends Rates with TableInfo<$RatesTable, Rate> {
   late final GeneratedColumn<double> lostTicketFee = GeneratedColumn<double>(
       'lost_ticket_fee', aliasedName, false,
       type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _overnightCutoffMeta =
+      const VerificationMeta('overnightCutoff');
+  @override
+  late final GeneratedColumn<String> overnightCutoff = GeneratedColumn<String>(
+      'overnight_cutoff', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _syncStatusMeta =
       const VerificationMeta('syncStatus');
   @override
@@ -3879,6 +3970,7 @@ class $RatesTable extends Rates with TableInfo<$RatesTable, Rate> {
         succeedingHourFee,
         overnightFee,
         lostTicketFee,
+        overnightCutoff,
         syncStatus,
         updatedAt
       ];
@@ -3951,6 +4043,12 @@ class $RatesTable extends Rates with TableInfo<$RatesTable, Rate> {
     } else if (isInserting) {
       context.missing(_lostTicketFeeMeta);
     }
+    if (data.containsKey('overnight_cutoff')) {
+      context.handle(
+          _overnightCutoffMeta,
+          overnightCutoff.isAcceptableOrUnknown(
+              data['overnight_cutoff']!, _overnightCutoffMeta));
+    }
     if (data.containsKey('sync_status')) {
       context.handle(
           _syncStatusMeta,
@@ -3994,6 +4092,8 @@ class $RatesTable extends Rates with TableInfo<$RatesTable, Rate> {
           .read(DriftSqlType.double, data['${effectivePrefix}overnight_fee'])!,
       lostTicketFee: attachedDatabase.typeMapping.read(
           DriftSqlType.double, data['${effectivePrefix}lost_ticket_fee'])!,
+      overnightCutoff: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}overnight_cutoff']),
       syncStatus: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
       updatedAt: attachedDatabase.typeMapping
@@ -4017,6 +4117,9 @@ class Rate extends DataClass implements Insertable<Rate> {
   final double overnightFee;
   final double lostTicketFee;
 
+  /// Overnight billing cutoff (`HH:mm`, local); nullable until synced from API.
+  final String? overnightCutoff;
+
   /// `pending` | `synced`
   final String syncStatus;
   final String updatedAt;
@@ -4029,6 +4132,7 @@ class Rate extends DataClass implements Insertable<Rate> {
       required this.succeedingHourFee,
       required this.overnightFee,
       required this.lostTicketFee,
+      this.overnightCutoff,
       required this.syncStatus,
       required this.updatedAt});
   @override
@@ -4042,6 +4146,9 @@ class Rate extends DataClass implements Insertable<Rate> {
     map['succeeding_hour_fee'] = Variable<double>(succeedingHourFee);
     map['overnight_fee'] = Variable<double>(overnightFee);
     map['lost_ticket_fee'] = Variable<double>(lostTicketFee);
+    if (!nullToAbsent || overnightCutoff != null) {
+      map['overnight_cutoff'] = Variable<String>(overnightCutoff);
+    }
     map['sync_status'] = Variable<String>(syncStatus);
     map['updated_at'] = Variable<String>(updatedAt);
     return map;
@@ -4057,6 +4164,9 @@ class Rate extends DataClass implements Insertable<Rate> {
       succeedingHourFee: Value(succeedingHourFee),
       overnightFee: Value(overnightFee),
       lostTicketFee: Value(lostTicketFee),
+      overnightCutoff: overnightCutoff == null && nullToAbsent
+          ? const Value.absent()
+          : Value(overnightCutoff),
       syncStatus: Value(syncStatus),
       updatedAt: Value(updatedAt),
     );
@@ -4074,6 +4184,7 @@ class Rate extends DataClass implements Insertable<Rate> {
       succeedingHourFee: serializer.fromJson<double>(json['succeedingHourFee']),
       overnightFee: serializer.fromJson<double>(json['overnightFee']),
       lostTicketFee: serializer.fromJson<double>(json['lostTicketFee']),
+      overnightCutoff: serializer.fromJson<String?>(json['overnightCutoff']),
       syncStatus: serializer.fromJson<String>(json['syncStatus']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
     );
@@ -4090,6 +4201,7 @@ class Rate extends DataClass implements Insertable<Rate> {
       'succeedingHourFee': serializer.toJson<double>(succeedingHourFee),
       'overnightFee': serializer.toJson<double>(overnightFee),
       'lostTicketFee': serializer.toJson<double>(lostTicketFee),
+      'overnightCutoff': serializer.toJson<String?>(overnightCutoff),
       'syncStatus': serializer.toJson<String>(syncStatus),
       'updatedAt': serializer.toJson<String>(updatedAt),
     };
@@ -4104,6 +4216,7 @@ class Rate extends DataClass implements Insertable<Rate> {
           double? succeedingHourFee,
           double? overnightFee,
           double? lostTicketFee,
+          Value<String?> overnightCutoff = const Value.absent(),
           String? syncStatus,
           String? updatedAt}) =>
       Rate(
@@ -4115,6 +4228,9 @@ class Rate extends DataClass implements Insertable<Rate> {
         succeedingHourFee: succeedingHourFee ?? this.succeedingHourFee,
         overnightFee: overnightFee ?? this.overnightFee,
         lostTicketFee: lostTicketFee ?? this.lostTicketFee,
+        overnightCutoff: overnightCutoff.present
+            ? overnightCutoff.value
+            : this.overnightCutoff,
         syncStatus: syncStatus ?? this.syncStatus,
         updatedAt: updatedAt ?? this.updatedAt,
       );
@@ -4138,6 +4254,9 @@ class Rate extends DataClass implements Insertable<Rate> {
       lostTicketFee: data.lostTicketFee.present
           ? data.lostTicketFee.value
           : this.lostTicketFee,
+      overnightCutoff: data.overnightCutoff.present
+          ? data.overnightCutoff.value
+          : this.overnightCutoff,
       syncStatus:
           data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -4155,6 +4274,7 @@ class Rate extends DataClass implements Insertable<Rate> {
           ..write('succeedingHourFee: $succeedingHourFee, ')
           ..write('overnightFee: $overnightFee, ')
           ..write('lostTicketFee: $lostTicketFee, ')
+          ..write('overnightCutoff: $overnightCutoff, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -4171,6 +4291,7 @@ class Rate extends DataClass implements Insertable<Rate> {
       succeedingHourFee,
       overnightFee,
       lostTicketFee,
+      overnightCutoff,
       syncStatus,
       updatedAt);
   @override
@@ -4185,6 +4306,7 @@ class Rate extends DataClass implements Insertable<Rate> {
           other.succeedingHourFee == this.succeedingHourFee &&
           other.overnightFee == this.overnightFee &&
           other.lostTicketFee == this.lostTicketFee &&
+          other.overnightCutoff == this.overnightCutoff &&
           other.syncStatus == this.syncStatus &&
           other.updatedAt == this.updatedAt);
 }
@@ -4198,6 +4320,7 @@ class RatesCompanion extends UpdateCompanion<Rate> {
   final Value<double> succeedingHourFee;
   final Value<double> overnightFee;
   final Value<double> lostTicketFee;
+  final Value<String?> overnightCutoff;
   final Value<String> syncStatus;
   final Value<String> updatedAt;
   final Value<int> rowid;
@@ -4210,6 +4333,7 @@ class RatesCompanion extends UpdateCompanion<Rate> {
     this.succeedingHourFee = const Value.absent(),
     this.overnightFee = const Value.absent(),
     this.lostTicketFee = const Value.absent(),
+    this.overnightCutoff = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -4223,6 +4347,7 @@ class RatesCompanion extends UpdateCompanion<Rate> {
     required double succeedingHourFee,
     required double overnightFee,
     required double lostTicketFee,
+    this.overnightCutoff = const Value.absent(),
     required String syncStatus,
     required String updatedAt,
     this.rowid = const Value.absent(),
@@ -4245,6 +4370,7 @@ class RatesCompanion extends UpdateCompanion<Rate> {
     Expression<double>? succeedingHourFee,
     Expression<double>? overnightFee,
     Expression<double>? lostTicketFee,
+    Expression<String>? overnightCutoff,
     Expression<String>? syncStatus,
     Expression<String>? updatedAt,
     Expression<int>? rowid,
@@ -4258,6 +4384,7 @@ class RatesCompanion extends UpdateCompanion<Rate> {
       if (succeedingHourFee != null) 'succeeding_hour_fee': succeedingHourFee,
       if (overnightFee != null) 'overnight_fee': overnightFee,
       if (lostTicketFee != null) 'lost_ticket_fee': lostTicketFee,
+      if (overnightCutoff != null) 'overnight_cutoff': overnightCutoff,
       if (syncStatus != null) 'sync_status': syncStatus,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -4273,6 +4400,7 @@ class RatesCompanion extends UpdateCompanion<Rate> {
       Value<double>? succeedingHourFee,
       Value<double>? overnightFee,
       Value<double>? lostTicketFee,
+      Value<String?>? overnightCutoff,
       Value<String>? syncStatus,
       Value<String>? updatedAt,
       Value<int>? rowid}) {
@@ -4285,6 +4413,7 @@ class RatesCompanion extends UpdateCompanion<Rate> {
       succeedingHourFee: succeedingHourFee ?? this.succeedingHourFee,
       overnightFee: overnightFee ?? this.overnightFee,
       lostTicketFee: lostTicketFee ?? this.lostTicketFee,
+      overnightCutoff: overnightCutoff ?? this.overnightCutoff,
       syncStatus: syncStatus ?? this.syncStatus,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -4318,6 +4447,9 @@ class RatesCompanion extends UpdateCompanion<Rate> {
     if (lostTicketFee.present) {
       map['lost_ticket_fee'] = Variable<double>(lostTicketFee.value);
     }
+    if (overnightCutoff.present) {
+      map['overnight_cutoff'] = Variable<String>(overnightCutoff.value);
+    }
     if (syncStatus.present) {
       map['sync_status'] = Variable<String>(syncStatus.value);
     }
@@ -4341,6 +4473,7 @@ class RatesCompanion extends UpdateCompanion<Rate> {
           ..write('succeedingHourFee: $succeedingHourFee, ')
           ..write('overnightFee: $overnightFee, ')
           ..write('lostTicketFee: $lostTicketFee, ')
+          ..write('overnightCutoff: $overnightCutoff, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -5718,6 +5851,8 @@ typedef $$TicketsTableCreateCompanionBuilder = TicketsCompanion Function({
   Value<String?> serverTicketId,
   Value<String?> driverIn,
   Value<String?> driverOut,
+  Value<String?> parkingInfo,
+  Value<String?> slotId,
   Value<int> rowid,
 });
 typedef $$TicketsTableUpdateCompanionBuilder = TicketsCompanion Function({
@@ -5742,6 +5877,8 @@ typedef $$TicketsTableUpdateCompanionBuilder = TicketsCompanion Function({
   Value<String?> serverTicketId,
   Value<String?> driverIn,
   Value<String?> driverOut,
+  Value<String?> parkingInfo,
+  Value<String?> slotId,
   Value<int> rowid,
 });
 
@@ -5783,6 +5920,8 @@ class $$TicketsTableTableManager extends RootTableManager<
             Value<String?> serverTicketId = const Value.absent(),
             Value<String?> driverIn = const Value.absent(),
             Value<String?> driverOut = const Value.absent(),
+            Value<String?> parkingInfo = const Value.absent(),
+            Value<String?> slotId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TicketsCompanion(
@@ -5807,6 +5946,8 @@ class $$TicketsTableTableManager extends RootTableManager<
             serverTicketId: serverTicketId,
             driverIn: driverIn,
             driverOut: driverOut,
+            parkingInfo: parkingInfo,
+            slotId: slotId,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -5831,6 +5972,8 @@ class $$TicketsTableTableManager extends RootTableManager<
             Value<String?> serverTicketId = const Value.absent(),
             Value<String?> driverIn = const Value.absent(),
             Value<String?> driverOut = const Value.absent(),
+            Value<String?> parkingInfo = const Value.absent(),
+            Value<String?> slotId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TicketsCompanion.insert(
@@ -5855,6 +5998,8 @@ class $$TicketsTableTableManager extends RootTableManager<
             serverTicketId: serverTicketId,
             driverIn: driverIn,
             driverOut: driverOut,
+            parkingInfo: parkingInfo,
+            slotId: slotId,
             rowid: rowid,
           ),
         ));
@@ -5960,6 +6105,16 @@ class $$TicketsTableFilterComposer
 
   ColumnFilters<String> get driverOut => $state.composableBuilder(
       column: $state.table.driverOut,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get parkingInfo => $state.composableBuilder(
+      column: $state.table.parkingInfo,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get slotId => $state.composableBuilder(
+      column: $state.table.slotId,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -6076,6 +6231,16 @@ class $$TicketsTableOrderingComposer
 
   ColumnOrderings<String> get driverOut => $state.composableBuilder(
       column: $state.table.driverOut,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get parkingInfo => $state.composableBuilder(
+      column: $state.table.parkingInfo,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get slotId => $state.composableBuilder(
+      column: $state.table.slotId,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
@@ -6275,6 +6440,7 @@ typedef $$RatesTableCreateCompanionBuilder = RatesCompanion Function({
   required double succeedingHourFee,
   required double overnightFee,
   required double lostTicketFee,
+  Value<String?> overnightCutoff,
   required String syncStatus,
   required String updatedAt,
   Value<int> rowid,
@@ -6288,6 +6454,7 @@ typedef $$RatesTableUpdateCompanionBuilder = RatesCompanion Function({
   Value<double> succeedingHourFee,
   Value<double> overnightFee,
   Value<double> lostTicketFee,
+  Value<String?> overnightCutoff,
   Value<String> syncStatus,
   Value<String> updatedAt,
   Value<int> rowid,
@@ -6318,6 +6485,7 @@ class $$RatesTableTableManager extends RootTableManager<
             Value<double> succeedingHourFee = const Value.absent(),
             Value<double> overnightFee = const Value.absent(),
             Value<double> lostTicketFee = const Value.absent(),
+            Value<String?> overnightCutoff = const Value.absent(),
             Value<String> syncStatus = const Value.absent(),
             Value<String> updatedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -6331,6 +6499,7 @@ class $$RatesTableTableManager extends RootTableManager<
             succeedingHourFee: succeedingHourFee,
             overnightFee: overnightFee,
             lostTicketFee: lostTicketFee,
+            overnightCutoff: overnightCutoff,
             syncStatus: syncStatus,
             updatedAt: updatedAt,
             rowid: rowid,
@@ -6344,6 +6513,7 @@ class $$RatesTableTableManager extends RootTableManager<
             required double succeedingHourFee,
             required double overnightFee,
             required double lostTicketFee,
+            Value<String?> overnightCutoff = const Value.absent(),
             required String syncStatus,
             required String updatedAt,
             Value<int> rowid = const Value.absent(),
@@ -6357,6 +6527,7 @@ class $$RatesTableTableManager extends RootTableManager<
             succeedingHourFee: succeedingHourFee,
             overnightFee: overnightFee,
             lostTicketFee: lostTicketFee,
+            overnightCutoff: overnightCutoff,
             syncStatus: syncStatus,
             updatedAt: updatedAt,
             rowid: rowid,
@@ -6404,6 +6575,11 @@ class $$RatesTableFilterComposer
 
   ColumnFilters<double> get lostTicketFee => $state.composableBuilder(
       column: $state.table.lostTicketFee,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get overnightCutoff => $state.composableBuilder(
+      column: $state.table.overnightCutoff,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -6458,6 +6634,11 @@ class $$RatesTableOrderingComposer
 
   ColumnOrderings<double> get lostTicketFee => $state.composableBuilder(
       column: $state.table.lostTicketFee,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get overnightCutoff => $state.composableBuilder(
+      column: $state.table.overnightCutoff,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 

@@ -10,6 +10,7 @@ import 'package:flutter/material.dart' show AlertDialog, BuildContext, Navigator
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/formatting/plate_number.dart';
 import '../../../core/printing/check_in_receipt_data.dart';
 import '../../../core/printing/print_flow.dart';
 import '../../../core/time/unix_timestamp.dart';
@@ -46,6 +47,7 @@ class CheckInState extends Equatable {
     this.vehicleBodyType = VehicleBodyType.sedan,
     this.parkingLevel = '',
     this.parkingSlot = '',
+    this.parkingSlotId = '',
     this.selectedBelongings = const [],
     this.otherBelongings = '',
     this.selectedDamageType = DamageType.dent,
@@ -76,6 +78,9 @@ class CheckInState extends Equatable {
 
   final String parkingLevel;
   final String parkingSlot;
+
+  /// Parking slot UUID from area detail (`levels[].slots[].id`) for `POST /transactions/check-in`.
+  final String parkingSlotId;
 
   /// Toggle keys for the belongings grid (e.g. laptop, cellphone).
   final List<String> selectedBelongings;
@@ -121,6 +126,7 @@ class CheckInState extends Equatable {
     VehicleBodyType? vehicleBodyType,
     String? parkingLevel,
     String? parkingSlot,
+    String? parkingSlotId,
     List<String>? selectedBelongings,
     String? otherBelongings,
     DamageType? selectedDamageType,
@@ -149,6 +155,7 @@ class CheckInState extends Equatable {
       vehicleBodyType: vehicleBodyType ?? this.vehicleBodyType,
       parkingLevel: parkingLevel ?? this.parkingLevel,
       parkingSlot: parkingSlot ?? this.parkingSlot,
+      parkingSlotId: parkingSlotId ?? this.parkingSlotId,
       selectedBelongings: selectedBelongings ?? this.selectedBelongings,
       otherBelongings: otherBelongings ?? this.otherBelongings,
       selectedDamageType: selectedDamageType ?? this.selectedDamageType,
@@ -183,6 +190,7 @@ class CheckInState extends Equatable {
       vehicleBodyType,
       parkingLevel,
       parkingSlot,
+      parkingSlotId,
       b.join('|'),
       otherBelongings,
       selectedDamageType,
@@ -420,7 +428,6 @@ class CheckInCubit extends Cubit<CheckInState> {
       final site = await auth.branchAndAreaFromDb();
       sigFile = await ts.saveSignatureToFile(sig, ticketId);
       final vehicle = _buildVehicleMap();
-      final parking = _buildParkingMap();
       final belongings = _belongingsList();
       final damages = _damageMaps();
 
@@ -442,7 +449,21 @@ class CheckInCubit extends Cubit<CheckInState> {
         valetType: _valetTypeApi(state.valetServiceType),
         parkingLevel: state.parkingLevel.trim(),
         parkingSlot: state.parkingSlot.trim(),
+        slotId: state.parkingSlotId.trim(),
       );
+
+      final slotId = state.parkingSlotId.trim();
+      if (slotId.isEmpty) {
+        emit(state.copyWith(isSubmitting: false));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Select a parking slot on step 2 before check-in.'),
+            ),
+          );
+        }
+        return;
+      }
 
       final token = session.authToken;
       if (token == null || token.isEmpty) {
@@ -452,11 +473,11 @@ class CheckInCubit extends Cubit<CheckInState> {
       final response = await api.submitCheckIn(
         token: token,
         ticketNumber: ticketId,
+        slotId: slotId,
         contactNumber: state.contactNumber.trim(),
         valetType: _valetTypeApi(state.valetServiceType),
         signatureFile: sigFile,
         vehicle: vehicle,
-        parking: parking,
         belongings: belongings,
         damages: damages,
         customerName: _optionalTrim(state.customerFullName),
@@ -546,10 +567,10 @@ class CheckInCubit extends Cubit<CheckInState> {
     final payload = checkInSyncQueuePayload(
       localTicketId: ticketId,
       signaturePath: signaturePath,
+      slotId: state.parkingSlotId.trim(),
       contactNumber: state.contactNumber.trim(),
       valetType: _valetTypeApi(state.valetServiceType),
       vehicle: _buildVehicleMap(),
-      parking: _buildParkingMap(),
       belongings: _belongingsList(),
       damages: _damageMaps(),
       customerName: _optionalTrim(state.customerFullName),
@@ -563,7 +584,7 @@ class CheckInCubit extends Cubit<CheckInState> {
     final yearRaw = state.vehicleYear.trim();
     final year = yearRaw.isEmpty ? null : int.tryParse(yearRaw);
     return <String, dynamic>{
-      'plate_number': state.plateNumber.trim(),
+      'plate_number': normalizePlateNumber(state.plateNumber),
       'brand': state.vehicleBrandMake.trim(),
       'model': state.vehicleModel.trim(),
       'color': state.vehicleColor.trim(),
@@ -572,6 +593,7 @@ class CheckInCubit extends Cubit<CheckInState> {
     };
   }
 
+  // ignore: unused_element
   Map<String, dynamic> _buildParkingMap() {
     final level = state.parkingLevel.trim();
     final slot = state.parkingSlot.trim();
@@ -623,7 +645,7 @@ class CheckInCubit extends Cubit<CheckInState> {
     if (other.isNotEmpty) belongings.add('Other: $other');
     final valet = state.assignedValetDriver.trim();
     return CheckInFormData(
-      plateNumber: state.plateNumber.trim(),
+      plateNumber: normalizePlateNumber(state.plateNumber),
       vehicleBrand: '${state.vehicleBrandMake} ${state.vehicleModel}'.trim(),
       vehicleColor: state.vehicleColor.trim(),
       vehicleType: _vehicleTypeApi(state.vehicleBodyType),
@@ -686,12 +708,14 @@ class CheckInCubit extends Cubit<CheckInState> {
     VehicleBodyType? vehicleBodyType,
     String? parkingLevel,
     String? parkingSlot,
+    String? parkingSlotId,
     List<String>? selectedBelongings,
     String? otherBelongings,
   }) {
     emit(
       state.copyWith(
-        plateNumber: plateNumber,
+        plateNumber:
+            plateNumber != null ? normalizePlateNumber(plateNumber) : null,
         vehicleModel: vehicleModel,
         vehicleBrandMake: vehicleBrandMake,
         vehicleColor: vehicleColor,
@@ -699,6 +723,7 @@ class CheckInCubit extends Cubit<CheckInState> {
         vehicleBodyType: vehicleBodyType,
         parkingLevel: parkingLevel,
         parkingSlot: parkingSlot,
+        parkingSlotId: parkingSlotId,
         selectedBelongings: selectedBelongings,
         otherBelongings: otherBelongings,
       ),

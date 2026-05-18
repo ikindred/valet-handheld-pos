@@ -3,15 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-import '../../../core/formatting/peso_currency.dart';
 import '../../../core/platform/camera_preview_orientation.dart';
 import '../../../core/platform/orientation_lock.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/keyboard_aware_scroll.dart';
-import '../../auth/state/auth_bloc.dart';
 import '../../check_in/presentation/widgets/check_in_compact_tokens.dart';
 import '../../check_in/presentation/widgets/check_in_form_fields.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
@@ -43,15 +39,15 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen>
   static const _viewportSize = 240.0;
   static const _manualMaxWidth = 360.0;
 
-  static const List<String> _pesoFallback = ['Noto Sans', 'Roboto'];
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _ticketCtrl = TextEditingController();
     _plateCtrl = TextEditingController();
-    unawaited(_initScanner());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_initScanner());
+    });
   }
 
   Future<void> _initScanner() async {
@@ -89,6 +85,11 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      // Keyboard open/close also fires metrics — rebuilding restarts the camera
+      // and dismisses the text field focus.
+      final view = View.maybeOf(context);
+      if (view != null && view.viewInsets.bottom > 0) return;
+
       final sc = _scanner;
       final turns = cameraPreviewQuarterTurns(
         context,
@@ -248,21 +249,14 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen>
     BuildContext context,
     CheckOutState state,
     bool busy, {
-    required bool pinLostFeeToBottom,
-    bool keyboardOpen = false,
+    bool alignToTop = false,
   }) {
-    final auth = context.read<AuthBloc>().state;
-    final lostFee = auth is AuthAuthenticated
-        ? (auth.standardRates?.lostTicketFeePesos ?? 200)
-        : 200;
-    final peso = PesoCurrency.currency(decimalDigits: 2);
-
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: _manualMaxWidth),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisAlignment:
-            pinLostFeeToBottom ? MainAxisAlignment.start : MainAxisAlignment.center,
+            alignToTop ? MainAxisAlignment.start : MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
@@ -322,19 +316,10 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen>
               ),
             ),
           ),
-          if (state.scanError.isNotEmpty && !pinLostFeeToBottom) ...[
+          if (state.scanError.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(state.scanError, style: CheckOutUiTokens.error()),
           ],
-          if (pinLostFeeToBottom && !keyboardOpen) const Spacer(),
-          Text(
-            'Lost ticket fee: ${peso.format(lostFee)}',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFFEC2231),
-            ).copyWith(fontFamilyFallback: _pesoFallback),
-          ),
         ],
       ),
     );
@@ -372,64 +357,65 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen>
     );
   }
 
-  Widget _keyboardFocusLayout(
-    BuildContext context,
-    CheckOutState state,
-    bool busy,
-  ) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: _manualPanel(
-        context,
-        state,
-        busy,
-        pinLostFeeToBottom: false,
-        keyboardOpen: true,
-      ),
-    );
-  }
-
   Widget _stackedLayout(
     CheckOutState state,
     bool busy,
-    String? scanError, {
-    required bool keyboardOpen,
-  }) {
+    String? scanError,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (!keyboardOpen) ...[
-          Center(
-            child: _scannerColumn(busy: busy, scanError: scanError),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: CheckoutOrDivider.horizontal(),
-          ),
-        ],
         Center(
-          child: _manualPanel(
-            context,
-            state,
-            busy,
-            pinLostFeeToBottom: false,
-            keyboardOpen: keyboardOpen,
-          ),
+          child: _scannerColumn(busy: busy, scanError: scanError),
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: CheckoutOrDivider.horizontal(),
+        ),
+        Center(
+          child: _manualPanel(context, state, busy),
         ),
       ],
     );
   }
 
+  Widget _twoColumnLayout(
+    CheckOutState state,
+    bool busy,
+    String? scanError,
+  ) {
+    return Align(
+      alignment: Alignment.center,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 920),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Center(
+                child: _scannerColumn(busy: busy, scanError: scanError),
+              ),
+            ),
+            const CheckoutOrDivider.vertical(),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: _manualPanel(context, state, busy, alignToTop: true),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final screenW = MediaQuery.sizeOf(context).width;
-    final keyboardOpen = isKeyboardVisible(context);
-    final twoColumn =
-        screenW >= _twoColumnMinWidth && !keyboardOpen;
+    final twoColumn = MediaQuery.sizeOf(context).width >= _twoColumnMinWidth;
 
     return CheckOutStepBody(
-      scrollable: !twoColumn,
+      scrollable: true,
       footer: _cancelOnlyFooter(context),
       child: BlocBuilder<CheckOutCubit, CheckOutState>(
         buildWhen: (a, b) =>
@@ -438,55 +424,11 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen>
           final busy = state.isLookupBusy;
           final scanError = state.scanError;
 
-          if (keyboardOpen) {
-            return _keyboardFocusLayout(context, state, busy);
-          }
-
           if (twoColumn) {
-            return Align(
-              alignment: Alignment.center,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 920),
-                child: IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: Center(
-                          child: _scannerColumn(
-                            busy: busy,
-                            scanError: scanError,
-                          ),
-                        ),
-                      ),
-                      const CheckoutOrDivider.vertical(),
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: _manualPanel(
-                              context,
-                              state,
-                              busy,
-                              pinLostFeeToBottom: true,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
+            return _twoColumnLayout(state, busy, scanError);
           }
 
-          return _stackedLayout(
-            state,
-            busy,
-            scanError,
-            keyboardOpen: false,
-          );
+          return _stackedLayout(state, busy, scanError);
         },
       ),
     );

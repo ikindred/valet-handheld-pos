@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../shared/widgets/keyboard_aware_scroll.dart';
 import '../../../check_in/presentation/widgets/check_in_compact_tokens.dart';
 import '../../../check_in/presentation/widgets/check_in_footer_actions.dart';
 import '../../state/check_out_cubit.dart';
@@ -16,6 +17,7 @@ class CheckOutStepBody extends StatelessWidget {
     this.showBack = false,
     this.onBack,
     this.scrollable = true,
+    this.fillViewportWhenShort = false,
     this.footer,
   }) : assert(
          footer != null || (primaryLabel != null && onPrimary != null),
@@ -28,6 +30,10 @@ class CheckOutStepBody extends StatelessWidget {
   final bool showBack;
   final VoidCallback? onBack;
   final bool scrollable;
+
+  /// When [scrollable] is true, centers short content vertically (step 1 scan only).
+  /// Do not use on steps with [Expanded] / fixed-height [LayoutBuilder] children.
+  final bool fillViewportWhenShort;
   final Widget? footer;
 
   void _cancel(BuildContext context) {
@@ -47,16 +53,28 @@ class CheckOutStepBody extends StatelessWidget {
           onPrimary: onPrimary!,
         );
 
-    final viewInsets = MediaQuery.viewInsetsOf(context);
-    final keyboardOpen = viewInsets.bottom > 0;
-    final insetBottom = keyboardOpen ? viewInsets.bottom : 0.0;
+    final keyboardOpen = isKeyboardVisible(context);
+    final insetBottom =
+        keyboardOpen ? View.of(context).viewInsets.bottom : 0.0;
 
     Widget body = child;
     if (scrollable) {
-      body = SingleChildScrollView(
-        padding: EdgeInsets.only(bottom: insetBottom),
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        child: child,
+      body = LayoutBuilder(
+        builder: (context, constraints) {
+          final scrollChild = fillViewportWhenShort &&
+                  constraints.maxHeight.isFinite
+              ? ConstrainedBox(
+                  constraints:
+                      BoxConstraints(minHeight: constraints.maxHeight),
+                  child: child,
+                )
+              : child;
+          return SingleChildScrollView(
+            padding: EdgeInsets.only(bottom: insetBottom),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: scrollChild,
+          );
+        },
       );
     } else if (keyboardOpen) {
       body = Padding(

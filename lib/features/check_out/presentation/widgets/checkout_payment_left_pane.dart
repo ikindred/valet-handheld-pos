@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../data/local/db/app_database.dart';
+import '../../domain/checkout_pricing.dart';
 import '../../models/checkout_preview_response.dart';
 import 'check_out_ui_tokens.dart';
 
@@ -12,17 +13,25 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
     required this.row,
     required this.preview,
     required this.serverTotal,
+    this.breakdown,
     required this.peso2,
     required this.timeInLabel,
     required this.dateInLabel,
     required this.timeOutLabel,
     required this.durationLabel,
     required this.driverOutController,
+    required this.isLostTicket,
+    required this.lostTicketFee,
+    required this.onLostTicketChanged,
   });
 
   final Ticket row;
   final CheckoutPreviewResponse? preview;
   final double serverTotal;
+  final CheckoutBreakdown? breakdown;
+  final bool isLostTicket;
+  final double lostTicketFee;
+  final ValueChanged<bool> onLostTicketChanged;
   final NumberFormat peso2;
   final String timeInLabel;
   final String dateInLabel;
@@ -34,6 +43,7 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
   static const _plateBarBg = Color(0xFFA7D6FF);
   static const _orange = Color(0xFFF68D00);
   static const _green = Color(0xFF27AE60);
+  static const _red = Color(0xFFEC2231);
   static const _border = Color(0xFFC0C0BF);
 
   String get _plate {
@@ -54,13 +64,19 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pt = preview?.ticket;
-    final flatLabel = pt?.flatRateLabel?.trim().isNotEmpty == true
-        ? pt!.flatRateLabel!.trim()
-        : 'Flat rate';
-    final flatAmount = pt?.flatRateAmount ?? serverTotal;
-    final succeedingLabel = pt?.succeedingTimeLabel?.trim() ?? '';
-    final succeedingAmount = pt?.succeedingRateAmount ?? 0;
+    final b = breakdown;
+    final flatHours = CheckoutPricing.defaultFlatBlockHours;
+    final flatLabel = b != null
+        ? 'First $flatHours hrs (flat)'
+        : (preview?.ticket.flatRateLabel?.trim().isNotEmpty == true
+            ? preview!.ticket.flatRateLabel!.trim()
+            : 'Flat rate');
+    final flatAmount = b?.flatRateAmount ?? serverTotal;
+    final succeedingAmount = b?.succeedingAmount ?? 0;
+    final succeedingLabel = b != null && succeedingAmount > 0.009
+        ? 'Succeeding hours'
+        : (preview?.ticket.succeedingTimeLabel?.trim() ?? '');
+    final overnightAmount = b?.overnightAmount ?? 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -90,15 +106,62 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
                 children: [
                   Text('RATE BREAKDOWN', style: CheckOutUiTokens.sectionTitle()),
                   const SizedBox(height: 8),
+                  Material(
+                    color: isLostTicket
+                        ? const Color(0xFFFFECEC)
+                        : CheckOutUiTokens.hintFill,
+                    borderRadius: BorderRadius.circular(8),
+                    child: CheckboxListTile(
+                      value: isLostTicket,
+                      onChanged: (v) => onLostTicketChanged(v ?? false),
+                      dense: true,
+                      visualDensity: VisualDensity.compact,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                      activeColor: _red,
+                      checkColor: Colors.white,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: Text(
+                        'Lost ticket (no stub)',
+                        style: CheckOutUiTokens.body().copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Charge lost ticket fee · ${peso2.format(lostTicketFee)}',
+                        style: CheckOutUiTokens.money().copyWith(
+                          color: _red,
+                          fontSize: CheckOutUiTokens.helper().fontSize,
+                          fontWeight: CheckOutUiTokens.helper().fontWeight,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   _BreakdownLine(
                     label: flatLabel,
                     value: peso2.format(flatAmount),
                   ),
-                  if (succeedingLabel.isNotEmpty && succeedingAmount > 0.009) ...[
+                  if (succeedingLabel.isNotEmpty &&
+                      succeedingAmount > 0.009) ...[
                     const SizedBox(height: 6),
                     _BreakdownLine(
                       label: succeedingLabel,
                       value: peso2.format(succeedingAmount),
+                    ),
+                  ],
+                  if (overnightAmount > 0.009) ...[
+                    const SizedBox(height: 6),
+                    _BreakdownLine(
+                      label: 'Overnight fee',
+                      value: peso2.format(overnightAmount),
+                    ),
+                  ],
+                  if (isLostTicket) ...[
+                    const SizedBox(height: 6),
+                    _BreakdownLine(
+                      label: 'Lost ticket fee',
+                      value: peso2.format(lostTicketFee),
+                      showRule: false,
                     ),
                   ],
                   const SizedBox(height: 10),
@@ -214,7 +277,7 @@ class _VehicleSummaryCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _TimeColumn(
-                  label: 'TIME IN',
+                  label: 'CHECK IN',
                   primary: timeInLabel,
                   secondary: dateInLabel,
                   primaryColor: const Color(0xFF0A1B39),
@@ -224,7 +287,7 @@ class _VehicleSummaryCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: _TimeColumn(
-                  label: 'TIME OUT',
+                  label: 'CHECK OUT',
                   primary: timeOutLabel,
                   secondary: durationLabel,
                   primaryColor: CheckoutPaymentLeftPane._orange,

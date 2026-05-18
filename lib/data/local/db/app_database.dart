@@ -196,6 +196,12 @@ class Tickets extends Table {
   /// Valet attendant who returned the vehicle at check-out.
   TextColumn get driverOut => text().nullable()();
 
+  /// JSON: `{"area","level","slot"}` from server or check-in.
+  TextColumn get parkingInfo => text().nullable()();
+
+  /// Parking slot UUID from area detail (`levels[].slots[].id`).
+  TextColumn get slotId => text().named('slot_id').nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -249,6 +255,9 @@ class Rates extends Table {
   RealColumn get overnightFee => real()();
 
   RealColumn get lostTicketFee => real()();
+
+  /// Overnight billing cutoff (`HH:mm`, local); nullable until synced from API.
+  TextColumn get overnightCutoff => text().nullable()();
 
   /// `pending` | `synced`
   TextColumn get syncStatus => text()();
@@ -318,7 +327,7 @@ class AppDatabase extends _$AppDatabase {
   final bool _skipDevOfflineSeed;
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -378,6 +387,15 @@ FROM offline_accounts''');
               offlineAccounts,
               offlineAccounts.shiftScheduleJson,
             );
+          }
+          if (from < 8) {
+            await m.addColumn(tickets, tickets.parkingInfo);
+          }
+          if (from < 9) {
+            await m.addColumn(rates, rates.overnightCutoff);
+          }
+          if (from < 10) {
+            await m.addColumn(tickets, tickets.slotId);
           }
         },
       );

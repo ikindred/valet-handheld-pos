@@ -154,11 +154,14 @@ class _CheckOutPaymentSummaryScreenState
       buildWhen: (a, b) =>
           a.ticket != b.ticket ||
           a.preview != b.preview ||
+          a.breakdown != b.breakdown ||
           a.serverTotal != b.serverTotal ||
           a.isLoadingPreview != b.isLoadingPreview ||
           a.isSubmitting != b.isSubmitting ||
           a.amountTenderedInput != b.amountTenderedInput ||
-          a.driverOut != b.driverOut,
+          a.driverOut != b.driverOut ||
+          a.isLostTicket != b.isLostTicket ||
+          a.rates != b.rates,
       builder: (context, state) {
         if (state.ticket == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -200,7 +203,7 @@ class _CheckOutPaymentSummaryScreenState
             tendered + 1e-6 >= total;
 
         return CheckOutStepBody(
-          scrollable: true,
+          scrollable: false,
           footer: CheckoutVehicleReviewFooter(
             onBack: state.isSubmitting ? () {} : () => context.go('/check-out/step-3'),
             primaryLabel: state.isSubmitting ? 'Completing…' : 'Confirm payment',
@@ -222,17 +225,24 @@ class _CheckOutPaymentSummaryScreenState
               : LayoutBuilder(
                   builder: (context, c) {
                     final wide = c.maxWidth >= 720;
+                    final bodyHeight = c.maxHeight.isFinite
+                        ? c.maxHeight
+                        : MediaQuery.sizeOf(context).height * 0.55;
 
                     final leftPane = CheckoutPaymentLeftPane(
                       row: row,
                       preview: preview,
                       serverTotal: total,
+                      breakdown: state.breakdown,
                       peso2: peso2,
                       timeInLabel: timeInLabel,
                       dateInLabel: dateInLabel,
                       timeOutLabel: timeOutLabel,
                       durationLabel: durationLabel,
                       driverOutController: _driverOutCtrl,
+                      isLostTicket: state.isLostTicket,
+                      lostTicketFee: state.lostTicketFeePesos,
+                      onLostTicketChanged: cubit.setLostTicket,
                     );
 
                     final rightPane = _PaymentRightPane(
@@ -257,7 +267,7 @@ class _CheckOutPaymentSummaryScreenState
 
                     if (wide) {
                       return SizedBox(
-                        height: c.maxHeight,
+                        height: bodyHeight,
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [

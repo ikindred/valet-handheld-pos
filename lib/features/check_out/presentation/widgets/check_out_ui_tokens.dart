@@ -61,7 +61,7 @@ abstract final class CheckOutUiTokens {
         fontWeight: FontWeight.w600,
         height: 1.2,
         color: color ?? AppColors.textPrimary,
-      );
+      ).copyWith(fontFamilyFallback: const ['Noto Sans', 'Roboto']);
 
   static TextStyle amountHero({Color? color}) => GoogleFonts.poppins(
         fontSize: 22,

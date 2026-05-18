@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/connectivity/internet_reachability.dart';
+import '../../../core/time/philippine_time.dart';
+import '../../../core/formatting/plate_number.dart';
 import '../../../core/logging/valet_log.dart';
 import '../../../core/session/standard_parking_rates.dart';
 import '../../../data/local/db/app_database.dart';
@@ -20,6 +22,7 @@ import '../../../data/services/ticket_service.dart';
 import '../../check_in/domain/vehicle_damage.dart';
 import '../../check_in/domain/vehicle_damage_zones.dart';
 import '../domain/checkout_condition_payload.dart';
+import '../domain/check_out_request_payload.dart';
 import '../domain/checkout_preview_format.dart';
 import '../domain/checkout_pricing.dart';
 import '../domain/checkout_receipt_snapshot.dart';
@@ -43,12 +46,14 @@ class CheckOutState extends Equatable {
     this.isLookupBusy = false,
     this.isLoadingPreview = false,
     this.isSubmitting = false,
+    this.isLostTicket = false,
     this.previewError = '',
     this.serverTicketId,
     this.serverTotal,
     this.invoiceNumber,
     this.checkOutResponse,
     this.flatBlockHours = CheckoutPricing.defaultFlatBlockHours,
+    this.overnightCutoff = '',
     this.receiptTicket,
     this.receiptTotalPesos,
     this.receiptChangePesos,
@@ -71,12 +76,14 @@ class CheckOutState extends Equatable {
   final bool isLookupBusy;
   final bool isLoadingPreview;
   final bool isSubmitting;
+  final bool isLostTicket;
   final String previewError;
   final String? serverTicketId;
   final double? serverTotal;
   final String? invoiceNumber;
   final CheckOutResponse? checkOutResponse;
   final int flatBlockHours;
+  final String overnightCutoff;
   final String? receiptTicket;
   final double? receiptTotalPesos;
   final double? receiptChangePesos;
@@ -89,11 +96,16 @@ class CheckOutState extends Equatable {
         ...checkoutAddedDamage,
       ];
 
+  double get lostTicketFeePesos =>
+      preview?.rates?.lostTicketFee ??
+      rates?.lostTicketFeePesos.toDouble() ??
+      200.0;
+
   double? get authoritativeTotal {
-    if (serverTotal != null) return serverTotal;
-    final previewTotal = preview?.ticket.totalAmount;
-    if (previewTotal != null) return previewTotal;
-    return breakdown?.totalPesos.toDouble();
+    final parking = breakdown?.total;
+    if (parking == null) return null;
+    if (isLostTicket) return parking + lostTicketFeePesos;
+    return parking;
   }
 
   CheckOutState copyWith({
@@ -113,14 +125,17 @@ class CheckOutState extends Equatable {
     bool? isLookupBusy,
     bool? isLoadingPreview,
     bool? isSubmitting,
+    bool? isLostTicket,
     String? previewError,
     String? serverTicketId,
     bool clearServerTicketId = false,
     double? serverTotal,
+    bool clearServerTotal = false,
     String? invoiceNumber,
     CheckOutResponse? checkOutResponse,
     bool clearCheckOutResponse = false,
     int? flatBlockHours,
+    String? overnightCutoff,
     String? receiptTicket,
     double? receiptTotalPesos,
     double? receiptChangePesos,
@@ -144,14 +159,17 @@ class CheckOutState extends Equatable {
       isLookupBusy: isLookupBusy ?? this.isLookupBusy,
       isLoadingPreview: isLoadingPreview ?? this.isLoadingPreview,
       isSubmitting: isSubmitting ?? this.isSubmitting,
+      isLostTicket: isLostTicket ?? this.isLostTicket,
       previewError: previewError ?? this.previewError,
       serverTicketId:
           clearServerTicketId ? null : (serverTicketId ?? this.serverTicketId),
-      serverTotal: serverTotal ?? this.serverTotal,
+      serverTotal:
+          clearServerTotal ? null : (serverTotal ?? this.serverTotal),
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       checkOutResponse:
           clearCheckOutResponse ? null : (checkOutResponse ?? this.checkOutResponse),
       flatBlockHours: flatBlockHours ?? this.flatBlockHours,
+      overnightCutoff: overnightCutoff ?? this.overnightCutoff,
       receiptTicket: clearReceipt ? null : (receiptTicket ?? this.receiptTicket),
       receiptTotalPesos:
           clearReceipt ? null : (receiptTotalPesos ?? this.receiptTotalPesos),
@@ -180,12 +198,14 @@ class CheckOutState extends Equatable {
         isLookupBusy,
         isLoadingPreview,
         isSubmitting,
+        isLostTicket,
         previewError,
         serverTicketId,
         serverTotal,
         invoiceNumber,
         checkOutResponse,
         flatBlockHours,
+        overnightCutoff,
         receiptTicket,
         receiptTotalPesos,
         receiptChangePesos,
@@ -212,6 +232,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         CheckOutState(
           rates: state.rates,
           flatBlockHours: state.flatBlockHours,
+          overnightCutoff: state.overnightCutoff,
           branchName: state.branchName,
           mallHours: state.mallHours,
         ),
@@ -222,25 +243,68 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     _recomputeBreakdown();
   }
 
-  Future<void> hydrateRatesFromDrift() async {
-    final t = state.ticket;
-    if (t == null) return;
+  /// Branch rates from Drift (Standard row when [vehicleType] is null).
+  Future<void> hydrateBranchRatesFromDrift({String? vehicleType}) async {
     try {
-      final site = await _auth.branchAndAreaFromDb();
-      final vehicleType = t.vehicleType.trim();
-      final resolved = await _rates.checkoutRatesResolved(
-        branchId: site.branch,
-        vehicleType: vehicleType.isEmpty ? null : vehicleType,
+      final branchId = await _auth.branchUuidForApi();
+      final vt = vehicleType?.trim();
+      final resolved = await _rates.checkoutRatesForOffline(
+        branchId: branchId,
+        vehicleType: vt == null || vt.isEmpty ? null : vt,
       );
-      if (isClosed || resolved == null) return;
+      if (isClosed) return;
       emit(
         state.copyWith(
           rates: resolved.rates,
           flatBlockHours: resolved.flatBlockHours,
+          overnightCutoff: resolved.overnightCutoff,
+        ),
+      );
+    } catch (_) {
+      if (isClosed) return;
+      const fallback = StandardParkingRates.offlineDefault;
+      emit(
+        state.copyWith(
+          rates: fallback,
+          flatBlockHours: CheckoutPricing.defaultFlatBlockHours,
+          overnightCutoff: '01:30',
+        ),
+      );
+    }
+  }
+
+  Future<void> hydrateRatesFromDrift() async {
+    final t = state.ticket;
+    if (t == null) return;
+    try {
+      // Same branch UUID key as RateFetchService / dashboard modal upsert.
+      final branchId = await _auth.branchUuidForApi();
+      final vehicleType = t.vehicleType.trim();
+      final resolved = await _rates.checkoutRatesForOffline(
+        branchId: branchId,
+        vehicleType: vehicleType.isEmpty ? null : vehicleType,
+      );
+      if (isClosed) return;
+      emit(
+        state.copyWith(
+          rates: resolved.rates,
+          flatBlockHours: resolved.flatBlockHours,
+          overnightCutoff: resolved.overnightCutoff,
         ),
       );
       _recomputeBreakdown();
-    } catch (_) {}
+    } catch (_) {
+      if (isClosed) return;
+      const fallback = StandardParkingRates.offlineDefault;
+      emit(
+        state.copyWith(
+          rates: fallback,
+          flatBlockHours: CheckoutPricing.defaultFlatBlockHours,
+          overnightCutoff: '01:30',
+        ),
+      );
+      _recomputeBreakdown();
+    }
   }
 
   void beginFromTicket(Ticket t) {
@@ -249,6 +313,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       CheckOutState(
         rates: state.rates,
         flatBlockHours: state.flatBlockHours,
+        overnightCutoff: state.overnightCutoff,
         branchName: state.branchName,
         mallHours: state.mallHours,
         ticket: t,
@@ -305,17 +370,17 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         preview: preview,
         previewError: '',
         serverTicketId: preview.transactionId,
-        serverTotal: preview.ticket.totalAmount,
+        clearServerTotal: true,
         ticket: ticket,
         driverIn: ticket.driverIn,
         isLookupBusy: false,
         isLoadingPreview: false,
         checkInDamage: dmg.checkIn,
         checkoutAddedDamage: dmg.checkout,
+        clearBreakdown: true,
       ),
     );
     _recomputeBreakdown();
-    unawaited(hydrateRatesFromDrift());
   }
 
   Ticket _mergeTicketWithPreview(Ticket base, CheckoutPreviewResponse preview) {
@@ -424,6 +489,16 @@ class CheckOutCubit extends Cubit<CheckOutState> {
 
   void setAmountTenderedInput(String s) =>
       emit(state.copyWith(amountTenderedInput: s));
+
+  void setLostTicket(bool value) {
+    if (value == state.isLostTicket) return;
+    emit(
+      state.copyWith(
+        isLostTicket: value,
+        amountTenderedInput: value ? '' : state.amountTenderedInput,
+      ),
+    );
+  }
 
   void setDriverOut(String raw) {
     final t = raw.trim();
@@ -539,7 +614,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
   }
 
   Future<void> lookupByPlate(String raw) async {
-    final plate = raw.trim();
+    final plate = normalizePlateNumber(raw);
     if (plate.isEmpty) return;
     emit(
       state.copyWith(
@@ -638,22 +713,55 @@ class CheckOutCubit extends Cubit<CheckOutState> {
   }
 
   void _recomputeBreakdown() {
+    final previewRates = state.preview?.rates;
+    if (previewRates != null) {
+      final timeInRaw = state.preview!.ticket.timeIn.trim();
+      if (timeInRaw.isEmpty) {
+        emit(state.copyWith(clearBreakdown: true));
+        return;
+      }
+      final timeIn = PhilippineTime.fromApiIso(timeInRaw);
+      final timeOut = PhilippineTime.now();
+      final b = CheckoutPricing.computeFromPreviewRates(
+        timeIn: timeIn,
+        timeOut: timeOut,
+        rates: previewRates,
+        flatBlockHours: CheckoutPricing.defaultFlatBlockHours,
+      );
+      emit(
+        state.copyWith(
+          breakdown: b,
+          rates: StandardParkingRates(
+            flatRatePesos: previewRates.flatRate.round(),
+            succeedingHourPesos: previewRates.succeedingRate.round(),
+            overnightFeePesos: previewRates.overnightFee.round(),
+            lostTicketFeePesos: previewRates.lostTicketFee.round(),
+          ),
+        ),
+      );
+      return;
+    }
+
     final t = state.ticket;
     final rates = state.rates;
     if (t == null || rates == null) {
       emit(state.copyWith(clearBreakdown: true));
       return;
     }
-    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final parsedIn = DateTime.tryParse(t.checkInAt)?.toUtc();
-    final timeInUnix = parsedIn != null
-        ? parsedIn.millisecondsSinceEpoch ~/ 1000
-        : now;
+    final checkInRaw = t.checkInAt.trim();
+    if (checkInRaw.isEmpty) {
+      emit(state.copyWith(clearBreakdown: true));
+      return;
+    }
+    final cutoff = state.overnightCutoff.trim().isNotEmpty
+        ? state.overnightCutoff.trim()
+        : '01:30';
     final b = CheckoutPricing.compute(
-      timeInUnix: timeInUnix,
-      timeOutUnix: now,
+      timeIn: PhilippineTime.fromApiIso(checkInRaw),
+      timeOut: PhilippineTime.now(),
       rates: rates,
       flatBlockHours: state.flatBlockHours,
+      overnightCutoff: cutoff,
     );
     emit(state.copyWith(breakdown: b));
   }
@@ -676,6 +784,38 @@ class CheckOutCubit extends Cubit<CheckOutState> {
   List<Map<String, dynamic>> _conditionCheckoutBody() {
     final merged = [...state.checkInDamage, ...state.checkoutAddedDamage];
     return conditionCheckoutPayload(merged);
+  }
+
+  Map<String, dynamic> _buildPreviewPayload(
+    CheckoutPreviewResponse preview,
+    String timeOutIso,
+  ) =>
+      buildCheckOutPreviewPayload(preview, timeOut: timeOutIso);
+
+  Future<void> _enqueueOfflineCheckoutFinalize({
+    required String ticketId,
+    required String? serverTicketId,
+    required double amount,
+    required List<Map<String, dynamic>> conditionBody,
+    required bool isOvernight,
+    required bool ticketLost,
+  }) async {
+    final preview = state.preview;
+    if (preview == null) {
+      throw StateError('Checkout preview is not loaded.');
+    }
+    final timeOutIso = PhilippineTime.now().toUtc().toIso8601String();
+    await _tickets.enqueueCheckoutFinalize(
+      ticketId: ticketId,
+      serverTicketId: serverTicketId,
+      amount: amount,
+      timeOut: timeOutIso,
+      isOvernight: isOvernight,
+      ticketLost: ticketLost,
+      preview: _buildPreviewPayload(preview, timeOutIso),
+      driverOut: state.driverOut,
+      conditionCheckout: conditionBody,
+    );
   }
 
   /// Returns error message for snackbar, or `null` on success.
@@ -723,6 +863,8 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       final token = session?.authToken;
       final pathId = _checkOutPathId();
       final conditionBody = _conditionCheckoutBody();
+      final isOvernight = state.breakdown?.overnightApplied ?? false;
+      final ticketLost = state.isLostTicket;
       final hasInternet = await InternetReachability.hasInternet();
 
       if (token != null && token.isNotEmpty) {
@@ -732,61 +874,92 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         }
         if (hasInternet) {
           try {
-            await _transactionsApi.postCheckoutPreview(
-              token: token,
-              ticketId: pathId,
-              driverOut: driverOut,
-              conditionCheckout: conditionBody,
-            );
-            response = await _transactionsApi.submitCheckOut(
-              token: token,
-              ticketId: pathId,
-              amountPaid: tendered,
-              change: change,
-            );
-            invoice = response.invoiceNumber;
-            serverTotal = response.total;
+            if (state.isLostTicket) {
+              await _tickets.markTicketLost(
+                pathId,
+                notes: 'Lost ticket stub at payment',
+              );
+              // Keep parking + lost fee total; API lost fee is additive, not a replacement.
+              serverTotal = total;
+            } else {
+              final preview = state.preview;
+              if (preview == null) {
+                emit(state.copyWith(isSubmitting: false));
+                return 'Checkout preview is not loaded.';
+              }
+              final timeOutIso =
+                  PhilippineTime.now().toUtc().toIso8601String();
+              response = await _transactionsApi.submitCheckOut(
+                token: token,
+                ticketId: pathId,
+                amount: total,
+                timeOut: timeOutIso,
+                isOvernight: isOvernight,
+                ticketLost: ticketLost,
+                preview: _buildPreviewPayload(preview, timeOutIso),
+                driverOut: state.driverOut,
+                conditionCheckout: conditionBody,
+              );
+              invoice = response.invoiceNumber;
+              serverTotal = response.total;
+            }
           } on SocketException {
-            await _tickets.enqueueCheckoutFinalize(
+            if (state.isLostTicket) {
+              emit(state.copyWith(isSubmitting: false));
+              return 'Lost ticket checkout requires an internet connection.';
+            }
+            await _enqueueOfflineCheckoutFinalize(
               ticketId: t.id,
               serverTicketId: pathId,
-              driverOut: driverOut,
-              conditionCheckout: conditionBody,
-              amountPaid: tendered,
-              change: change,
+              amount: total,
+              conditionBody: conditionBody,
+              isOvernight: isOvernight,
+              ticketLost: ticketLost,
             );
           } on DioException catch (e) {
             if (_isOfflineDio(e)) {
-              await _tickets.enqueueCheckoutFinalize(
+              if (state.isLostTicket) {
+                emit(state.copyWith(isSubmitting: false));
+                return 'Lost ticket checkout requires an internet connection.';
+              }
+              await _enqueueOfflineCheckoutFinalize(
                 ticketId: t.id,
                 serverTicketId: pathId,
-                driverOut: driverOut,
-                conditionCheckout: conditionBody,
-                amountPaid: tendered,
-                change: change,
+                amount: total,
+                conditionBody: conditionBody,
+                isOvernight: isOvernight,
+                ticketLost: ticketLost,
               );
             } else {
               rethrow;
             }
           }
         } else {
-          await _tickets.enqueueCheckoutFinalize(
+          if (state.isLostTicket) {
+            emit(state.copyWith(isSubmitting: false));
+            return 'Lost ticket checkout requires an internet connection.';
+          }
+          await _enqueueOfflineCheckoutFinalize(
             ticketId: t.id,
             serverTicketId: pathId,
-            driverOut: driverOut,
-            conditionCheckout: conditionBody,
-            amountPaid: tendered,
-            change: change,
+            amount: total,
+            conditionBody: conditionBody,
+            isOvernight: isOvernight,
+            ticketLost: ticketLost,
           );
         }
       } else {
-        await _tickets.enqueueCheckoutFinalize(
+        if (state.isLostTicket) {
+          emit(state.copyWith(isSubmitting: false));
+          return 'Lost ticket checkout requires sign-in and a connection.';
+        }
+        await _enqueueOfflineCheckoutFinalize(
           ticketId: t.id,
           serverTicketId: pathId ?? state.serverTicketId,
-          driverOut: driverOut,
-          conditionCheckout: conditionBody,
-          amountPaid: tendered,
-          change: change,
+          amount: total,
+          conditionBody: conditionBody,
+          isOvernight: isOvernight,
+          ticketLost: ticketLost,
         );
       }
 
@@ -796,6 +969,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         totalFee: serverTotal.toDouble(),
         damageMarkersJson: markersJson,
         driverOut: driverOut,
+        status: state.isLostTicket ? 'lost' : 'completed',
       );
 
       final preview = state.preview;
@@ -816,6 +990,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
                   tendered: tendered,
                   change: change,
                   timeOutUnix: timeOut,
+                  totalPesos: total,
                 )
               : CheckoutReceiptSnapshot.minimal(
                   ticketNumber: t.id,

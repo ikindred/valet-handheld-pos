@@ -134,6 +134,7 @@ class CheckoutReceiptSnapshot extends Equatable {
     required double change,
     required int timeOutUnix,
     int flatBlockHours = CheckoutPricing.defaultFlatBlockHours,
+    double? totalPesos,
   }) {
     final flatMins = flatBlockHours * 60;
     final extraMins = (b.durationMinutes - flatMins).clamp(0, 1 << 30);
@@ -153,12 +154,12 @@ class CheckoutReceiptSnapshot extends Equatable {
       slotLine: slotLineFromTicket(ticket),
       valetName: null,
       flatBlockHours: flatBlockHours,
-      flatPesos: b.flatPortionPesos.toDouble(),
-      succeedingPesos: b.succeedingPortionPesos.toDouble(),
+      flatPesos: b.flatRateAmount,
+      succeedingPesos: b.succeedingAmount,
       succeedingExtraMinutes: extraMins,
       overnightApplied: b.overnightApplied,
-      overnightPesos: b.overnightPortionPesos.toDouble(),
-      totalPesos: b.totalPesos.toDouble(),
+      overnightPesos: b.overnightAmount,
+      totalPesos: totalPesos ?? b.total,
       amountTendered: tendered,
       changePesos: change,
       branchLine: branch.isEmpty ? null : branch,

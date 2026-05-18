@@ -411,20 +411,24 @@ body {
               <div class="branch-label">QR scan</div>
               <div class="branch-body">
                 <div class="node node-local" style="margin:0"><div class="node-title"><span class="node-tag tag-local">Drift</span>Lookup by server_ticket_id</div><div class="node-sub">local first</div></div>
-                <div class="node node-api" style="margin:0;margin-top:6px"><div class="node-title"><span class="method GET">GET</span>/transactions/:id</div><div class="node-sub">remote fallback if not found locally</div></div>
+                <div class="node node-api" style="margin:0;margin-top:6px"><div class="node-title"><span class="method GET">GET</span>/transactions/:id/checkout-preview</div><div class="node-sub">after local ticket resolved — server UUID</div></div>
               </div>
             </div>
             <div class="branch">
               <div class="branch-label">Manual TKT-XXXX</div>
               <div class="branch-body">
                 <div class="node node-local" style="margin:0"><div class="node-title"><span class="node-tag tag-local">Drift</span>Lookup by ticket_number</div><div class="node-sub">local first</div></div>
-                <div class="node node-api" style="margin:0;margin-top:6px"><div class="node-title"><span class="method GET">GET</span>/transactions/:id/checkout-preview</div><div class="node-sub">:id = TKT-XXXX or plate (online)</div></div>
+                <div class="node node-api" style="margin:0;margin-top:6px"><div class="node-title"><span class="method GET">GET</span>/transactions/:id/checkout-preview</div><div class="node-sub">server UUID after local ticket_number match</div></div>
               </div>
             </div>
           </div>
+          <div class="node node-api">
+            <div class="node-title"><span class="method GET">GET</span>/transactions/:id/checkout-preview</div>
+            <div class="node-sub">server UUID → rates block + transaction + preview</div>
+          </div>
           <div class="node node-action">
-            <div class="node-title"><span class="node-tag tag-screen">On-device</span>Fee computed from cached Drift rates — no server call</div>
-            <div class="node-sub">flat_rate + succeeding_hours + overnight_fee if applicable</div>
+            <div class="node-title"><span class="node-tag tag-screen">On-device</span>Fee computed from preview.rates — not server total</div>
+            <div class="node-sub">flat_rate + ceil(extraHours) × succeeding_rate + overnight_fee if crosses overnight_cutoff window</div>
           </div>
           <div class="node node-api">
             <div class="node-title"><span class="method PATCH">PATCH</span>/transactions/:id</div>
@@ -436,7 +440,7 @@ body {
           </div>
           <div class="node node-local">
             <div class="node-title"><span class="node-tag tag-local">Drift</span>Update ticket — status: completed, syncStatus: synced</div>
-            <div class="node-sub">fee + driverOut + damageMarkers persisted</div>
+            <div class="node-sub">fee + breakdown + driverOut + damageMarkers persisted</div>
           </div>
           <div class="node node-action">
             <div class="node-title"><span class="node-tag tag-screen">Print</span>Receipt — change displayed, car released</div>
@@ -547,9 +551,13 @@ body {
             <div class="node-title"><span class="node-tag tag-local">Drift</span>Lookup ticket — local only</div>
             <div class="node-sub">no remote fallback — if not on device, cannot proceed until online</div>
           </div>
+          <div class="node node-local">
+            <div class="node-title"><span class="node-tag tag-local">Drift</span>Resolve rates from local rates table</div>
+            <div class="node-sub">1. exact (branchId, vehicleType) · 2. (branchId, 'Standard') · 3. first row for branchId · 4. offlineDefault ₱150 / ₱30 / ₱200 / ₱200</div>
+          </div>
           <div class="node node-action">
-            <div class="node-title"><span class="node-tag tag-screen">On-device</span>Fee computed from cached Drift rates</div>
-            <div class="node-sub">flat_rate + succeeding_hours + overnight_fee if applicable</div>
+            <div class="node-title"><span class="node-tag tag-screen">On-device</span>Fee computed from cached rates</div>
+            <div class="node-sub">same formula as online — flat + succeeding + overnight · overnightCutoff from Drift row → branch_config → "01:30"</div>
           </div>
           <div class="node node-local">
             <div class="node-title"><span class="node-tag tag-local">Drift</span>Update ticket — checkout condition + payment</div>

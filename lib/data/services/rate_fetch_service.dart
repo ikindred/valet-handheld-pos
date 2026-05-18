@@ -41,7 +41,11 @@ class RateFetchService {
       final res = await _dio.get<dynamic>(
         AppConfig.branchAreaDetailUrl(branchId, areaId),
         options: Options(
-          headers: {'Authorization': 'Bearer $token'},
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
           validateStatus: (s) => s != null && s < 500,
         ),
       );
@@ -72,14 +76,22 @@ class RateFetchService {
       await syncRatesForBranch(branchId);
       return;
     }
-    await _persistAreaRatesDetail(branchId: branchId, detail: detail);
+    await cacheAreaDetailRates(branchId: branchId, detail: detail);
   }
+
+  /// Writes standard + vehicle-type fees from area detail into Drift [rates].
+  Future<void> cacheAreaDetailRates({
+    required String branchId,
+    required AreaDetail detail,
+  }) =>
+      _persistAreaRatesDetail(branchId: branchId, detail: detail);
 
   Future<void> _persistAreaRatesDetail({
     required String branchId,
     required AreaDetail detail,
   }) async {
     final flatHours = CheckoutPricing.defaultFlatBlockHours;
+    final areaOvernightCutoff = detail.overnightCutoff;
     if (detail.standard.hasAny) {
       await _upsertRateRow(
         branchId: branchId,
@@ -89,6 +101,7 @@ class RateFetchService {
         succeeding: detail.standard.succeedingRate.toDouble(),
         overnight: detail.standard.overnightFee.toDouble(),
         lost: detail.standard.lostTicketFee.toDouble(),
+        overnightCutoff: areaOvernightCutoff,
       );
     }
 
@@ -109,6 +122,7 @@ class RateFetchService {
         succeeding: row.fees.succeedingRate.toDouble(),
         overnight: row.fees.overnightFee.toDouble(),
         lost: lost,
+        overnightCutoff: areaOvernightCutoff,
       );
     }
   }
@@ -154,6 +168,7 @@ class RateFetchService {
               succeeding: parsed.succeedingHourPesos.toDouble(),
               overnight: parsed.overnightFeePesos.toDouble(),
               lost: parsed.lostTicketFeePesos.toDouble(),
+              overnightCutoff: _overnightCutoffFromMap(m),
             );
           }
         }
@@ -201,6 +216,7 @@ class RateFetchService {
           succeeding: succeeding,
           overnight: overnight,
           lost: lost,
+          overnightCutoff: _overnightCutoffFromMap(row),
         );
       }
     } catch (e, st) {
@@ -254,6 +270,16 @@ class RateFetchService {
     );
   }
 
+  static String? _overnightCutoffFromMap(Map<String, dynamic> m) {
+    for (final k in const ['overnight_cutoff', 'overnightCutoff']) {
+      final v = m[k];
+      if (v == null) continue;
+      final s = v.toString().trim();
+      if (s.isNotEmpty) return s;
+    }
+    return null;
+  }
+
   static double _doubleField(Map<String, dynamic> m, List<String> keys) {
     for (final k in keys) {
       final v = m[k];
@@ -292,6 +318,7 @@ class RateFetchService {
     required double succeeding,
     required double overnight,
     required double lost,
+    String? overnightCutoff,
   }) async {
     final now = DateTime.now().toIso8601String();
     final existing = await (_db.select(_db.rates)
@@ -310,6 +337,7 @@ class RateFetchService {
           succeedingHourFee: Value(succeeding),
           overnightFee: Value(overnight),
           lostTicketFee: Value(lost),
+          overnightCutoff: Value(overnightCutoff),
           syncStatus: const Value('synced'),
           updatedAt: Value(now),
         ),
@@ -325,6 +353,7 @@ class RateFetchService {
               succeedingHourFee: succeeding,
               overnightFee: overnight,
               lostTicketFee: lost,
+              overnightCutoff: Value(overnightCutoff),
               syncStatus: 'synced',
               updatedAt: now,
             ),

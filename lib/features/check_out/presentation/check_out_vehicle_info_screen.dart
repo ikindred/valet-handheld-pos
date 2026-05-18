@@ -165,14 +165,14 @@ class _PreviewVehicleBody extends StatelessWidget {
           contact: contact,
         ),
         timeInCard: _TimeCard(
-          title: 'TIME IN',
+          title: 'CHECK IN',
           primary: timeInLabel,
           secondary: dateInLabel,
           primaryColor: const Color(0xFF0A1B39),
           secondaryColor: const Color(0xFF0A1B39),
         ),
         timeOutCard: _TimeCard(
-          title: 'TIME OUT',
+          title: 'CHECK OUT',
           primary: timeOutLabel,
           secondary: durationLabel,
           primaryColor: DashboardStyles.orange,
@@ -223,14 +223,14 @@ class _OfflineVehicleBody extends StatelessWidget {
         tabs: tabs,
         customerCard: const _CustomerCard(name: '—', contact: '—'),
         timeInCard: _TimeCard(
-          title: 'TIME IN',
+          title: 'CHECK IN',
           primary: formatPreviewTime(row.checkInAt),
           secondary: formatPreviewDate(row.checkInAt),
           primaryColor: const Color(0xFF0A1B39),
           secondaryColor: const Color(0xFF0A1B39),
         ),
         timeOutCard: _TimeCard(
-          title: 'TIME OUT',
+          title: 'CHECK OUT',
           primary: formatPreviewTime(PhilippineTime.iso8601Now()),
           secondary: CheckOutVehicleInfoScreen._durationSoFar(timeIn),
           primaryColor: DashboardStyles.orange,

@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import '../../core/config/app_config.dart';
 import '../../features/check_in/models/check_in_response.dart';
 import '../../features/check_out/models/check_out_response.dart';
+import '../../features/check_out/models/checkout_preview_rates.dart';
 import '../../features/check_out/models/checkout_preview_response.dart';
 import 'api_error_message.dart';
 import 'check_in_exceptions.dart';
@@ -150,13 +151,17 @@ class TransactionsApi {
     }
   }
 
-  /// POST [AppConfig.checkOutUrl] — finalize checkout (payment only; no condition body).
+  /// POST [AppConfig.checkOutUrl] — finalize checkout (single-call unified payload).
   Future<CheckOutResponse> submitCheckOut({
     required String token,
     required String ticketId,
-    required double amountPaid,
-    required double change,
-    String paymentMethod = 'cash',
+    required double amount,
+    required String timeOut,
+    required bool isOvernight,
+    required bool ticketLost,
+    required Map<String, dynamic> preview,
+    String? driverOut,
+    List<Map<String, dynamic>>? conditionCheckout,
   }) async {
     final id = ticketId.trim();
     if (id.isEmpty) {
@@ -165,18 +170,23 @@ class TransactionsApi {
     if (AppConfig.useStubApi) {
       return CheckOutResponse(
         invoiceNumber: 'INV-STUB-001',
-        durationMinutes: 120,
-        base: 150,
-        extra: 60,
-        overnight: 0,
-        total: amountPaid,
+        transactionId: id,
+        status: 'completed',
+        total: amount,
       );
     }
     final body = <String, dynamic>{
-      'amount_paid': amountPaid,
-      'change': change,
-      'payment_method': paymentMethod,
+      'amount': amount,
+      'time_out': timeOut,
+      'is_overnight': isOvernight,
+      'ticket_lost': ticketLost,
+      'preview': preview,
+      'condition_checkout': conditionCheckout ?? const [],
     };
+    final driver = driverOut?.trim();
+    if (driver != null && driver.isNotEmpty) {
+      body['driver_out'] = driver;
+    }
     try {
       final res = await _dio.post<dynamic>(
         AppConfig.checkOutUrl(id),
@@ -197,11 +207,11 @@ class TransactionsApi {
   Future<CheckInResponse> submitCheckIn({
     required String token,
     required String ticketNumber,
+    required String slotId,
     required String contactNumber,
     required String valetType,
     required File signatureFile,
     required Map<String, dynamic> vehicle,
-    required Map<String, dynamic> parking,
     required List<String> belongings,
     required List<Map<String, dynamic>> damages,
     String? customerName,
@@ -218,10 +228,10 @@ class TransactionsApi {
 
     final fields = <MapEntry<String, String>>[
       MapEntry('ticket_number', ticketNumber.trim()),
+      MapEntry('slot_id', slotId.trim()),
       MapEntry('contact_number', contactNumber),
       MapEntry('valet_type', valetType),
       MapEntry('vehicle', jsonEncode(vehicle)),
-      MapEntry('parking', jsonEncode(parking)),
       MapEntry('belongings', jsonEncode(belongings)),
       MapEntry('damages', jsonEncode(damages)),
     ];
@@ -511,6 +521,13 @@ class TransactionsApi {
         customer: 'Juan dela Cruz',
         duration: '2h 15m',
       ),
+      rates: const CheckoutPreviewRates(
+        flatRate: 150,
+        succeedingRate: 30,
+        overnightFee: 200,
+        lostTicketFee: 200,
+        overnightCutoff: '01:30',
+      ),
       ticket: CheckoutPreviewTicket(
         ticketNumber: ticketId,
         plate: 'ABC 1234',
@@ -520,11 +537,9 @@ class TransactionsApi {
         vehicleType: 'Sedan',
         timeIn: DateTime.now().subtract(const Duration(hours: 2)).toIso8601String(),
         duration: '2h 15m',
-        flatRateLabel: 'First 3 hrs (flat)',
-        flatRateAmount: 150,
-        succeedingTimeLabel: '+15 mins',
-        succeedingRateAmount: 60,
-        totalAmount: 210,
+        flatRateAmount: 0,
+        succeedingRateAmount: 0,
+        totalAmount: 0,
       ),
       conditionComparison: const [
         ConditionComparison(

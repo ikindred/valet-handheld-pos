@@ -5,7 +5,45 @@ import '../../core/theme/app_theme.dart';
 import '../../data/remote/area_detail.dart';
 import '../../features/dashboard/presentation/widgets/dashboard_widgets.dart';
 
-/// Compact per-level slot grid (available vs occupied) from area `levels[]`.
+/// One level: title, free/used counts, and slot chips.
+class AreaParkingLevelPanel extends StatelessWidget {
+  const AreaParkingLevelPanel({
+    super.key,
+    required this.level,
+    this.showTitle = true,
+  });
+
+  final AreaParkingLevel level;
+  final bool showTitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showTitle) ...[
+          Row(
+            children: [
+              Expanded(child: Text(level.name, style: _levelTitle())),
+              Text(
+                '${level.availableCount} free · ${level.occupiedCount} used',
+                style: _levelMeta(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+        ],
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [for (final slot in level.slots) _SlotChip(slot: slot)],
+        ),
+      ],
+    );
+  }
+}
+
+/// All levels stacked (legacy combined modal).
 class AreaParkingLayoutSection extends StatelessWidget {
   const AreaParkingLayoutSection({
     super.key,
@@ -27,42 +65,8 @@ class AreaParkingLayoutSection extends StatelessWidget {
         const SizedBox(height: 8),
         for (var i = 0; i < levels.length; i++) ...[
           if (i > 0) const SizedBox(height: 10),
-          _LevelBlock(level: levels[i]),
+          AreaParkingLevelPanel(level: levels[i]),
         ],
-      ],
-    );
-  }
-}
-
-class _LevelBlock extends StatelessWidget {
-  const _LevelBlock({required this.level});
-
-  final AreaParkingLevel level;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(level.name, style: _levelTitle()),
-            ),
-            Text(
-              '${level.availableCount} free · ${level.occupiedCount} used',
-              style: _levelMeta(),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            for (final slot in level.slots) _SlotChip(slot: slot),
-          ],
-        ),
       ],
     );
   }

@@ -20,14 +20,42 @@ class CheckoutOrDivider extends StatelessWidget {
   Widget _buildVertical() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          const Expanded(child: _Rule(axis: Axis.vertical)),
-          const SizedBox(height: 14),
-          _orLabel(),
-          const SizedBox(height: 14),
-          const Expanded(child: _Rule(axis: Axis.vertical)),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Inside a vertical scroll view, max height is infinite — [Expanded] crashes.
+          final stretch = constraints.maxHeight.isFinite;
+          if (stretch) {
+            return Column(
+              children: [
+                const Expanded(child: _Rule(axis: Axis.vertical)),
+                const SizedBox(height: 14),
+                _orLabel(),
+                const SizedBox(height: 14),
+                const Expanded(child: _Rule(axis: Axis.vertical)),
+              ],
+            );
+          }
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _fixedVerticalRule(120),
+              const SizedBox(height: 14),
+              _orLabel(),
+              const SizedBox(height: 14),
+              _fixedVerticalRule(120),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _fixedVerticalRule(double height) {
+    return Center(
+      child: Container(
+        width: 1,
+        height: height,
+        color: _line,
       ),
     );
   }

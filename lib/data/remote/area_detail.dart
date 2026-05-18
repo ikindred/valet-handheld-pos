@@ -176,6 +176,7 @@ class AreaDetail {
     required this.standard,
     required this.vehicleTypeRates,
     required this.levels,
+    this.overnightCutoff,
   });
 
   final String id;
@@ -184,6 +185,9 @@ class AreaDetail {
   final ParkingRateFees standard;
   final List<VehicleTypeRateRow> vehicleTypeRates;
   final List<AreaParkingLevel> levels;
+
+  /// Area-level overnight cutoff (`HH:mm`), applied to all cached rate rows.
+  final String? overnightCutoff;
 
   AreaSlotCounts get slotCounts {
     if (levels.isEmpty) return AreaSlotCounts.empty;
@@ -220,7 +224,14 @@ class AreaDetail {
       standard: standard,
       vehicleTypeRates: vehicleRows,
       levels: levels,
+      overnightCutoff: _parseOvernightCutoff(body),
     );
+  }
+
+  static String? _parseOvernightCutoff(Map<String, dynamic> body) {
+    final raw = body['overnight_cutoff'] ?? body['overnightCutoff'];
+    final s = raw?.toString().trim() ?? '';
+    return s.isEmpty ? null : s;
   }
 
   static List<VehicleTypeRateRow> _parseVehicleTypeRates(
