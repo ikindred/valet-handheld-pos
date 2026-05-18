@@ -258,9 +258,9 @@ class _StatsRow extends StatelessWidget {
         subtitle: 'This shift',
       ),
       DashboardStatCard(
-        title: 'Active Slots',
-        valueText: '${d.activeSlotsUsed}',
-        subtitle: 'of ${d.activeSlotsTotal} Slots',
+        title: 'Remaining Slots',
+        valueText: '${d.remainingSlots}',
+        subtitle: 'of ${d.totalSlots} Slots',
       ),
     ];
 
@@ -298,24 +298,7 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final checkIn = DashboardActionTile(
-      primary: true,
-      title: 'Check in Vehicle',
-      subtitle: 'New parking Transaction',
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.27),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
-      ),
-      onTap: () {
-        context.read<CheckInCubit>().resetSession();
-        context.push('/check-in/step-1');
-      },
-    );
+    const checkIn = _CheckInVehicleActionTile();
 
     final checkOut = DashboardActionTile(
       primary: false,
@@ -351,6 +334,65 @@ class _ActionRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [checkIn, const SizedBox(height: 8), checkOut],
+    );
+  }
+}
+
+class _CheckInVehicleActionTile extends StatefulWidget {
+  const _CheckInVehicleActionTile();
+
+  @override
+  State<_CheckInVehicleActionTile> createState() =>
+      _CheckInVehicleActionTileState();
+}
+
+class _CheckInVehicleActionTileState extends State<_CheckInVehicleActionTile> {
+  bool _reserving = false;
+
+  Future<void> _onTap() async {
+    if (_reserving) return;
+    setState(() => _reserving = true);
+    final cubit = context.read<CheckInCubit>();
+    final ok = await cubit.prepareNewCheckInSession();
+    if (!mounted) return;
+    setState(() => _reserving = false);
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not reserve a ticket number. Open a cash shift and try again.',
+          ),
+        ),
+      );
+      return;
+    }
+    context.push('/check-in/step-1');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DashboardActionTile(
+      primary: true,
+      title: 'Check in Vehicle',
+      subtitle: _reserving ? 'Reserving ticket…' : 'New parking Transaction',
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.27),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: _reserving
+            ? const Padding(
+                padding: EdgeInsets.all(8),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+      ),
+      onTap: _reserving ? () {} : () => unawaited(_onTap()),
     );
   }
 }

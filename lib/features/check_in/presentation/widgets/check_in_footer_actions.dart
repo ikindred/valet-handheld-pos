@@ -14,6 +14,7 @@ class CheckInFooterActions extends StatelessWidget {
     required this.primaryLabel,
     required this.onPrimary,
     this.showBack = false,
+    this.primaryBusy = false,
   });
 
   final VoidCallback onCancel;
@@ -21,6 +22,7 @@ class CheckInFooterActions extends StatelessWidget {
   final String primaryLabel;
   final VoidCallback onPrimary;
   final bool showBack;
+  final bool primaryBusy;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +42,7 @@ class CheckInFooterActions extends StatelessWidget {
           child: _PrimaryFooterButton(
             label: primaryLabel,
             onPressed: onPrimary,
+            busy: primaryBusy,
           ),
         ),
       ],
@@ -79,17 +82,22 @@ class _OutlinedFooterButton extends StatelessWidget {
 }
 
 class _PrimaryFooterButton extends StatelessWidget {
-  const _PrimaryFooterButton({required this.label, required this.onPressed});
+  const _PrimaryFooterButton({
+    required this.label,
+    required this.onPressed,
+    this.busy = false,
+  });
 
   final String label;
   final VoidCallback onPressed;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: CheckInCompactTokens.footerButtonHeight,
       child: FilledButton(
-        onPressed: onPressed,
+        onPressed: busy ? null : onPressed,
         style: FilledButton.styleFrom(
           backgroundColor: const Color(0xFFF68D00),
           foregroundColor: Colors.white,
@@ -97,12 +105,21 @@ class _PrimaryFooterButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
           ),
         ),
-        child: Text(
-          label,
-          style: CheckInCompactTokens.footerLabel().copyWith(
-            color: Colors.white,
-          ),
-        ),
+        child: busy
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : Text(
+                label,
+                style: CheckInCompactTokens.footerLabel().copyWith(
+                  color: Colors.white,
+                ),
+              ),
       ),
     );
   }

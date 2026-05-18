@@ -1,16 +1,27 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:bloc/bloc.dart';
+import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart' show AlertDialog, BuildContext, Navigator, ScaffoldMessenger, SnackBar, Text, TextButton, showDialog;
+import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/printing/check_in_receipt_data.dart';
+import '../../../core/printing/print_flow.dart';
 import '../../../core/time/unix_timestamp.dart';
+import '../../../data/remote/api_error_message.dart';
+import '../../../data/remote/check_in_exceptions.dart';
+import '../../../data/remote/transactions_api.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/check_in_sync_payload.dart';
 import '../../../data/services/shift_service.dart';
 import '../../../data/services/ticket_service.dart';
 import '../domain/check_in_demo_defaults.dart';
+import '../models/receipt_part.dart';
 import '../domain/check_in_form_data.dart';
 import '../domain/vehicle_body_type.dart';
 import '../domain/vehicle_damage.dart';
@@ -42,6 +53,10 @@ class CheckInState extends Equatable {
     this.hasCustomerSignature = false,
     this.signaturePng,
     this.signatureCapturedAt,
+    this.receiptParts = initialReceiptParts,
+    this.serverTicketId,
+    this.qrCode,
+    this.isSubmitting = false,
   });
 
   final String ticketNumber;
@@ -81,6 +96,15 @@ class CheckInState extends Equatable {
   /// Unix seconds when [signaturePng] was captured.
   final int? signatureCapturedAt;
 
+  final List<ReceiptPartState> receiptParts;
+
+  final String? serverTicketId;
+  final String? qrCode;
+  final bool isSubmitting;
+
+  bool get allPartsPrinted =>
+      receiptParts.every((p) => p.status == ReceiptPartStatus.printed);
+
   CheckInState copyWith({
     String? ticketNumber,
     String? customerFullName,
@@ -104,6 +128,10 @@ class CheckInState extends Equatable {
     bool? hasCustomerSignature,
     Uint8List? signaturePng,
     int? signatureCapturedAt,
+    List<ReceiptPartState>? receiptParts,
+    String? serverTicketId,
+    String? qrCode,
+    bool? isSubmitting,
   }) {
     return CheckInState(
       ticketNumber: ticketNumber ?? this.ticketNumber,
@@ -129,6 +157,10 @@ class CheckInState extends Equatable {
       signaturePng: signaturePng ?? this.signaturePng,
       signatureCapturedAt:
           signatureCapturedAt ?? this.signatureCapturedAt,
+      receiptParts: receiptParts ?? this.receiptParts,
+      serverTicketId: serverTicketId ?? this.serverTicketId,
+      qrCode: qrCode ?? this.qrCode,
+      isSubmitting: isSubmitting ?? this.isSubmitting,
     );
   }
 
@@ -158,6 +190,10 @@ class CheckInState extends Equatable {
       hasCustomerSignature,
       signaturePng,
       signatureCapturedAt,
+      receiptParts,
+      serverTicketId,
+      qrCode,
+      isSubmitting,
     ];
   }
 }
@@ -167,9 +203,11 @@ class CheckInCubit extends Cubit<CheckInState> {
     TicketService? ticketService,
     AuthRepository? authRepository,
     ShiftService? shiftService,
+    TransactionsApi? transactionsApi,
   })  : _ticketService = ticketService,
         _authRepository = authRepository,
         _shiftService = shiftService,
+        _transactionsApi = transactionsApi,
         super(
           CheckInDemoDefaults.enabled
               ? CheckInDemoDefaults.initial()
@@ -181,79 +219,403 @@ class CheckInCubit extends Cubit<CheckInState> {
   final TicketService? _ticketService;
   final AuthRepository? _authRepository;
   final ShiftService? _shiftService;
+  final TransactionsApi? _transactionsApi;
 
-  /// Reserves a sequential ticket id via a draft `tickets` row (see [TicketService.createDraftTicket]).
-  /// Call when the check-in shell opens. Safe to call repeatedly while [CheckInState.ticketNumber] is empty.
-  Future<void> ensureDraftTicketReserved() async {
-    final ts = _ticketService;
-    final auth = _authRepository;
-    final shiftSvc = _shiftService;
-    if (ts == null || auth == null || shiftSvc == null) return;
-    if (state.ticketNumber.trim().isNotEmpty) return;
-    final session = await auth.getActiveSession();
-    if (session == null) return;
-    final userId = await shiftSvc.shiftUserIdForLocalAccount(session.userId);
-    final shift = await shiftSvc.getActiveShift(userId);
-    if (shift == null) return;
-    final site = await auth.branchAndAreaFromDb();
+  bool _draftReservationInFlight = false;
+  Completer<void>? _draftReservationCompleter;
+
+  int get nextPartToPrint {
+    final next = state.receiptParts.firstWhere(
+      (p) => p.status != ReceiptPartStatus.printed,
+      orElse: () => const ReceiptPartState(
+        part: 0,
+        label: '',
+        status: ReceiptPartStatus.printed,
+      ),
+    );
+    return next.part;
+  }
+
+  Future<void> printPart(
+    BuildContext context,
+    int part,
+    CheckInReceiptData data,
+  ) async {
+    if (part != nextPartToPrint) return;
+    _updatePartStatus(part, ReceiptPartStatus.printing);
+    final ok = await printCheckInPartFromContext(
+      context,
+      data: data,
+      part: part,
+    );
+    _updatePartStatus(
+      part,
+      ok ? ReceiptPartStatus.printed : ReceiptPartStatus.failed,
+    );
+  }
+
+  Future<void> reprintPart(
+    BuildContext context,
+    int part,
+    CheckInReceiptData data,
+  ) async {
+    if (part < 1 || part > state.receiptParts.length) return;
+    final current = state.receiptParts[part - 1];
+    if (current.status != ReceiptPartStatus.printed &&
+        current.status != ReceiptPartStatus.failed) {
+      return;
+    }
+    final preceding = state.receiptParts.take(part - 1);
+    if (preceding.any((p) => p.status != ReceiptPartStatus.printed)) {
+      return;
+    }
+    _updatePartStatus(part, ReceiptPartStatus.printing);
+    final ok = await printCheckInPartFromContext(
+      context,
+      data: data,
+      part: part,
+    );
+    _updatePartStatus(
+      part,
+      ok ? ReceiptPartStatus.printed : ReceiptPartStatus.failed,
+    );
+  }
+
+  void _updatePartStatus(int part, ReceiptPartStatus status) {
+    final updated = state.receiptParts
+        .map((p) => p.part == part ? p.copyWith(status: status) : p)
+        .toList();
+    emit(state.copyWith(receiptParts: updated));
+  }
+
+  /// Clears session state and awaits a new draft ticket id before check-in UI opens.
+  Future<bool> prepareNewCheckInSession() async {
+    resetSession();
+    return _reserveDraftWithRetry();
+  }
+
+  /// Reserves a draft `tickets` row (see [TicketService.createDraftTicket]).
+  /// Returns true when [CheckInState.ticketNumber] is set.
+  Future<bool> ensureDraftTicketReserved() async {
+    if (state.ticketNumber.trim().isNotEmpty) return true;
+
+    if (_draftReservationInFlight) {
+      await (_draftReservationCompleter?.future ?? Future<void>.value());
+      return state.ticketNumber.trim().isNotEmpty;
+    }
+
+    _draftReservationInFlight = true;
+    final done = Completer<void>();
+    _draftReservationCompleter = done;
     try {
-      final id = await ts.createDraftTicket(
-        shiftId: shift.id,
-        userId: userId,
-        branchId: site.branch,
-      );
-      emit(state.copyWith(ticketNumber: id));
-    } catch (_) {
-      // Leave empty; header shows … until a draft can be created (e.g. shift opened).
+      final ts = _ticketService;
+      final auth = _authRepository;
+      final shiftSvc = _shiftService;
+      if (ts == null || auth == null || shiftSvc == null) return false;
+      if (state.ticketNumber.trim().isNotEmpty) return true;
+      final session = await auth.getActiveSession();
+      if (session == null) return false;
+      final userId = await shiftSvc.shiftUserIdForLocalAccount(session.userId);
+      final shift = await shiftSvc.getActiveShift(userId);
+      if (shift == null) return false;
+      final site = await auth.branchAndAreaFromDb();
+      try {
+        final id = await ts.createDraftTicket(
+          shiftId: shift.id,
+          userId: userId,
+          branchId: site.branch,
+        );
+        emit(state.copyWith(ticketNumber: id));
+      } catch (_) {
+        return false;
+      }
+      return state.ticketNumber.trim().isNotEmpty;
+    } finally {
+      _draftReservationInFlight = false;
+      if (!done.isCompleted) done.complete();
+      _draftReservationCompleter = null;
     }
   }
 
-  /// Persists `valet_tickets` + sync queue. Returns null on success, else error text.
-  Future<String?> submitValetTicket() async {
+  Future<bool> _reserveDraftWithRetry() async {
+    if (await ensureDraftTicketReserved()) return true;
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    return ensureDraftTicketReserved();
+  }
+
+  /// Confirms check-in: signature file, local Drift, then multipart API (or queue offline).
+  Future<void> confirmCheckIn(BuildContext context) async {
     final ts = _ticketService;
     final auth = _authRepository;
     final shiftSvc = _shiftService;
-    if (ts == null || auth == null || shiftSvc == null) {
-      return 'Check-in services are not configured.';
+    final api = _transactionsApi;
+    if (ts == null || auth == null || shiftSvc == null || api == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Check-in services are not configured.')),
+        );
+      }
+      return;
     }
-    final session = await auth.getActiveSession();
-    if (session == null) return 'No active session.';
-    final userId = await shiftSvc.shiftUserIdForLocalAccount(session.userId);
-    final shift = await shiftSvc.getActiveShift(userId);
-    if (shift == null) return 'Open a cash shift before check-in.';
-    final site = await auth.branchAndAreaFromDb();
+
+    final sig = state.signaturePng;
+    if (sig == null || sig.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Customer signature is required.')),
+        );
+      }
+      return;
+    }
+
+    final ticketId = state.ticketNumber.trim();
+    if (ticketId.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No ticket number yet.')),
+        );
+      }
+      return;
+    }
+
     final data = _buildFormData();
     if (!data.isComplete) {
-      return 'Complete plate, brand, color, and cellphone.';
-    }
-    try {
-      final existingId = state.ticketNumber.trim();
-      if (existingId.isNotEmpty) {
-        final row = await ts.ticketById(existingId);
-        if (row != null && row.status == 'draft') {
-          final ticket = await ts.finalizeDraftTicket(
-            ticketId: existingId,
-            data: data,
-            shiftId: shift.id,
-            userId: userId,
-            branchId: site.branch,
-          );
-          emit(state.copyWith(ticketNumber: ticket.id));
-          return null;
-        }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Complete plate, brand, color, and cellphone.'),
+          ),
+        );
       }
-      final ticket = await ts.createTicket(
-        data: data,
+      return;
+    }
+
+    emit(state.copyWith(isSubmitting: true));
+
+    late final File sigFile;
+    try {
+      final session = await auth.getActiveSession();
+      if (session == null) {
+        emit(state.copyWith(isSubmitting: false));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No active session. Sign in again.')),
+          );
+        }
+        return;
+      }
+
+      final userId = await shiftSvc.shiftUserIdForLocalAccount(session.userId);
+      final shift = await shiftSvc.getActiveShift(userId);
+      if (shift == null) {
+        emit(state.copyWith(isSubmitting: false));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Open a cash shift before check-in.')),
+          );
+        }
+        return;
+      }
+
+      final site = await auth.branchAndAreaFromDb();
+      sigFile = await ts.saveSignatureToFile(sig, ticketId);
+      final vehicle = _buildVehicleMap();
+      final parking = _buildParkingMap();
+      final belongings = _belongingsList();
+      final damages = _damageMaps();
+
+      await ts.persistCheckInLocally(
+        ticketId: ticketId,
+        signaturePath: sigFile.path,
         shiftId: shift.id,
         userId: userId,
         branchId: site.branch,
+        plateNumber: data.plateNumber,
+        vehicleBrand: data.vehicleBrand,
+        vehicleColor: data.vehicleColor,
+        vehicleType: _vehicleTypeApi(state.vehicleBodyType),
+        cellphoneNumber: data.cellphoneNumber,
+        damageMarkersJson: data.damageMarkersJson,
+        personalBelongingsJson: data.personalBelongingsJson,
+        driverIn: data.driverIn,
+        customerName: state.customerFullName.trim(),
+        valetType: _valetTypeApi(state.valetServiceType),
+        parkingLevel: state.parkingLevel.trim(),
+        parkingSlot: state.parkingSlot.trim(),
       );
-      emit(state.copyWith(ticketNumber: ticket.id));
-      return null;
+
+      final token = session.authToken;
+      if (token == null || token.isEmpty) {
+        throw StateError('No bearer token.');
+      }
+
+      final response = await api.submitCheckIn(
+        token: token,
+        ticketNumber: ticketId,
+        contactNumber: state.contactNumber.trim(),
+        valetType: _valetTypeApi(state.valetServiceType),
+        signatureFile: sigFile,
+        vehicle: vehicle,
+        parking: parking,
+        belongings: belongings,
+        damages: damages,
+        customerName: _optionalTrim(state.customerFullName),
+        driverIn: data.driverIn,
+        notes: _optionalTrim(state.specialInstructions),
+      );
+
+      await ts.updateServerTicketId(ticketId, response.id);
+
+      emit(
+        state.copyWith(
+          isSubmitting: false,
+          serverTicketId: response.id,
+          qrCode: ticketId,
+        ),
+      );
+
+      if (context.mounted) context.go('/check-in/print');
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionError ||
+          e.error is SocketException) {
+        await _enqueueCheckIn(
+          ts: ts,
+          ticketId: ticketId,
+          signaturePath: sigFile.path,
+        );
+        emit(
+          state.copyWith(
+            isSubmitting: false,
+            qrCode: ticketId,
+          ),
+        );
+        if (context.mounted) context.go('/check-in/print');
+        return;
+      }
+      emit(state.copyWith(isSubmitting: false));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    } on VehicleAlreadyCheckedInException catch (_) {
+      emit(state.copyWith(isSubmitting: false));
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Already checked in'),
+          content: const Text('This vehicle is already checked in.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } on CheckInValidationException catch (e) {
+      emit(state.copyWith(isSubmitting: false));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+    } on LoginApiFailure catch (e) {
+      emit(state.copyWith(isSubmitting: false));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
     } catch (e) {
-      return e.toString();
+      emit(state.copyWith(isSubmitting: false));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
     }
   }
+
+  Future<void> _enqueueCheckIn({
+    required TicketService ts,
+    required String ticketId,
+    required String signaturePath,
+  }) async {
+    final payload = checkInSyncQueuePayload(
+      localTicketId: ticketId,
+      signaturePath: signaturePath,
+      contactNumber: state.contactNumber.trim(),
+      valetType: _valetTypeApi(state.valetServiceType),
+      vehicle: _buildVehicleMap(),
+      parking: _buildParkingMap(),
+      belongings: _belongingsList(),
+      damages: _damageMaps(),
+      customerName: _optionalTrim(state.customerFullName),
+      driverIn: _optionalTrim(state.assignedValetDriver),
+      notes: _optionalTrim(state.specialInstructions),
+    );
+    await ts.enqueueCheckInSync(localTicketId: ticketId, payload: payload);
+  }
+
+  Map<String, dynamic> _buildVehicleMap() {
+    final yearRaw = state.vehicleYear.trim();
+    final year = yearRaw.isEmpty ? null : int.tryParse(yearRaw);
+    return <String, dynamic>{
+      'plate_number': state.plateNumber.trim(),
+      'brand': state.vehicleBrandMake.trim(),
+      'model': state.vehicleModel.trim(),
+      'color': state.vehicleColor.trim(),
+      'type': _vehicleTypeApi(state.vehicleBodyType),
+      'year': year,
+    };
+  }
+
+  Map<String, dynamic> _buildParkingMap() {
+    final level = state.parkingLevel.trim();
+    final slot = state.parkingSlot.trim();
+    return <String, dynamic>{
+      'level': level.isEmpty ? null : level,
+      'slot': slot.isEmpty ? null : slot,
+    };
+  }
+
+  List<String> _belongingsList() {
+    final list = List<String>.from(state.selectedBelongings);
+    final other = state.otherBelongings.trim();
+    if (other.isNotEmpty) list.add('Other: $other');
+    return list;
+  }
+
+  List<Map<String, dynamic>> _damageMaps() => [
+        for (final e in state.vehicleDamageEntries)
+          <String, dynamic>{
+            'zone': e.zoneLabel ?? '',
+            'type': e.type.name,
+            'x': e.normalizedX,
+            'y': e.normalizedY,
+          },
+      ];
+
+  static String? _optionalTrim(String? raw) {
+    if (raw == null) return null;
+    final t = raw.trim();
+    return t.isEmpty ? null : t;
+  }
+
+  static String _valetTypeApi(ValetServiceType t) => switch (t) {
+        ValetServiceType.standardValet => 'standard_valet',
+        ValetServiceType.selfPark => 'self_park',
+      };
+
+  static String _vehicleTypeApi(VehicleBodyType t) => switch (t) {
+        VehicleBodyType.sedan => 'sedan',
+        VehicleBodyType.suv => 'suv',
+        VehicleBodyType.van => 'van',
+        VehicleBodyType.luxury => 'luxury',
+        VehicleBodyType.evPhev => 'ev_phev',
+      };
 
   CheckInFormData _buildFormData() {
     final belongings = List<String>.from(state.selectedBelongings);
@@ -264,7 +626,7 @@ class CheckInCubit extends Cubit<CheckInState> {
       plateNumber: state.plateNumber.trim(),
       vehicleBrand: '${state.vehicleBrandMake} ${state.vehicleModel}'.trim(),
       vehicleColor: state.vehicleColor.trim(),
-      vehicleType: '',
+      vehicleType: _vehicleTypeApi(state.vehicleBodyType),
       driverIn: valet.isEmpty ? null : valet,
       cellphoneNumber: state.contactNumber.trim(),
       damageMarkersJson: _damageMarkersJson(state.vehicleDamageEntries),
@@ -291,7 +653,7 @@ class CheckInCubit extends Cubit<CheckInState> {
     emit(
       CheckInDemoDefaults.enabled
           ? CheckInDemoDefaults.initial()
-          : const CheckInState(),
+          : const CheckInState(receiptParts: initialReceiptParts),
     );
   }
 

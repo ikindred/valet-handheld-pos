@@ -16,6 +16,7 @@ Verified against the NestJS backend at `valet-api/`.
 7. [Rates & Settings Sync](#7-rates--settings-sync)
 8. [Error Reference](#8-error-reference)
 9. [Endpoint Quick Reference](#9-endpoint-quick-reference)
+10. [Device presence (WebSocket)](#10-device-presence-websocket)
 
 ---
 
@@ -74,7 +75,7 @@ POST /device/register        ← called on every online splash (after setup)
 
 ### `GET /devices/active`
 
-List unclaimed terminal slots visible to the tablet. No authentication required.
+List unclaimed terminal slots visible to the tablet (rows with `claimedAt == null` and a branch assignment). No authentication required.
 
 **Request**
 
@@ -225,16 +226,17 @@ POST /api/v1/auth/login
 {
   "email": "cashier@example.com",
   "password": "strongpassword",
-  "device_id": "sha256-hash"
+  "server_device_id": "00000000-0000-4000-8000-000000000000"
 }
 ```
+
+`server_device_id` is optional. When present, it must be the **device row UUID** from `GET /devices/active` or claim — not the hardware `deviceId` string. The server checks that the device’s **branch** matches the user’s branch (and for **CASHIER**, if the device is tied to an **area**, the cashier’s **open** cash session must be for that same area). On success, **`lastSeenAt`** is updated for activity tracking (separate from **`claimedAt`**, which is set only when a slot is claimed via `POST /devices/claim`). If checks fail, the API responds **403** and does not issue tokens.
 
 **Response 200**
 
 ```json
 {
   "accessToken": "eyJ...",
-  "token": "eyJ...",
   "is_open_cash": false,
   "user": {
     "id": "uuid",
@@ -247,16 +249,29 @@ POST /api/v1/auth/login
     "branch": {
       "id": "uuid",
       "name": "Jazz Mall"
-    }
+    },
+    "area": {
+      "id": "uuid",
+      "name": "Area A",
+      "code": "AREA-A"
+    },
+    "shiftSchedule": [
+      { "dayOfWeek": 1, "startTime": "08:00", "endTime": "17:00" },
+      { "dayOfWeek": 2, "startTime": "08:00", "endTime": "17:00" }
+    ]
   }
 }
 ```
 
 | Field | Notes |
 |---|---|
-| `accessToken` / `token` | Both fields carry the same JWT. Read either. |
+| `accessToken` | Short-lived JWT (15 minutes). Send as `Authorization: Bearer <accessToken>`. |
+| `token` | Same value as `accessToken` (mobile clients may read either). |
+| `server_device_id` | Optional on login. When sent, must pass branch/area rules above or login returns **403**. |
 | `is_open_cash` | `true` if this cashier already has an open shift. Skip the "Open Shift" screen and go straight to the main screen. |
 | `user.branch.id` | Store this as the cashier's `branchId` — required for rates sync. |
+| `user.area` | Cashiers only — assigned operating area used when opening a shift via `POST /cash-sessions/start` (server reads branch/area from the user profile). |
+| `user.shiftSchedule` | Cashiers only — admin-assigned recurring weekly hours (`dayOfWeek` 0=Sun … 6=Sat, `startTime`/`endTime` as `HH:mm`). Empty array if not configured. |
 
 If `is_open_cash` is `false`, the next required call is `POST /cash-sessions/start` before entering cashier transaction flow.
 
@@ -289,10 +304,15 @@ Authorization: Bearer <storedToken>
     "id": "uuid",
     "email": "cashier@example.com",
     "full_name": "Juan dela Cruz",
-    "role": "CASHIER"
+    "role": "CASHIER",
+    "shiftSchedule": [
+      { "dayOfWeek": 1, "startTime": "08:00", "endTime": "17:00" }
+    ]
   }
 }
 ```
+
+`user.shiftSchedule` is included for cashiers (same shape as login). Empty array when no schedule is configured.
 
 If `valid: false` — clear the local session and navigate to `/login`.
 
@@ -338,14 +358,19 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "shift_date": "2026-05-08T02:00:00.000Z",
-  "branch_id": "branch-uuid",
-  "area_id": "area-uuid",
-  "device_id": "android-device-id-or-app-device-identifier",
-  "opening_balance": 2000,
-  "notes": null
+  "openingBalance": 2000,
+  "timestamp": "2026-05-16T08:00:00.000Z",
+  "notes": ""
 }
 ```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `openingBalance` | Yes | ≥ 0 |
+| `timestamp` | Yes | Shift open time from the device (UTC ISO-8601). Persisted as `openedAt`. |
+| `notes` | No | Empty string is stored as no note |
+
+Branch and area come from the cashier profile (`user.branch`, `user.area`) — do not send them in the body.
 
 **Response 201**
 
@@ -353,12 +378,12 @@ Authorization: Bearer <token>
 {
   "id": "uuid",
   "status": "open",
-  "opened_at": "2024-01-01T08:00:00.000Z"
+  "opened_at": "2026-05-16T08:00:00.000Z",
+  "timestamp": "2026-05-16T08:00:00.000Z"
 }
 ```
 
-Save returned `id` as local `shift_id` and `opened_at` as local `shift_opened_at`. These are required for close-shift and open-to-close reporting windows.
-`shift_date`, `branch_id`, and `area_id` are required on request and validated by the backend.
+`opened_at` and `timestamp` are UTC ISO-8601 strings (same value on start). Save `id` as local `shift_id` and `opened_at` (or `timestamp`) as `shift_opened_at` for close-shift and reporting windows.
 
 ---
 
@@ -375,11 +400,19 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "shift_id": "uuid",
-  "actual_cash": 3890,
-  "notes": null
+  "shiftId": "uuid",
+  "actualCash": 3890,
+  "timestamp": "2026-05-16T17:00:00.000Z",
+  "notes": ""
 }
 ```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `shiftId` | Yes | Session UUID from `POST /cash-sessions/start` (`id`) |
+| `actualCash` | Yes | Physical cash count, ≥ 0 |
+| `timestamp` | Yes | Shift close time from the device (UTC ISO-8601). Persisted as `closedAt`. Must be ≥ shift `opened_at`. |
+| `notes` | No | Empty string stored as no note |
 
 **Response 200**
 
@@ -387,8 +420,9 @@ Authorization: Bearer <token>
 {
   "id": "uuid",
   "status": "closed",
-  "opened_at": "2024-01-01T08:00:00.000Z",
-  "closed_at": "2024-01-01T17:00:00.000Z",
+  "opened_at": "2026-05-16T08:00:00.000Z",
+  "closed_at": "2026-05-16T17:00:00.000Z",
+  "timestamp": "2026-05-16T17:00:00.000Z",
   "opening_balance": 2000,
   "total_transactions": 12,
   "total_sales": 1890,
@@ -412,7 +446,7 @@ Totals include only tickets checked out by the authenticated cashier.
 
 ### `GET /cash-sessions/current`
 
-Fetch the current open session for the authenticated cashier. Wired for future use.
+Fetch the current open session for the authenticated cashier. **Bearer token only** — no request body.
 
 **Request**
 
@@ -427,19 +461,12 @@ Authorization: Bearer <token>
 {
   "id": "uuid",
   "status": "open",
-  "total_transactions": 12,
-  "total_sales": 1890,
-  "expected_cash": 3890,
-  "breakdown": {
-    "flat_rate": 1500,
-    "succeeding_hours": 240,
-    "overnight_fee": 0,
-    "lost_ticket_fee": 150
-  },
   "opening_balance": 2000,
-  "opened_at": "2024-01-01T08:00:00.000Z"
+  "opened_at": "2026-05-16T08:00:00.000Z"
 }
 ```
+
+**Response 404** — no open shift (`{ "message": "No active shift found" }`).
 
 ---
 
@@ -452,9 +479,22 @@ The full check-in to check-out flow uses **3 API calls**:
   1. POST   /transactions/check-in      ← single-call check-in with full payload (ACTIVE)
 
 [Check-out]
-  2. POST   /transactions/:id/checkout-preview ← preview totals + condition comparison
-  3. POST   /transactions/:id/check-out        ← confirm checkout (marks COMPLETED)
+  2. GET    /transactions/:id/checkout-preview ← Vehicle Review + Payment (no checkout condition)
+  3. POST   /transactions/:id/check-out          ← finalize + optional checkout condition
 ```
+
+### Checkout condition (when it is saved)
+
+- **Check-in** — `condition_checkin` (damages + signature) on `POST /transactions/check-in`.
+- **Checkout preview** — does **not** accept `condition_checkout`. Mobile keeps new marks in local state through Vehicle Review / Condition / Payment.
+- **Check-out** — mobile sends `condition_checkout` (and `driver_out`) on the **final** `POST check-out` only. If `condition_checkout` is present in the body, the server saves it to `conditionCheckout` (with `is_new` vs check-in) and returns `condition_comparison` in the response.
+
+### Payment recording
+
+- **Only the amount collected** is stored — the parking fee charged at checkout (`Ticket.amount`, server-computed from rates).
+- **Not stored:** amount tendered (cash rendered by the customer), change, or tender-vs-total validation. The mobile UI may show those for cashier convenience locally, but the API does not persist them.
+- Checkout confirmation (`check-out`) writes `amount`, `timeOut`, and `COMPLETED`; there is no separate pay step.
+- Response fields `amount_paid`, `change`, and `payment_method` are legacy placeholders and remain `null`.
 
 > **Optional extra:**
 > - `POST /transactions/:id/print-log` — log that the thermal ticket was printed
@@ -484,9 +524,9 @@ Authorization: Bearer <token>
   "opening_balance": 2000,
   "total_vehicles_in": 14,
   "checked_out_total": 12,
-  "active_slots": 2,
-  "parked_count": 2,
-  "remaining_count": 2,
+  "active_slots": 6,
+  "parked_count_area": 6,
+  "remaining_count": 24,
   "total_slots": 30,
   "total_revenue": 1890,
   "collected_cash": 1890,
@@ -505,11 +545,14 @@ Authorization: Bearer <token>
 }
 ```
 
-- `active_slots`, `parked_count`, and `total_slots` are area-scoped (current shift area only).
-- `recent_transactions` returns max 10 records.
+- **Cashier + shift:** `total_vehicles_in`, `checked_out_total`, revenue/cash fields, `recent_transactions`.
+- **Shift area (all cashiers in area):** `active_slots`, `parked_count_area`, `remaining_count`, `total_slots`.
+- Area occupancy trio: `parked_count_area` (= occupied), `remaining_count` (= free slots), `total_slots` (= capacity in that area).
+- `recent_transactions`: max 10; includes still-parked (`ACTIVE`, `time_out: null`) and completed/lost checkouts for this cashier in the shift; sorted by most recent `time_out` or `time_in`.
 - Revenue/transactions are checkout-based (`COMPLETED` + `LOST`) for the current cashier shift window.
 - Mobile Reports page can reuse this endpoint as the primary source for shift KPI cards.
 - Exception: Reports `Transactions` tab should use `GET /transactions` (paginated via `limit` and `page`).
+- Legacy data: run `npm run backfill:ticket-area -- --email <cashier@email> [--dry-run]` in `valet-api` if slot counts stay 0 (sets `areaId` from cashier profile).
 
 ---
 
@@ -517,111 +560,167 @@ Authorization: Bearer <token>
 
 Call once when a car arrives with all check-in details. This creates an `ACTIVE` ticket immediately and returns the server UUID used for checkout/payment calls.
 
-**Request**
+**The mobile app must send `ticket_number`** (physical or pre-assigned number). The server does **not** auto-generate a ticket number on this endpoint. If that number already exists, the API returns **409**.
+
+The ticket’s `areaId` is set from the cashier’s profile (`user.areaId`), not from the request body — same value used when opening cash. Cashier must be assigned to an area or check-in returns 400.
+
+**Request** — `multipart/form-data` (not JSON)
 
 ```
 POST /api/v1/transactions/check-in
 Authorization: Bearer <token>
+Content-Type: multipart/form-data
 ```
 
-```json
-{
-  "customer_name": "Juan dela Cruz",
-  "contact_number": "09171234567",
-  "valet_type": "standard_valet",
-  "driver_in": "Juan dela Cruz",
-  "notes": null,
-  "vehicle": {
-    "plate_number": "ABC 1234",
-    "brand": "Toyota",
-    "model": "Camry",
-    "color": "Silver",
-    "type": "sedan",
-    "year": null
-  },
-  "parking": {
-    "level": null,
-    "slot": null
-  },
-  "belongings": ["iPad", "Cellphone / Charger"],
-  "condition": {
-    "damages": [
-      { "zone": "Hood", "type": "dent", "x": 0.2, "y": 0.15 }
-    ],
-    "signature": "data:image/png;base64,iVBORw0KGgo..."
-  }
-}
-```
+| Field | Required | Notes |
+|-------|----------|--------|
+| `ticket_number` | Yes | e.g. `TKT-0142` — from mobile / printed ticket |
+| `signature` | Yes | Image file (PNG/JPEG/WebP, max 1MB) |
+| `vehicle` | Yes | JSON **string**: `{"plate_number":"ABC 1234","brand":"Toyota",...}` |
+| `customer_name` | No | |
+| `contact_number` | No | |
+| `valet_type` | No | e.g. `standard_valet`, `premium_valet` |
+| `driver_in` | No | |
+| `notes` | No | |
+| `parking` | No | JSON string: `{"level":null,"slot":null}` |
+| `belongings` | No | JSON array string or comma-separated list |
+| `damages` | No | JSON array string of damage points |
 
-**Response 201**
+Example form fields:
+
+- `ticket_number`: `TKT-0142`
+- `vehicle`: `{"plate_number":"ABC 1234","brand":"Toyota","model":"Camry","color":"Silver","type":"sedan","year":null}`
+- `belongings`: `["iPad","Cellphone / Charger"]`
+- `damages`: `[{"zone":"Hood","type":"dent","x":0.2,"y":0.15}]`
+- `signature`: *(file upload)*
+
+**Response 201** — full transaction object (abbreviated):
 
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
-  "ticket_number": "TKT-0001",
-  "status": "active"
+  "ticket_number": "TKT-0142",
+  "status": "active",
+  "vehicle": { "plate_number": "ABC 1234", "brand": "Toyota", "model": "Camry" },
+  "condition_checkin": { "damages": [], "signature": "/uploads/signatures/..." },
+  "qr_code": "TKT-0142"
 }
 ```
 
-Save `id` as `server_ticket_id`. All subsequent API calls for this ticket use this UUID as `:id`.
+Save `id` as `server_ticket_id`. Subsequent calls may use either the UUID or `ticket_number` as `:id`.
 
 ---
 
-### Step 2 — `POST /transactions/:id/checkout-preview` — Preview checkout
+### Step 2 — `GET /transactions/:id/checkout-preview` — Checkout preview
 
-Before final confirmation, send checkout payload to preview charges and compare checkout condition vs check-in condition.
+**One GET** for Vehicle Review (both tabs) and the Payment screen (rate lines and total). Do **not** send checkout condition here.
 
 **Request**
 
 ```
-POST /api/v1/transactions/:id/checkout-preview
+GET /api/v1/transactions/:id/checkout-preview
 Authorization: Bearer <token>
 ```
 
-```json
-{
-  "driver_out": "Pedro Santos",
-  "condition_checkout": [
-    { "zone": "Front Bumper", "type": "scratch", "x": 0.5, "y": 0.05 }
-  ],
-  "status": "active"
-}
-```
+`:id` = ticket UUID or `TKT-XXXX`.
 
 **Response 200**
 
 ```json
 {
-  "release_summary": {
-    "plate": "ABC 1234",
-    "customer": "Juan dela Cruz",
-    "duration": "2h 15m"
+  "transaction": {
+    "id": "uuid",
+    "ticket_number": "TKT-0142",
+    "status": "active",
+    "customer": { "name": "Juan dela Cruz", "contact_number": "09171234567" },
+    "vehicle": {
+      "plate_number": "ABC 1234",
+      "brand": "Toyota",
+      "model": "Vios",
+      "color": "White",
+      "year": 2022,
+      "type": "sedan"
+    },
+    "parking": { "level": "Level 2", "slot": "B-04", "area": "Zone B" },
+    "belongings": ["Cellphone declared"],
+    "condition_checkin": {
+      "damages": [{ "zone": "Hood", "type": "dent", "x": 0.2, "y": 0.15 }],
+      "signature": "/uploads/signatures/..."
+    },
+    "condition_checkout": null,
+    "valet_type": "standard_valet",
+    "driver_in": "Carlos Mendoza",
+    "driver_out": null,
+    "time_in": "2026-03-24T02:18:00.000Z",
+    "time_out": null,
+    "duration_minutes": 209,
+    "amount": null
   },
-  "ticket": {
-    "ticket_number": "TKT-0001",
-    "flat_rate_amount": 150,
-    "succeeding_rate_amount": 60,
-    "total_amount": 210
+  "preview": {
+    "release_summary": {
+      "plate": "ABC 1234",
+      "customer": "Juan dela Cruz",
+      "duration": "3h 29m"
+    },
+    "ticket": {
+      "ticket_number": "TKT-0142",
+      "plate": "ABC 1234",
+      "vehicle_make": "Toyota",
+      "vehicle_model": "Vios",
+      "vehicle_color": "White",
+      "time_in": "2026-03-24T02:18:00.000Z",
+      "time_out": "2026-03-24T05:47:00.000Z",
+      "duration": "3h 29m",
+      "parking_slot": "B-04",
+      "valet_in": "Carlos Mendoza",
+      "valet_out": "Pedro Santos",
+      "flat_rate_label": "Flat Rate (first hour)",
+      "flat_rate_amount": 150,
+      "succeeding_time_label": "Succeeding Time (2 hour/s @ 30.00)",
+      "succeeding_rate_amount": 30,
+      "total_amount": 180
+    },
+    "condition_comparison": []
   },
-  "condition_comparison": [
-    { "zone": "Front Bumper", "type": "scratch", "x": 0.5, "y": 0.05, "is_new": true }
-  ]
+  "compute": {
+    "duration_minutes": 209,
+    "breakdown": {
+      "base": 150,
+      "extra": 30,
+      "overnight": 0
+    },
+    "total": 180
+  }
 }
 ```
 
-Use this response to show checkout confirmation UI. No separate pay endpoint is required.
+`compute` matches `GET /transactions/:id/compute` (duration + base/extra/overnight breakdown). `preview.ticket.total_amount` equals `compute.total`.
+
+`preview.condition_comparison` is **empty** at preview time. Compare check-in vs new checkout marks in the app locally until check-out.
+
+**UI mapping**
+
+| Screen | Fields |
+|--------|--------|
+| Vehicle Review — Vehicle info | `transaction.*` (customer, vehicle, parking, belongings, `time_in`, `driver_in`, `valet_type`) |
+| Vehicle Review — Condition | `transaction.condition_checkin`; **new** checkout marks kept in **app state only** |
+| Payment | `preview.ticket` (times, rate lines, `total_amount`); `compute.breakdown` for base/extra/overnight; cash tendered / change **local only** |
+| Checkout summary | `POST check-out` response (same as checkout-preview + `invoice_number`; cash tendered / change **local only**) |
+
+While `status` is `active`, use `preview.ticket.time_out` as projected checkout time (not `transaction.time_out`, which stays `null` until confirm).
 
 ---
 
 ### Step 3 — `POST /transactions/:id/check-out` — Confirm and finalize checkout
 
-After preview confirmation, call check-out with the same payload to finalize.
+Final step. Send **`driver_out`** and **`condition_checkout`** here when the user completed the condition screen.
 
 **Request**
 
 ```
 POST /api/v1/transactions/:id/check-out
 Authorization: Bearer <token>
+Content-Type: application/json
 ```
 
 ```json
@@ -629,22 +728,68 @@ Authorization: Bearer <token>
   "driver_out": "Pedro Santos",
   "condition_checkout": [
     { "zone": "Front Bumper", "type": "scratch", "x": 0.5, "y": 0.05 }
-  ],
-  "status": "active"
+  ]
 }
 ```
+
+| Field | Required | Notes |
+|-------|----------|--------|
+| `driver_out` | No | Valet releasing the vehicle |
+| `condition_checkout` | No | Omit if no new checkout marks. If **present** (including `[]`), server saves to DB and returns `condition_comparison` |
 
 **Response 200**
 
+Same shape as **`GET checkout-preview`**, plus top-level **`invoice_number`**. Timestamps and duration use the **actual** checkout `time_out` (not projected).
+
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "status": "completed",
-  "total": 210
+  "invoice_number": "INV-0042",
+  "transaction": {
+    "id": "uuid",
+    "ticket_number": "TKT-0142",
+    "invoice_number": "INV-0042",
+    "status": "completed",
+    "customer": { "name": "Juan dela Cruz", "contact_number": "09171234567" },
+    "vehicle": { "plate_number": "ABC 1234", "brand": "Toyota", "model": "Vios", "color": "White", "type": "sedan" },
+    "parking": { "level": "Level 2", "slot": "B-04", "area": "Zone B" },
+    "time_in": "2026-03-24T02:18:00.000Z",
+    "time_out": "2026-03-24T05:47:00.000Z",
+    "duration_minutes": 209,
+    "amount": 180,
+    "driver_in": "Carlos Mendoza",
+    "driver_out": "Pedro Santos"
+  },
+  "preview": {
+    "release_summary": {
+      "plate": "ABC 1234",
+      "customer": "Juan dela Cruz",
+      "duration": "3h 29m"
+    },
+    "ticket": {
+      "ticket_number": "TKT-0142",
+      "plate": "ABC 1234",
+      "time_in": "2026-03-24T02:18:00.000Z",
+      "time_out": "2026-03-24T05:47:00.000Z",
+      "duration": "3h 29m",
+      "total_amount": 180
+    },
+    "condition_comparison": [
+      { "zone": "Front Bumper", "type": "scratch", "x": 0.5, "y": 0.05, "is_new": true }
+    ]
+  },
+  "compute": {
+    "duration_minutes": 209,
+    "breakdown": { "base": 150, "extra": 30, "overnight": 0 },
+    "total": 180
+  }
 }
 ```
 
-After success the ticket is marked **COMPLETED** on the server.
+`preview.condition_comparison` is populated when `condition_checkout` was sent on this request; otherwise `[]`.
+
+`transaction.time_out`, `preview.ticket.time_out`, and `compute.duration_minutes` all reflect the finalized checkout time.
+
+After success the ticket is **COMPLETED**. The server persists **`amount`** (amount collected) and, when provided, **`conditionCheckout`** on the ticket.
 
 ---
 
@@ -752,7 +897,7 @@ Results are scoped to the authenticated cashier's branch automatically. Used for
 
 ## 6. Transaction Lookup
 
-Both endpoints return the same full transaction shape. The app resolves from local Drift first; these are fallback for cross-device lookups.
+Returns the full transaction shape. The app resolves from local Drift first; this is a fallback for cross-device lookups. **Check-out** uses `GET /transactions/:id/checkout-preview` instead (see §5); `GET /tickets/by-number/{ticketNumber}` is not used.
 
 ### `GET /transactions/:id` — Lookup by server UUID
 
@@ -766,21 +911,6 @@ Authorization: Bearer <token>
 ```
 
 > `:id` accepts either a UUID or a `TKT-XXXX` ticket number.
-
-**Response 200** — see [full transaction shape](#full-transaction-shape) below.
-
----
-
-### `GET /tickets/by-number/:ticketNumber` — Lookup by ticket number
-
-Used when the customer manually types their `TKT-XXXX` stub number.
-
-**Request**
-
-```
-GET /api/v1/tickets/by-number/TKT-0001
-Authorization: Bearer <token>
-```
 
 **Response 200** — see [full transaction shape](#full-transaction-shape) below.
 
@@ -826,14 +956,13 @@ Authorization: Bearer <token>
   "time_out": null,
   "duration_minutes": 45,
   "amount": null,
-  "amount_paid": null,
-  "change": null,
-  "payment_method": null,
   "printed_at": null
 }
 ```
 
-> Tickets with status `completed`, `lost`, or `void` return **409 Conflict** from both lookup endpoints. Handle this by displaying the ticket's final state from local storage.
+> `amount` is the **amount collected** (parking fee) once checkout completes. Legacy keys `amount_paid`, `change`, and `payment_method` may still appear on some responses as `null` — ignore them; they are not part of the product model.
+
+> Tickets with status `completed`, `lost`, or `void` return **409 Conflict** from transaction lookup / checkout-preview. Handle this by displaying the ticket's final state from local storage.
 
 ---
 
@@ -1007,8 +1136,6 @@ All errors follow this shape:
 | Plate already checked in | `"Vehicle ABC 1234 is already checked in"` |
 | Ticket already closed | `"Ticket is already completed"` |
 | Ticket is already lost | `"Ticket is already lost"` |
-| Paying a completed ticket | `"Can only process payment for an active ticket"` |
-| Insufficient payment | `"Insufficient payment. Required: 150, received: 100"` |
 
 ---
 
@@ -1028,17 +1155,56 @@ All errors follow this shape:
 | `POST` | `/cash-sessions/close` | Bearer | Close shift |
 | `GET` | `/cash-sessions/current` | Bearer | Current open session |
 | `POST` | `/transactions/check-in` | Bearer | Single-call check-in (full payload) |
-| `POST` | `/transactions/:id/checkout-preview` | Bearer | Preview release summary + compare condition |
+| `GET` | `/transactions/:id/checkout-preview` | Bearer | Full ticket + pricing preview + compute breakdown (no checkout condition) |
 | `POST` | `/transactions/:id/check-out` | Bearer | Confirm checkout → marks COMPLETED |
 | `POST` | `/transactions/:id/print-log` | Bearer | Log ticket print |
-| `GET` | `/transactions/:id` | Bearer | Lookup by UUID or TKT-XXXX |
+| `GET` | `/transactions/:id` | Bearer | Lookup by UUID or TKT-XXXX *(not used on checkout scan)* |
 | `GET` | `/transactions` | Bearer | List / reports sync |
-| `GET` | `/tickets/by-number/:ticketNumber` | Bearer | Lookup by TKT-XXXX |
 | `POST` | `/tickets/:id/lost` | Bearer | Mark ticket lost *(reserved)* |
 | `GET` | `/branches/:id` | Bearer | Branch hours |
 | `GET` | `/branches/:id/rates` | Bearer | Standard branch rates |
 | `GET` | `/rates/branches/:branchId/vehicle-types` | Bearer | Per-vehicle-type rates |
 | `GET` | `/settings` | Bearer | System config + overnight cutoff |
+
+---
+
+## 10. Device presence (WebSocket)
+
+Admins see tablet **ONLINE** / **OFFLINE** in real time. **OFFLINE** means the tablet is **not connected** to the server (not the same as an unclaimed `IDLE` slot).
+
+After login (with `server_device_id` from claim), the app must keep a Socket.io connection open while the cashier session is active.
+
+### Connect
+
+```
+URL: wss://<server>/realtime
+Library: socket_io_client (Dart)
+```
+
+Handshake `auth`:
+
+```json
+{
+  "token": "<accessToken from POST /auth/login>",
+  "clientType": "mobile",
+  "server_device_id": "<device row UUID from claim>"
+}
+```
+
+### Lifecycle
+
+| App action | Expected |
+|------------|----------|
+| Login success + `server_device_id` known | Connect presence socket |
+| App foreground / resume | Ensure socket connected |
+| Logout | Disconnect socket |
+| Token invalid / re-login | Disconnect old socket; connect with new token |
+
+Server sets the device row to `ONLINE` on connect and `OFFLINE` ~15s after disconnect (configurable `DEVICE_PRESENCE_GRACE_MS`). Claim/rebind alone sets `OFFLINE` until the first presence connection.
+
+The tablet does **not** need to listen for branch events—presence only.
+
+See [`valet-api/docs/REALTIME.md`](valet-api/docs/REALTIME.md) for admin subscription and nginx proxy notes.
 
 ---
 

@@ -69,6 +69,8 @@ dependencies:
   # Use a fork that avoids the `image` version conflict.
   flutter_esc_pos_utils_image_3: ^0.1.9
   flutter_pos_printer_platform_image_3: ^1.0.0
+  image_v3: ^3.3.0
+  qr: ^3.0.2
 
   # Signature Capture
   signature: ^5.4.1

@@ -5,8 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/connectivity/internet_reachability.dart';
 import '../../../core/formatting/peso_currency.dart';
-import '../../../core/storage/offline_mode_prefs.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/shift_service.dart';
@@ -46,13 +46,16 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
 
   Future<void> _loadHeader() async {
     final repo = context.read<AuthRepository>();
-    final prefs = await SharedPreferences.getInstance();
     final dateLine = DateFormat('EEEE, MMMM d, y').format(DateTime.now());
-    final siteSub = await repo.dateAndSiteLine(prefs, dateLine);
+    final siteSub = await repo.dateAndSiteLine(
+      await SharedPreferences.getInstance(),
+      dateLine,
+    );
+    final hasInternet = await InternetReachability.hasInternet();
     if (!mounted) return;
     setState(() {
       _headerSubtitle = siteSub;
-      _online = !OfflineModePrefs.read(prefs);
+      _online = hasInternet;
     });
   }
 

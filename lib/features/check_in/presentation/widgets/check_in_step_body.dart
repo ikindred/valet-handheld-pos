@@ -54,19 +54,35 @@ class CheckInStepBody extends StatelessWidget {
           onPrimary: onPrimary!,
         );
 
+    final viewInsets = MediaQuery.viewInsetsOf(context);
+    final keyboardOpen = viewInsets.bottom > 0;
+    final insetBottom = keyboardOpen ? viewInsets.bottom : 0.0;
+
+    Widget body = child;
+    if (scrollable) {
+      body = SingleChildScrollView(
+        padding: EdgeInsets.only(bottom: insetBottom),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        child: child,
+      );
+    } else if (keyboardOpen) {
+      body = Padding(
+        padding: EdgeInsets.only(bottom: insetBottom),
+        child: child,
+      );
+    }
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
+      padding: EdgeInsets.fromLTRB(
         CheckInCompactTokens.screenPaddingH,
         CheckInCompactTokens.screenPaddingTop,
         CheckInCompactTokens.screenPaddingH,
-        CheckInCompactTokens.screenPaddingBottom,
+        keyboardOpen ? 8 : CheckInCompactTokens.screenPaddingBottom,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: scrollable ? SingleChildScrollView(child: child) : child,
-          ),
+          Expanded(child: body),
           const SizedBox(height: CheckInCompactTokens.footerGap),
           bottom,
         ],

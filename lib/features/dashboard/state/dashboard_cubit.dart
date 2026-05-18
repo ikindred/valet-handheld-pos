@@ -1,12 +1,10 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../../core/config/app_config.dart';
+import '../../../core/connectivity/internet_reachability.dart';
 import '../../../core/formatting/peso_currency.dart';
 import '../../../core/logging/valet_log.dart';
-import '../../../core/storage/offline_mode_prefs.dart';
 import '../../../data/local/db/app_database.dart';
 import '../../../data/remote/area_detail.dart';
 import '../../../data/remote/dashboard_api.dart';
@@ -39,8 +37,8 @@ final class DashboardReady extends DashboardState {
     required this.vehiclesIn,
     required this.checkedOut,
     required this.checkInsLastHour,
-    required this.activeSlotsUsed,
-    required this.activeSlotsTotal,
+    required this.remainingSlots,
+    required this.totalSlots,
     required this.recent,
   });
 
@@ -50,11 +48,11 @@ final class DashboardReady extends DashboardState {
   /// Check-ins on this shift in the last rolling hour (`check_in_at`), local only.
   final int checkInsLastHour;
 
-  /// Occupied slots (from API `active_slots` or local active ticket count).
-  final int activeSlotsUsed;
+  /// Open slots (`remaining_count` from API, or derived offline).
+  final int remainingSlots;
 
   /// Area capacity (`total_slots` from API, or default offline).
-  final int activeSlotsTotal;
+  final int totalSlots;
 
   final List<DashboardRecentTx> recent;
 
@@ -63,8 +61,8 @@ final class DashboardReady extends DashboardState {
         vehiclesIn,
         checkedOut,
         checkInsLastHour,
-        activeSlotsUsed,
-        activeSlotsTotal,
+        remainingSlots,
+        totalSlots,
         recent,
       ];
 }
@@ -140,11 +138,10 @@ class DashboardCubit extends Cubit<DashboardState> {
         return;
       }
 
-      final prefs = await SharedPreferences.getInstance();
-      final offline = OfflineModePrefs.read(prefs);
       final token = session.authToken?.trim() ?? '';
+      final hasInternet = await InternetReachability.hasInternet();
 
-      if (!offline && !AppConfig.useStubApi && token.isNotEmpty) {
+      if (hasInternet && !AppConfig.useStubApi && token.isNotEmpty) {
         try {
           final summary = await _dashboardApi.fetchSummary(bearerToken: token);
           if (summary != null) {
@@ -180,18 +177,17 @@ class DashboardCubit extends Cubit<DashboardState> {
     int checkInsLastHour, {
     AreaSlotCounts? areaSlots,
   }) {
-    var activeUsed = summary.activeSlots;
-    var activeTotal = summary.totalSlots;
+    var remaining = summary.remainingCount;
+    var total = summary.totalSlots;
     if (areaSlots != null && areaSlots.total > 0) {
-      activeUsed = areaSlots.occupied;
-      activeTotal = areaSlots.total;
+      total = areaSlots.total;
     }
     return DashboardReady(
       vehiclesIn: summary.totalVehiclesIn,
       checkedOut: summary.checkedOutTotal,
       checkInsLastHour: checkInsLastHour,
-      activeSlotsUsed: activeUsed,
-      activeSlotsTotal: activeTotal,
+      remainingSlots: remaining,
+      totalSlots: total,
       recent: summary.recent
           .map((r) => DashboardRecentTx.fromSummaryRow(r.toRecentRow()))
           .toList(),
@@ -242,8 +238,8 @@ class DashboardCubit extends Cubit<DashboardState> {
           vehiclesIn: 0,
           checkedOut: 0,
           checkInsLastHour: 0,
-          activeSlotsUsed: 0,
-          activeSlotsTotal: defaultAreaSlotCapacity,
+          remainingSlots: defaultAreaSlotCapacity,
+          totalSlots: defaultAreaSlotCapacity,
           recent: [],
         ),
       );
@@ -265,13 +261,21 @@ class DashboardCubit extends Cubit<DashboardState> {
     final rawRecent = await _tickets.recentTicketsForShift(shiftId, limit: 10);
     final recent = rawRecent.map(_recentFromTicket).toList();
 
+    final areaSlots = await _slotCountsFromArea();
+    final total = areaSlots != null && areaSlots.total > 0
+        ? areaSlots.total
+        : defaultAreaSlotCapacity;
+    final remaining = areaSlots != null && areaSlots.total > 0
+        ? areaSlots.available
+        : (total - vehiclesIn).clamp(0, total);
+
     emit(
       DashboardReady(
         vehiclesIn: vehiclesIn,
         checkedOut: checkedOut,
         checkInsLastHour: checkInsLastHour,
-        activeSlotsUsed: vehiclesIn,
-        activeSlotsTotal: defaultAreaSlotCapacity,
+        remainingSlots: remaining,
+        totalSlots: total,
         recent: recent,
       ),
     );

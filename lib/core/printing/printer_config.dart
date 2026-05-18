@@ -13,8 +13,8 @@ extension PrinterPaperWidthX on PrinterPaperWidth {
       };
 
   String get label => switch (this) {
-        PrinterPaperWidth.mm58 => '58 mm',
-        PrinterPaperWidth.mm80 => '80 mm',
+        PrinterPaperWidth.mm58 => '2 in (58 mm)',
+        PrinterPaperWidth.mm80 => '3 in (80 mm)',
       };
 
   static PrinterPaperWidth fromStored(String? value) {

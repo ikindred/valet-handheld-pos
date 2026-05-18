@@ -188,10 +188,16 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
           children: [
             Text('Bluetooth printer', style: CheckInCompactTokens.pageHeading()),
             const SizedBox(height: 4),
-            Text(
-              'Any ESC/POS thermal printer (HPRT, Xprinter, Epson-compatible, etc.).',
-              style: CheckInCompactTokens.bodyHint(),
-            ),
+          Text(
+            'Any ESC/POS thermal printer (HPRT, Xprinter, Epson-compatible, etc.).',
+            style: CheckInCompactTokens.bodyHint(),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'HPRT HM-A300: set printer menu Paper to Receipt (not Label). '
+            'App paper: 2 in (58 mm).',
+            style: CheckInCompactTokens.helperText(),
+          ),
             const SizedBox(height: 4),
             Text(
               notifier.statusSubtitle,

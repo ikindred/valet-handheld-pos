@@ -5,14 +5,12 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../../core/config/app_config.dart';
 import '../../../core/formatting/peso_currency.dart';
 import '../../../core/session/cashier_shift_schedule.dart';
 import '../../../core/time/philippine_time.dart';
 import '../../../core/logging/valet_log.dart';
-import '../../../core/storage/offline_mode_prefs.dart';
+import '../../../core/connectivity/internet_reachability.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/branch_config_service.dart';
@@ -115,15 +113,15 @@ class _OpenCashViewState extends State<_OpenCashView> {
   /// Staff from active session; branch/area from cached device site (prefs / claim).
   Future<void> _loadContext() async {
     final repo = context.read<AuthRepository>();
-    final prefs = await SharedPreferences.getInstance();
     final session = await repo.getActiveSession();
     if (session == null || !mounted) return;
     final acct = await repo.offlineAccountById(session.userId);
     if (!mounted) return;
     final site = await repo.branchAndAreaFromDb();
     final schedule = await repo.shiftScheduleForLocalUser(session.userId);
+    final hasInternet = await InternetReachability.hasInternet();
     setState(() {
-      _online = !OfflineModePrefs.read(prefs);
+      _online = hasInternet;
       _staffName = acct?.fullName ?? acct?.email ?? '—';
       _branchName = site.branch;
       _areaName = site.area;

@@ -17,25 +17,68 @@ class CheckInShell extends StatefulWidget {
 }
 
 class _CheckInShellState extends State<CheckInShell> {
+  bool _awaitingDraft = false;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final c = context.read<CheckInCubit>();
-      await c.ensureDraftTicketReserved();
+    _awaitingDraft = _ticketNumberEmpty;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _runDraftReservation());
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    if (_ticketNumberEmpty) {
+      setState(() => _awaitingDraft = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _runDraftReservation());
+    }
+  }
+
+  bool get _ticketNumberEmpty =>
+      context.read<CheckInCubit>().state.ticketNumber.trim().isEmpty;
+
+  Future<void> _runDraftReservation() async {
+    if (!mounted) return;
+    final cubit = context.read<CheckInCubit>();
+    if (cubit.state.ticketNumber.trim().isNotEmpty) {
+      if (mounted) setState(() => _awaitingDraft = false);
+      return;
+    }
+    final ok = await cubit.ensureDraftTicketReserved();
+    if (!mounted) return;
+    if (!ok && cubit.state.ticketNumber.trim().isEmpty) {
+      await Future<void>.delayed(const Duration(milliseconds: 400));
       if (!mounted) return;
-      if (c.state.ticketNumber.isEmpty) {
-        await Future<void>.delayed(const Duration(milliseconds: 400));
-        if (!mounted) return;
-        await c.ensureDraftTicketReserved();
-      }
-    });
+      await cubit.ensureDraftTicketReserved();
+    }
+    if (mounted) setState(() => _awaitingDraft = false);
   }
 
   @override
   Widget build(BuildContext context) {
     final path = GoRouterState.of(context).uri.path;
     final stepIndex = checkInStepIndexFromPath(path);
+
+    if (_awaitingDraft) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF4F5F7),
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DashboardLeftRail(),
+            Expanded(
+              child: SafeArea(
+                left: false,
+                child: Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F7),

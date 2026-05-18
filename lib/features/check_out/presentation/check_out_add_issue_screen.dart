@@ -1,21 +1,18 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../check_in/domain/vehicle_damage.dart';
 import '../../check_in/domain/vehicle_damage_zones.dart';
 import '../../check_in/presentation/widgets/vehicle_condition_diagram.dart';
+import '../../check_in/presentation/widgets/check_in_compact_tokens.dart';
 import '../state/check_out_cubit.dart';
 import 'widgets/check_out_add_issue_footer.dart';
-import 'widgets/checkout_issue_signature_modal.dart';
 import 'widgets/check_out_step_body.dart';
+import 'widgets/check_out_ui_tokens.dart';
 
-const _kGrey500 = Color(0xFF6C7688);
 const _kBorder = Color(0xFFC0C0BF);
 
 /// Checkout **Add new Issue** — same interaction model as [CheckInVehicleConditionScreen].
@@ -32,7 +29,6 @@ class _CheckOutAddIssueScreenState extends State<CheckOutAddIssueScreen> {
   var _seeded = false;
   late List<VehicleDamageEntry> _draft;
   late DamageType _selected;
-  Uint8List? _signatureBytes;
 
   @override
   void didChangeDependencies() {
@@ -56,21 +52,18 @@ class _CheckOutAddIssueScreenState extends State<CheckOutAddIssueScreen> {
           zoneLabel: label,
         ),
       );
-      _signatureBytes = null;
     });
   }
 
   void _remove(String id) {
     setState(() {
       _draft.removeWhere((e) => e.id == id);
-      _signatureBytes = null;
     });
   }
 
   void _clearDraft() {
     setState(() {
       _draft = [];
-      _signatureBytes = null;
     });
   }
 
@@ -79,28 +72,10 @@ class _CheckOutAddIssueScreenState extends State<CheckOutAddIssueScreen> {
     return [...c.state.checkInDamage, ..._draft];
   }
 
-  Future<void> _onSave() async {
-    if (_draft.isEmpty) {
-      context.read<CheckOutCubit>().applyCheckoutIssueSession(
-            damage: const [],
-            signatureAcknowledged: false,
-          );
-      if (mounted) context.pop();
-      return;
-    }
-    if (_signatureBytes == null) {
-      await showCheckoutIssueSignatureModal(
-        context,
-        onConfirmed: (bytes) => setState(() => _signatureBytes = bytes),
-      );
-      if (!mounted) return;
-      if (_signatureBytes == null) return;
-    }
-    context.read<CheckOutCubit>().setSelectedDamage(_selected);
-    context.read<CheckOutCubit>().applyCheckoutIssueSession(
-          damage: List.from(_draft),
-          signatureAcknowledged: true,
-        );
+  void _onSave() {
+    final cubit = context.read<CheckOutCubit>();
+    cubit.setSelectedDamage(_selected);
+    cubit.applyCheckoutIssueSession(damage: List.from(_draft));
     if (mounted) context.pop();
   }
 
@@ -119,14 +94,8 @@ class _CheckOutAddIssueScreenState extends State<CheckOutAddIssueScreen> {
         return CheckOutStepBody(
           scrollable: false,
           footer: CheckOutAddIssueFooter(
-            hasCustomerSignature: _signatureBytes != null,
-            onCancel: () => context.pop(),
             onBack: () => context.pop(),
-            onSignature: () => showCheckoutIssueSignatureModal(
-              context,
-              onConfirmed: (bytes) => setState(() => _signatureBytes = bytes),
-            ),
-            onSave: _onSave,
+            onConfirm: _onSave,
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -136,7 +105,7 @@ class _CheckOutAddIssueScreenState extends State<CheckOutAddIssueScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(flex: 5, child: _DiagramPanel(selected: _selected, entries: _diagramEntries, onTap: _addAt)),
-                    const SizedBox(width: 24),
+                    const SizedBox(width: CheckInCompactTokens.columnDividerWidth),
                     Expanded(
                       flex: 4,
                       child: _DamageSidePanel(
@@ -154,7 +123,7 @@ class _CheckOutAddIssueScreenState extends State<CheckOutAddIssueScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(flex: 5, child: _DiagramPanel(selected: _selected, entries: _diagramEntries, onTap: _addAt)),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: CheckInCompactTokens.blockGap),
                   Expanded(
                     flex: 4,
                     child: _DamageSidePanel(
@@ -191,31 +160,15 @@ class _DiagramPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'TAP DIAGRAM TO MARK DAMAGE',
-          style: GoogleFonts.poppins(
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-            color: _kGrey500,
-          ),
-        ),
+        Text('TAP DIAGRAM TO MARK DAMAGE', style: CheckOutUiTokens.fieldLabel()),
         const SizedBox(height: 8),
         Text.rich(
           TextSpan(
             children: [
-              TextSpan(
-                text: 'Selected: ',
-                style: GoogleFonts.poppins(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0x936C7688),
-                ),
-              ),
+              TextSpan(text: 'Selected: ', style: CheckOutUiTokens.hint()),
               TextSpan(
                 text: selected.label,
-                style: GoogleFonts.poppins(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                style: CheckOutUiTokens.body().copyWith(
                   color: _selectedTypeAccent(selected),
                 ),
               ),
@@ -305,17 +258,10 @@ class _DamageSidePanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'MARK DAMAGE TYPE',
-          style: GoogleFonts.poppins(
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-            color: _kGrey500,
-          ),
-        ),
-        const SizedBox(height: 12),
+        Text('MARK DAMAGE TYPE', style: CheckOutUiTokens.fieldLabel()),
+        const SizedBox(height: 8),
         SizedBox(
-          height: 88,
+          height: CheckInCompactTokens.damageTypeButtonHeight,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -326,7 +272,7 @@ class _DamageSidePanel extends StatelessWidget {
                   onTap: () => onSelect(DamageType.crack),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: _DamageTypeButton(
                   type: DamageType.scratch,
@@ -334,7 +280,7 @@ class _DamageSidePanel extends StatelessWidget {
                   onTap: () => onSelect(DamageType.scratch),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: _DamageTypeButton(
                   type: DamageType.dent,
@@ -345,18 +291,14 @@ class _DamageSidePanel extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: CheckInCompactTokens.blockGap),
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: Text(
-                'NEW AT CHECK-OUT (${draft.length})',
-                style: GoogleFonts.poppins(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: _kGrey500,
-                ),
+                'LOGGED DAMAGE (${draft.length})',
+                style: CheckOutUiTokens.fieldLabel(),
               ),
             ),
             TextButton(
@@ -364,30 +306,24 @@ class _DamageSidePanel extends StatelessWidget {
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.textPrimary,
                 disabledForegroundColor: AppColors.textSecondary,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               child: Text(
                 'Clear logged damage',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: CheckOutUiTokens.body(),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Expanded(
           child: draft.isEmpty
               ? Center(
                   child: Text(
                     'No new damage logged yet.',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
+                    style: CheckOutUiTokens.hint(),
                   ),
                 )
               : ListView.separated(
@@ -443,11 +379,7 @@ class _DamageTypeButton extends StatelessWidget {
             child: Text(
               type.label,
               textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: fg,
-              ),
+              style: CheckOutUiTokens.body().copyWith(color: fg),
             ),
           ),
         ),
@@ -480,7 +412,7 @@ class _LoggedDamageRow extends StatelessWidget {
         '${(entry.normalizedX * 100).round()}%, ${(entry.normalizedY * 100).round()}%';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: CheckOutUiTokens.cardPaddingDense,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
@@ -489,34 +421,20 @@ class _LoggedDamageRow extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 15,
-            height: 15,
+            width: 10,
+            height: 10,
             decoration: BoxDecoration(
               color: _dot(entry.type),
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 15),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  entry.type.label,
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0x7F0A1B39),
-                  ),
-                ),
+                Text(entry.type.label, style: CheckOutUiTokens.body()),
+                Text(subtitle, style: CheckOutUiTokens.helper()),
               ],
             ),
           ),

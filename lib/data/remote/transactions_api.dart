@@ -1,6 +1,15 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 
 import '../../core/config/app_config.dart';
+import '../../features/check_in/models/check_in_response.dart';
+import '../../features/check_out/models/check_out_response.dart';
+import '../../features/check_out/models/checkout_preview_response.dart';
+import 'api_error_message.dart';
+import 'check_in_exceptions.dart';
+import 'checkout_exceptions.dart';
 
 /// Thrown by [TransactionsApi] on HTTP errors or bad response bodies.
 class TransactionsApiException implements Exception {
@@ -79,34 +88,235 @@ class TransactionsApi {
     }
   }
 
-  /// GET [AppConfig.ticketByNumberUrl] — transaction payload keyed by local ticket number.
-  Future<Map<String, dynamic>> getTransactionByTicketNumber({
+  /// POST [AppConfig.checkoutPreviewUrl] — persist checkout payload + refresh preview.
+  Future<CheckoutPreviewResponse> postCheckoutPreview({
     required String token,
-    required String ticketNumber,
+    required String ticketId,
+    required String driverOut,
+    required List<Map<String, dynamic>> conditionCheckout,
   }) async {
-    final code = ticketNumber.trim();
-    if (code.isEmpty) {
-      throw TransactionsApiException('Ticket number is empty.');
+    final id = ticketId.trim();
+    if (id.isEmpty) {
+      throw CheckoutApiException('Transaction id is empty.');
     }
     if (AppConfig.useStubApi) {
-      return _stubTransactionMap(
-        serverId: '00000000-0000-4000-8000-000000000001',
-        ticketNumber: code,
-      );
+      return _stubCheckoutPreview(ticketId: id);
     }
+    final body = <String, dynamic>{
+      'driver_out': driverOut,
+      'condition_checkout': conditionCheckout,
+      'status': 'active',
+    };
     try {
-      final res = await _dio.get<dynamic>(
-        AppConfig.ticketByNumberUrl(code),
+      final res = await _dio.post<dynamic>(
+        AppConfig.checkoutPreviewUrl(id),
+        data: body,
         options: Options(
           headers: {'Authorization': 'Bearer $token'},
           validateStatus: (_) => true,
         ),
       );
-      _throwIfBadResponse(res, 'GET ticket by number $code');
-      return _asJsonMap(res.data);
+      _throwCheckoutIfBad(res, 'POST checkout-preview $id');
+      return CheckoutPreviewResponse.fromResponseBody(_asJsonMap(res.data));
     } on DioException catch (e) {
-      throw _fromDio(e, 'GET ticket by number $code');
+      _rethrowCheckoutDio(e, 'POST checkout-preview $id');
     }
+  }
+
+  /// GET [AppConfig.checkoutPreviewUrl] — server pricing + condition comparison.
+  Future<CheckoutPreviewResponse> getCheckoutPreview({
+    required String token,
+    required String ticketId,
+  }) async {
+    final id = ticketId.trim();
+    if (id.isEmpty) {
+      throw CheckoutApiException('Transaction id is empty.');
+    }
+    if (AppConfig.useStubApi) {
+      return _stubCheckoutPreview(ticketId: id);
+    }
+    try {
+      final res = await _dio.get<dynamic>(
+        AppConfig.checkoutPreviewUrl(id),
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (_) => true,
+        ),
+      );
+      _throwCheckoutIfBad(res, 'GET checkout-preview $id');
+      return CheckoutPreviewResponse.fromResponseBody(_asJsonMap(res.data));
+    } on DioException catch (e) {
+      _rethrowCheckoutDio(e, 'GET checkout-preview $id');
+    }
+  }
+
+  /// POST [AppConfig.checkOutUrl] — finalize checkout (payment only; no condition body).
+  Future<CheckOutResponse> submitCheckOut({
+    required String token,
+    required String ticketId,
+    required double amountPaid,
+    required double change,
+    String paymentMethod = 'cash',
+  }) async {
+    final id = ticketId.trim();
+    if (id.isEmpty) {
+      throw CheckoutApiException('Transaction id is empty.');
+    }
+    if (AppConfig.useStubApi) {
+      return CheckOutResponse(
+        invoiceNumber: 'INV-STUB-001',
+        durationMinutes: 120,
+        base: 150,
+        extra: 60,
+        overnight: 0,
+        total: amountPaid,
+      );
+    }
+    final body = <String, dynamic>{
+      'amount_paid': amountPaid,
+      'change': change,
+      'payment_method': paymentMethod,
+    };
+    try {
+      final res = await _dio.post<dynamic>(
+        AppConfig.checkOutUrl(id),
+        data: body,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (_) => true,
+        ),
+      );
+      _throwCheckoutIfBad(res, 'POST check-out $id');
+      return CheckOutResponse.fromResponseBody(_asJsonMap(res.data));
+    } on DioException catch (e) {
+      _rethrowCheckoutDio(e, 'POST check-out $id');
+    }
+  }
+
+  /// POST [AppConfig.checkInUrl] — full check-in (multipart).
+  Future<CheckInResponse> submitCheckIn({
+    required String token,
+    required String ticketNumber,
+    required String contactNumber,
+    required String valetType,
+    required File signatureFile,
+    required Map<String, dynamic> vehicle,
+    required Map<String, dynamic> parking,
+    required List<String> belongings,
+    required List<Map<String, dynamic>> damages,
+    String? customerName,
+    String? driverIn,
+    String? notes,
+  }) async {
+    if (AppConfig.useStubApi) {
+      return CheckInResponse(
+        id: '00000000-0000-4000-8000-000000000099',
+        ticketNumber: 'TKT-0001',
+        qrCode: 'TKT-0001',
+      );
+    }
+
+    final fields = <MapEntry<String, String>>[
+      MapEntry('ticket_number', ticketNumber.trim()),
+      MapEntry('contact_number', contactNumber),
+      MapEntry('valet_type', valetType),
+      MapEntry('vehicle', jsonEncode(vehicle)),
+      MapEntry('parking', jsonEncode(parking)),
+      MapEntry('belongings', jsonEncode(belongings)),
+      MapEntry('damages', jsonEncode(damages)),
+    ];
+
+    final name = customerName?.trim();
+    if (name != null && name.isNotEmpty) {
+      fields.add(MapEntry('customer_name', name));
+    }
+    final driver = driverIn?.trim();
+    if (driver != null && driver.isNotEmpty) {
+      fields.add(MapEntry('driver_in', driver));
+    }
+    final note = notes?.trim();
+    if (note != null && note.isNotEmpty) {
+      fields.add(MapEntry('notes', note));
+    }
+
+    final form = FormData.fromMap({
+      for (final e in fields) e.key: e.value,
+      'signature': await MultipartFile.fromFile(
+        signatureFile.path,
+        filename: 'signature.png',
+        contentType: DioMediaType.parse('image/png'),
+      ),
+    });
+
+    try {
+      final res = await _dio.post<dynamic>(
+        AppConfig.checkInUrl,
+        data: form,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (_) => true,
+          contentType: 'multipart/form-data',
+        ),
+      );
+
+      final code = res.statusCode ?? 0;
+      if (code == 201) {
+        final body = _checkInBodyMap(res.data);
+        return CheckInResponse.fromJson(body);
+      }
+      if (code == 400) {
+        throw CheckInValidationException(
+          messageFromResponseData(res.data) ?? 'Invalid check-in data.',
+        );
+      }
+      if (code == 401) {
+        throw LoginApiFailure(
+          messageFromResponseData(res.data) ?? 'Unauthorized.',
+        );
+      }
+      if (code == 409) {
+        throw VehicleAlreadyCheckedInException();
+      }
+      throw CheckInApiException(
+        messageFromResponseData(res.data) ?? res.statusMessage ?? 'HTTP $code',
+        statusCode: code,
+      );
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionError ||
+          e.error is SocketException) {
+        rethrow;
+      }
+      final code = e.response?.statusCode;
+      if (code == 400) {
+        throw CheckInValidationException(
+          messageFromResponseData(e.response?.data) ?? 'Invalid check-in data.',
+        );
+      }
+      if (code == 401) {
+        throw LoginApiFailure(
+          messageFromResponseData(e.response?.data) ?? 'Unauthorized.',
+        );
+      }
+      if (code == 409) {
+        throw VehicleAlreadyCheckedInException();
+      }
+      throw CheckInApiException(
+        messageFromResponseData(e.response?.data) ?? e.message ?? 'Check-in failed',
+        statusCode: code,
+      );
+    }
+  }
+
+  static Map<String, dynamic> _checkInBodyMap(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      return _unwrapTransaction(data);
+    }
+    if (data is Map) {
+      return _unwrapTransaction(Map<String, dynamic>.from(data));
+    }
+    throw CheckInApiException(
+      'Expected JSON object, got ${data.runtimeType}',
+    );
   }
 
   /// POST [AppConfig.ticketLost] — mark ticket lost (live-only; no queue).
@@ -197,17 +407,48 @@ class TransactionsApi {
   }
 
   static Map<String, dynamic> _asJsonMap(dynamic data) {
-    if (data is Map<String, dynamic>) return data;
-    if (data is Map) return Map<String, dynamic>.from(data);
+    if (data is Map<String, dynamic>) {
+      return _unwrapTransaction(data);
+    }
+    if (data is Map) {
+      return _unwrapTransaction(Map<String, dynamic>.from(data));
+    }
     throw TransactionsApiException(
       'Expected JSON object, got ${data.runtimeType}',
     );
+  }
+
+  static Map<String, dynamic> _unwrapTransaction(Map<String, dynamic> root) {
+    final data = root['data'];
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    // Checkout-preview / check-out envelopes: keep siblings (preview, compute).
+    if (root.containsKey('preview') ||
+        root.containsKey('compute') ||
+        root.containsKey('release_summary')) {
+      return root;
+    }
+
+    for (final key in const ['transaction', 'result']) {
+      final inner = root[key];
+      if (inner is Map<String, dynamic>) return inner;
+      if (inner is Map) return Map<String, dynamic>.from(inner);
+    }
+    return root;
   }
 
   static String? _messageFromBody(dynamic data) {
     if (data is Map) {
       final m = Map<String, dynamic>.from(data);
       final msg = m['message'] ?? m['detail'] ?? m['error'];
+      if (msg is List) {
+        return msg.map((e) => e.toString()).join('; ');
+      }
       return msg?.toString();
     }
     return null;
@@ -220,5 +461,80 @@ class TransactionsApi {
         e.message ??
         e.type.name;
     return TransactionsApiException('$context: $msg', statusCode: code);
+  }
+
+  static void _throwCheckoutIfBad(Response<dynamic> res, String context) {
+    final code = res.statusCode ?? 0;
+    if (code >= 200 && code < 300) {
+      if (res.data is Map || res.data is Map<String, dynamic>) return;
+      throw CheckoutApiException(
+        '$context: expected JSON object',
+        statusCode: code,
+      );
+    }
+    final msg = _messageFromBody(res.data) ?? res.statusMessage ?? 'HTTP $code';
+    throw _checkoutExceptionForStatus(code, msg);
+  }
+
+  static Never _checkoutExceptionForStatus(int code, String msg) {
+    switch (code) {
+      case 400:
+        throw CheckOutValidationException(msg);
+      case 401:
+        throw CheckoutAuthException(msg);
+      case 404:
+        throw TicketNotFoundException(msg);
+      case 409:
+        throw TicketAlreadyCheckedOutException(msg);
+      default:
+        throw CheckoutApiException(msg, statusCode: code);
+    }
+  }
+
+  static Never _rethrowCheckoutDio(DioException e, String context) {
+    final code = e.response?.statusCode;
+    if (code != null) {
+      final msg =
+          _messageFromBody(e.response?.data) ?? e.message ?? 'HTTP $code';
+      _checkoutExceptionForStatus(code, msg);
+    }
+    throw e;
+  }
+
+  static CheckoutPreviewResponse _stubCheckoutPreview({required String ticketId}) {
+    return CheckoutPreviewResponse(
+      transactionId: '00000000-0000-4000-8000-000000000001',
+      customerContact: '09171234567',
+      belongings: const ['iPad', 'Cellphone / Charger'],
+      releaseSummary: const ReleaseSummary(
+        plate: 'ABC 1234',
+        customer: 'Juan dela Cruz',
+        duration: '2h 15m',
+      ),
+      ticket: CheckoutPreviewTicket(
+        ticketNumber: ticketId,
+        plate: 'ABC 1234',
+        vehicleMake: 'Toyota',
+        vehicleModel: 'Vios',
+        vehicleColor: 'White',
+        vehicleType: 'Sedan',
+        timeIn: DateTime.now().subtract(const Duration(hours: 2)).toIso8601String(),
+        duration: '2h 15m',
+        flatRateLabel: 'First 3 hrs (flat)',
+        flatRateAmount: 150,
+        succeedingTimeLabel: '+15 mins',
+        succeedingRateAmount: 60,
+        totalAmount: 210,
+      ),
+      conditionComparison: const [
+        ConditionComparison(
+          zone: 'Front Bumper',
+          type: 'scratch',
+          x: 0.5,
+          y: 0.05,
+          isNew: true,
+        ),
+      ],
+    );
   }
 }

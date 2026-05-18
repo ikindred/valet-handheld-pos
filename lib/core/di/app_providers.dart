@@ -98,6 +98,7 @@ class AppProviders extends StatelessWidget {
             database: c.read<AppDatabase>(),
             dio: c.read<Dio>(),
             authRepository: c.read<AuthRepository>(),
+            ticketService: c.read<TicketService>(),
           ),
         ),
         Provider<BranchConfigService>(
@@ -128,6 +129,7 @@ class AppProviders extends StatelessWidget {
             ticketService: c.read<TicketService>(),
             authRepository: c.read<AuthRepository>(),
             shiftService: c.read<ShiftService>(),
+            transactionsApi: c.read<TransactionsApi>(),
           ),
         ),
         BlocProvider(
@@ -135,6 +137,7 @@ class AppProviders extends StatelessWidget {
             c.read<TicketService>(),
             c.read<RateService>(),
             c.read<AuthRepository>(),
+            c.read<TransactionsApi>(),
           ),
         ),
         BlocProvider(

@@ -8,6 +8,7 @@ void main() {
       'total_vehicles_in': 14,
       'checked_out_total': 12,
       'active_slots': 38,
+      'remaining_count': 82,
       'total_slots': 120,
       'recent_transactions': [
         {
@@ -25,6 +26,7 @@ void main() {
     expect(summary!.totalVehiclesIn, 14);
     expect(summary.checkedOutTotal, 12);
     expect(summary.activeSlots, 38);
+    expect(summary.remainingCount, 82);
     expect(summary.totalSlots, 120);
     expect(summary.recent, hasLength(1));
     expect(summary.recent.first.plateNumber, 'ABC1234');
@@ -32,5 +34,16 @@ void main() {
     final row = summary.recent.first.toRecentRow();
     expect(row.isCheckedOut, isTrue);
     expect(row.plate, 'ABC1234');
+  });
+
+  test('remaining_count falls back to total_slots minus active_slots', () {
+    final summary = DashboardSummary.fromResponseData({
+      'total_vehicles_in': 2,
+      'active_slots': 2,
+      'total_slots': 30,
+    });
+
+    expect(summary, isNotNull);
+    expect(summary!.remainingCount, 28);
   });
 }

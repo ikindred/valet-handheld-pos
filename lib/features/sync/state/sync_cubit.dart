@@ -9,6 +9,7 @@ import '../../../core/logging/valet_log.dart';
 import '../../../data/local/db/app_database.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/cash_session_start_payload.dart';
+import '../../../data/services/ticket_service.dart';
 import '../../../data/services/ticket_sync_payload.dart';
 import 'sync_state.dart';
 
@@ -24,14 +25,17 @@ class SyncCubit extends Cubit<SyncState> {
     required AppDatabase database,
     required Dio dio,
     required AuthRepository authRepository,
+    required TicketService ticketService,
   })  : _db = database,
         _dio = dio,
         _auth = authRepository,
+        _ticketService = ticketService,
         super(const SyncIdle());
 
   final AppDatabase _db;
   final Dio _dio;
   final AuthRepository _auth;
+  final TicketService _ticketService;
 
   Future<int> pendingCount() async {
     final row = await _db.customSelect(
@@ -109,6 +113,43 @@ class SyncCubit extends Cubit<SyncState> {
                 StateError('SYNC_PAYLOAD'),
               );
               await _markQueueFailed(row);
+              continue;
+            }
+
+            if (row.queueTableName == 'tickets' && row.operation == 'checkin') {
+              try {
+                await _ticketService.syncQueuedCheckIn(payloadMap, token);
+                await _markQueueSynced(row);
+                await _markEntitySynced(row);
+                syncedThisRun++;
+              } on DioException catch (e, st) {
+                final status = e.response?.statusCode;
+                if (status != null && status >= 400 && status < 500) {
+                  ValetLog.error(
+                    'SyncCubit.flush',
+                    'check-in client error $status recordId=${row.recordId}',
+                    e,
+                    st,
+                  );
+                  await _markQueueFailed(row);
+                } else {
+                  ValetLog.error(
+                    'SyncCubit.flush',
+                    'check-in retry recordId=${row.recordId}',
+                    e,
+                    st,
+                  );
+                  await _incrementRetry(row);
+                }
+              } catch (e, st) {
+                ValetLog.error(
+                  'SyncCubit.flush',
+                  'check-in failed recordId=${row.recordId}',
+                  e,
+                  st,
+                );
+                await _markQueueFailed(row);
+              }
               continue;
             }
 
@@ -260,16 +301,47 @@ class SyncCubit extends Cubit<SyncState> {
       ];
     }
 
-    if (table == 'tickets' && op == 'create') {
-      final sid = body['server_ticket_id']?.toString().trim();
-      if (sid == null || sid.isEmpty) {
+    if (table == 'tickets' && op == 'checkout/finalize') {
+      final ticketNumber =
+          body['ticket_number']?.toString().trim() ?? row.recordId.trim();
+      final serverId =
+          body['server_ticket_id']?.toString().trim() ?? ticketNumber;
+      if (serverId.isEmpty) {
         return const [];
       }
+      final driverOut = body['driver_out']?.toString() ?? '';
+      final condition = body['condition_checkout'];
+      final conditionList = condition is List
+          ? [
+              for (final e in condition)
+                if (e is Map) Map<String, dynamic>.from(e),
+            ]
+          : <Map<String, dynamic>>[];
+      final amountPaid = body['amount_paid'];
+      final change = body['change'];
+      final paymentMethod = body['payment_method']?.toString() ?? 'cash';
       return [
         _SyncHop(
-          'PATCH',
-          AppConfig.ticketById(sid),
-          transactionCheckInPatchFromSyncPayload(body),
+          'POST',
+          AppConfig.checkoutPreviewUrl(serverId),
+          <String, dynamic>{
+            'driver_out': driverOut,
+            'condition_checkout': conditionList,
+            'status': 'active',
+          },
+        ),
+        _SyncHop(
+          'POST',
+          AppConfig.checkOutUrl(serverId),
+          <String, dynamic>{
+            'amount_paid': amountPaid is num
+                ? amountPaid.toDouble()
+                : double.tryParse('$amountPaid') ?? 0,
+            'change': change is num
+                ? change.toDouble()
+                : double.tryParse('$change') ?? 0,
+            'payment_method': paymentMethod,
+          },
         ),
       ];
     }

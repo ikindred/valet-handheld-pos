@@ -4,73 +4,61 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
-
-import '../../../core/theme/app_theme.dart';
-import '../../../data/local/db/app_database.dart';
+import '../../../core/time/philippine_time.dart';
+import '../../check_in/presentation/widgets/check_in_compact_tokens.dart';
+import '../../check_in/presentation/widgets/check_in_vehicle_details_widgets.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
+import '../domain/checkout_preview_format.dart';
+import '../models/checkout_preview_response.dart';
 import '../state/check_out_cubit.dart';
 import 'widgets/check_out_step_body.dart';
+import 'widgets/check_out_ui_tokens.dart';
+import 'widgets/checkout_vehicle_review_footer.dart';
 import 'widgets/checkout_vehicle_review_tabs.dart';
 
-/// Step 2 — Vehicle review (read-only), Figma-aligned
-/// ([Figma](https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=34-1994)).
+/// Step 2 — Vehicle review · **Vehicle Info** tab
 class CheckOutVehicleInfoScreen extends StatelessWidget {
   const CheckOutVehicleInfoScreen({super.key});
 
-  static const _grey500 = Color(0xFF6C7688);
-  static const _plateBlue = Color(0xFF0068D3);
-  static const _plateBarBg = Color(0xFFA7D6FF);
   static const _green = Color(0xFF27AE60);
 
-  static List<String> _belongings(String? json) {
+  static String _belongingLabel(String raw) {
+    final id = raw.trim();
+    if (id.isEmpty) return raw;
+    for (final e in CheckInBelongingsIds.entries) {
+      if (e.$1 == id) return e.$2;
+    }
+    if (id.startsWith('Other:')) return id;
+    return id;
+  }
+
+  static List<String> _belongingsFromPreview(CheckoutPreviewResponse preview) {
+    return [
+      for (final b in preview.belongings)
+        if (b.trim().isNotEmpty) _belongingLabel(b),
+    ];
+  }
+
+  static List<String> _belongingsFromDrift(String? json) {
     if (json == null || json.trim().isEmpty) return const [];
     try {
       final d = jsonDecode(json);
       if (d is List) {
-        return [for (final e in d) e.toString()];
+        return [
+          for (final e in d)
+            _belongingLabel(e.toString()),
+        ];
       }
     } catch (_) {}
     return const [];
   }
 
-  static String _slotLine(Ticket row) {
-    return '—';
-  }
-
-  static String _prettyValetType(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return 'Standard Valet';
-    return raw
-        .split(RegExp(r'[_\s]+'))
-        .where((s) => s.isNotEmpty)
-        .map(
-          (w) =>
-              '${w[0].toUpperCase()}${w.length > 1 ? w.substring(1).toLowerCase() : ''}',
-        )
-        .join(' ');
-  }
-
-  static String _durationSoFar(int timeInUnix) {
-    final inDt = DateTime.fromMillisecondsSinceEpoch(timeInUnix * 1000);
-    final d = DateTime.now().difference(inDt);
+  static String _durationSoFar(DateTime timeIn) {
+    final d = PhilippineTime.now().difference(timeIn);
     final h = d.inHours;
     final m = d.inMinutes.remainder(60);
     if (h <= 0) return '$m mins';
     return '$h hrs $m mins';
-  }
-
-  static TextStyle _poppins(
-    double size,
-    FontWeight w,
-    Color c, {
-    double? height,
-  }) {
-    return GoogleFonts.poppins(
-      fontSize: size,
-      fontWeight: w,
-      height: height,
-      color: c,
-    );
   }
 
   @override
@@ -78,247 +66,450 @@ class CheckOutVehicleInfoScreen extends StatelessWidget {
     return BlocBuilder<CheckOutCubit, CheckOutState>(
       buildWhen: (a, b) =>
           a.ticket != b.ticket ||
-          a.driverIn != b.driverIn ||
+          a.preview != b.preview ||
+          a.isLoadingPreview != b.isLoadingPreview ||
           a.driverOut != b.driverOut,
       builder: (context, state) {
-        final row = state.ticket;
-        if (row == null) {
+        if (state.ticket == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (context.mounted) context.go('/check-out/step-1');
           });
           return const SizedBox.shrink();
         }
 
-        final belongings = _belongings(row.personalBelongings);
-        final timeInMs = DateTime.tryParse(row.checkInAt)?.millisecondsSinceEpoch ?? 0;
-        final timeIn = DateTime.fromMillisecondsSinceEpoch(timeInMs);
-        final now = DateTime.now();
-        final timeInLabel = DateFormat('h:mm a').format(timeIn);
-        final dateInLabel = DateFormat('MMMM d, y').format(timeIn);
-        final timeOutLabel = DateFormat('h:mm a').format(now);
-        final durationLabel = _durationSoFar(timeInMs ~/ 1000);
-        final slot = _slotLine(row);
-        final subtitle = [
-          row.vehicleBrand.trim(),
-          row.vehicleColor.trim(),
-          row.vehicleType.trim(),
-        ].where((s) => s.isNotEmpty).join(' · ');
-        final displaySubtitle = subtitle.isEmpty ? '—' : subtitle;
+        final preview = state.preview;
+        if (preview == null) {
+          if (state.isLookupBusy || state.isLoadingPreview) {
+            return CheckOutStepBody(
+              scrollable: true,
+              footer: CheckoutVehicleReviewFooter(
+                onBack: () => context.go('/check-out/step-1'),
+                primaryLabel: 'Next: Proceed to payment',
+                onPrimary: null,
+              ),
+              child: const Center(child: CircularProgressIndicator()),
+            );
+          }
+          return _OfflineVehicleBody(state: state);
+        }
 
-        return CheckOutStepBody(
-          showBack: true,
-          onBack: () => context.go('/check-out/step-1'),
-          primaryLabel: 'Next: Proceed to payment',
-          onPrimary: () => context.go('/check-out/step-3'),
-          child: LayoutBuilder(
-            builder: (context, c) {
-              final wide = c.maxWidth >= 960;
+        return _PreviewVehicleBody(state: state, preview: preview);
+      },
+    );
+  }
+}
 
-              final tabs = CheckoutVehicleReviewTabs(
-                vehicleInfoSelected: true,
-                onVehicleInfoTap: null,
-                onConditionTap: () => context.go('/check-out/step-3'),
-              );
+class _PreviewVehicleBody extends StatelessWidget {
+  const _PreviewVehicleBody({
+    required this.state,
+    required this.preview,
+  });
 
-              final vehicleCard = _WhiteCard(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('VEHICLE', style: _poppins(15, FontWeight.w500, AppColors.textPrimary)),
-                    const SizedBox(height: 24),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      color: _plateBarBg,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          row.plateNumber.isEmpty ? '—' : row.plateNumber,
-                          style: _poppins(40, FontWeight.w700, _plateBlue),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 11),
-                    Text(displaySubtitle, style: _poppins(15, FontWeight.w500, AppColors.textPrimary)),
-                    const SizedBox(height: 22),
-                    _OrangeChip(text: slot),
-                  ],
-                ),
-              );
+  final CheckOutState state;
+  final CheckoutPreviewResponse preview;
 
-              final customerCard = _WhiteCard(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('CUSTOMER', style: _poppins(15, FontWeight.w500, AppColors.textPrimary)),
-                    const SizedBox(height: 11),
-                    Text(
-                      '—',
-                      style: _poppins(25, FontWeight.w500, AppColors.textPrimary),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      row.cellphoneNumber.trim().isEmpty
-                          ? '—'
-                          : row.cellphoneNumber.trim(),
-                      style: _poppins(15, FontWeight.w500, AppColors.textPrimary),
-                    ),
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        _prettyValetType(null),
-                        style: _poppins(15, FontWeight.w600, DashboardStyles.orange),
-                      ),
-                    ),
-                  ],
-                ),
-              );
+  @override
+  Widget build(BuildContext context) {
+    final pt = preview.ticket;
+    final rs = preview.releaseSummary;
 
-              final timeInCard = _WhiteCard(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('TIME IN', style: _poppins(15, FontWeight.w500, _grey500)),
-                    const SizedBox(height: 11),
-                    Text(timeInLabel, style: _poppins(30, FontWeight.w600, AppColors.textPrimary)),
-                    Text(dateInLabel, style: _poppins(15, FontWeight.w500, AppColors.textPrimary)),
-                  ],
-                ),
-              );
+    final nameDisplay = rs.customer.trim().isEmpty ? '—' : rs.customer.trim();
+    final contact = (preview.customerContact ?? '').trim().isEmpty
+        ? '—'
+        : preview.customerContact!.trim();
 
-              final timeOutCard = _WhiteCard(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('TIME OUT', style: _poppins(15, FontWeight.w500, _grey500)),
-                    const SizedBox(height: 11),
-                    Text(
-                      timeOutLabel,
-                      style: _poppins(30, FontWeight.w600, DashboardStyles.orange),
-                    ),
-                    Text(
-                      durationLabel,
-                      style: _poppins(15, FontWeight.w500, _green),
-                    ),
-                  ],
-                ),
-              );
+    final timeInLabel = formatPreviewTime(pt.timeIn);
+    final dateInLabel = formatPreviewDate(pt.timeIn);
+    final timeOutLabel = pt.timeOut != null
+        ? formatPreviewTime(pt.timeOut)
+        : formatPreviewTime(PhilippineTime.iso8601Now());
+    final durationLabel = pt.duration.isNotEmpty
+        ? pt.duration
+        : (rs.duration.isNotEmpty ? rs.duration : '—');
 
-              final dIn = state.driverIn?.trim();
-              final valetInName =
-                  (dIn == null || dIn.isEmpty) ? '—' : dIn;
-              final dOut = state.driverOut?.trim();
-              final valetOutName =
-                  (dOut == null || dOut.isEmpty) ? '—' : dOut;
+    final plateDisplay = pt.plate.isNotEmpty ? pt.plate : rs.plate;
+    final makeModel = [
+      pt.vehicleMake.trim(),
+      pt.vehicleModel.trim(),
+    ].where((s) => s.isNotEmpty).join(' ');
+    final colorDisplay = pt.vehicleColor.trim().isEmpty ? '—' : pt.vehicleColor.trim();
+    final typeDisplay = pt.vehicleType.trim().isEmpty ? '—' : pt.vehicleType.trim();
+    final parkingLabel = pt.parkingLocationLine.trim().isEmpty
+        ? '—'
+        : pt.parkingLocationLine.trim();
 
-              final staffCard = _WhiteCard(
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('STAFF', style: _poppins(15, FontWeight.w500, AppColors.textPrimary)),
-                    const SizedBox(height: 25),
-                    _StaffRow(label: 'Valet In', name: valetInName),
-                    const SizedBox(height: 8),
-                    Divider(height: 1, thickness: 1, color: Colors.black.withValues(alpha: 0.13)),
-                    const SizedBox(height: 8),
-                    _StaffRow(label: 'Valet Out', name: valetOutName),
-                  ],
-                ),
-              );
+    final valetIn = (pt.valetIn ?? '').trim().isEmpty ? '—' : pt.valetIn!.trim();
+    final valetOutPrefill = pt.valetOut ?? state.driverOut;
+    final valetOut =
+        (valetOutPrefill ?? '').trim().isEmpty ? '—' : valetOutPrefill!.trim();
 
-              final belongingsCard = _WhiteCard(
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'DECLARED BELONGINGS',
-                      style: _poppins(15, FontWeight.w500, AppColors.textPrimary),
-                    ),
-                    const SizedBox(height: 25),
-                    if (belongings.isEmpty)
-                      Text(
-                        'None declared',
-                        style: _poppins(14, FontWeight.w400, _grey500),
-                      )
-                    else
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final b in belongings) _OrangeChip(text: b),
-                        ],
-                      ),
-                  ],
-                ),
-              );
+    final belongings = CheckOutVehicleInfoScreen._belongingsFromPreview(preview);
 
-              if (wide) {
-                return Column(
+    final tabs = CheckoutVehicleReviewTabs(
+      vehicleInfoSelected: true,
+      onVehicleInfoTap: null,
+      onConditionTap: () => context.go('/check-out/step-3'),
+    );
+
+    return CheckOutStepBody(
+      scrollable: true,
+      footer: CheckoutVehicleReviewFooter(
+        onBack: () => context.go('/check-out/step-1'),
+        primaryLabel: 'Next: Proceed to payment',
+        onPrimary: () => context.go('/check-out/step-3'),
+      ),
+      child: _VehicleInfoLayout(
+        tabs: tabs,
+        customerCard: _CustomerCard(
+          name: nameDisplay,
+          contact: contact,
+        ),
+        timeInCard: _TimeCard(
+          title: 'TIME IN',
+          primary: timeInLabel,
+          secondary: dateInLabel,
+          primaryColor: const Color(0xFF0A1B39),
+          secondaryColor: const Color(0xFF0A1B39),
+        ),
+        timeOutCard: _TimeCard(
+          title: 'TIME OUT',
+          primary: timeOutLabel,
+          secondary: durationLabel,
+          primaryColor: DashboardStyles.orange,
+          secondaryColor: CheckOutVehicleInfoScreen._green,
+        ),
+        vehicleCard: _VehicleCard(
+          plate: plateDisplay.isEmpty ? '—' : plateDisplay,
+          makeModel: makeModel.isEmpty ? '—' : makeModel,
+          color: colorDisplay,
+          type: typeDisplay,
+          slot: parkingLabel,
+        ),
+        staffCard: _StaffCard(valetIn: valetIn, valetOut: valetOut),
+        belongingsCard: _BelongingsCard(belongings: belongings),
+      ),
+    );
+  }
+}
+
+/// Offline checkout: no preview payload — show Drift ticket data.
+class _OfflineVehicleBody extends StatelessWidget {
+  const _OfflineVehicleBody({required this.state});
+
+  final CheckOutState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final row = state.ticket!;
+    final timeIn = PhilippineTime.fromApiIso(row.checkInAt);
+    final belongings = CheckOutVehicleInfoScreen._belongingsFromDrift(
+      row.personalBelongings,
+    );
+
+    final tabs = CheckoutVehicleReviewTabs(
+      vehicleInfoSelected: true,
+      onVehicleInfoTap: null,
+      onConditionTap: () => context.go('/check-out/step-3'),
+    );
+
+    return CheckOutStepBody(
+      scrollable: true,
+      footer: CheckoutVehicleReviewFooter(
+        onBack: () => context.go('/check-out/step-1'),
+        primaryLabel: 'Next: Proceed to payment',
+        onPrimary: () => context.go('/check-out/step-3'),
+      ),
+      child: _VehicleInfoLayout(
+        tabs: tabs,
+        customerCard: const _CustomerCard(name: '—', contact: '—'),
+        timeInCard: _TimeCard(
+          title: 'TIME IN',
+          primary: formatPreviewTime(row.checkInAt),
+          secondary: formatPreviewDate(row.checkInAt),
+          primaryColor: const Color(0xFF0A1B39),
+          secondaryColor: const Color(0xFF0A1B39),
+        ),
+        timeOutCard: _TimeCard(
+          title: 'TIME OUT',
+          primary: formatPreviewTime(PhilippineTime.iso8601Now()),
+          secondary: CheckOutVehicleInfoScreen._durationSoFar(timeIn),
+          primaryColor: DashboardStyles.orange,
+          secondaryColor: CheckOutVehicleInfoScreen._green,
+        ),
+        vehicleCard: _VehicleCard(
+          plate: row.plateNumber.isEmpty ? '—' : row.plateNumber,
+          makeModel: [
+            row.vehicleBrand.trim(),
+            row.vehicleColor.trim(),
+          ].where((s) => s.isNotEmpty).join(' '),
+          color: row.vehicleColor.isEmpty ? '—' : row.vehicleColor,
+          type: row.vehicleType.isEmpty ? '—' : row.vehicleType,
+          slot: '—',
+        ),
+        staffCard: _StaffCard(
+          valetIn: (row.driverIn ?? '').trim().isEmpty ? '—' : row.driverIn!,
+          valetOut: (state.driverOut ?? '').trim().isEmpty
+              ? '—'
+              : state.driverOut!.trim(),
+        ),
+        belongingsCard: _BelongingsCard(belongings: belongings),
+      ),
+    );
+  }
+}
+
+class _VehicleInfoLayout extends StatelessWidget {
+  const _VehicleInfoLayout({
+    required this.tabs,
+    required this.customerCard,
+    required this.timeInCard,
+    required this.timeOutCard,
+    required this.vehicleCard,
+    required this.staffCard,
+    required this.belongingsCard,
+  });
+
+  final Widget tabs;
+  final Widget customerCard;
+  final Widget timeInCard;
+  final Widget timeOutCard;
+  final Widget vehicleCard;
+  final Widget staffCard;
+  final Widget belongingsCard;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final wide = c.maxWidth >= 720;
+        if (wide) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              tabs,
+              const SizedBox(height: CheckInCompactTokens.blockGap),
+              IntrinsicHeight(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    tabs,
-                    const SizedBox(height: 20),
-                    vehicleCard,
-                    const SizedBox(height: 16),
-                    IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(flex: 5, child: customerCard),
-                          const SizedBox(width: 16),
-                          Expanded(flex: 3, child: timeInCard),
-                          const SizedBox(width: 16),
-                          Expanded(flex: 3, child: timeOutCard),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    staffCard,
-                    const SizedBox(height: 16),
-                    belongingsCard,
+                    Expanded(child: customerCard),
+                    const SizedBox(width: 16),
+                    Expanded(child: timeInCard),
+                    const SizedBox(width: 16),
+                    Expanded(child: timeOutCard),
                   ],
-                );
-              }
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  tabs,
-                  const SizedBox(height: 16),
-                  vehicleCard,
-                  const SizedBox(height: 12),
-                  customerCard,
-                  const SizedBox(height: 12),
-                  timeInCard,
-                  const SizedBox(height: 12),
-                  timeOutCard,
-                  const SizedBox(height: 12),
-                  staffCard,
-                  const SizedBox(height: 12),
-                  belongingsCard,
-                ],
-              );
-            },
-          ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: vehicleCard),
+                    const SizedBox(width: 16),
+                    Expanded(child: staffCard),
+                    const SizedBox(width: 16),
+                    Expanded(child: belongingsCard),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            tabs,
+            const SizedBox(height: 16),
+            customerCard,
+            const SizedBox(height: 12),
+            timeInCard,
+            const SizedBox(height: 12),
+            timeOutCard,
+            const SizedBox(height: 12),
+            vehicleCard,
+            const SizedBox(height: 12),
+            staffCard,
+            const SizedBox(height: 12),
+            belongingsCard,
+          ],
         );
       },
     );
   }
 }
 
-class _WhiteCard extends StatelessWidget {
-  const _WhiteCard({required this.child, required this.padding});
+class _CustomerCard extends StatelessWidget {
+  const _CustomerCard({required this.name, required this.contact});
+
+  final String name;
+  final String contact;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ReviewCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('CUSTOMER', style: CheckOutUiTokens.sectionTitle()),
+          const SizedBox(height: 8),
+          Text(name, style: CheckOutUiTokens.timeDisplay()),
+          const SizedBox(height: 4),
+          Text(contact, style: CheckOutUiTokens.body()),
+        ],
+      ),
+    );
+  }
+}
+
+class _TimeCard extends StatelessWidget {
+  const _TimeCard({
+    required this.title,
+    required this.primary,
+    required this.secondary,
+    required this.primaryColor,
+    required this.secondaryColor,
+  });
+
+  final String title;
+  final String primary;
+  final String secondary;
+  final Color primaryColor;
+  final Color secondaryColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ReviewCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: CheckOutUiTokens.sectionTitle()),
+          const SizedBox(height: 6),
+          Text(primary, style: CheckOutUiTokens.timeDisplay(color: primaryColor)),
+          Text(
+            secondary,
+            style: CheckOutUiTokens.body().copyWith(color: secondaryColor),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VehicleCard extends StatelessWidget {
+  const _VehicleCard({
+    required this.plate,
+    required this.makeModel,
+    required this.color,
+    required this.type,
+    required this.slot,
+  });
+
+  final String plate;
+  final String makeModel;
+  final String color;
+  final String type;
+  final String slot;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ReviewCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('VEHICLE', style: CheckOutUiTokens.sectionTitle()),
+          const SizedBox(height: CheckInCompactTokens.sectionGap),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            color: CheckOutUiTokens.plateBarBg,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                plate,
+                style: CheckOutUiTokens.plate().copyWith(
+                  color: CheckOutUiTokens.plateBlue,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text('Make / Model', style: CheckOutUiTokens.fieldLabel()),
+          Text(makeModel, style: CheckOutUiTokens.body()),
+          const SizedBox(height: 6),
+          Text('Color', style: CheckOutUiTokens.fieldLabel()),
+          Text(color, style: CheckOutUiTokens.body()),
+          const SizedBox(height: 6),
+          Text('Type', style: CheckOutUiTokens.fieldLabel()),
+          Text(type, style: CheckOutUiTokens.body()),
+          const SizedBox(height: 10),
+          _OrangeChip(text: slot),
+        ],
+      ),
+    );
+  }
+}
+
+class _StaffCard extends StatelessWidget {
+  const _StaffCard({required this.valetIn, required this.valetOut});
+
+  final String valetIn;
+  final String valetOut;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ReviewCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('STAFF', style: CheckOutUiTokens.sectionTitle()),
+          const SizedBox(height: 10),
+          _StaffRow(label: 'Valet In', name: valetIn),
+          const SizedBox(height: 6),
+          const Divider(height: 1, thickness: 1, color: CheckOutUiTokens.hairline),
+          const SizedBox(height: 6),
+          _StaffRow(label: 'Valet Out', name: valetOut),
+        ],
+      ),
+    );
+  }
+}
+
+class _BelongingsCard extends StatelessWidget {
+  const _BelongingsCard({required this.belongings});
+
+  final List<String> belongings;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ReviewCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('DECLARED BELONGINGS', style: CheckOutUiTokens.sectionTitle()),
+          const SizedBox(height: 10),
+          if (belongings.isEmpty)
+            Text('None declared', style: CheckOutUiTokens.hint())
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final b in belongings) _OrangeChip(text: b),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  const _ReviewCard({required this.child});
 
   final Widget child;
-  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
@@ -329,7 +520,7 @@ class _WhiteCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
       ),
-      padding: padding,
+      padding: CheckOutUiTokens.cardPadding,
       child: child,
     );
   }
@@ -343,7 +534,7 @@ class _OrangeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: const Color(0xFFFFF7EC),
         borderRadius: BorderRadius.circular(5),
@@ -371,25 +562,12 @@ class _StaffRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(
-          child: Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: CheckOutVehicleInfoScreen._grey500,
-            ),
-          ),
-        ),
+        Expanded(child: Text(label, style: CheckOutUiTokens.fieldLabel())),
         Expanded(
           child: Text(
             name,
             textAlign: TextAlign.right,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
-            ),
+            style: CheckOutUiTokens.body(),
           ),
         ),
       ],

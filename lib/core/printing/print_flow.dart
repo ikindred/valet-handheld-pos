@@ -71,13 +71,32 @@ Future<bool> _ensurePrinterReady(BuildContext context) async {
   return false;
 }
 
+/// Prints all three receipt parts in order (Step 5 review preview — unchanged UX).
 Future<bool> printCheckInFromContext(
   BuildContext context, {
   required CheckInReceiptData data,
 }) {
   return runBluetoothPrint(
     context,
-    printJob: () => context.read<ValetPrintService>().printCheckIn(data),
+    printJob: () async {
+      final service = context.read<ValetPrintService>();
+      for (var part = 1; part <= 3; part++) {
+        await service.printCheckIn(data, part: part);
+      }
+    },
+  );
+}
+
+/// Prints a single receipt part (Step 6 sequential tear-off flow).
+Future<bool> printCheckInPartFromContext(
+  BuildContext context, {
+  required CheckInReceiptData data,
+  required int part,
+}) {
+  return runBluetoothPrint(
+    context,
+    printJob: () =>
+        context.read<ValetPrintService>().printCheckIn(data, part: part),
   );
 }
 
@@ -102,6 +121,7 @@ Future<CheckInReceiptData> withBranchName(
     valetTypeLabel: data.valetTypeLabel,
     specialRequest: data.specialRequest,
     hasSignature: data.hasSignature,
+    qrCode: data.qrCode,
   );
 }
 

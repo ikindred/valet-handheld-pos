@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../data/local/db/app_database.dart';
+import '../models/checkout_preview_response.dart';
 import 'checkout_pricing.dart';
 
 /// Immutable receipt data captured at checkout finalize (ticket row is cleared from state after).
@@ -13,8 +14,12 @@ class CheckoutReceiptSnapshot extends Equatable {
     required this.timeInUnix,
     required this.timeOutUnix,
     required this.durationMinutes,
+    this.durationLabel,
     required this.slotLine,
     this.valetName,
+    this.valetOutName,
+    this.flatRateLabel,
+    this.succeedingTimeLabel,
     required this.flatBlockHours,
     required this.flatPesos,
     required this.succeedingPesos,
@@ -25,6 +30,7 @@ class CheckoutReceiptSnapshot extends Equatable {
     required this.amountTendered,
     required this.changePesos,
     this.branchLine,
+    this.invoiceNumber,
   });
 
   final String ticketNumber;
@@ -34,8 +40,12 @@ class CheckoutReceiptSnapshot extends Equatable {
   final int timeInUnix;
   final int timeOutUnix;
   final int durationMinutes;
+  final String? durationLabel;
   final String slotLine;
   final String? valetName;
+  final String? valetOutName;
+  final String? flatRateLabel;
+  final String? succeedingTimeLabel;
   final int flatBlockHours;
   final double flatPesos;
   final double succeedingPesos;
@@ -46,6 +56,7 @@ class CheckoutReceiptSnapshot extends Equatable {
   final double amountTendered;
   final double changePesos;
   final String? branchLine;
+  final String? invoiceNumber;
 
   static String slotLineFromTicket(Ticket t) {
     return '—';
@@ -67,6 +78,55 @@ class CheckoutReceiptSnapshot extends Equatable {
     return '$h hrs $m mins';
   }
 
+  factory CheckoutReceiptSnapshot.fromPreview({
+    required String localTicketId,
+    required CheckoutPreviewResponse preview,
+    required double totalPesos,
+    required double tendered,
+    required double change,
+    String? invoiceNumber,
+    String? branchName,
+  }) {
+    final pt = preview.ticket;
+    final parsedIn = DateTime.tryParse(pt.timeIn)?.toUtc();
+    final parsedOut = DateTime.tryParse(pt.timeOut ?? '')?.toUtc();
+    final timeInUnix = parsedIn != null
+        ? parsedIn.millisecondsSinceEpoch ~/ 1000
+        : 0;
+    final timeOutUnix = parsedOut != null
+        ? parsedOut.millisecondsSinceEpoch ~/ 1000
+        : DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+
+    return CheckoutReceiptSnapshot(
+      ticketNumber: localTicketId,
+      plateNumber: pt.plate.isNotEmpty ? pt.plate : preview.releaseSummary.plate,
+      vehicleReceiptLine: pt.vehicleReceiptLine,
+      customerName: preview.releaseSummary.customer,
+      timeInUnix: timeInUnix,
+      timeOutUnix: timeOutUnix,
+      durationMinutes: 0,
+      durationLabel: pt.duration.isNotEmpty
+          ? pt.duration
+          : preview.releaseSummary.duration,
+      slotLine: pt.parkingLocationLine.isNotEmpty ? pt.parkingLocationLine : '—',
+      valetName: pt.valetIn,
+      valetOutName: pt.valetOut,
+      flatBlockHours: CheckoutPricing.defaultFlatBlockHours,
+      flatPesos: pt.flatRateAmount,
+      flatRateLabel: pt.flatRateLabel,
+      succeedingPesos: pt.succeedingRateAmount,
+      succeedingTimeLabel: pt.succeedingTimeLabel,
+      succeedingExtraMinutes: 0,
+      overnightApplied: false,
+      overnightPesos: 0,
+      totalPesos: totalPesos,
+      amountTendered: tendered,
+      changePesos: change,
+      branchLine: branchName,
+      invoiceNumber: invoiceNumber,
+    );
+  }
+
   factory CheckoutReceiptSnapshot.capture({
     required Ticket ticket,
     required CheckoutBreakdown b,
@@ -78,7 +138,7 @@ class CheckoutReceiptSnapshot extends Equatable {
     final flatMins = flatBlockHours * 60;
     final extraMins = (b.durationMinutes - flatMins).clamp(0, 1 << 30);
     final branch = ticket.branchId.trim();
-    final parsedIn = DateTime.tryParse(ticket.checkInAt);
+    final parsedIn = DateTime.tryParse(ticket.checkInAt)?.toUtc();
     final timeInUnix = parsedIn != null
         ? parsedIn.millisecondsSinceEpoch ~/ 1000
         : timeOutUnix;
@@ -152,5 +212,10 @@ class CheckoutReceiptSnapshot extends Equatable {
         amountTendered,
         changePesos,
         branchLine,
+        invoiceNumber,
+        durationLabel,
+        valetOutName,
+        flatRateLabel,
+        succeedingTimeLabel,
       ];
 }

@@ -16,9 +16,9 @@ abstract final class ValetLog {
     printer: PrettyPrinter(
       methodCount: 0,
       errorMethodCount: 5,
-      lineLength: 120,
-      colors: false,
-      printEmojis: false,
+      lineLength: 500,
+      colors: true,
+      printEmojis: true,
       dateTimeFormat: DateTimeFormat.none,
     ),
   );

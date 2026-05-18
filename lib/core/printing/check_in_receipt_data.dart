@@ -12,6 +12,7 @@ class CheckInReceiptData {
     this.valetTypeLabel,
     this.specialRequest,
     this.hasSignature = false,
+    this.qrCode,
   });
 
   final Ticket ticket;
@@ -23,4 +24,7 @@ class CheckInReceiptData {
   final String? valetTypeLabel;
   final String? specialRequest;
   final bool hasSignature;
+
+  /// Server `qr_code` (or local ticket number when offline); used for receipt QR only.
+  final String? qrCode;
 }

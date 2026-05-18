@@ -6,12 +6,14 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/formatting/peso_currency.dart';
-import '../domain/checkout_receipt_snapshot.dart';
+import '../domain/checkout_preview_format.dart';
+import '../models/checkout_preview_response.dart';
+import '../../check_in/presentation/widgets/check_in_compact_tokens.dart';
 import '../state/check_out_cubit.dart';
 import 'widgets/check_out_step_body.dart';
+import 'widgets/check_out_ui_tokens.dart';
 
-/// Step 6 — Complete + print
-/// ([Figma](https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=43-43)).
+/// Step 5 — Complete + print
 class CheckOutPaymentDoneScreen extends StatelessWidget {
   const CheckOutPaymentDoneScreen({super.key});
 
@@ -38,27 +40,6 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
     ).copyWith(fontFamilyFallback: _pesoGlyphFallback);
   }
 
-  static String _dt(int unix) {
-    if (unix <= 0) return '—';
-    final dt = DateTime.fromMillisecondsSinceEpoch(unix * 1000);
-    return '${DateFormat('MMM d, y').format(dt)} · ${DateFormat('h:mm a').format(dt)}';
-  }
-
-  static String _customer(CheckoutReceiptSnapshot s) {
-    final n = (s.customerName ?? '').trim();
-    return n.isEmpty ? '—' : n;
-  }
-
-  static String _plate(CheckoutReceiptSnapshot s) {
-    final p = s.plateNumber.trim();
-    return p.isEmpty ? '—' : p;
-  }
-
-  static String _valet(CheckoutReceiptSnapshot s) {
-    final v = (s.valetName ?? '').trim();
-    return v.isEmpty ? '—' : v;
-  }
-
   void _printStub(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -75,6 +56,14 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<CheckOutCubit, CheckOutState>(
+      buildWhen: (a, b) =>
+          a.receiptTicket != b.receiptTicket ||
+          a.preview != b.preview ||
+          a.serverTotal != b.serverTotal ||
+          a.amountTenderedInput != b.amountTenderedInput ||
+          a.invoiceNumber != b.invoiceNumber ||
+          a.branchName != b.branchName ||
+          a.mallHours != b.mallHours,
       builder: (context, state) {
         if (state.receiptTicket == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -83,82 +72,79 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        final snap = state.receiptSnapshot ??
-            CheckoutReceiptSnapshot.minimal(
-              ticketNumber: state.receiptTicket!,
-              totalPesos: state.receiptTotalPesos ?? 0,
-              changePesos: state.receiptChangePesos ?? 0,
-            );
-
+        final cubit = context.read<CheckOutCubit>();
+        final preview = state.preview;
         final peso2 = PesoCurrency.currency(decimalDigits: 2);
-        final durationLabel =
-            CheckoutReceiptSnapshot.durationLabelFromMinutes(snap.durationMinutes);
-        final branch = (snap.branchLine ?? '').trim();
+        final total = state.serverTotal ?? preview?.ticket.totalAmount ?? 0;
+        final tendered = cubit.parsedTendered() ?? total;
+        final change = cubit.changeDue() ?? 0;
+        final branch = (state.branchName ?? '').trim();
         final thankYou = branch.isEmpty
             ? 'THANK YOU FOR USING VALET MASTER'
             : 'THANK YOU FOR USING VALET MASTER · $branch';
 
         return CheckOutStepBody(
-          footer: FilledButton(
-            onPressed: () => _releaseDone(context),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(0, 54),
-              backgroundColor: _orange,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            child: Text(
-              'Release Vehicle & Done',
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
+          footer: Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => _releaseDone(context),
+                style: FilledButton.styleFrom(
+                  minimumSize: Size(0, CheckInCompactTokens.footerButtonHeight),
+                  backgroundColor: _orange,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: Text(
+                  'Release Vehicle & Done',
+                  style: CheckInCompactTokens.footerLabel().copyWith(
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ),
           ),
           child: LayoutBuilder(
             builder: (context, c) {
               final wide = c.maxWidth >= 960;
-              final header = _vehicleReviewCompleteHeader();
-              final success = _transactionCompleteCard();
-              final printCard = _printBluetoothCard(
-                onTap: () => _printStub(context),
+
+              final leftColumn = Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _transactionCompleteCard(),
+                  const SizedBox(height: 16),
+                  _releaseSummaryCard(
+                    preview: preview,
+                    peso2: peso2,
+                    total: total,
+                    tendered: tendered,
+                    change: change,
+                  ),
+                  const SizedBox(height: 16),
+                  _printBluetoothCard(onTap: () => _printStub(context)),
+                ],
               );
-              final summary = _releaseSummaryCard(snap, peso2, durationLabel);
+
               final receipt = _receiptPreview(
-                snap: snap,
+                localTicketId: state.receiptTicket!,
+                preview: preview,
                 peso2: peso2,
-                durationLabel: durationLabel,
+                total: total,
+                change: change,
                 thankYou: thankYou,
+                mallHours: state.mallHours,
+                driverOut: state.driverOut,
               );
 
               if (wide) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    header,
-                    const SizedBox(height: 24),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 5,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              success,
-                              const SizedBox(height: 16),
-                              printCard,
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 20),
-                        Expanded(flex: 5, child: summary),
-                        const SizedBox(width: 20),
-                        Expanded(flex: 6, child: receipt),
-                      ],
-                    ),
+                    Expanded(flex: 5, child: leftColumn),
+                    const SizedBox(width: 20),
+                    Expanded(flex: 6, child: receipt),
                   ],
                 );
               }
@@ -166,13 +152,7 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  header,
-                  const SizedBox(height: 20),
-                  success,
-                  const SizedBox(height: 16),
-                  printCard,
-                  const SizedBox(height: 20),
-                  summary,
+                  leftColumn,
                   const SizedBox(height: 20),
                   receipt,
                 ],
@@ -184,42 +164,9 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
     );
   }
 
-  Widget _vehicleReviewCompleteHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text(
-          'VEHICLE REVIEW',
-          textAlign: TextAlign.center,
-          style: _poppins(15, FontWeight.w500, _grey500),
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: 200,
-          child: Row(
-            children: [
-              for (var i = 0; i < 4; i++) ...[
-                if (i > 0) const SizedBox(width: 9),
-                Expanded(
-                  child: Container(
-                    height: 13,
-                    decoration: BoxDecoration(
-                      color: _green,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _transactionCompleteCard() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+      padding: CheckOutUiTokens.cardPaddingDense,
       decoration: BoxDecoration(
         color: _successSurface,
         borderRadius: BorderRadius.circular(10),
@@ -228,19 +175,19 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Icon(Icons.check_circle, color: _green, size: 45),
-          const SizedBox(width: 17),
+          const Icon(Icons.check_circle, color: _green, size: 32),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Transaction Complete',
-                  style: _poppins(20, FontWeight.w600, _green),
+                  style: CheckOutUiTokens.timeDisplay(color: _green),
                 ),
                 Text(
                   'Vehicle may be released to customer',
-                  style: _poppins(15, FontWeight.w500, _green),
+                  style: CheckOutUiTokens.body().copyWith(color: _green),
                 ),
               ],
             ),
@@ -251,67 +198,57 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
   }
 
   Widget _printBluetoothCard({required VoidCallback onTap}) {
-    return Material(
-      color: _orange,
-      elevation: 1,
-      shadowColor: Colors.black.withValues(alpha: 0.08),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-        side: BorderSide(color: Colors.black.withValues(alpha: 0.13)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                height: 45,
-                width: 45,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.27),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
+    return SizedBox(
+      width: double.infinity,
+      child: Material(
+        color: _orange,
+        elevation: 1,
+        shadowColor: Colors.black.withValues(alpha: 0.08),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: Colors.black.withValues(alpha: 0.13)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: CheckOutUiTokens.cardPadding,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
                   LucideIcons.bluetooth,
                   color: Colors.white.withValues(alpha: 0.95),
-                  size: 24,
+                  size: 20,
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Print Via Bluetooth',
-                      style: _poppins(18, FontWeight.w600, Colors.white),
-                    ),
-                    Text(
-                      'Valet Master Printer · Connected',
-                      style: _poppins(
-                        12,
-                        FontWeight.w500,
-                        Colors.white.withValues(alpha: 0.70),
-                      ),
-                    ),
-                  ],
+                const SizedBox(width: 8),
+                Text(
+                  'Print Via Bluetooth',
+                  style: CheckOutUiTokens.body().copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _releaseSummaryCard(
-    CheckoutReceiptSnapshot snap,
-    NumberFormat peso2,
-    String durationLabel,
-  ) {
+  Widget _releaseSummaryCard({
+    required CheckoutPreviewResponse? preview,
+    required NumberFormat peso2,
+    required double total,
+    required double tendered,
+    required double change,
+  }) {
+    final rs = preview?.releaseSummary;
+    final plate = rs?.plate.trim().isNotEmpty == true ? rs!.plate : '—';
+    final customer = rs?.customer.trim().isNotEmpty == true ? rs!.customer : '—';
+    final duration = rs?.duration.trim().isNotEmpty == true ? rs!.duration : '—';
+
     Widget row(String label, Widget right, {bool divider = true}) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -319,7 +256,7 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: _poppins(12, FontWeight.w500, _grey500)),
+              Text(label, style: CheckOutUiTokens.fieldLabel()),
               right,
             ],
           ),
@@ -331,7 +268,7 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+      padding: CheckOutUiTokens.cardPadding,
       decoration: BoxDecoration(
         color: _surfaceCard,
         borderRadius: BorderRadius.circular(10),
@@ -339,51 +276,45 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'RELEASE SUMMARY',
-            style: _poppins(15, FontWeight.w500, _navy),
-          ),
-          const SizedBox(height: 25),
+          Text('RELEASE SUMMARY', style: CheckOutUiTokens.sectionTitle()),
+          const SizedBox(height: 10),
           row(
             'Plate',
             Text(
-              _plate(snap),
-              style: _poppins(15, FontWeight.w600, _plateBlue),
+              plate,
+              style: CheckOutUiTokens.body().copyWith(
+                color: _plateBlue,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           row(
             'Customer',
-            Text(
-              _customer(snap),
-              style: _poppins(12, FontWeight.w500, _navy),
-            ),
+            Text(customer, style: CheckOutUiTokens.body()),
           ),
-          row(
-            'Duration',
-            Text(
-              durationLabel,
-              style: _poppins(12, FontWeight.w500, _navy),
-            ),
-          ),
+          row('Duration', Text(duration, style: CheckOutUiTokens.body())),
           row(
             'Amount Paid',
             Text(
-              peso2.format(snap.totalPesos),
-              style: _poppins(15, FontWeight.w600, _orange),
+              peso2.format(total),
+              style: CheckOutUiTokens.body().copyWith(
+                color: _orange,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           row(
             'Cash Tendered',
-            Text(
-              peso2.format(snap.amountTendered),
-              style: _poppins(12, FontWeight.w500, _navy),
-            ),
+            Text(peso2.format(tendered), style: CheckOutUiTokens.body()),
           ),
           row(
             'Change Given',
             Text(
-              peso2.format(snap.changePesos),
-              style: _poppins(15, FontWeight.w600, _green),
+              peso2.format(change),
+              style: CheckOutUiTokens.body().copyWith(
+                color: _green,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             divider: false,
           ),
@@ -393,11 +324,40 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
   }
 
   Widget _receiptPreview({
-    required CheckoutReceiptSnapshot snap,
+    required String localTicketId,
+    required CheckoutPreviewResponse? preview,
     required NumberFormat peso2,
-    required String durationLabel,
+    required double total,
+    required double change,
     required String thankYou,
+    required String mallHours,
+    String? driverOut,
   }) {
+    final pt = preview?.ticket;
+    final plate = pt?.plate.isNotEmpty == true
+        ? pt!.plate
+        : preview?.releaseSummary.plate ?? '—';
+    final vehicleLine = pt?.vehicleReceiptLine ?? '—';
+    final timeIn = pt != null ? formatPreviewDateTime(pt.timeIn) : '—';
+    final timeOut = pt?.timeOut != null ? formatPreviewDateTime(pt!.timeOut) : '—';
+    final duration = pt?.duration.isNotEmpty == true
+        ? pt!.duration
+        : preview?.releaseSummary.duration ?? '—';
+    final slot = pt != null && pt.parkingLocationLine.trim().isNotEmpty
+        ? pt.parkingLocationLine.trim()
+        : '—';
+    final valetIn = pt?.valetIn?.trim().isNotEmpty == true ? pt!.valetIn! : '—';
+    final valetOut = (driverOut?.trim().isNotEmpty == true)
+        ? driverOut!.trim()
+        : (pt?.valetOut?.trim().isNotEmpty == true ? pt!.valetOut! : '—');
+
+    final flatLabel = pt?.flatRateLabel?.trim().isNotEmpty == true
+        ? pt!.flatRateLabel!.trim()
+        : 'Flat rate';
+    final succeedingLabel = pt?.succeedingTimeLabel?.trim() ?? '';
+    final flatAmount = pt?.flatRateAmount ?? total;
+    final succeedingAmount = pt?.succeedingRateAmount ?? 0;
+
     Widget smallRow(String label, String value) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 14),
@@ -437,13 +397,8 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
       );
     }
 
-    final valet = _valet(snap);
-    final flatLabel = 'First ${snap.flatBlockHours} hrs (flat)';
-    final showSucceeding = snap.succeedingPesos > 0.009;
-    final succeedingLabel = '+${snap.succeedingExtraMinutes} mins';
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+      padding: CheckOutUiTokens.cardPadding,
       decoration: BoxDecoration(
         color: _surfaceCard,
         borderRadius: BorderRadius.circular(10),
@@ -458,53 +413,38 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text('TICKET NUMBER', style: CheckOutUiTokens.fieldLabel()),
+          const SizedBox(height: 4),
           Text(
-            'TICKET NUMBER',
-            style: _poppins(12, FontWeight.w500, _grey500),
+            localTicketId,
+            style: CheckOutUiTokens.plate().copyWith(color: _orange),
           ),
           const SizedBox(height: 4),
           Text(
-            snap.ticketNumber,
-            style: _poppins(20, FontWeight.w700, _orange),
+            plate,
+            style: CheckOutUiTokens.body().copyWith(
+              color: _plateBlue,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            _plate(snap),
-            style: _poppins(15, FontWeight.w700, _plateBlue),
-          ),
-          if (snap.vehicleReceiptLine.trim().isNotEmpty) ...[
+          if (vehicleLine != '—') ...[
             const SizedBox(height: 2),
             Text(
-              snap.vehicleReceiptLine,
+              vehicleLine,
               style: _poppins(10, FontWeight.w400, Colors.black),
             ),
           ],
           const SizedBox(height: 16),
-          smallRow('Time In', _dt(snap.timeInUnix)),
-          smallRow('Time Out', _dt(snap.timeOutUnix)),
-          smallRow('Duration', durationLabel),
-          smallRow('Parking Slot', snap.slotLine),
-          smallRow('Valet In', valet),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Valet Out', style: _poppins(10, FontWeight.w500, _grey500)),
-                  Text(valet, style: _poppins(10, FontWeight.w500, _navy)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Divider(height: 1, thickness: 1, color: Colors.black.withValues(alpha: 0.13)),
-            ],
-          ),
+          smallRow('Time In', timeIn),
+          smallRow('Time Out', timeOut),
+          smallRow('Duration', duration),
+          smallRow('Parking Slot', slot),
+          smallRow('Valet In', valetIn),
+          smallRow('Valet Out', valetOut),
           const SizedBox(height: 14),
-          feeRow(flatLabel, peso2.format(snap.flatPesos)),
-          if (showSucceeding)
-            feeRow(succeedingLabel, peso2.format(snap.succeedingPesos)),
-          if (snap.overnightApplied && snap.overnightPesos > 0.009)
-            feeRow('Overnight', peso2.format(snap.overnightPesos)),
+          feeRow(flatLabel, peso2.format(flatAmount)),
+          if (succeedingLabel.isNotEmpty && succeedingAmount > 0.009)
+            feeRow(succeedingLabel, peso2.format(succeedingAmount)),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -512,33 +452,38 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
             children: [
               Text('Total', style: _poppins(10, FontWeight.w500, _grey500)),
               Text(
-                peso2.format(snap.totalPesos),
+                peso2.format(total),
                 style: _poppins(20, FontWeight.w700, _orange),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Divider(height: 1, thickness: 1, color: Colors.black.withValues(alpha: 0.13)),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
             decoration: BoxDecoration(
               color: _successSurface,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(100),
               border: Border.all(color: _green),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('Change', style: _poppins(10, FontWeight.w500, _green)),
+                Text('Change', style: _poppins(10, FontWeight.w600, _green)),
+                const SizedBox(width: 8),
                 Text(
-                  peso2.format(snap.changePesos),
-                  style: _poppins(10, FontWeight.w700, _green),
+                  peso2.format(change),
+                  style: _poppins(12, FontWeight.w700, _green),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
+          Text(
+            'NOTE: THIS IS NOT AN OFFICIAL RECEIPT (OR)',
+            textAlign: TextAlign.center,
+            style: _poppins(8, FontWeight.w500, _grey500),
+          ),
+          const SizedBox(height: 10),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
@@ -552,18 +497,12 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  'MONDAY – SUNDAY · 10:00AM – 9:00PM',
+                  mallHours,
                   textAlign: TextAlign.center,
                   style: _poppins(8, FontWeight.w500, _grey500),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'NOTE: THIS IS NOT AN OFFICIAL RECEIPT (OR)',
-            textAlign: TextAlign.center,
-            style: _poppins(8, FontWeight.w500, _grey500),
           ),
         ],
       ),

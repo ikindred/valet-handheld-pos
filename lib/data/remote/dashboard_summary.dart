@@ -29,6 +29,7 @@ class DashboardSummary {
     required this.totalVehiclesIn,
     required this.checkedOutTotal,
     required this.activeSlots,
+    required this.remainingCount,
     required this.totalSlots,
     required this.recent,
   });
@@ -37,6 +38,7 @@ class DashboardSummary {
   final int totalVehiclesIn;
   final int checkedOutTotal;
   final int activeSlots;
+  final int remainingCount;
   final int totalSlots;
   final List<DashboardSummaryRecent> recent;
 
@@ -73,6 +75,7 @@ class DashboardSummary {
         const ['active_slots', 'activeSlots'],
         fallback: _intField(body, const ['parked_count', 'parkedCount']),
       ),
+      remainingCount: _remainingCount(body),
       totalSlots: _intField(
         body,
         const ['total_slots', 'totalSlots'],
@@ -95,6 +98,26 @@ class DashboardSummary {
       if (v is Map) return Map<String, dynamic>.from(v);
     }
     return root;
+  }
+
+  static int _remainingCount(Map<String, dynamic> body) {
+    final fromApi = _intField(
+      body,
+      const ['remaining_count', 'remainingCount'],
+      fallback: -1,
+    );
+    if (fromApi >= 0) return fromApi;
+    final total = _intField(
+      body,
+      const ['total_slots', 'totalSlots'],
+      fallback: kDefaultDashboardTotalSlots,
+    );
+    final occupied = _intField(
+      body,
+      const ['active_slots', 'activeSlots'],
+      fallback: _intField(body, const ['parked_count', 'parkedCount']),
+    );
+    return (total - occupied).clamp(0, total);
   }
 
   static int _intField(

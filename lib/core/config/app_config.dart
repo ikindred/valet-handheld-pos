@@ -123,7 +123,14 @@ class AppConfig {
   static String get ticketCreate =>
       baseUrl + (_env('API_TICKET_CREATE') ?? '/api/v1/transactions');
 
-  /// POST create draft transaction; PATCH by [ticketById].
+  /// POST full check-in (multipart) — single-call ACTIVE ticket.
+  static String get checkInUrl {
+    final t = (_env('API_TRANSACTIONS_CHECK_IN') ?? '').trim();
+    if (t.isNotEmpty) return baseUrl + t;
+    return '$baseUrl/api/v1/transactions/check-in';
+  }
+
+  /// Legacy draft POST (retired from check-in flow).
   static String get ticketsRest =>
       baseUrl + (_env('API_TICKETS_REST') ?? '/api/v1/transactions');
 
@@ -144,12 +151,20 @@ class AppConfig {
     return '$baseUrl/api/v1/transactions/$enc';
   }
 
-  /// GET `/api/v1/tickets/by-number/{ticketNumber}` (e.g. `TKT-0001`).
-  static String ticketByNumberUrl(String ticketNumber) {
-    final enc = Uri.encodeComponent(ticketNumber.trim());
-    final t = (_env('API_TICKET_BY_NUMBER') ?? '').trim();
-    if (t.isNotEmpty) return baseUrl + t.replaceAll('{ticket_number}', enc);
-    return '$baseUrl/api/v1/tickets/by-number/$enc';
+  /// GET `/api/v1/transactions/{id}/checkout-preview` (no body).
+  static String checkoutPreviewUrl(String id) {
+    final enc = Uri.encodeComponent(id.trim());
+    final t = (_env('API_CHECKOUT_PREVIEW') ?? '').trim();
+    if (t.isNotEmpty) return baseUrl + t.replaceAll('{id}', enc);
+    return '$baseUrl/api/v1/transactions/$enc/checkout-preview';
+  }
+
+  /// POST `/api/v1/transactions/{id}/check-out`.
+  static String checkOutUrl(String id) {
+    final enc = Uri.encodeComponent(id.trim());
+    final t = (_env('API_CHECK_OUT') ?? '').trim();
+    if (t.isNotEmpty) return baseUrl + t.replaceAll('{id}', enc);
+    return '$baseUrl/api/v1/transactions/$enc/check-out';
   }
 
   /// POST `/api/v1/transactions/{id}/pay`.

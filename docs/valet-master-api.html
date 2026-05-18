@@ -645,16 +645,11 @@
         <div class="flow-step-num">3</div>
         <div class="flow-step-content">
           <div class="flow-step-title">Customer presents ticket — look up the transaction</div>
-          <div class="flow-step-desc">Customer returns and presents their stub. Cashier either scans the QR code or manually types the TKT-XXXX. The app fetches the transaction to get the check-in time, then computes the fee locally using the cached branch rates — no server-side fee computation.</div>
+          <div class="flow-step-desc">Customer returns and presents their stub. Cashier scans the QR code, types TKT-XXXX, or searches by plate. The app calls checkout-preview online (Drift first when offline).</div>
           <div class="flow-ep-tag">
             <span class="method-badge GET" style="font-size:10px;padding:2px 8px;">GET</span>
-            <code>/tickets/by-number/:ticketNumber</code>
-            <span style="font-size:11px;color:var(--text3);">manual TKT-XXXX</span>
-          </div>
-          <div class="flow-ep-tag" style="margin-top:4px;">
-            <span class="method-badge GET" style="font-size:10px;padding:2px 8px;">GET</span>
-            <code>/transactions/:id</code>
-            <span style="font-size:11px;color:var(--text3);">QR scan</span>
+            <code>/transactions/:id/checkout-preview</code>
+            <span style="font-size:11px;color:var(--text3);">:id = UUID, TKT-XXXX, or plate</span>
           </div>
           <div class="flow-payload-label">Response 200</div>
           <pre>{
@@ -669,7 +664,7 @@
   },
   <span class="key">"status"</span>: <span class="str">"active"</span>
 }</pre>
-          <div class="flow-note">Both endpoints return the same shape. App resolves from local Drift first — these calls are fallback for cross-device lookups or tickets not found locally.</div>
+          <div class="flow-note">Returns transaction + preview + compute. App resolves from local Drift first when offline. <code>GET /tickets/by-number</code> is not used by the mobile app.</div>
         </div>
       </div>
 
@@ -1207,9 +1202,9 @@ Response 200
     <div class="endpoint" data-status="ok">
       <div class="ep-header" onclick="toggle(this)">
         <span class="method-badge GET">GET</span>
-        <span class="ep-path">/tickets/by-number/:ticketNumber</span>
+        <span class="ep-path">/transactions/:id/checkout-preview</span>
         <span class="status-badge badge-ok">in swagger</span>
-        <span class="ep-desc">Lookup by TKT-XXXX — wired</span>
+        <span class="ep-desc">Checkout lookup — wired</span>
         <span class="chevron">›</span>
       </div>
       <div class="ep-body">
@@ -1219,7 +1214,7 @@ Response 200
             <pre>Authorization: Bearer &lt;token&gt;</pre>
           </div>
         </div>
-        <div class="note">Wired via <code>AppConfig.ticketByNumberUrl()</code>. Not yet called from active screen code — reserved for future QR scan lookup path.</div>
+        <div class="note">Wired via <code>AppConfig.checkoutPreviewUrl()</code>. Used for QR scan, manual TKT-XXXX, and plate search at check-out. <code>GET /tickets/by-number/:ticketNumber</code> is not used.</div>
       </div>
     </div>
 

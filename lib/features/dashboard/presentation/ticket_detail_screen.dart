@@ -15,7 +15,7 @@ import '../../check_in/domain/vehicle_damage_zones.dart';
 import '../../check_out/domain/ticket_damage_markers.dart';
 import 'widgets/dashboard_widgets.dart';
 
-/// Read-only ticket summary from local Drift (opened from dashboard recent list).
+/// Read-only ticket summary (dashboard recent list: API when online, else Drift).
 class TicketDetailScreen extends StatefulWidget {
   const TicketDetailScreen({super.key, required this.ticketId});
 
@@ -34,7 +34,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _future ??=
-        context.read<TicketService>().ticketById(widget.ticketId.trim());
+        context.read<TicketService>().loadTicketForDetail(widget.ticketId.trim());
   }
 
   static List<String> _belongingsList(String raw) {
@@ -99,7 +99,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'Ticket not found.',
+                  'Ticket not found. Connect to load from server, or open this ticket on this device.',
                   style: DashboardStyles.statHint(),
                   textAlign: TextAlign.center,
                 ),
@@ -189,6 +189,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 'Cellphone',
                 t.cellphoneNumber.trim().isEmpty ? '—' : t.cellphoneNumber.trim(),
               ),
+              if (t.driverIn?.trim().isNotEmpty == true)
+                _kv('Driver in', t.driverIn!.trim()),
+              if (t.driverOut?.trim().isNotEmpty == true)
+                _kv('Driver out', t.driverOut!.trim()),
               const SizedBox(height: 20),
               _sectionTitle('Times'),
               _kv('Check-in', checkInLabel),

@@ -3,6 +3,7 @@ import 'bluetooth_pos_printer.dart';
 import 'check_in_receipt_data.dart';
 import 'escpos_receipt_builder.dart';
 import 'printer_config.dart';
+import 'receipt_raster_builder.dart';
 import 'valet_print_service.dart';
 
 class BluetoothValetPrintService implements ValetPrintService {
@@ -10,19 +11,45 @@ class BluetoothValetPrintService implements ValetPrintService {
 
   final BluetoothPosPrinter _printer;
 
-  Future<EscPosReceiptBuilder> _builder() async {
+  Future<List<int>> _buildCheckInPartBytes(
+    CheckInReceiptData data, {
+    required int part,
+  }) async {
     final profile = await _printer.loadProfile();
     final width = await _printer.paperWidth;
-    return EscPosReceiptBuilder(profile, paperSize: width.paperSize);
+    if (width == PrinterPaperWidth.mm58) {
+      return ReceiptRasterBuilder(paperSize: width.paperSize)
+          .buildCheckInPartEscPosBytes(data, profile, part);
+    }
+    return EscPosReceiptBuilder(profile, paperSize: width.paperSize)
+        .buildCheckInPartReceipt(data, part: part);
+  }
+
+  Future<List<int>> _buildTestBytes({
+    required String branchName,
+    required String staffLabel,
+  }) async {
+    final profile = await _printer.loadProfile();
+    final width = await _printer.paperWidth;
+    if (width == PrinterPaperWidth.mm58) {
+      return ReceiptRasterBuilder(paperSize: width.paperSize)
+          .buildTestEscPosBytes(
+            profile: profile,
+            branchName: branchName,
+            staffLabel: staffLabel,
+          );
+    }
+    return EscPosReceiptBuilder(profile, paperSize: width.paperSize)
+        .buildTestReceipt(branchName: branchName, staffLabel: staffLabel);
   }
 
   @override
-  Future<void> printCheckIn(CheckInReceiptData data) async {
-    final bytes = (await _builder()).buildCheckInReceipt(data);
+  Future<void> printCheckIn(CheckInReceiptData data, {required int part}) async {
+    final bytes = await _buildCheckInPartBytes(data, part: part);
     await _printer.printBytes(bytes);
     ValetLog.info(
       'BluetoothValetPrintService',
-      'printed check-in ${data.ticket.id}',
+      'printed check-in ${data.ticket.id} part $part',
     );
   }
 
@@ -31,7 +58,7 @@ class BluetoothValetPrintService implements ValetPrintService {
     required String branchName,
     String staffLabel = 'Test print',
   }) async {
-    final bytes = (await _builder()).buildTestReceipt(
+    final bytes = await _buildTestBytes(
       branchName: branchName,
       staffLabel: staffLabel,
     );

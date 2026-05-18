@@ -18,7 +18,6 @@ import '../../features/check_in/presentation/check_in_vehicle_condition_screen.d
 import '../../features/check_in/presentation/check_in_vehicle_details_screen.dart';
 import '../../features/check_out/presentation/check_out_add_issue_screen.dart';
 import '../../features/check_out/presentation/check_out_condition_screen.dart';
-import '../../features/check_out/presentation/check_out_payment_collect_screen.dart';
 import '../../features/check_out/presentation/check_out_payment_done_screen.dart';
 import '../../features/check_out/presentation/check_out_payment_summary_screen.dart';
 import '../../features/check_out/presentation/check_out_scan_screen.dart';
@@ -166,11 +165,6 @@ GoRouter createAppRouter(
               ),
               GoRoute(
                 path: 'step-5',
-                builder: (context, state) =>
-                    const CheckOutPaymentCollectScreen(),
-              ),
-              GoRoute(
-                path: 'step-6',
                 builder: (context, state) =>
                     const CheckOutPaymentDoneScreen(),
               ),

@@ -4,10 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import '../../../../core/storage/offline_mode_prefs.dart';
+import '../../../../core/connectivity/internet_reachability.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/logout_flow.dart';
 
@@ -168,65 +165,78 @@ class DashboardLeftRail extends StatelessWidget {
         right: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
-          child: Column(
-            children: [
-              Container(
-                width: 44,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: Colors.black.withValues(alpha: 0.13),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.black.withValues(alpha: 0.13),
+                              ),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Image.asset(
+                                'assets/images/app_logo.png',
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.high,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _RailIcon(
+                            selected: path == '/dashboard',
+                            icon: Icons.space_dashboard_rounded,
+                            onTap: () => context.go('/dashboard'),
+                            accentSelection: true,
+                          ),
+                          const SizedBox(height: 10),
+                          _RailIcon(
+                            selected: path == '/reports',
+                            icon: Icons.bar_chart_rounded,
+                            onTap: () => context.go('/reports'),
+                            accentSelection: false,
+                          ),
+                          const SizedBox(height: 10),
+                          _RailIcon(
+                            selected: path == '/cash/activity',
+                            icon: Icons.payments_rounded,
+                            onTap: () => context.go('/cash/activity'),
+                            accentSelection: false,
+                          ),
+                          const SizedBox(height: 10),
+                          _RailIcon(
+                            selected: path == '/settings',
+                            icon: Icons.settings_rounded,
+                            onTap: () => context.go('/settings'),
+                            accentSelection: false,
+                          ),
+                        ],
+                      ),
+                      _RailIcon(
+                        selected: false,
+                        icon: Icons.logout_rounded,
+                        onTap: () => showLogoutFlow(context),
+                        accentSelection: false,
+                      ),
+                    ],
                   ),
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: Image.asset(
-                    'assets/images/app_logo.png',
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              _RailIcon(
-                selected: path == '/dashboard',
-                icon: Icons.space_dashboard_rounded,
-                onTap: () => context.go('/dashboard'),
-                accentSelection: true,
-              ),
-              const SizedBox(height: 10),
-              _RailIcon(
-                selected: path == '/reports',
-                icon: Icons.bar_chart_rounded,
-                onTap: () => context.go('/reports'),
-                accentSelection: false,
-              ),
-              const SizedBox(height: 10),
-              _RailIcon(
-                selected: path == '/cash/activity',
-                icon: Icons.payments_rounded,
-                onTap: () => context.go('/cash/activity'),
-                accentSelection: false,
-              ),
-              const SizedBox(height: 10),
-              _RailIcon(
-                selected: path == '/settings',
-                icon: Icons.settings_rounded,
-                onTap: () => context.go('/settings'),
-                accentSelection: false,
-              ),
-              const SizedBox(height: 10),
-              _RailIcon(
-                selected: false,
-                icon: Icons.logout_rounded,
-                onTap: () => showLogoutFlow(context),
-                accentSelection: false,
-              ),
-              const Spacer(),
-            ],
+              );
+            },
           ),
         ),
       ),
@@ -275,7 +285,7 @@ class _RailIcon extends StatelessWidget {
   }
 }
 
-/// Live connectivity + [OfflineModePrefs]; rebuilds when network changes or app resumes.
+/// Live connectivity pill; rebuilds when network changes or app resumes.
 class DashboardStatusPillLive extends StatefulWidget {
   const DashboardStatusPillLive({super.key});
 
@@ -285,7 +295,6 @@ class DashboardStatusPillLive extends StatefulWidget {
 
 class _DashboardStatusPillLiveState extends State<DashboardStatusPillLive>
     with WidgetsBindingObserver {
-  bool _offlineMode = false;
   bool _hasInternet = false;
   StreamSubscription<List<ConnectivityResult>>? _connSub;
 
@@ -314,44 +323,24 @@ class _DashboardStatusPillLiveState extends State<DashboardStatusPillLive>
   }
 
   Future<void> _refresh() async {
-    final prefs = await SharedPreferences.getInstance();
-    final offlineMode = OfflineModePrefs.read(prefs);
-    var hasInternet = false;
-    try {
-      hasInternet = await InternetConnection()
-          .hasInternetAccess
-          .timeout(const Duration(seconds: 4), onTimeout: () => false);
-    } catch (_) {
-      hasInternet = false;
-    }
+    final hasInternet = await InternetReachability.hasInternet();
     if (!mounted) return;
-    setState(() {
-      _offlineMode = offlineMode;
-      _hasInternet = hasInternet;
-    });
+    setState(() => _hasInternet = hasInternet);
   }
 
   @override
   Widget build(BuildContext context) {
-    return DashboardStatusPill(
-      offlineMode: _offlineMode,
-      hasInternet: _hasInternet,
-    );
+    return DashboardStatusPill(hasInternet: _hasInternet);
   }
 }
 
-/// Status from [offlineMode] prefs (offline vs online workflow) and live internet.
+/// Online / offline status from live internet reachability.
 class DashboardStatusPill extends StatelessWidget {
   const DashboardStatusPill({
     super.key,
-    required this.offlineMode,
     required this.hasInternet,
   });
 
-  /// [OfflineModePrefs] — user is in offline-first workflow (e.g. offline login).
-  final bool offlineMode;
-
-  /// Result of [InternetConnection] / connectivity check.
   final bool hasInternet;
 
   @override
@@ -384,20 +373,6 @@ class DashboardStatusPill extends StatelessWidget {
   }
 
   (String, Color, Color) _presentation() {
-    if (offlineMode) {
-      if (hasInternet) {
-        return (
-          'Offline mode',
-          AppColors.textSecondary,
-          const Color(0xFFF3F4F6),
-        );
-      }
-      return (
-        'Offline · No connection',
-        AppColors.warning,
-        const Color(0xFFFFF7EC),
-      );
-    }
     if (hasInternet) {
       return (
         'Online',
@@ -406,7 +381,7 @@ class DashboardStatusPill extends StatelessWidget {
       );
     }
     return (
-      'No connection',
+      'Offline',
       AppColors.warning,
       const Color(0xFFFFF7EC),
     );
