@@ -7,12 +7,14 @@
     "elidtech",
     "epcs",
     "evac",
+    "HPRT",
     "listview",
     "milliwatts",
     "RFID",
     "rssi",
     "Snackbars",
     "sqflite",
-    "verifyi"
+    "verifyi",
+    "xadvance"
   ]
 }

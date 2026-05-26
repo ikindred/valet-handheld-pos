@@ -92,11 +92,15 @@ class CheckInState extends Equatable {
   /// Logged damage markers (normalized coordinates on the car bitmap).
   final List<VehicleDamageEntry> vehicleDamageEntries;
 
-  /// True after the customer completes the signature step (step 4).
+  /// Legacy flag; prefer [isCustomerSignatureComplete] (requires [signaturePng]).
   final bool hasCustomerSignature;
 
   /// PNG bytes from the signature pad (for local DB / sync).
   final Uint8List? signaturePng;
+
+  /// True only when the customer signed on step 4 (PNG bytes present).
+  bool get isCustomerSignatureComplete =>
+      signaturePng != null && signaturePng!.isNotEmpty;
 
   /// Unix seconds when [signaturePng] was captured.
   final int? signatureCapturedAt;

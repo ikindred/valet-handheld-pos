@@ -22,7 +22,6 @@ import '../../../data/services/ticket_service.dart';
 import '../../check_in/domain/vehicle_damage.dart';
 import '../../check_in/domain/vehicle_damage_zones.dart';
 import '../domain/checkout_condition_payload.dart';
-import '../domain/check_out_request_payload.dart';
 import '../domain/checkout_preview_format.dart';
 import '../domain/checkout_pricing.dart';
 import '../domain/checkout_receipt_snapshot.dart';
@@ -53,7 +52,8 @@ class CheckOutState extends Equatable {
     this.invoiceNumber,
     this.checkOutResponse,
     this.flatBlockHours = CheckoutPricing.defaultFlatBlockHours,
-    this.overnightCutoff = '',
+    this.overnightStart = '',
+    this.overnightEnd = '',
     this.receiptTicket,
     this.receiptTotalPesos,
     this.receiptChangePesos,
@@ -83,7 +83,8 @@ class CheckOutState extends Equatable {
   final String? invoiceNumber;
   final CheckOutResponse? checkOutResponse;
   final int flatBlockHours;
-  final String overnightCutoff;
+  final String overnightStart;
+  final String overnightEnd;
   final String? receiptTicket;
   final double? receiptTotalPesos;
   final double? receiptChangePesos;
@@ -135,7 +136,8 @@ class CheckOutState extends Equatable {
     CheckOutResponse? checkOutResponse,
     bool clearCheckOutResponse = false,
     int? flatBlockHours,
-    String? overnightCutoff,
+    String? overnightStart,
+    String? overnightEnd,
     String? receiptTicket,
     double? receiptTotalPesos,
     double? receiptChangePesos,
@@ -169,7 +171,8 @@ class CheckOutState extends Equatable {
       checkOutResponse:
           clearCheckOutResponse ? null : (checkOutResponse ?? this.checkOutResponse),
       flatBlockHours: flatBlockHours ?? this.flatBlockHours,
-      overnightCutoff: overnightCutoff ?? this.overnightCutoff,
+      overnightStart: overnightStart ?? this.overnightStart,
+      overnightEnd: overnightEnd ?? this.overnightEnd,
       receiptTicket: clearReceipt ? null : (receiptTicket ?? this.receiptTicket),
       receiptTotalPesos:
           clearReceipt ? null : (receiptTotalPesos ?? this.receiptTotalPesos),
@@ -205,7 +208,8 @@ class CheckOutState extends Equatable {
         invoiceNumber,
         checkOutResponse,
         flatBlockHours,
-        overnightCutoff,
+        overnightStart,
+        overnightEnd,
         receiptTicket,
         receiptTotalPesos,
         receiptChangePesos,
@@ -232,7 +236,8 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         CheckOutState(
           rates: state.rates,
           flatBlockHours: state.flatBlockHours,
-          overnightCutoff: state.overnightCutoff,
+          overnightStart: state.overnightStart,
+          overnightEnd: state.overnightEnd,
           branchName: state.branchName,
           mallHours: state.mallHours,
         ),
@@ -257,7 +262,8 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         state.copyWith(
           rates: resolved.rates,
           flatBlockHours: resolved.flatBlockHours,
-          overnightCutoff: resolved.overnightCutoff,
+          overnightStart: resolved.overnightStart,
+          overnightEnd: resolved.overnightEnd,
         ),
       );
     } catch (_) {
@@ -267,7 +273,8 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         state.copyWith(
           rates: fallback,
           flatBlockHours: CheckoutPricing.defaultFlatBlockHours,
-          overnightCutoff: '01:30',
+          overnightStart: CheckoutPricing.defaultOvernightStart,
+          overnightEnd: CheckoutPricing.defaultOvernightEnd,
         ),
       );
     }
@@ -289,7 +296,8 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         state.copyWith(
           rates: resolved.rates,
           flatBlockHours: resolved.flatBlockHours,
-          overnightCutoff: resolved.overnightCutoff,
+          overnightStart: resolved.overnightStart,
+          overnightEnd: resolved.overnightEnd,
         ),
       );
       _recomputeBreakdown();
@@ -300,7 +308,8 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         state.copyWith(
           rates: fallback,
           flatBlockHours: CheckoutPricing.defaultFlatBlockHours,
-          overnightCutoff: '01:30',
+          overnightStart: CheckoutPricing.defaultOvernightStart,
+          overnightEnd: CheckoutPricing.defaultOvernightEnd,
         ),
       );
       _recomputeBreakdown();
@@ -313,7 +322,8 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       CheckOutState(
         rates: state.rates,
         flatBlockHours: state.flatBlockHours,
-        overnightCutoff: state.overnightCutoff,
+        overnightStart: state.overnightStart,
+        overnightEnd: state.overnightEnd,
         branchName: state.branchName,
         mallHours: state.mallHours,
         ticket: t,
@@ -753,15 +763,19 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       emit(state.copyWith(clearBreakdown: true));
       return;
     }
-    final cutoff = state.overnightCutoff.trim().isNotEmpty
-        ? state.overnightCutoff.trim()
-        : '01:30';
+    final start = state.overnightStart.trim().isNotEmpty
+        ? state.overnightStart.trim()
+        : CheckoutPricing.defaultOvernightStart;
+    final end = state.overnightEnd.trim().isNotEmpty
+        ? state.overnightEnd.trim()
+        : CheckoutPricing.defaultOvernightEnd;
     final b = CheckoutPricing.compute(
       timeIn: PhilippineTime.fromApiIso(checkInRaw),
       timeOut: PhilippineTime.now(),
       rates: rates,
       flatBlockHours: state.flatBlockHours,
-      overnightCutoff: cutoff,
+      overnightStart: start,
+      overnightEnd: end,
     );
     emit(state.copyWith(breakdown: b));
   }
@@ -786,12 +800,6 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     return conditionCheckoutPayload(merged);
   }
 
-  Map<String, dynamic> _buildPreviewPayload(
-    CheckoutPreviewResponse preview,
-    String timeOutIso,
-  ) =>
-      buildCheckOutPreviewPayload(preview, timeOut: timeOutIso);
-
   Future<void> _enqueueOfflineCheckoutFinalize({
     required String ticketId,
     required String? serverTicketId,
@@ -800,10 +808,6 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     required bool isOvernight,
     required bool ticketLost,
   }) async {
-    final preview = state.preview;
-    if (preview == null) {
-      throw StateError('Checkout preview is not loaded.');
-    }
     final timeOutIso = PhilippineTime.now().toUtc().toIso8601String();
     await _tickets.enqueueCheckoutFinalize(
       ticketId: ticketId,
@@ -812,7 +816,6 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       timeOut: timeOutIso,
       isOvernight: isOvernight,
       ticketLost: ticketLost,
-      preview: _buildPreviewPayload(preview, timeOutIso),
       driverOut: state.driverOut,
       conditionCheckout: conditionBody,
     );
@@ -874,35 +877,26 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         }
         if (hasInternet) {
           try {
-            if (state.isLostTicket) {
-              await _tickets.markTicketLost(
-                pathId,
-                notes: 'Lost ticket stub at payment',
-              );
-              // Keep parking + lost fee total; API lost fee is additive, not a replacement.
-              serverTotal = total;
-            } else {
-              final preview = state.preview;
-              if (preview == null) {
-                emit(state.copyWith(isSubmitting: false));
-                return 'Checkout preview is not loaded.';
-              }
-              final timeOutIso =
-                  PhilippineTime.now().toUtc().toIso8601String();
-              response = await _transactionsApi.submitCheckOut(
-                token: token,
-                ticketId: pathId,
-                amount: total,
-                timeOut: timeOutIso,
-                isOvernight: isOvernight,
-                ticketLost: ticketLost,
-                preview: _buildPreviewPayload(preview, timeOutIso),
-                driverOut: state.driverOut,
-                conditionCheckout: conditionBody,
-              );
-              invoice = response.invoiceNumber;
-              serverTotal = response.total;
+            final preview = state.preview;
+            if (preview == null) {
+              emit(state.copyWith(isSubmitting: false));
+              return 'Checkout preview is not loaded.';
             }
+            final timeOutIso =
+                PhilippineTime.now().toUtc().toIso8601String();
+            response = await _transactionsApi.submitCheckOut(
+              token: token,
+              ticketId: pathId,
+              amount: total,
+              timeOut: timeOutIso,
+              isOvernight: isOvernight,
+              ticketLost: ticketLost,
+              driverOut: state.driverOut,
+              conditionCheckout: conditionBody,
+            );
+            invoice = response.invoiceNumber;
+            // Lost fee is additive — keep full total due, not server lost-fee-only.
+            serverTotal = ticketLost ? total : response.total;
           } on SocketException {
             if (state.isLostTicket) {
               emit(state.copyWith(isSubmitting: false));

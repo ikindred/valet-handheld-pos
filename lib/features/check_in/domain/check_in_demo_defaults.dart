@@ -47,7 +47,6 @@ abstract final class CheckInDemoDefaults {
           zoneLabel: 'Rear door',
         ),
       ],
-      hasCustomerSignature: true,
     );
   }
 }

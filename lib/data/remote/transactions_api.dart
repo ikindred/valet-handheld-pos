@@ -20,10 +20,9 @@ class TransactionsApiException implements Exception {
   final int? statusCode;
 
   @override
-  String toString() =>
-      statusCode != null
-          ? 'TransactionsApiException($statusCode): $message'
-          : 'TransactionsApiException: $message';
+  String toString() => statusCode != null
+      ? 'TransactionsApiException($statusCode): $message'
+      : 'TransactionsApiException: $message';
 }
 
 /// Remote transactions (list Tier 2, single fetch, ticket number lookup, lost).
@@ -55,9 +54,7 @@ class TransactionsApi {
         'limit': limit,
         'page': page,
       },
-      options: Options(
-        headers: {'Authorization': 'Bearer $token'},
-      ),
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
     );
     return _parseList(res.data);
   }
@@ -151,7 +148,10 @@ class TransactionsApi {
     }
   }
 
-  /// POST [AppConfig.checkOutUrl] — finalize checkout (single-call unified payload).
+  /// POST [AppConfig.checkOutUrl] — finalize checkout.
+  ///
+  /// Server computes `preview` in the response; do not echo GET checkout-preview
+  /// fields (`release_summary`, `ticket`, `condition_comparison`) in the body.
   Future<CheckOutResponse> submitCheckOut({
     required String token,
     required String ticketId,
@@ -159,7 +159,6 @@ class TransactionsApi {
     required String timeOut,
     required bool isOvernight,
     required bool ticketLost,
-    required Map<String, dynamic> preview,
     String? driverOut,
     List<Map<String, dynamic>>? conditionCheckout,
   }) async {
@@ -180,7 +179,9 @@ class TransactionsApi {
       'time_out': timeOut,
       'is_overnight': isOvernight,
       'ticket_lost': ticketLost,
-      'preview': preview,
+      // Mobile-computed totals only at top level. Do not echo GET preview blocks
+      // (`release_summary`, `ticket`, `condition_comparison`) — server rejects them.
+      'preview': <String, dynamic>{},
       'condition_checkout': conditionCheckout ?? const [],
     };
     final driver = driverOut?.trim();
@@ -311,7 +312,9 @@ class TransactionsApi {
         throw VehicleAlreadyCheckedInException();
       }
       throw CheckInApiException(
-        messageFromResponseData(e.response?.data) ?? e.message ?? 'Check-in failed',
+        messageFromResponseData(e.response?.data) ??
+            e.message ??
+            'Check-in failed',
         statusCode: code,
       );
     }
@@ -324,9 +327,7 @@ class TransactionsApi {
     if (data is Map) {
       return _unwrapTransaction(Map<String, dynamic>.from(data));
     }
-    throw CheckInApiException(
-      'Expected JSON object, got ${data.runtimeType}',
-    );
+    throw CheckInApiException('Expected JSON object, got ${data.runtimeType}');
   }
 
   /// POST [AppConfig.ticketLost] — mark ticket lost (live-only; no queue).
@@ -388,8 +389,10 @@ class TransactionsApi {
     if (data is List) {
       return [
         for (final e in data)
-          if (e is Map<String, dynamic>) e
-          else if (e is Map) Map<String, dynamic>.from(e),
+          if (e is Map<String, dynamic>)
+            e
+          else if (e is Map)
+            Map<String, dynamic>.from(e),
       ];
     }
     if (data is Map) {
@@ -466,10 +469,7 @@ class TransactionsApi {
 
   static TransactionsApiException _fromDio(DioException e, String context) {
     final code = e.response?.statusCode;
-    final msg =
-        _messageFromBody(e.response?.data) ??
-        e.message ??
-        e.type.name;
+    final msg = _messageFromBody(e.response?.data) ?? e.message ?? e.type.name;
     return TransactionsApiException('$context: $msg', statusCode: code);
   }
 
@@ -511,7 +511,9 @@ class TransactionsApi {
     throw e;
   }
 
-  static CheckoutPreviewResponse _stubCheckoutPreview({required String ticketId}) {
+  static CheckoutPreviewResponse _stubCheckoutPreview({
+    required String ticketId,
+  }) {
     return CheckoutPreviewResponse(
       transactionId: '00000000-0000-4000-8000-000000000001',
       customerContact: '09171234567',
@@ -526,7 +528,8 @@ class TransactionsApi {
         succeedingRate: 30,
         overnightFee: 200,
         lostTicketFee: 200,
-        overnightCutoff: '01:30',
+        overnightStart: '01:30',
+        overnightEnd: '05:30',
       ),
       ticket: CheckoutPreviewTicket(
         ticketNumber: ticketId,
@@ -535,7 +538,9 @@ class TransactionsApi {
         vehicleModel: 'Vios',
         vehicleColor: 'White',
         vehicleType: 'Sedan',
-        timeIn: DateTime.now().subtract(const Duration(hours: 2)).toIso8601String(),
+        timeIn: DateTime.now()
+            .subtract(const Duration(hours: 2))
+            .toIso8601String(),
         duration: '2h 15m',
         flatRateAmount: 0,
         succeedingRateAmount: 0,

@@ -117,17 +117,27 @@ class BranchConfigService {
         final root = _asStringKeyedMap(res.data);
         final settings = _unwrapSettingsMap(root);
         if (settings != null) {
-          final cutoff = _hhMmFromDynamic(
-            settings['overnightCutoff'] ??
-                settings['overnight_cutoff'] ??
+          final start = _hhMmFromDynamic(
+            settings['overnight_start'] ??
                 settings['overnightStart'] ??
+                settings['overnightCutoff'] ??
+                settings['overnight_cutoff'] ??
                 settings['overnight_start_time'],
           );
-          if (cutoff != null) {
-            entries.add((key: 'overnight_start_time', value: cutoff));
+          if (start != null) {
+            entries.add((key: 'overnight_start_time', value: start));
+          }
+          final end = _hhMmFromDynamic(
+            settings['overnight_end'] ??
+                settings['overnightEnd'] ??
+                settings['overnight_end_time'],
+          );
+          if (end != null) {
+            entries.add((key: 'overnight_end_time', value: end));
+          } else {
+            entries.add((key: 'overnight_end_time', value: '06:00'));
           }
         }
-        entries.add((key: 'overnight_end_time', value: '06:00'));
       } else {
         ValetLog.warning(
           'BranchConfigService.syncFromServer',
@@ -293,8 +303,10 @@ class BranchConfigService {
   Future<OvernightWindow?> getOvernightWindow(String branchId) async {
     final map = await getConfig(branchId.trim());
     final start = OvernightWindow.parseHhMm(map['overnight_start_time']);
-    final end = OvernightWindow.parseHhMm(map['overnight_end_time']);
-    if (start == null || end == null) return null;
+    if (start == null) return null;
+    final end =
+        OvernightWindow.parseHhMm(map['overnight_end_time']) ??
+            OvernightWindow.defaultEndTime;
     return OvernightWindow(startTime: start, endTime: end);
   }
 }

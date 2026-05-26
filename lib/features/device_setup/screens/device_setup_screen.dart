@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/device_id_service.dart';
+import '../../../core/storage/device_claim_restore.dart';
+import '../../../core/storage/prefs_keys.dart';
+import '../../../data/local/db/app_database.dart';
 import '../cubit/device_setup_cubit.dart';
 import '../cubit/device_setup_state.dart';
 
@@ -38,8 +41,21 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
   void initState() {
     super.initState();
     _search.addListener(() => setState(() {}));
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      final prefs = await SharedPreferences.getInstance();
+      var claimed = prefs.getString(PrefsKeys.deviceIdentityKey)?.trim() ?? '';
+      if (claimed.isEmpty) {
+        final db = context.read<AppDatabase>();
+        if (!mounted) return;
+        final restored = await DeviceClaimRestore.tryRestoreFromDatabase(db);
+        claimed = restored?.serverDeviceId.trim() ?? '';
+      }
+      if (!mounted) return;
+      if (claimed.isNotEmpty) {
+        context.go('/login');
+        return;
+      }
       context.read<DeviceSetupCubit>().fetchDevices();
     });
   }
@@ -266,8 +282,6 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
                           context,
                           loaded.devices,
                         ),
-                      final DeviceSetupPendingActivation pending =>
-                        _buildPendingInline(context, pending),
                       DeviceSetupError(:final message) => _ErrorBody(
                           message: message,
                           poppins: poppins,
@@ -291,6 +305,8 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
         poppins: poppins,
         mono: mono,
         onRetry: () => context.read<DeviceSetupCubit>().fetchDevices(),
+        onContinueClaimed: () =>
+            context.read<DeviceSetupCubit>().continueIfAlreadyClaimed(),
       );
     }
 
@@ -400,159 +416,6 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
     );
   }
 
-  Widget _buildPendingInline(
-    BuildContext context,
-    DeviceSetupPendingActivation pending,
-  ) {
-    final serverId = (pending.selectedServerDeviceId ?? '').trim();
-    final cubit = context.read<DeviceSetupCubit>();
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 12),
-                  Icon(
-                    LucideIcons.clock,
-                    size: 52,
-                    color: _T.greySubtitle,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Device claimed but not yet activated',
-                    textAlign: TextAlign.center,
-                    style: poppins(20, FontWeight.w700, _T.white),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Contact your administrator to activate this device.',
-                    textAlign: TextAlign.center,
-                    style: poppins(
-                      14,
-                      FontWeight.w400,
-                      _T.greySubtitle,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Server device ID',
-                    style: poppins(13, FontWeight.w600, _T.greyMuted),
-                  ),
-                  const SizedBox(height: 8),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: _T.cardBg,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: _T.cardBorder),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: SelectableText(
-                        serverId.isEmpty ? '—' : serverId,
-                        style: mono(13, FontWeight.w500, _T.white),
-                      ),
-                    ),
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: serverId.isEmpty
-                          ? null
-                          : () async {
-                              await Clipboard.setData(
-                                ClipboardData(text: serverId),
-                              );
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Server device ID copied'),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            },
-                      icon: const Icon(LucideIcons.copy, size: 18),
-                      label: const Text('Copy'),
-                    ),
-                  ),
-                  if (pending.polling) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: _T.orange,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          'Checking…',
-                          style: poppins(
-                            13,
-                            FontWeight.w500,
-                            _T.greyMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          Text(
-            'Auto-check runs every 30 seconds.',
-            textAlign: TextAlign.center,
-            style: poppins(12, FontWeight.w400, _T.greyMuted),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: () => cubit.returnToDeviceList(),
-            icon: const Icon(LucideIcons.arrowLeft, size: 18, color: _T.white),
-            label: Text(
-              'Back to device list',
-              style: poppins(15, FontWeight.w600, _T.white),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: _T.white,
-              side: const BorderSide(color: _T.cardBorder),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          FilledButton(
-            onPressed: () => cubit.checkPendingAgain(),
-            style: FilledButton.styleFrom(
-              backgroundColor: _T.orange,
-              foregroundColor: _T.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Check again',
-              style: poppins(16, FontWeight.w700, _T.white),
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
 }
 
 class _DeviceSkeletonList extends StatelessWidget {
@@ -643,11 +506,13 @@ class _EmptyDevicesBody extends StatelessWidget {
     required this.poppins,
     required this.mono,
     required this.onRetry,
+    required this.onContinueClaimed,
   });
 
   final TextStyle Function(double, FontWeight, Color, {double height}) poppins;
   final TextStyle Function(double, FontWeight, Color) mono;
   final VoidCallback onRetry;
+  final VoidCallback onContinueClaimed;
 
   @override
   Widget build(BuildContext context) {
@@ -673,14 +538,24 @@ class _EmptyDevicesBody extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Ask your administrator to register this tablet in the '
-                    'portal. Your device ID is:',
+                    'Unclaimed slots appear here. If this tablet is already '
+                    'claimed in the portal, continue to login.',
                     textAlign: TextAlign.center,
                     style: poppins(
                       14,
                       FontWeight.w400,
                       _T.greySubtitle,
                       height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Hardware fingerprint (for admin):',
+                    textAlign: TextAlign.center,
+                    style: poppins(
+                      12,
+                      FontWeight.w500,
+                      _T.greyMuted,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -709,7 +584,7 @@ class _EmptyDevicesBody extends StatelessWidget {
             ),
           ),
           FilledButton(
-            onPressed: onRetry,
+            onPressed: onContinueClaimed,
             style: FilledButton.styleFrom(
               backgroundColor: _T.orange,
               foregroundColor: _T.white,
@@ -719,8 +594,24 @@ class _EmptyDevicesBody extends StatelessWidget {
               ),
             ),
             child: Text(
-              'Retry',
+              'Already claimed — continue to login',
               style: poppins(16, FontWeight.w700, _T.white),
+            ),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton(
+            onPressed: onRetry,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _T.white,
+              side: const BorderSide(color: _T.cardBorder),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Retry',
+              style: poppins(15, FontWeight.w600, _T.white),
             ),
           ),
           const SizedBox(height: 16),

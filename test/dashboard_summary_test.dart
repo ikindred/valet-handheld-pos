@@ -34,6 +34,27 @@ void main() {
     final row = summary.recent.first.toRecentRow();
     expect(row.isCheckedOut, isTrue);
     expect(row.plate, 'ABC1234');
+    expect(row.line1, '—');
+    expect(row.line2, contains('Out at'));
+    expect(row.line2, contains('₱150.00'));
+  });
+
+  test('toRecentRow uses vehicle and slot fields when present', () {
+    final row = DashboardSummaryRecent.fromJson({
+      'id': 'ticket-uuid',
+      'ticket_number': 'TKT-0123',
+      'plate_number': 'ABC 1234',
+      'status': 'ACTIVE',
+      'time_in': '2026-05-08T01:32:00.000Z',
+      'vehicle': {'brand': 'Toyota', 'model': 'Vios', 'color': 'White'},
+      'parking': {'slot': 'B-04'},
+    })!.toRecentRow();
+
+    expect(row.isCheckedOut, isFalse);
+    expect(row.line1, 'Toyota Vios · White');
+    expect(row.line2, contains('In at'));
+    expect(row.line2, contains('Slot B-04'));
+    expect(row.line2, isNot(contains('TKT-0123')));
   });
 
   test('remaining_count falls back to total_slots minus active_slots', () {

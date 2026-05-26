@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../core/branch/overnight_window.dart';
 import '../../../core/session/standard_parking_rates.dart';
 import '../models/checkout_preview_rates.dart';
 
@@ -38,6 +39,9 @@ class CheckoutPricing {
   /// Hours included in the flat block when the API does not send a per-branch value.
   static const int defaultFlatBlockHours = 3;
 
+  static const String defaultOvernightStart = '01:30';
+  static const String defaultOvernightEnd = '06:00';
+
   static CheckoutBreakdown computeFromPreviewRates({
     required DateTime timeIn,
     required DateTime timeOut,
@@ -50,17 +54,19 @@ class CheckoutPricing {
         flatRate: rates.flatRate,
         succeedingRate: rates.succeedingRate,
         overnightFee: rates.overnightFee,
-        overnightCutoff: rates.overnightCutoff,
+        overnightStart: rates.overnightStart,
+        overnightEnd: rates.overnightEnd,
         flatBlockHours: flatBlockHours,
       );
 
-  /// Offline / Drift rates (optional [overnightCutoff] when cached locally).
+  /// Offline / Drift rates with cached overnight window (`HH:mm`).
   static CheckoutBreakdown compute({
     required DateTime timeIn,
     required DateTime timeOut,
     required StandardParkingRates rates,
     int flatBlockHours = defaultFlatBlockHours,
-    String overnightCutoff = '',
+    String overnightStart = '',
+    String overnightEnd = '',
   }) =>
       computeFees(
         timeIn: timeIn,
@@ -68,7 +74,8 @@ class CheckoutPricing {
         flatRate: rates.flatRatePesos.toDouble(),
         succeedingRate: rates.succeedingHourPesos.toDouble(),
         overnightFee: rates.overnightFeePesos.toDouble(),
-        overnightCutoff: overnightCutoff,
+        overnightStart: overnightStart,
+        overnightEnd: overnightEnd,
         flatBlockHours: flatBlockHours,
       );
 
@@ -78,7 +85,8 @@ class CheckoutPricing {
     required double flatRate,
     required double succeedingRate,
     required double overnightFee,
-    required String overnightCutoff,
+    required String overnightStart,
+    required String overnightEnd,
     int flatBlockHours = defaultFlatBlockHours,
   }) {
     final durationMinutes = durationMinutesCeil(timeIn, timeOut);
@@ -96,8 +104,9 @@ class CheckoutPricing {
       succeedingPortion = extraHours * succeedingRate;
     }
 
+    final window = OvernightWindow.tryFromHhMm(overnightStart, overnightEnd);
     final overnightApplied =
-        crossesOvernightCutoff(timeIn, timeOut, overnightCutoff);
+        window?.stayOverlaps(timeIn, timeOut) ?? false;
     final overnightPortion = overnightApplied ? overnightFee : 0.0;
     final total = flatPortion + succeedingPortion + overnightPortion;
 
@@ -118,31 +127,17 @@ class CheckoutPricing {
     return ((ms + 59999) ~/ 60000).clamp(0, 1 << 30);
   }
 
-  /// `true` when stay crosses [overnightCutoff] (`HH:mm` local) with entry before
-  /// cutoff and exit after the same cutoff instant.
+  /// Legacy single-cutoff helper — maps to [overnightStart] with [defaultOvernightEnd].
+  @Deprecated('Use overnight_start + overnight_end window overlap instead')
   static bool crossesOvernightCutoff(
     DateTime timeIn,
     DateTime timeOut,
     String overnightCutoff,
   ) {
-    final trimmed = overnightCutoff.trim();
-    if (trimmed.isEmpty) return false;
-    final parts = trimmed.split(':');
-    if (parts.length < 2) return false;
-    final ch = int.tryParse(parts[0].trim());
-    final cm = int.tryParse(parts[1].trim());
-    if (ch == null || cm == null) return false;
-
-    var day = DateTime(timeIn.year, timeIn.month, timeIn.day);
-    final lastDay = DateTime(timeOut.year, timeOut.month, timeOut.day);
-
-    while (!day.isAfter(lastDay)) {
-      final cutoff = DateTime(day.year, day.month, day.day, ch, cm);
-      if (timeIn.isBefore(cutoff) && timeOut.isAfter(cutoff)) {
-        return true;
-      }
-      day = day.add(const Duration(days: 1));
-    }
-    return false;
+    final window = OvernightWindow.tryFromHhMm(
+      overnightCutoff,
+      defaultOvernightEnd,
+    );
+    return window?.stayOverlaps(timeIn, timeOut) ?? false;
   }
 }

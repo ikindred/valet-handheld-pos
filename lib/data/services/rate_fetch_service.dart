@@ -91,7 +91,12 @@ class RateFetchService {
     required AreaDetail detail,
   }) async {
     final flatHours = CheckoutPricing.defaultFlatBlockHours;
-    final areaOvernightCutoff = detail.overnightCutoff;
+    final areaOvernight = detail.overnightTimes;
+    await _persistOvernightWindowConfig(
+      branchId: branchId,
+      start: areaOvernight.start,
+      end: areaOvernight.end,
+    );
     if (detail.standard.hasAny) {
       await _upsertRateRow(
         branchId: branchId,
@@ -101,7 +106,7 @@ class RateFetchService {
         succeeding: detail.standard.succeedingRate.toDouble(),
         overnight: detail.standard.overnightFee.toDouble(),
         lost: detail.standard.lostTicketFee.toDouble(),
-        overnightCutoff: areaOvernightCutoff,
+        overnightCutoff: areaOvernight.start,
       );
     }
 
@@ -122,7 +127,7 @@ class RateFetchService {
         succeeding: row.fees.succeedingRate.toDouble(),
         overnight: row.fees.overnightFee.toDouble(),
         lost: lost,
-        overnightCutoff: areaOvernightCutoff,
+        overnightCutoff: areaOvernight.start,
       );
     }
   }
@@ -160,6 +165,12 @@ class RateFetchService {
           if (parsed != null &&
               (parsed.flatRatePesos > 0 || parsed.succeedingHourPesos > 0)) {
             standardRates = parsed;
+            final overnight = _overnightTimesFromMap(m);
+            await _persistOvernightWindowConfig(
+              branchId: bid,
+              start: overnight.start,
+              end: overnight.end,
+            );
             await _upsertRateRow(
               branchId: bid,
               vehicleType: 'Standard',
@@ -168,7 +179,7 @@ class RateFetchService {
               succeeding: parsed.succeedingHourPesos.toDouble(),
               overnight: parsed.overnightFeePesos.toDouble(),
               lost: parsed.lostTicketFeePesos.toDouble(),
-              overnightCutoff: _overnightCutoffFromMap(m),
+              overnightCutoff: overnight.start,
             );
           }
         }
@@ -203,20 +214,21 @@ class RateFetchService {
         final flat = _doubleField(row, const ['flatRate', 'flat_rate']);
         final succeeding =
             _doubleField(row, const ['succeedingRate', 'succeeding_rate']);
-        final overnight =
+        final overnightFee =
             _doubleField(row, const ['overnightFee', 'overnight_fee']);
         var lost = _doubleField(row, const ['lostTicketFee', 'lost_ticket_fee']);
         if (lost <= 0) lost = lostFallback;
 
+        final overnightTimes = _overnightTimesFromMap(row);
         await _upsertRateRow(
           branchId: bid,
           vehicleType: vt,
           flatHours: CheckoutPricing.defaultFlatBlockHours,
           flat: flat,
           succeeding: succeeding,
-          overnight: overnight,
+          overnight: overnightFee,
           lost: lost,
-          overnightCutoff: _overnightCutoffFromMap(row),
+          overnightCutoff: overnightTimes.start,
         );
       }
     } catch (e, st) {
@@ -270,14 +282,90 @@ class RateFetchService {
     );
   }
 
-  static String? _overnightCutoffFromMap(Map<String, dynamic> m) {
-    for (final k in const ['overnight_cutoff', 'overnightCutoff']) {
-      final v = m[k];
-      if (v == null) continue;
-      final s = v.toString().trim();
-      if (s.isNotEmpty) return s;
+  static ({String? start, String? end}) _overnightTimesFromMap(
+    Map<String, dynamic> m,
+  ) {
+    String? pick(List<String> keys) {
+      for (final k in keys) {
+        final v = m[k];
+        if (v == null) continue;
+        final s = v.toString().trim();
+        if (s.isNotEmpty) return s;
+      }
+      return null;
     }
-    return null;
+
+    return (
+      start: pick(const [
+        'overnight_start',
+        'overnightStart',
+        'overnight_cutoff',
+        'overnightCutoff',
+      ]),
+      end: pick(const ['overnight_end', 'overnightEnd']),
+    );
+  }
+
+  Future<void> _persistOvernightWindowConfig({
+    required String branchId,
+    String? start,
+    String? end,
+  }) async {
+    final bid = branchId.trim();
+    if (bid.isEmpty) return;
+    final now = DateTime.now().toIso8601String();
+    if (start != null && start.trim().isNotEmpty) {
+      await _upsertBranchConfigRow(
+        branchId: bid,
+        configKey: 'overnight_start_time',
+        configValue: start.trim(),
+        updatedAt: now,
+      );
+    }
+    if (end != null && end.trim().isNotEmpty) {
+      await _upsertBranchConfigRow(
+        branchId: bid,
+        configKey: 'overnight_end_time',
+        configValue: end.trim(),
+        updatedAt: now,
+      );
+    }
+  }
+
+  Future<void> _upsertBranchConfigRow({
+    required String branchId,
+    required String configKey,
+    required String configValue,
+    required String updatedAt,
+  }) async {
+    final existing = await (_db.select(_db.branchConfigs)
+          ..where(
+            (c) =>
+                c.branchId.equals(branchId) & c.configKey.equals(configKey),
+          )
+          ..limit(1))
+        .getSingleOrNull();
+    if (existing != null) {
+      await (_db.update(_db.branchConfigs)..where((c) => c.id.equals(existing.id)))
+          .write(
+        BranchConfigsCompanion(
+          configValue: Value(configValue),
+          syncStatus: const Value('synced'),
+          updatedAt: Value(updatedAt),
+        ),
+      );
+    } else {
+      await _db.into(_db.branchConfigs).insert(
+            BranchConfigsCompanion.insert(
+              id: _uuid.v4(),
+              branchId: branchId,
+              configKey: configKey,
+              configValue: configValue,
+              syncStatus: 'synced',
+              updatedAt: updatedAt,
+            ),
+          );
+    }
   }
 
   static double _doubleField(Map<String, dynamic> m, List<String> keys) {

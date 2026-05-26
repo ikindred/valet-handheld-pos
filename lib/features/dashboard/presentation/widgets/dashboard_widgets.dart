@@ -110,6 +110,20 @@ abstract final class DashboardStyles {
     height: 1.25,
   );
 
+  static TextStyle transactionLinePrimary() => GoogleFonts.poppins(
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+    color: AppColors.textPrimary,
+    height: 1.2,
+  );
+
+  static TextStyle transactionLineSecondary() => GoogleFonts.poppins(
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    color: AppColors.textPrimary,
+    height: 1.25,
+  );
+
   static TextStyle statusParked() => GoogleFonts.poppins(
     fontSize: 11,
     fontWeight: FontWeight.w600,
@@ -531,7 +545,8 @@ class DashboardTransactionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isParked = status == TransactionStatusKind.parked;
-    final lineStyle = DashboardStyles.transactionLine();
+    final line1Style = DashboardStyles.transactionLinePrimary();
+    final line2Style = DashboardStyles.transactionLineSecondary();
 
     final plateBadge = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -543,10 +558,30 @@ class DashboardTransactionRow extends StatelessWidget {
       child: Text(plate, style: DashboardStyles.plateBadge()),
     );
 
+    final details = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          line1,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: line1Style,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          line2,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: line2Style,
+        ),
+      ],
+    );
+
     final statusPill = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: isParked ? const Color(0xFFF4FBF7) : const Color(0xFFF8F9FB),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(100),
         border: Border.all(
           color: isParked ? DashboardStyles.green : const Color(0xFF6E7584),
@@ -561,7 +596,7 @@ class DashboardTransactionRow extends StatelessWidget {
     );
 
     Widget body(BoxConstraints constraints) {
-      final wide = constraints.maxWidth >= 640;
+      final wide = constraints.maxWidth >= 520;
       if (!wide) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -571,8 +606,7 @@ class DashboardTransactionRow extends StatelessWidget {
               children: [plateBadge, const Spacer(), statusPill],
             ),
             const SizedBox(height: 8),
-            Text(line1, style: lineStyle),
-            Text(line2, style: lineStyle),
+            details,
           ],
         );
       }
@@ -581,34 +615,16 @@ class DashboardTransactionRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           plateBadge,
-          const SizedBox(width: 16),
-          Expanded(
-            flex: 3,
-            child: Text(
-              line1,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: lineStyle,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            flex: 3,
-            child: Text(
-              line2,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: lineStyle,
-            ),
-          ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
+          Expanded(child: details),
+          const SizedBox(width: 12),
           statusPill,
         ],
       );
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final child = body(constraints);

@@ -9,8 +9,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/logging/valet_log.dart';
 import '../../../core/services/device_id_service.dart';
+import '../../../core/storage/device_claim_restore.dart';
 import '../../../core/storage/offline_mode_prefs.dart';
 import '../../../core/storage/prefs_keys.dart';
+import '../../../data/local/db/app_database.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../auth/auth_session_sync.dart';
 
@@ -41,7 +43,12 @@ class _SplashScreenState extends State<SplashScreen> {
     final prefs = await SharedPreferences.getInstance();
     try {
       ValetLog.debug('splash/_bootstrap', 'start');
-      final deviceIdentityKey = prefs.getString(PrefsKeys.deviceIdentityKey);
+      var deviceIdentityKey = prefs.getString(PrefsKeys.deviceIdentityKey)?.trim();
+      if (deviceIdentityKey == null || deviceIdentityKey.isEmpty) {
+        final db = context.read<AppDatabase>();
+        final restored = await DeviceClaimRestore.tryRestoreFromDatabase(db);
+        deviceIdentityKey = restored?.serverDeviceId;
+      }
       if (deviceIdentityKey == null || deviceIdentityKey.isEmpty) {
         ValetLog.debug(
           'splash/_bootstrap',

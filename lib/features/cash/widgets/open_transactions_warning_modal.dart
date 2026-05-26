@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../models/open_transaction.dart';
+import 'open_transactions_data_table.dart';
 
 /// Shown when closing shift with vehicles still checked in under this shift.
 class OpenTransactionsWarningModal extends StatelessWidget {
@@ -39,18 +39,15 @@ class OpenTransactionsWarningModal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final n = openTransactions.length;
-    final timeFmt = DateFormat.jm();
-    final dateFmt = DateFormat.MMMd();
-    final now = DateTime.now();
+    final maxDialogH = MediaQuery.sizeOf(context).height * 0.85;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 600),
+        constraints: BoxConstraints(maxWidth: 600, maxHeight: maxDialogH),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
@@ -86,51 +83,10 @@ class OpenTransactionsWarningModal extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 20),
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    headingRowColor: WidgetStateProperty.all(
-                      const Color(0xFFF9F9F9),
-                    ),
-                    dataRowMinHeight: 44,
-                    columns: const [
-                      DataColumn(label: Text('Ticket #')),
-                      DataColumn(label: Text('Plate No.')),
-                      DataColumn(label: Text('Vehicle')),
-                      DataColumn(label: Text('Time In')),
-                      DataColumn(label: Text('Duration')),
-                    ],
-                    rows: [
-                      for (var i = 0; i < openTransactions.length; i++)
-                        DataRow(
-                          color: WidgetStateProperty.all(
-                            i.isEven
-                                ? const Color(0xFFF9F9F9)
-                                : Colors.white,
-                          ),
-                          cells: [
-                            DataCell(Text(openTransactions[i].ticketNumber)),
-                            DataCell(Text(openTransactions[i].plateNumber)),
-                            DataCell(Text(openTransactions[i].vehicleLabel)),
-                            DataCell(Text(
-                              '${dateFmt.format(openTransactions[i].timeIn.toLocal())} '
-                              '${timeFmt.format(openTransactions[i].timeIn.toLocal())}',
-                            )),
-                            DataCell(Text(
-                              OpenTransaction.formatDurationSince(
-                                openTransactions[i].timeIn.toLocal(),
-                                now,
-                              ),
-                            )),
-                          ],
-                        ),
-                    ],
-                  ),
+              Expanded(
+                child: OpenTransactionsDataTable(
+                  transactions: openTransactions,
+                  durationColumnLabel: 'Duration',
                 ),
               ),
               const SizedBox(height: 12),

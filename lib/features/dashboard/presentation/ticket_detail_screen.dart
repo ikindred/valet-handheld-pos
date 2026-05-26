@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -408,14 +409,41 @@ class _HeroHeaderCard extends StatelessWidget {
           const SizedBox(height: 14),
           Text('Ticket ID', style: _detailLabelStyle()),
           const SizedBox(height: 4),
-          Text(
-            ticketId,
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
-              height: 1.35,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: SelectableText(
+                  ticketId,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: ticketId.trim().isEmpty
+                    ? null
+                    : () async {
+                        await Clipboard.setData(ClipboardData(text: ticketId));
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Ticket ID copied'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                icon: const Icon(LucideIcons.copy, size: 20),
+                tooltip: 'Copy ticket ID',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                color: DashboardStyles.grey500,
+              ),
+            ],
           ),
         ],
       ),

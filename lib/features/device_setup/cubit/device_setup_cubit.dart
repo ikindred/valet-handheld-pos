@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:bloc/bloc.dart';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
@@ -8,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/platform/device_info_payload.dart';
 import '../../../core/services/device_id_service.dart';
+import '../../../core/storage/device_claim_restore.dart';
 import '../../../core/storage/prefs_keys.dart';
 import '../../../core/storage/site_display_name.dart';
 import '../../../data/local/db/app_database.dart';
@@ -25,77 +24,46 @@ class DeviceSetupCubit extends Cubit<DeviceSetupState> {
   final Dio _dio;
   final AppDatabase _db;
 
-  Timer? _pollTimer;
-  String? _pendingSlotId;
-  String? _pendingAndroidIdHash;
-
-  @override
-  Future<void> close() {
-    _cancelPoll();
-    return super.close();
-  }
-
   void _safeEmit(DeviceSetupState state) {
     if (!isClosed) {
       emit(state);
     }
   }
 
-  void _cancelPoll() {
-    _pollTimer?.cancel();
-    _pollTimer = null;
-  }
-
-  void _startPoll() {
-    _cancelPoll();
-    _pollTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) => unawaited(_pollTick()),
-    );
-  }
-
-  Future<void> _pollTick() async {
-    final s = state;
-    if (s is! DeviceSetupPendingActivation) return;
-    _safeEmit(s.copyWith(polling: true));
+  /// When GET active is empty but this tablet is already claimed on the server.
+  Future<void> continueIfAlreadyClaimed() async {
+    _safeEmit(const DeviceSetupClaiming());
     try {
-      await _tryResolveClaimPending(s);
-    } finally {
-      final cur = state;
-      if (cur is DeviceSetupPendingActivation) {
-        _safeEmit(cur.copyWith(polling: false));
+      final restored = await DeviceClaimRestore.tryRestoreFromDatabase(_db);
+      if (restored != null) {
+        _safeEmit(DeviceClaimSuccess(restored));
+        return;
       }
+      final reclaimed = await _attemptReclaimByBindingHash();
+      if (reclaimed == null) {
+        _safeEmit(
+          const DeviceSetupError(
+            'Could not verify this tablet. Contact your administrator.',
+          ),
+        );
+        return;
+      }
+      final hash = await DeviceIdService.sha256RawAndroidId();
+      await _persistClaimedDevice(reclaimed, hash);
+      _safeEmit(DeviceClaimSuccess(reclaimed));
+    } on DioException catch (e) {
+      _safeEmit(DeviceSetupError(_messageFromDio(e)));
+    } catch (_) {
+      _safeEmit(
+        const DeviceSetupError(
+          'Could not verify this tablet. Contact your administrator.',
+        ),
+      );
     }
   }
 
-  /// Manual poll trigger from UI.
-  Future<void> checkPendingAgain() async {
-    final s = state;
-    if (s is! DeviceSetupPendingActivation) return;
-    _safeEmit(s.copyWith(polling: true));
-    try {
-      await _tryResolveClaimPending(s);
-    } finally {
-      final cur = state;
-      if (cur is DeviceSetupPendingActivation) {
-        _safeEmit(cur.copyWith(polling: false));
-      }
-    }
-  }
-
-  /// Leave pending activation UI and reload the device list.
-  Future<void> returnToDeviceList() async {
-    _cancelPoll();
-    _pendingSlotId = null;
-    _pendingAndroidIdHash = null;
-    await fetchDevices();
-  }
-
-  /// GET [AppConfig.devicesActiveUrl]
+  /// GET [AppConfig.devicesActiveUrl] — only before first successful claim.
   Future<void> fetchDevices() async {
-    _cancelPoll();
-    _pendingSlotId = null;
-    _pendingAndroidIdHash = null;
     _safeEmit(const DeviceSetupLoadingDevices());
     try {
       if (AppConfig.useStubApi) {
@@ -124,6 +92,24 @@ class DeviceSetupCubit extends Cubit<DeviceSetupState> {
           ),
         );
         return;
+      }
+      if (devices.isEmpty) {
+        final restored = await DeviceClaimRestore.tryRestoreFromDatabase(_db);
+        if (restored != null) {
+          _safeEmit(DeviceClaimSuccess(restored));
+          return;
+        }
+        final reclaimed = await _attemptReclaimByBindingHash();
+        if (reclaimed != null) {
+          try {
+            final hash = await DeviceIdService.sha256RawAndroidId();
+            await _persistClaimedDevice(reclaimed, hash);
+            _safeEmit(DeviceClaimSuccess(reclaimed));
+            return;
+          } catch (_) {
+            // show empty state below
+          }
+        }
       }
       _safeEmit(DeviceSetupDevicesLoaded(devices));
     } on DioException {
@@ -162,9 +148,8 @@ class DeviceSetupCubit extends Cubit<DeviceSetupState> {
         .toList();
   }
 
-  /// POST [AppConfig.devicesClaimUrl] (thin; mirrors body shape used elsewhere).
+  /// POST [AppConfig.devicesClaimUrl] — one-time per tablet until app data wipe.
   Future<void> claimDevice(String serverDeviceId) async {
-    _cancelPoll();
     _safeEmit(const DeviceSetupClaiming());
     try {
       final androidIdHash = await DeviceIdService.sha256RawAndroidId();
@@ -177,7 +162,7 @@ class DeviceSetupCubit extends Cubit<DeviceSetupState> {
         return;
       }
 
-      DeviceModel? claimed;
+      final DeviceModel claimed;
       if (AppConfig.useStubApi) {
         claimed = DeviceModel(
           serverDeviceId: serverDeviceId,
@@ -190,30 +175,12 @@ class DeviceSetupCubit extends Cubit<DeviceSetupState> {
           isActive: true,
         );
       } else {
-        claimed = await _postClaim(serverDeviceId, androidIdHash);
-        if (claimed == null) {
+        final parsed = await _postClaim(serverDeviceId, androidIdHash);
+        if (parsed == null) {
           _safeEmit(const DeviceSetupError('Claim failed. Try again.'));
           return;
         }
-        if (!claimed.isActive) {
-          final displayId = await DeviceIdService.getOrCreate();
-          _pendingSlotId = serverDeviceId;
-          _pendingAndroidIdHash = androidIdHash;
-          _safeEmit(
-            DeviceSetupPendingActivation(
-              displayDeviceId: displayId,
-              selectedServerDeviceId: serverDeviceId,
-            ),
-          );
-          unawaited(_tryResolveClaimPending(
-            DeviceSetupPendingActivation(
-              displayDeviceId: displayId,
-              selectedServerDeviceId: serverDeviceId,
-            ),
-          ));
-          _startPoll();
-          return;
-        }
+        claimed = parsed;
       }
 
       try {
@@ -228,13 +195,49 @@ class DeviceSetupCubit extends Cubit<DeviceSetupState> {
       }
       _safeEmit(DeviceClaimSuccess(claimed));
     } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        final androidIdHash = await DeviceIdService.sha256RawAndroidId();
+        if (androidIdHash.isNotEmpty) {
+          final recovered = _deviceFrom409(e, serverDeviceId);
+          if (recovered != null) {
+            try {
+              await _persistClaimedDevice(recovered, androidIdHash);
+              _safeEmit(DeviceClaimSuccess(recovered));
+              return;
+            } catch (_) {
+              // fall through to error message
+            }
+          }
+        }
+      }
       _safeEmit(DeviceSetupError(_messageFromDio(e)));
     } catch (_) {
       _safeEmit(const DeviceSetupError('Claim failed. Try again.'));
     }
   }
 
-  Future<DeviceModel?> _postClaim(String serverDeviceId, String androidIdHash) async {
+  /// Tablet already bound on server: active list is empty; recover via claim by hash.
+  Future<DeviceModel?> _attemptReclaimByBindingHash() async {
+    if (AppConfig.useStubApi) return null;
+    final androidIdHash = await DeviceIdService.sha256RawAndroidId();
+    if (androidIdHash.isEmpty) return null;
+
+    try {
+      return await _postClaim('', androidIdHash);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        return _deviceFrom409(e, '');
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<DeviceModel?> _postClaim(
+    String serverDeviceId,
+    String androidIdHash,
+  ) async {
     final deviceId = await DeviceIdService.getOrCreate();
     final deviceInfo = await buildDeviceInfoPayload();
     final deviceModel = deviceInfo['model']?.toString() ??
@@ -245,15 +248,19 @@ class DeviceSetupCubit extends Cubit<DeviceSetupState> {
         '';
 
     final bearer = AppConfig.deviceClaimBearerToken;
+    final body = <String, dynamic>{
+      'device_id': deviceId,
+      'android_id_hash': androidIdHash,
+      'device_model': deviceModel,
+      'os_version': osVersion,
+    };
+    final slotId = serverDeviceId.trim();
+    if (slotId.isNotEmpty) {
+      body['server_device_id'] = slotId;
+    }
     final res = await _dio.post<Map<String, dynamic>>(
       AppConfig.devicesClaimUrl,
-      data: <String, dynamic>{
-        'server_device_id': serverDeviceId,
-        'device_id': deviceId,
-        'android_id_hash': androidIdHash,
-        'device_model': deviceModel,
-        'os_version': osVersion,
-      },
+      data: body,
       options: bearer == null
           ? null
           : Options(
@@ -265,56 +272,44 @@ class DeviceSetupCubit extends Cubit<DeviceSetupState> {
     final data = res.data ?? {};
     return DeviceModel.fromClaimResponse(
       data,
-      selectedServerDeviceId: serverDeviceId,
+      selectedServerDeviceId: slotId,
     );
   }
 
-  Future<void> _tryResolveClaimPending(DeviceSetupPendingActivation pending) async {
-    final slotId = pending.selectedServerDeviceId ?? _pendingSlotId;
-    final hash = _pendingAndroidIdHash;
-    if (slotId == null || slotId.isEmpty || hash == null) return;
-
-    final list = await _fetchActiveDevicesList();
-    if (list != null) {
-      for (final d in list) {
-        if (d.serverDeviceId == slotId && d.isActive) {
-          await _finishClaimFromModel(d, hash);
-          return;
-        }
-      }
-    }
-
-    try {
-      final claimed = await _postClaim(slotId, hash);
-      if (claimed != null && claimed.isActive) {
-        await _finishClaimFromModel(claimed, hash);
-      }
-    } catch (_) {
-      // keep pending; next tick retries
-    }
-  }
-
-  Future<void> _finishClaimFromModel(DeviceModel claimed, String androidIdHash) async {
-    try {
-      await _persistClaimedDevice(claimed, androidIdHash);
-    } catch (_) {
-      _safeEmit(
-        const DeviceSetupError(
-          'Could not save device identity. Try again.',
-        ),
+  /// When the slot is already bound to this tablet, recover from 409 body (`id` field).
+  DeviceModel? _deviceFrom409(DioException e, String serverDeviceId) {
+    final data = e.response?.data;
+    if (data is Map<String, dynamic>) {
+      final parsed = DeviceModel.fromClaimResponse(
+        data,
+        selectedServerDeviceId: serverDeviceId,
       );
-      _cancelPoll();
-      _pendingSlotId = null;
-      _pendingAndroidIdHash = null;
-      return;
+      if (parsed.serverDeviceId.isNotEmpty) return parsed;
+    } else if (data is Map) {
+      final parsed = DeviceModel.fromClaimResponse(
+        Map<String, dynamic>.from(data),
+        selectedServerDeviceId: serverDeviceId,
+      );
+      if (parsed.serverDeviceId.isNotEmpty) return parsed;
     }
-    _cancelPoll();
-    _pendingSlotId = null;
-    _pendingAndroidIdHash = null;
-    _safeEmit(DeviceClaimSuccess(claimed));
+    final sid = serverDeviceId.trim();
+    if (sid.isEmpty) return null;
+    return DeviceModel(
+      serverDeviceId: sid,
+      deviceLabel: '',
+      branchName: '',
+      areaName: '',
+      serialNumber: '',
+      branchId: '',
+      areaId: '',
+      isActive: false,
+    );
   }
 
   static String _messageFromDio(DioException e) {
+    if (e.response?.statusCode == 409) {
+      return 'This device is already claimed. Contact your admin.';
+    }
     final data = e.response?.data;
     if (data is Map<String, dynamic>) {
       final m = data['message'] ?? data['error'];

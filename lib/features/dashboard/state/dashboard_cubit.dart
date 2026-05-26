@@ -1,9 +1,7 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/connectivity/internet_reachability.dart';
-import '../../../core/formatting/peso_currency.dart';
 import '../../../core/logging/valet_log.dart';
 import '../../../data/local/db/app_database.dart';
 import '../../../data/remote/area_detail.dart';
@@ -12,6 +10,7 @@ import '../../../data/remote/dashboard_summary.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/rate_fetch_service.dart';
 import '../../../data/services/ticket_service.dart';
+import '../domain/dashboard_recent_format.dart';
 
 /// Parked vs checked out for recent-transaction rows (UI maps to [TransactionStatusKind]).
 enum DashboardRecentStatus { parked, checkedOut }
@@ -282,30 +281,19 @@ class DashboardCubit extends Cubit<DashboardState> {
   }
 
   static DashboardRecentTx _recentFromTicket(Ticket t) {
-    final timeFmt = DateFormat.jm();
     final plate =
         t.plateNumber.trim().isNotEmpty ? t.plateNumber.trim() : t.id;
-    final parts = <String>[
-      if (t.vehicleBrand.trim().isNotEmpty) t.vehicleBrand.trim(),
-      if (t.vehicleColor.trim().isNotEmpty) t.vehicleColor.trim(),
-      if (t.vehicleType.trim().isNotEmpty) t.vehicleType.trim(),
-    ];
-    final line1 = parts.isEmpty ? '—' : parts.join(' · ');
+    final line1 = DashboardRecentFormat.vehicleLineFromTicket(t);
     final inLocal =
         DateTime.tryParse(t.checkInAt) ??
             DateTime.fromMillisecondsSinceEpoch(0);
     if (t.status == 'completed') {
-      final fee = t.fee;
-      final feeStr =
-          fee != null
-              ? '${PesoCurrency.symbol}${NumberFormat('#,##0').format(fee)}'
-              : '—';
       final outLocal = DateTime.tryParse(t.checkOutAt ?? '') ?? inLocal;
       return DashboardRecentTx(
         ticketId: t.id,
         plate: plate,
         line1: line1,
-        line2: 'Out at ${timeFmt.format(outLocal)} — $feeStr',
+        line2: DashboardRecentFormat.checkedOutSubline(outLocal, t.fee),
         status: DashboardRecentStatus.checkedOut,
       );
     }
@@ -313,7 +301,10 @@ class DashboardCubit extends Cubit<DashboardState> {
       ticketId: t.id,
       plate: plate,
       line1: line1,
-      line2: 'In at ${timeFmt.format(inLocal)} — ${t.id}',
+      line2: DashboardRecentFormat.parkedSubline(
+        inLocal,
+        parkingJson: t.parkingInfo,
+      ),
       status: DashboardRecentStatus.parked,
     );
   }

@@ -32,9 +32,32 @@ class _CheckInReviewPrintScreenState extends State<CheckInReviewPrintScreen> {
   /// Two-column fallback for narrow landscape.
   static const double _mediumBreakpoint = 480.0;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final signed =
+          context.read<CheckInCubit>().state.isCustomerSignatureComplete;
+      if (!signed) {
+        context.go('/check-in/step-4');
+      }
+    });
+  }
+
   Future<void> _commitAndLeave() async {
     if (!mounted) return;
     final cubit = context.read<CheckInCubit>();
+    if (!cubit.state.isCustomerSignatureComplete) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Customer signature is required.'),
+        ),
+      );
+      context.go('/check-in/step-4');
+      return;
+    }
     if (cubit.state.isSubmitting) return;
     ValetLog.info(
       'check_in/review_print/_commitAndLeave',
@@ -469,9 +492,9 @@ class _ConditionLogCard extends StatelessWidget {
                 ),
               ),
               Text(
-                state.hasCustomerSignature ? 'Signed ✓' : 'Not signed',
+                state.isCustomerSignatureComplete ? 'Signed ✓' : 'Not signed',
                 style: _ReviewTokens.value().copyWith(
-                  color: state.hasCustomerSignature
+                  color: state.isCustomerSignatureComplete
                       ? DashboardStyles.green
                       : DashboardStyles.grey500,
                 ),

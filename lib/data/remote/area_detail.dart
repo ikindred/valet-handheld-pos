@@ -176,7 +176,7 @@ class AreaDetail {
     required this.standard,
     required this.vehicleTypeRates,
     required this.levels,
-    this.overnightCutoff,
+    required this.overnightTimes,
   });
 
   final String id;
@@ -186,8 +186,8 @@ class AreaDetail {
   final List<VehicleTypeRateRow> vehicleTypeRates;
   final List<AreaParkingLevel> levels;
 
-  /// Area-level overnight cutoff (`HH:mm`), applied to all cached rate rows.
-  final String? overnightCutoff;
+  /// Area-level overnight window (`HH:mm`), applied to all cached rate rows.
+  final ({String? start, String? end}) overnightTimes;
 
   AreaSlotCounts get slotCounts {
     if (levels.isEmpty) return AreaSlotCounts.empty;
@@ -224,14 +224,32 @@ class AreaDetail {
       standard: standard,
       vehicleTypeRates: vehicleRows,
       levels: levels,
-      overnightCutoff: _parseOvernightCutoff(body),
+      overnightTimes: _parseOvernightTimes(body),
     );
   }
 
-  static String? _parseOvernightCutoff(Map<String, dynamic> body) {
-    final raw = body['overnight_cutoff'] ?? body['overnightCutoff'];
-    final s = raw?.toString().trim() ?? '';
-    return s.isEmpty ? null : s;
+  static ({String? start, String? end}) _parseOvernightTimes(
+    Map<String, dynamic> body,
+  ) {
+    String? pick(List<String> keys) {
+      for (final k in keys) {
+        final v = body[k];
+        if (v == null) continue;
+        final s = v.toString().trim();
+        if (s.isNotEmpty) return s;
+      }
+      return null;
+    }
+
+    return (
+      start: pick(const [
+        'overnight_start',
+        'overnightStart',
+        'overnight_cutoff',
+        'overnightCutoff',
+      ]),
+      end: pick(const ['overnight_end', 'overnightEnd']),
+    );
   }
 
   static List<VehicleTypeRateRow> _parseVehicleTypeRates(

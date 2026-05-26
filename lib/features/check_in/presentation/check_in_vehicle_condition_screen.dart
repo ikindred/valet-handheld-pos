@@ -22,10 +22,11 @@ class CheckInVehicleConditionScreen extends StatelessWidget {
       scrollable: false,
       footer: BlocBuilder<CheckInCubit, CheckInState>(
         buildWhen: (prev, next) =>
-            prev.hasCustomerSignature != next.hasCustomerSignature,
+            prev.isCustomerSignatureComplete != next.isCustomerSignatureComplete,
         builder: (context, state) {
+          final signed = state.isCustomerSignatureComplete;
           return CheckInVehicleConditionFooter(
-            hasCustomerSignature: state.hasCustomerSignature,
+            hasCustomerSignature: signed,
             onCancel: () {
               context.read<CheckInCubit>().resetSession();
               context.go('/dashboard');
@@ -33,12 +34,18 @@ class CheckInVehicleConditionScreen extends StatelessWidget {
             onSignature: () => showCustomerSignatureModal(context),
             onBack: () => context.go('/check-in/step-3'),
             onNext: () {
-              final signed = state.hasCustomerSignature;
-              if (signed) {
-                context.go('/check-in/step-5');
-              } else {
+              if (!signed) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Customer signature is required before continuing.',
+                    ),
+                  ),
+                );
                 showCustomerSignatureModal(context);
+                return;
               }
+              context.go('/check-in/step-5');
             },
           );
         },

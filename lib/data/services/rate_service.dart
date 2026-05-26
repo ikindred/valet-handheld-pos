@@ -7,11 +7,12 @@ import '../../core/session/standard_parking_rates.dart';
 import '../../features/check_out/domain/checkout_pricing.dart';
 import '../local/db/app_database.dart';
 
-/// Resolved checkout fees from `rates` + flat block length + overnight cutoff.
+/// Resolved checkout fees from `rates` + flat block length + overnight window.
 typedef CheckoutRatesResolved = ({
   StandardParkingRates rates,
   int flatBlockHours,
-  String overnightCutoff,
+  String overnightStart,
+  String overnightEnd,
 });
 
 /// Reads `rates` (Drift). Other services must not query `rates` directly.
@@ -78,14 +79,15 @@ class RateService {
     final hours = pick.flatRateHours <= 0
         ? CheckoutPricing.defaultFlatBlockHours
         : pick.flatRateHours;
-    final cutoff = await _resolveOvernightCutoff(
+    final overnight = await _resolveOvernightWindow(
       branchId: bid,
       driftRate: pick,
     );
     return (
       rates: _ratesFromRow(pick),
       flatBlockHours: hours,
-      overnightCutoff: cutoff,
+      overnightStart: overnight.start,
+      overnightEnd: overnight.end,
     );
   }
 
@@ -110,22 +112,24 @@ class RateService {
       final hours = pick.flatRateHours <= 0
           ? CheckoutPricing.defaultFlatBlockHours
           : pick.flatRateHours;
-      final cutoff = await _resolveOvernightCutoff(
+      final overnight = await _resolveOvernightWindow(
         branchId: bid,
         driftRate: pick,
       );
       return (
         rates: _ratesFromRow(pick),
         flatBlockHours: hours,
-        overnightCutoff: cutoff,
+        overnightStart: overnight.start,
+        overnightEnd: overnight.end,
       );
     }
 
-    final cutoff = await _resolveOvernightCutoff(branchId: bid);
+    final overnight = await _resolveOvernightWindow(branchId: bid);
     return (
       rates: StandardParkingRates.offlineDefault,
       flatBlockHours: CheckoutPricing.defaultFlatBlockHours,
-      overnightCutoff: cutoff,
+      overnightStart: overnight.start,
+      overnightEnd: overnight.end,
     );
   }
 
@@ -150,31 +154,34 @@ class RateService {
         lostTicketFeePesos: pick.lostTicketFee.round(),
       );
 
-  /// Overnight cutoff resolution:
-  /// 0. Drift `rates.overnight_cutoff` on [driftRate] when non-null
-  /// 1. `branch_config.overnight_start_time`
-  /// 2. `"01:30"`
-  Future<String> _resolveOvernightCutoff({
+  /// Overnight window (`HH:mm`) from Drift + branch_config.
+  Future<({String start, String end})> _resolveOvernightWindow({
     required String branchId,
     Rate? driftRate,
   }) async {
-    final fromDrift = driftRate?.overnightCutoff?.trim() ?? '';
-    if (fromDrift.isNotEmpty) return fromDrift;
+    var start = driftRate?.overnightCutoff?.trim() ?? '';
+    var end = '';
 
     final bid = branchId.trim();
     if (bid.isNotEmpty) {
-      final row = await (_db.select(_db.branchConfigs)
-            ..where(
-              (c) =>
-                  c.branchId.equals(bid) &
-                  c.configKey.equals('overnight_start_time'),
-            )
-            ..limit(1))
-          .getSingleOrNull();
-      final fromConfig = row?.configValue.trim() ?? '';
-      if (fromConfig.isNotEmpty) return fromConfig;
+      final rows = await (_db.select(_db.branchConfigs)
+            ..where((c) => c.branchId.equals(bid)))
+          .get();
+      for (final r in rows) {
+        final v = r.configValue.trim();
+        if (v.isEmpty) continue;
+        if (r.configKey == 'overnight_start_time' && start.isEmpty) {
+          start = v;
+        }
+        if (r.configKey == 'overnight_end_time') {
+          end = v;
+        }
+      }
     }
-    return '01:30';
+
+    if (start.isEmpty) start = CheckoutPricing.defaultOvernightStart;
+    if (end.isEmpty) end = CheckoutPricing.defaultOvernightEnd;
+    return (start: start, end: end);
   }
 
   static Rate? _firstWhereIgnoreCase(List<Rate> rows, String vehicleType) {
@@ -201,8 +208,10 @@ class RateService {
           'succeeding_hour_fee': r.succeedingHourFee,
           'overnight_fee': r.overnightFee,
           'lost_ticket_fee': r.lostTicketFee,
-          if (r.overnightCutoff != null)
+          if (r.overnightCutoff != null) ...{
+            'overnight_start': r.overnightCutoff,
             'overnight_cutoff': r.overnightCutoff,
+          },
         },
     ]);
   }

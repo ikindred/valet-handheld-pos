@@ -7,7 +7,8 @@ class CheckoutPreviewRates extends Equatable {
     required this.succeedingRate,
     required this.overnightFee,
     required this.lostTicketFee,
-    required this.overnightCutoff,
+    required this.overnightStart,
+    required this.overnightEnd,
   });
 
   final double flatRate;
@@ -15,8 +16,11 @@ class CheckoutPreviewRates extends Equatable {
   final double overnightFee;
   final double lostTicketFee;
 
-  /// Local time cutoff, e.g. `01:30`.
-  final String overnightCutoff;
+  /// Overnight window start (`HH:mm`, 24h).
+  final String overnightStart;
+
+  /// Overnight window end (`HH:mm`, 24h).
+  final String overnightEnd;
 
   /// Parses `response["rates"]`; null when the block is absent (offline / legacy).
   static CheckoutPreviewRates? fromJson(dynamic raw) {
@@ -26,6 +30,14 @@ class CheckoutPreviewRates extends Equatable {
         ? raw
         : Map<String, dynamic>.from(raw);
     if (json.isEmpty) return null;
+
+    final start = _str(
+      json['overnight_start'] ??
+          json['overnightStart'] ??
+          json['overnight_cutoff'] ??
+          json['overnightCutoff'],
+    );
+    final end = _str(json['overnight_end'] ?? json['overnightEnd']);
 
     return CheckoutPreviewRates(
       flatRate: _dbl(json['flat_rate'] ?? json['flatRate']),
@@ -39,9 +51,8 @@ class CheckoutPreviewRates extends Equatable {
       lostTicketFee: _dbl(
         json['lost_ticket_fee'] ?? json['lostTicketFee'],
       ),
-      overnightCutoff: _str(
-        json['overnight_cutoff'] ?? json['overnightCutoff'],
-      ),
+      overnightStart: start.isEmpty ? '01:30' : start,
+      overnightEnd: end.isEmpty ? '06:00' : end,
     );
   }
 
@@ -58,6 +69,7 @@ class CheckoutPreviewRates extends Equatable {
         succeedingRate,
         overnightFee,
         lostTicketFee,
-        overnightCutoff,
+        overnightStart,
+        overnightEnd,
       ];
 }

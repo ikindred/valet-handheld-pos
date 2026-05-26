@@ -31,6 +31,17 @@ void main() {
     expect(detail.vehicleTypeRates.first.fees.succeedingRate, 50);
   });
 
+  test('AreaDetail parses overnight_start and overnight_end', () {
+    final detail = AreaDetail.fromResponseData({
+      'flatRate': 100,
+      'overnight_start': '01:30',
+      'overnight_end': '05:30',
+    });
+    expect(detail, isNotNull);
+    expect(detail!.overnightTimes.start, '01:30');
+    expect(detail.overnightTimes.end, '05:30');
+  });
+
   test('AreaDetail parses levels and slot availability', () {
     final detail = AreaDetail.fromResponseData({
       'flatRate': 100,

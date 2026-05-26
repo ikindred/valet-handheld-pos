@@ -86,21 +86,25 @@ class _PrimaryFooterButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.busy = false,
+    this.enabled = true,
   });
 
   final String label;
   final VoidCallback onPressed;
   final bool busy;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: CheckInCompactTokens.footerButtonHeight,
       child: FilledButton(
-        onPressed: busy ? null : onPressed,
+        onPressed: busy || !enabled ? null : onPressed,
         style: FilledButton.styleFrom(
           backgroundColor: const Color(0xFFF68D00),
+          disabledBackgroundColor: const Color(0xFFE8E8E8),
           foregroundColor: Colors.white,
+          disabledForegroundColor: const Color(0xFF9E9E9E),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
@@ -169,6 +173,7 @@ class CheckInVehicleConditionFooter extends StatelessWidget {
         Expanded(
           child: _PrimaryFooterButton(
             label: 'Next: Review & Print',
+            enabled: hasCustomerSignature,
             onPressed: onNext,
           ),
         ),

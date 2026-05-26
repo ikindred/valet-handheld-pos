@@ -1,6 +1,4 @@
-import 'package:intl/intl.dart';
-
-import '../../core/formatting/peso_currency.dart';
+import '../../features/dashboard/domain/dashboard_recent_format.dart';
 
 /// Default area capacity when API omits `total_slots`.
 const int kDefaultDashboardTotalSlots = 30;
@@ -147,6 +145,10 @@ class DashboardSummaryRecent {
     this.amount,
     this.timeIn,
     this.timeOut,
+    this.vehicleBrand,
+    this.vehicleModel,
+    this.vehicleColor,
+    this.parkingSlot,
   });
 
   final String id;
@@ -156,12 +158,36 @@ class DashboardSummaryRecent {
   final num? amount;
   final String? timeIn;
   final String? timeOut;
+  final String? vehicleBrand;
+  final String? vehicleModel;
+  final String? vehicleColor;
+  final String? parkingSlot;
 
   static DashboardSummaryRecent? fromJson(Map<String, dynamic> json) {
     final id = (json['id'] ?? json['ticket_id'] ?? json['ticketId'] ?? '')
         .toString()
         .trim();
     if (id.isEmpty) return null;
+
+    final vehicle = _asMap(json['vehicle']);
+    String? brand;
+    String? model;
+    String? color;
+    if (vehicle != null) {
+      brand = _str(vehicle['brand']);
+      model = _str(vehicle['model']);
+      color = _str(vehicle['color']);
+    }
+    brand ??= _str(json['vehicle_brand'] ?? json['vehicleBrand']);
+    model ??= _str(json['vehicle_model'] ?? json['vehicleModel']);
+    color ??= _str(json['vehicle_color'] ?? json['vehicleColor']);
+
+    final parking = _asMap(json['parking']);
+    var slot = _str(json['parking_slot'] ?? json['parkingSlot'] ?? json['slot']);
+    if ((slot == null || slot.isEmpty) && parking != null) {
+      slot = _str(parking['slot']);
+    }
+
     return DashboardSummaryRecent(
       id: id,
       ticketNumber: (json['ticket_number'] ?? json['ticketNumber'] ?? id)
@@ -175,26 +201,42 @@ class DashboardSummaryRecent {
           : num.tryParse('${json['amount']}'),
       timeIn: (json['time_in'] ?? json['timeIn'])?.toString(),
       timeOut: (json['time_out'] ?? json['timeOut'])?.toString(),
+      vehicleBrand: brand,
+      vehicleModel: model,
+      vehicleColor: color,
+      parkingSlot: slot,
     );
   }
 
+  static Map<String, dynamic>? _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
+  }
+
+  static String? _str(dynamic value) {
+    final s = value?.toString().trim() ?? '';
+    return s.isEmpty ? null : s;
+  }
+
   DashboardRecentRow toRecentRow() {
-    final timeFmt = DateFormat.jm();
     final plate =
         plateNumber.isNotEmpty && plateNumber != '—' ? plateNumber : ticketNumber;
     final upper = status.toUpperCase();
     final completed = upper == 'COMPLETED' || upper == 'LOST';
+    final line1 = DashboardRecentFormat.vehicleLine(
+      brand: vehicleBrand,
+      model: vehicleModel,
+      color: vehicleColor,
+    );
 
     if (completed) {
       final out = DateTime.tryParse(timeOut ?? '') ?? DateTime.now();
-      final feeStr = amount != null
-          ? '${PesoCurrency.symbol}${NumberFormat('#,##0').format(amount)}'
-          : '—';
       return DashboardRecentRow(
         ticketId: id,
         plate: plate,
-        line1: ticketNumber,
-        line2: 'Out at ${timeFmt.format(out.toLocal())} — $feeStr',
+        line1: line1,
+        line2: DashboardRecentFormat.checkedOutSubline(out.toLocal(), amount),
         isCheckedOut: true,
       );
     }
@@ -203,8 +245,11 @@ class DashboardSummaryRecent {
     return DashboardRecentRow(
       ticketId: id,
       plate: plate,
-      line1: ticketNumber,
-      line2: 'In at ${timeFmt.format(inn.toLocal())} — $ticketNumber',
+      line1: line1,
+      line2: DashboardRecentFormat.parkedSubline(
+        inn.toLocal(),
+        slot: parkingSlot,
+      ),
       isCheckedOut: false,
     );
   }

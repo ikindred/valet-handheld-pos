@@ -611,7 +611,6 @@ LIMIT 1
     required String timeOut,
     required bool isOvernight,
     required bool ticketLost,
-    required Map<String, dynamic> preview,
     required List<Map<String, dynamic>> conditionCheckout,
     String? driverOut,
   }) async {
@@ -625,7 +624,6 @@ LIMIT 1
       'time_out': timeOut,
       'is_overnight': isOvernight,
       'ticket_lost': ticketLost,
-      'preview': preview,
       'condition_checkout': conditionCheckout,
       if (driverOut != null && driverOut.trim().isNotEmpty)
         'driver_out': driverOut.trim(),
@@ -667,12 +665,6 @@ LIMIT 1
       throw StateError('Queued checkout/finalize missing time_out');
     }
 
-    final previewRaw = body['preview'];
-    if (previewRaw is! Map) {
-      throw StateError('Queued checkout/finalize missing preview');
-    }
-    final preview = Map<String, dynamic>.from(previewRaw);
-
     final isOvernight = body['is_overnight'] == true;
     final ticketLost = body['ticket_lost'] == true;
 
@@ -693,7 +685,6 @@ LIMIT 1
       timeOut: timeOut,
       isOvernight: isOvernight,
       ticketLost: ticketLost,
-      preview: preview,
       driverOut: driverOut,
       conditionCheckout: conditionList,
     );

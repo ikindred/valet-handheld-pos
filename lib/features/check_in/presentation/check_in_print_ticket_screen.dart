@@ -50,7 +50,7 @@ class _CheckInPrintTicketScreenState extends State<CheckInPrintTicketScreen> {
       parkingSlot: state.parkingSlot,
       valetTypeLabel: _valetTypeLabel(state.valetServiceType),
       specialRequest: state.specialInstructions,
-      hasSignature: state.hasCustomerSignature,
+      hasSignature: state.isCustomerSignatureComplete,
       qrCode: state.ticketNumber,
     );
     return withBranchName(auth, base);

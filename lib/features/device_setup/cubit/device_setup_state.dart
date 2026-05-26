@@ -67,43 +67,19 @@ class DeviceModel extends Equatable {
         'serialNumber',
         'serial_number',
       ]),
-      branchId: _str(json, const [
-        'branchId',
-        'branch_id',
-      ]),
-      areaId: _str(json, const [
-        'areaId',
-        'area_id',
-      ]),
+      branchId: _nestedId(json, 'branch', const ['branchId', 'branch_id']),
+      areaId: _nestedId(json, 'area', const ['areaId', 'area_id']),
       isActive: _bool(json['is_active'] ?? json['isActive']),
     );
   }
 
-  /// `POST /devices/claim` body per [docs/MOBILE_INTEGRATION_GUIDE.md] plus
-  /// extended name/serial fields when the API returns them.
+  /// `POST /devices/claim` — successful HTTP 200 means setup is complete (login next).
+  /// `status: OFFLINE` is connectivity only, not "wait for activation".
   factory DeviceModel.fromClaimResponse(
     Map<String, dynamic> json, {
-    required String selectedServerDeviceId,
+    String selectedServerDeviceId = '',
   }) {
-    final status = (json['status'] as String?)?.toUpperCase();
-    final bool isActive;
-    if (json['is_active'] is bool) {
-      isActive = json['is_active']! as bool;
-    } else if (json['isActive'] is bool) {
-      isActive = json['isActive']! as bool;
-    } else if (status != null && status.isNotEmpty) {
-      isActive = status == 'ONLINE';
-    } else {
-      isActive = true;
-    }
-
-    final serverDeviceId = selectedServerDeviceId.isNotEmpty
-        ? selectedServerDeviceId
-        : _str(json, const [
-            'server_device_id',
-            'serverDeviceId',
-            'id',
-          ]);
+    final serverDeviceId = _serverIdFromClaimResponse(json, selectedServerDeviceId);
 
     return DeviceModel(
       serverDeviceId: serverDeviceId,
@@ -126,16 +102,50 @@ class DeviceModel extends Equatable {
         'serialNumber',
         'serial_number',
       ]),
-      branchId: _str(json, const [
-        'branchId',
-        'branch_id',
-      ]),
-      areaId: _str(json, const [
-        'areaId',
-        'area_id',
-      ]),
-      isActive: isActive,
+      branchId: _nestedId(json, 'branch', const ['branchId', 'branch_id']),
+      areaId: _nestedId(json, 'area', const ['areaId', 'area_id']),
+      isActive: _connectivityActive(json),
     );
+  }
+
+  /// Authoritative server row UUID from claim `id` (not hardware `deviceId`).
+  static String _serverIdFromClaimResponse(
+    Map<String, dynamic> json,
+    String selectedSlotId,
+  ) {
+    final id = json['id']?.toString().trim() ?? '';
+    if (id.isNotEmpty) return id;
+    final fromKeys = _str(json, const [
+      'server_device_id',
+      'serverDeviceId',
+    ]);
+    if (fromKeys.isNotEmpty) return fromKeys;
+    return selectedSlotId.trim();
+  }
+
+  static String _nestedId(
+    Map<String, dynamic> json,
+    String objectKey,
+    List<String> topLevelKeys,
+  ) {
+    final nested = json[objectKey];
+    if (nested is Map) {
+      final map = nested is Map<String, dynamic>
+          ? nested
+          : Map<String, dynamic>.from(nested);
+      final id = map['id']?.toString().trim() ?? '';
+      if (id.isNotEmpty) return id;
+    }
+    return _str(json, topLevelKeys);
+  }
+
+  /// Records server connectivity when present; does not gate claim completion.
+  static bool _connectivityActive(Map<String, dynamic> json) {
+    if (json['is_active'] is bool) return json['is_active']! as bool;
+    if (json['isActive'] is bool) return json['isActive']! as bool;
+    final status = (json['status'] as String?)?.toUpperCase();
+    if (status == null || status.isEmpty) return true;
+    return status == 'ONLINE';
   }
 
   @override
@@ -177,34 +187,6 @@ final class DeviceSetupDevicesLoaded extends DeviceSetupState {
 
 final class DeviceSetupClaiming extends DeviceSetupState {
   const DeviceSetupClaiming();
-}
-
-final class DeviceSetupPendingActivation extends DeviceSetupState {
-  const DeviceSetupPendingActivation({
-    required this.displayDeviceId,
-    this.selectedServerDeviceId,
-    this.polling = false,
-  });
-
-  /// Shown to staff / admin (e.g. app `device_id` from [DeviceIdService.getOrCreate]).
-  final String displayDeviceId;
-
-  /// Server slot UUID we are waiting on until `is_active` is true.
-  final String? selectedServerDeviceId;
-
-  final bool polling;
-
-  DeviceSetupPendingActivation copyWith({bool? polling}) {
-    return DeviceSetupPendingActivation(
-      displayDeviceId: displayDeviceId,
-      selectedServerDeviceId: selectedServerDeviceId,
-      polling: polling ?? this.polling,
-    );
-  }
-
-  @override
-  List<Object?> get props =>
-      [displayDeviceId, selectedServerDeviceId, polling];
 }
 
 final class DeviceClaimSuccess extends DeviceSetupState {
