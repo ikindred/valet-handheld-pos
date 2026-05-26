@@ -36,7 +36,7 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
   bool _scanning = false;
   String? _error;
   PrinterDevice? _selected;
-  PrinterPaperWidth _paperWidth = PrinterPaperWidth.mm58;
+  PrinterPaperWidth _paperWidth = PrinterPaperWidth.mm80;
   bool _preferBle = false;
   PrinterPrefs? _prefs;
 

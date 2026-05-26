@@ -135,6 +135,7 @@ Future<CheckInReceiptData> withBranchName(
     specialRequest: data.specialRequest,
     hasSignature: data.hasSignature,
     qrCode: data.qrCode,
+    mallHours: data.mallHours,
   );
 }
 

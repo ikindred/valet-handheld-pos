@@ -2,7 +2,7 @@
 String sanitizeEscPosText(String input) {
   var s = input;
   const replacements = <String, String>{
-    '\u20B1': 'P', // Philippine peso — not in printer charset
+    '\u20B1': 'PHP ', // Philippine peso — not in printer charset
     '\u2014': '-', // em dash
     '\u2013': '-', // en dash
     '\u2212': '-', // minus

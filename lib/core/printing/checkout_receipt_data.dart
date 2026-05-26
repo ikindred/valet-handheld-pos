@@ -25,6 +25,7 @@ class CheckoutReceiptData {
     required this.totalPesosLabel,
     required this.tenderedPesosLabel,
     required this.changePesosLabel,
+    required this.changePesos,
     required this.branchName,
     required this.mallHours,
     this.invoiceNumber,
@@ -48,9 +49,12 @@ class CheckoutReceiptData {
   final String totalPesosLabel;
   final String tenderedPesosLabel;
   final String changePesosLabel;
+  final double changePesos;
   final String branchName;
   final String mallHours;
   final String? invoiceNumber;
+
+  bool get changeIsNonZero => changePesos > 0.009;
 
   factory CheckoutReceiptData.fromSnapshot(
     CheckoutReceiptSnapshot snap, {
@@ -61,11 +65,9 @@ class CheckoutReceiptData {
 
     final timeIn = _formatUnix(snap.timeInUnix);
     final timeOut = _formatUnix(snap.timeOutUnix);
-    final duration = snap.durationLabel?.trim().isNotEmpty == true
-        ? snap.durationLabel!.trim()
-        : CheckoutReceiptSnapshot.durationLabelFromMinutes(
-            snap.durationMinutes,
-          );
+    final duration = snap.durationMinutes > 0
+        ? ReceiptPrintFormat.durationLabel(snap.durationMinutes)
+        : '—';
 
     final flatLabel = snap.flatRateLabel?.trim().isNotEmpty == true
         ? snap.flatRateLabel!.trim()
@@ -76,31 +78,22 @@ class CheckoutReceiptData {
     final succeedingAmount = snap.succeedingPesos;
     final showSucceeding = succeedingLabel.isNotEmpty && succeedingAmount > 0.009;
 
-    var flatDisplay = snap.flatPesos;
-    if (flatDisplay < 0.009 && snap.totalPesos > 0.009 && !showSucceeding) {
-      flatDisplay = snap.totalPesos;
-    }
-
     final branch = (branchDisplayName ?? snap.branchLine ?? '').trim();
     final branchHeader = branch.isEmpty ? 'Valet Master' : branch;
 
     return CheckoutReceiptData(
       ticketNumber: snap.ticketNumber,
       plateNumber:
-          snap.plateNumber.trim().isEmpty ? '—' : snap.plateNumber.trim(),
+          snap.plateNumber.trim().isEmpty ? '-' : snap.plateNumber.trim(),
       vehicleReceiptLine: snap.vehicleReceiptLine.trim(),
       timeInLabel: timeIn,
       timeOutLabel: timeOut,
       durationLabel: duration,
-      slotLine: snap.slotLine.trim().isEmpty ? '—' : snap.slotLine.trim(),
-      valetInLabel: (snap.valetName ?? '').trim().isEmpty
-          ? '—'
-          : snap.valetName!.trim(),
-      valetOutLabel: (snap.valetOutName ?? '').trim().isEmpty
-          ? '—'
-          : snap.valetOutName!.trim(),
+      slotLine: snap.slotLine.trim().isEmpty ? '-' : snap.slotLine.trim(),
+      valetInLabel: _driverLabel(snap.valetName),
+      valetOutLabel: _driverLabel(snap.valetOutName),
       flatRateLabel: flatLabel,
-      flatPesosLabel: pesoNum(flatDisplay),
+      flatPesosLabel: pesoNum(snap.flatPesos),
       succeedingLabel: showSucceeding ? succeedingLabel : '',
       succeedingPesosLabel: showSucceeding ? pesoNum(succeedingAmount) : '',
       showOvernight: snap.overnightApplied && snap.overnightPesos > 0.009,
@@ -108,9 +101,10 @@ class CheckoutReceiptData {
       totalPesosLabel: pesoNum(snap.totalPesos),
       tenderedPesosLabel: pesoNum(snap.amountTendered),
       changePesosLabel: pesoNum(snap.changePesos),
+      changePesos: snap.changePesos,
       branchName: branchHeader,
       mallHours: mallHours.trim().isEmpty
-          ? 'MONDAY – SUNDAY · 10:00AM – 9:00PM'
+          ? ReceiptTemplateCopy.defaultMallHours
           : mallHours.trim(),
       invoiceNumber: snap.invoiceNumber?.trim(),
     );
@@ -137,9 +131,7 @@ class CheckoutReceiptData {
     var durationLabel = '—';
     if (checkIn != null && checkOut != null) {
       final totalM = checkOut.difference(checkIn).inMinutes;
-      final h = totalM ~/ 60;
-      final m = totalM % 60;
-      durationLabel = h < 1 ? '${totalM}m' : '${h}h ${m}m';
+      durationLabel = ReceiptPrintFormat.durationLabel(totalM);
     }
 
     final total = (ticket.fee ?? 0).toDouble();
@@ -149,7 +141,7 @@ class CheckoutReceiptData {
     return CheckoutReceiptData(
       ticketNumber: ticket.id,
       plateNumber:
-          ticket.plateNumber.trim().isEmpty ? '—' : ticket.plateNumber.trim(),
+          ticket.plateNumber.trim().isEmpty ? '-' : ticket.plateNumber.trim(),
       vehicleReceiptLine:
           CheckoutReceiptSnapshot.vehicleReceiptLineFromTicket(ticket),
       timeInLabel: _formatUnix(timeInUnix),
@@ -158,7 +150,7 @@ class CheckoutReceiptData {
       slotLine: _slotLineFromParking(parking),
       valetInLabel: _plainDriverLabel(ticket.driverIn),
       valetOutLabel: _plainDriverLabel(ticket.driverOut),
-      flatRateLabel: 'Amount paid',
+      flatRateLabel: 'Flat rate',
       flatPesosLabel: pesoNum(total),
       succeedingLabel: '',
       succeedingPesosLabel: '',
@@ -167,25 +159,31 @@ class CheckoutReceiptData {
       totalPesosLabel: pesoNum(total),
       tenderedPesosLabel: pesoNum(total),
       changePesosLabel: pesoNum(0),
+      changePesos: 0,
       branchName: branchHeader,
       mallHours: mallHours.trim().isEmpty
-          ? 'MONDAY – SUNDAY · 10:00AM – 9:00PM'
+          ? ReceiptTemplateCopy.defaultMallHours
           : mallHours.trim(),
     );
   }
 
   static String _slotLineFromParking(TicketParkingInfo? parking) {
-    if (parking == null || !parking.hasAny) return '—';
+    if (parking == null || !parking.hasAny) return '-';
     final parts = <String>[];
     if (parking.areaLabel != '—') parts.add(parking.areaLabel);
     if (parking.levelLabel != '—') parts.add(parking.levelLabel);
     if (parking.slotLabel != '—') parts.add(parking.slotLabel);
-    return parts.isEmpty ? '—' : parts.join(' · ');
+    return parts.isEmpty ? '-' : parts.join(' · ');
+  }
+
+  static String _driverLabel(String? raw) {
+    final t = raw?.trim() ?? '';
+    return t.isEmpty ? '-' : t;
   }
 
   static String _plainDriverLabel(String? raw) {
     final t = raw?.trim() ?? '';
-    if (t.isEmpty || t.startsWith('{')) return '—';
+    if (t.isEmpty || t.startsWith('{')) return '-';
     return t;
   }
 

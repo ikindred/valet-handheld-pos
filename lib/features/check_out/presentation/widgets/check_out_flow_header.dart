@@ -23,7 +23,7 @@ class CheckOutFlowHeader extends StatelessWidget {
     'VEHICLE REVIEW — INFO',
     'VEHICLE REVIEW — CONDITION',
     'PAYMENT — SUMMARY & COLLECT',
-    'PAYMENT — COMPLETE',
+    'CHECKOUT SUMMARY',
   ];
 
   static const Color _headerSurface = Color(0xFFFAFAFA);
@@ -34,9 +34,13 @@ class CheckOutFlowHeader extends StatelessWidget {
     final title = switch (safeStep) {
       1 || 2 => 'VEHICLE REVIEW',
       3 => 'PAYMENT',
+      4 => 'CHECKOUT SUMMARY',
       _ => stepTitles[safeStep],
     };
     final stepLabel = safeStep + 1;
+    final headerCaption = safeStep == 4
+        ? title
+        : 'STEP $stepLabel OF $totalSteps — $title';
     final hairline = Colors.black.withValues(alpha: 0.13);
 
     return SizedBox(
@@ -59,7 +63,7 @@ class CheckOutFlowHeader extends StatelessWidget {
                 mainAxisSize: MainAxisSize.max,
                 children: [
                   Text(
-                    'STEP $stepLabel OF $totalSteps — $title',
+                    headerCaption,
                     textAlign: TextAlign.left,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,

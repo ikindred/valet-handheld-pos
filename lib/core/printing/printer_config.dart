@@ -18,7 +18,7 @@ extension PrinterPaperWidthX on PrinterPaperWidth {
       };
 
   static PrinterPaperWidth fromStored(String? value) {
-    return value == 'mm80' ? PrinterPaperWidth.mm80 : PrinterPaperWidth.mm58;
+    return value == 'mm58' ? PrinterPaperWidth.mm58 : PrinterPaperWidth.mm80;
   }
 
   String get storageValue => switch (this) {

@@ -10,6 +10,7 @@ import '../time/philippine_time.dart';
 import 'check_in_receipt_data.dart';
 import 'checkout_receipt_data.dart';
 import 'esc_pos_text_sanitize.dart';
+import 'receipt_print_format.dart';
 
 /// Bitmap receipt tuned for 2 in (58 mm) portable printers (e.g. HPRT HM-A300).
 class ReceiptRasterBuilder {
@@ -29,6 +30,10 @@ class ReceiptRasterBuilder {
   /// Reserve dots on the right so wrapped lines never clip (HM-A300).
   static const _wrapSafetyPx = 48;
 
+  static const _checkInLogoWidthPx = 160;
+  static const _checkInValueColumnX = 100;
+  static const _checkInQrSizePx = 200;
+
   int get _widthPx => paperSize.width;
 
   int get _contentWidthPx => _widthPx - (_marginH + _padH) * 2;
@@ -47,12 +52,16 @@ class ReceiptRasterBuilder {
   List<int> buildCheckInPartEscPosBytes(
     CheckInReceiptData data,
     CapabilityProfile profile,
-    int part,
-  ) {
+    int part, {
+    img.Image? logo,
+  }) {
     final gen = Generator(paperSize, profile);
     return [
       ...gen.reset(),
-      ...gen.image(buildCheckInPartImage(data, part), align: PosAlign.center),
+      ...gen.image(
+        buildCheckInPartImage(data, part, logo: logo),
+        align: PosAlign.center,
+      ),
       ...gen.feed(3),
     ];
   }
@@ -82,74 +91,90 @@ class ReceiptRasterBuilder {
     CheckoutReceiptData data, {
     img.Image? logo,
   }) {
-    final branch = sanitizeEscPosText(data.branchName);
-    final blocks = <_Block>[
+    return [
+      ..._brandHeader(data.branchName, logo: logo),
+      const _RuleBlock(),
+      const _TextBlock('CHECKOUT RECEIPT', center: true, bold: true),
+      const _RuleBlock(),
+      const _GapBlock(6),
+      _TwoColumnFieldBlock('Ticket', data.ticketNumber),
+      _TwoColumnFieldBlock('Plate', data.plateNumber),
+      if (data.vehicleReceiptLine.isNotEmpty &&
+          data.vehicleReceiptLine != '-' &&
+          data.vehicleReceiptLine != '—')
+        _TwoColumnFieldBlock('Vehicle', data.vehicleReceiptLine),
+      if (data.invoiceNumber != null && data.invoiceNumber!.isNotEmpty)
+        _TwoColumnFieldBlock('Invoice', data.invoiceNumber!),
+      _TwoColumnFieldBlock('Time in', data.timeInLabel),
+      _TwoColumnFieldBlock('Time out', data.timeOutLabel),
+      _TwoColumnFieldBlock('Duration', data.durationLabel),
+      _TwoColumnFieldBlock('Parking', data.slotLine),
+      _TwoColumnFieldBlock('Valet in', data.valetInLabel),
+      _TwoColumnFieldBlock('Valet out', data.valetOutLabel),
+      const _GapBlock(4),
+      const _RuleBlock(),
+      const _GapBlock(4),
+      _TwoColumnFieldBlock(data.flatRateLabel, data.flatPesosLabel),
+      if (data.succeedingLabel.isNotEmpty)
+        _TwoColumnFieldBlock(data.succeedingLabel, data.succeedingPesosLabel),
+      if (data.showOvernight)
+        _TwoColumnFieldBlock('Overnight', data.overnightPesosLabel),
+      _TwoColumnFieldBlock('Total', data.totalPesosLabel, boldValue: true),
+      _TwoColumnFieldBlock('Cash tendered', data.tenderedPesosLabel),
+      _TwoColumnFieldBlock(
+        'Change',
+        data.changePesosLabel,
+        boldValue: data.changeIsNonZero,
+      ),
+      ..._checkoutFooter(mallHours: data.mallHours),
+      const _GapBlock(10),
+    ];
+  }
+
+  List<_Block> _brandHeader(String branchName, {img.Image? logo}) {
+    final branch = sanitizeEscPosText(branchName);
+    return [
       if (logo != null) _LogoBlock(logo),
+      const _TextBlock(
+        ReceiptTemplateCopy.brandName,
+        center: true,
+        bold: true,
+      ),
       if (branch.isNotEmpty && branch.toLowerCase() != 'valet master')
-        _TextBlock(branch, center: true, bold: true),
-      const _TextBlock('VALET MASTER', center: true, bold: true),
+        _TextBlock(branch, center: true),
       const _GapBlock(6),
       const _RuleBlock(),
       const _GapBlock(8),
-      const _SectionTitleBlock('CHECKOUT RECEIPT'),
-      const _GapBlock(4),
-      _FieldBlock('Ticket No.', data.ticketNumber, highlight: true),
-      _FieldBlock('Plate', data.plateNumber, highlight: true),
-      if (data.vehicleReceiptLine.isNotEmpty &&
-          data.vehicleReceiptLine != '—')
-        _FieldBlock('Vehicle', data.vehicleReceiptLine),
-      _FieldBlock('Parking', data.slotLine),
-      if (data.invoiceNumber != null && data.invoiceNumber!.isNotEmpty)
-        _FieldBlock('Invoice', data.invoiceNumber!),
-      _FieldBlock('Time in', data.timeInLabel),
-      _FieldBlock('Time out', data.timeOutLabel),
-      _FieldBlock('Duration', data.durationLabel),
-      _FieldBlock('Valet in', data.valetInLabel),
-      _FieldBlock('Valet out', data.valetOutLabel),
-      const _GapBlock(6),
-      const _RuleBlock(),
-      const _GapBlock(4),
-      _FieldBlock(data.flatRateLabel, data.flatPesosLabel),
-      if (data.succeedingLabel.isNotEmpty)
-        _FieldBlock(data.succeedingLabel, data.succeedingPesosLabel),
-      if (data.showOvernight)
-        _FieldBlock('Overnight', data.overnightPesosLabel),
-      _FieldBlock('Total', data.totalPesosLabel, highlight: true),
-      _FieldBlock('Cash tendered', data.tenderedPesosLabel),
-      _FieldBlock('Change', data.changePesosLabel, highlight: true),
-      const _GapBlock(6),
-      const _RuleBlock(),
-      const _GapBlock(4),
-      const _TextBlock(
-        'This is not an Official Receipt (OR).',
-        center: true,
-        small: true,
-      ),
-      const _GapBlock(4),
-      const _TextBlock(
-        'THANK YOU FOR USING VALET MASTER',
-        center: true,
-        bold: true,
-        small: true,
-      ),
-      _TextBlock(data.mallHours, center: true, small: true),
-      const _GapBlock(10),
     ];
-    return blocks;
   }
+
+  List<_Block> _checkoutFooter({required String mallHours}) => [
+        const _GapBlock(6),
+        const _RuleBlock(),
+        const _GapBlock(4),
+        const _TextBlock(
+          ReceiptTemplateCopy.orDisclaimerNote,
+          center: true,
+          small: true,
+        ),
+        const _GapBlock(4),
+        const _TextBlock(
+          ReceiptTemplateCopy.thankYouLine,
+          center: true,
+          bold: true,
+        ),
+        _TextBlock(mallHours, center: true, small: true),
+      ];
 
   List<int> buildTestEscPosBytes({
     required CapabilityProfile profile,
     required String branchName,
     required String staffLabel,
+    img.Image? logo,
   }) {
     final gen = Generator(paperSize, profile);
     final blocks = <_Block>[
-      _HeaderBlock(sanitizeEscPosText(branchName)),
-      _TextBlock('VALET MASTER', center: true, bold: true),
-      const _GapBlock(4),
-      const _RuleBlock(),
-      const _GapBlock(6),
+      ..._brandHeader(branchName, logo: logo),
       _TextBlock(staffLabel),
       const _GapBlock(8),
     ];
@@ -170,18 +195,46 @@ class ReceiptRasterBuilder {
     return _render(blocks);
   }
 
-  img.Image buildCheckInPartImage(CheckInReceiptData data, int part) {
-    return _render(_blocksForPart(data, part));
+  img.Image buildCheckInPartImage(
+    CheckInReceiptData data,
+    int part, {
+    img.Image? logo,
+  }) {
+    return _render(_blocksForPart(data, part, logo: logo));
   }
 
-  List<_Block> _blocksForPart(CheckInReceiptData data, int part) {
-    final header = <_Block>[
-      _HeaderBlock(sanitizeEscPosText(data.branchName)),
-      _TextBlock('VALET MASTER', center: true, bold: true),
+  List<_Block> _checkInBrandHeader(String branchName, {img.Image? logo}) {
+    final branch = sanitizeEscPosText(branchName);
+    return [
+      if (logo != null)
+        _LogoBlock(logo, displayWidth: _checkInLogoWidthPx)
+      else
+        const _GapBlock(8),
+      const _TextBlock(
+        ReceiptTemplateCopy.brandName,
+        center: true,
+        bold: true,
+      ),
+      if (branch.isNotEmpty && branch.toLowerCase() != 'valet master')
+        _TextBlock(branch, center: true),
       const _GapBlock(6),
-      const _RuleBlock(),
+      const _DashedRuleBlock(),
       const _GapBlock(8),
     ];
+  }
+
+  static String _checkInQrPayload(CheckInReceiptData data) {
+    final qr = data.qrCode?.trim();
+    if (qr != null && qr.isNotEmpty) return qr;
+    return data.ticket.id.trim();
+  }
+
+  List<_Block> _blocksForPart(
+    CheckInReceiptData data,
+    int part, {
+    img.Image? logo,
+  }) {
+    final header = _checkInBrandHeader(data.branchName, logo: logo);
     return switch (part) {
       1 => [
           ...header,
@@ -198,6 +251,7 @@ class ReceiptRasterBuilder {
             title: 'CUSTOMER COPY',
             data: data,
             includeQr: true,
+            includeThankYouFooter: true,
           ),
           const _GapBlock(10),
         ],
@@ -214,8 +268,9 @@ class ReceiptRasterBuilder {
     required String title,
     required CheckInReceiptData data,
     required bool includeQr,
+    bool includeThankYouFooter = false,
   }) {
-    final ticketId = data.ticket.id.trim();
+    final ticketNo = _checkInQrPayload(data);
     final plate = data.ticket.plateNumber.trim();
     final vehicle = _vehicleLine(data);
     final slot = _slotLine(data);
@@ -226,60 +281,90 @@ class ReceiptRasterBuilder {
     final driver = data.ticket.driverIn?.trim() ?? '';
 
     final blocks = <_Block>[
-      _SectionTitleBlock(title),
-      const _GapBlock(4),
-      _FieldBlock('Ticket No.', ticketId, highlight: true),
-      _FieldBlock('Plate', plate.isEmpty ? 'N/A' : plate),
-      if (vehicle.isNotEmpty) _FieldBlock('Vehicle', vehicle),
+      const _TextBlock('CHECK-IN', bold: true),
+      _TextBlock(title, bold: true),
+      const _DashedRuleBlock(),
+      const _GapBlock(6),
+      _CheckInRowBlock('Ticket', ticketNo),
+      _CheckInRowBlock('Plate', plate.isEmpty ? 'N/A' : plate),
+      if (vehicle.isNotEmpty) _CheckInRowBlock('Vehicle', vehicle),
       if (data.valetTypeLabel?.trim().isNotEmpty == true)
-        _FieldBlock('Valet type', data.valetTypeLabel!.trim()),
-      if (slot.isNotEmpty) _FieldBlock('Parking', slot),
-      _FieldBlock('Time in', timeIn),
-      if (contact.isNotEmpty) _FieldBlock('Contact', contact),
+        _CheckInRowBlock('Type', data.valetTypeLabel!.trim()),
+      if (slot.isNotEmpty) _CheckInRowBlock('Slot', slot),
+      _CheckInRowBlock('Time in', timeIn),
+      const _DashedRuleBlock(),
+      const _GapBlock(4),
+      if (contact.isNotEmpty) _CheckInRowBlock('Contact', contact),
       if (data.customerName?.trim().isNotEmpty == true)
-        _FieldBlock('Guest', data.customerName!.trim()),
-      if (driver.isNotEmpty) _FieldBlock('Valet driver', driver),
-      if (belongings.isNotEmpty) _FieldBlock('Belongings', belongings),
-      if (damage.isNotEmpty) _FieldBlock('Damage', damage),
+        _CheckInRowBlock('Guest', data.customerName!.trim()),
+      if (driver.isNotEmpty) _CheckInRowBlock('Valet', driver),
+      if (contact.isNotEmpty ||
+          data.customerName?.trim().isNotEmpty == true ||
+          driver.isNotEmpty)
+        const _DashedRuleBlock(),
+      if (belongings.isNotEmpty) ...[
+        const _GapBlock(4),
+        _LabeledWrapBlock('Belongings', belongings),
+      ],
+      if (damage.isNotEmpty) _LabeledWrapBlock('Damage', damage),
       if (data.specialRequest?.trim().isNotEmpty == true)
-        _FieldBlock('Notes', data.specialRequest!.trim()),
-      _FieldBlock(
+        _LabeledWrapBlock('Notes', data.specialRequest!.trim()),
+      _CheckInRowBlock(
         'Signature',
         data.hasSignature ? 'Signed' : 'Pending',
       ),
     ];
 
-    final qrPayload = (data.qrCode ?? ticketId).trim();
-    if (includeQr && qrPayload.isNotEmpty) {
+    if (includeQr && ticketNo.isNotEmpty) {
       blocks.addAll([
+        const _DashedRuleBlock(),
         const _GapBlock(8),
-        _QrBlock(qrPayload),
+        _QrBlock(ticketNo, sizePx: _checkInQrSizePx),
+        const _GapBlock(8),
+        const _TextBlock(
+          ReceiptTemplateCopy.scanQrHint,
+          center: true,
+        ),
+        const _DashedRuleBlock(),
+      ]);
+    } else {
+      blocks.add(const _DashedRuleBlock());
+    }
+
+    if (includeThankYouFooter) {
+      blocks.addAll([
         const _GapBlock(4),
-        const _TextBlock('Scan at check-out', center: true, small: true),
+        const _TextBlock(
+          ReceiptTemplateCopy.thankYouLine,
+          center: true,
+          bold: true,
+        ),
+        _TextBlock(data.mallHours, center: true),
       ]);
     }
 
-    blocks.addAll([
-      const _GapBlock(6),
+    blocks.add(
       const _TextBlock(
-        'This is not an Official Receipt (OR).',
+        ReceiptTemplateCopy.orDisclaimerNote,
         center: true,
         small: true,
       ),
-    ]);
+    );
     return blocks;
   }
 
   List<_Block> _keyTagBlocks(CheckInReceiptData data) {
-    final ticketId = data.ticket.id.trim();
+    final ticketId = _checkInQrPayload(data);
     final plate = data.ticket.plateNumber.trim();
     final slot = _slotLine(data);
     return [
-      _KeyTagBlock(
-        ticketId: ticketId,
-        plate: plate,
-        slot: slot,
-      ),
+      const _TextBlock('CHECK-IN', bold: true),
+      const _TextBlock('KEY TAG', bold: true),
+      const _DashedRuleBlock(),
+      const _GapBlock(6),
+      _TextBlock(ticketId, bold: true, large: true),
+      if (plate.isNotEmpty) _TextBlock(plate, bold: true, large: true),
+      if (slot.isNotEmpty) _TextBlock(slot),
     ];
   }
 
@@ -301,8 +386,12 @@ class ReceiptRasterBuilder {
 
   // ── Layout primitives ─────────────────────────────────────────────
 
-  List<String> wrapText(String text, img.BitmapFont font) {
-    final safe = math.max(48, _textWidthPx);
+  List<String> wrapText(
+    String text,
+    img.BitmapFont font, {
+    int? maxWidthPx,
+  }) {
+    final safe = math.max(48, maxWidthPx ?? _textWidthPx);
     return _wrap(sanitizeEscPosText(text), safe, font);
   }
 
@@ -369,11 +458,20 @@ class ReceiptRasterBuilder {
     }
   }
 
-  void paintQr(img.Image out, String data, int topY) {
+  void paintDashedRule(img.Image out, int y) {
+    final left = _marginH;
+    final right = _widthPx - _marginH;
+    for (var x = left; x < right; x += 6) {
+      img.drawLine(out, x, y, math.min(x + 2, right), y, _black);
+    }
+  }
+
+  void paintQr(img.Image out, String data, int topY, {int? sizePx}) {
     final qrCode = QrCode(4, QrErrorCorrectLevel.L)..addData(data);
     final qrImage = QrImage(qrCode);
     final maxQr = _textWidthPx - 20;
-    final targetPx = math.min(maxQr, paperSize == PaperSize.mm58 ? 110 : 140);
+    final fallback = paperSize == PaperSize.mm58 ? 110 : 140;
+    final targetPx = sizePx ?? math.min(maxQr, fallback);
     final module = math.max(1, targetPx ~/ qrImage.moduleCount);
     final size = qrImage.moduleCount * module;
     final left = (_widthPx - size) ~/ 2;
@@ -508,7 +606,7 @@ class ReceiptRasterBuilder {
   static String _formatCheckIn(String iso) {
     if (iso.trim().isEmpty) return iso;
     final ph = PhilippineTime.fromApiIso(iso);
-    return DateFormat('MMM d, yyyy - h:mm a').format(ph);
+    return DateFormat('MMM d, yyyy h:mm a').format(ph);
   }
 }
 
@@ -546,22 +644,41 @@ class _RuleBlock extends _Block {
   }
 }
 
+class _DashedRuleBlock extends _Block {
+  const _DashedRuleBlock();
+
+  @override
+  int measure(ReceiptRasterBuilder b) => 13;
+
+  @override
+  int paint(ReceiptRasterBuilder b, img.Image out, int y) {
+    b.paintDashedRule(out, y + 6);
+    return measure(b);
+  }
+}
+
 class _TextBlock extends _Block {
   const _TextBlock(
     this.text, {
     this.center = false,
     this.bold = false,
     this.small = false,
+    this.large = false,
   });
 
   final String text;
   final bool center;
   final bool bold;
   final bool small;
+  final bool large;
 
-  img.BitmapFont _font(ReceiptRasterBuilder b) => img.arial_14;
+  img.BitmapFont _font(ReceiptRasterBuilder b) =>
+      large ? img.arial_24 : img.arial_14;
 
-  int _lineH() => small ? 15 : 17;
+  int _lineH() {
+    if (large) return 26;
+    return small ? 15 : 17;
+  }
 
   @override
   int measure(ReceiptRasterBuilder b) =>
@@ -575,27 +692,38 @@ class _TextBlock extends _Block {
     final x = b._marginH + b._padH;
     if (center) {
       b.paintCenteredRows(out, rows, y, font, lineHeight: lh);
+      if (bold) {
+        b.paintCenteredRows(out, rows, y, font, lineHeight: lh);
+      }
     } else {
       b.paintTextRows(out, rows, x, y, font, lineHeight: lh);
+      if (bold) {
+        b.paintTextRows(out, rows, x + 1, y, font, lineHeight: lh);
+      }
     }
     return measure(b);
   }
 }
 
 class _LogoBlock extends _Block {
-  const _LogoBlock(this.image);
+  const _LogoBlock(this.image, {this.displayWidth});
+
   final img.Image image;
+  final int? displayWidth;
+
+  int _targetWidth(ReceiptRasterBuilder b) =>
+      displayWidth ?? math.min(image.width, b._textWidthPx);
 
   @override
   int measure(ReceiptRasterBuilder b) {
-    final targetW = b._textWidthPx;
+    final targetW = _targetWidth(b);
     final h = (image.height * targetW / image.width).round();
     return h + 10;
   }
 
   @override
   int paint(ReceiptRasterBuilder b, img.Image out, int y) {
-    final targetW = b._textWidthPx;
+    final targetW = _targetWidth(b);
     final resized = image.width == targetW
         ? image
         : img.copyResize(image, width: targetW);
@@ -605,174 +733,148 @@ class _LogoBlock extends _Block {
   }
 }
 
-class _HeaderBlock extends _Block {
-  const _HeaderBlock(this.text);
-  final String text;
+class _CheckInRowBlock extends _Block {
+  const _CheckInRowBlock(this.label, this.value);
 
-  @override
-  int measure(ReceiptRasterBuilder b) => b.textBlockHeight(text, img.arial_24, lineHeight: 26) + 4;
-
-  @override
-  int paint(ReceiptRasterBuilder b, img.Image out, int y) {
-    final rows = b.wrapText(text, img.arial_24);
-    b.paintCenteredRows(out, rows, y, img.arial_24, lineHeight: 26);
-    return measure(b);
-  }
-}
-
-class _SectionTitleBlock extends _Block {
-  const _SectionTitleBlock(this.text);
-  final String text;
-
-  @override
-  int measure(ReceiptRasterBuilder b) => 24;
-
-  @override
-  int paint(ReceiptRasterBuilder b, img.Image out, int y) {
-    const h = 22;
-    final left = b._marginH;
-    final right = b._widthPx - b._marginH;
-    img.fillRect(out, left, y, right, y + h, ReceiptRasterBuilder._black);
-    final row = b.wrapText(text, img.arial_14).first;
-    img.drawStringCentered(
-      out,
-      img.arial_14,
-      row,
-      y: y + 5,
-      color: ReceiptRasterBuilder._white,
-    );
-    return measure(b);
-  }
-}
-
-class _FieldBlock extends _Block {
-  const _FieldBlock(this.label, this.value, {this.highlight = false});
   final String label;
   final String value;
-  final bool highlight;
-
-  static const _labelIndent = 4;
 
   @override
   int measure(ReceiptRasterBuilder b) {
-    final labelH = b.textBlockHeight(label.toUpperCase(), img.arial_14, lineHeight: 15);
-    final valueFont = highlight ? img.arial_24 : img.arial_14;
-    final valueH = b.textBlockHeight(value, valueFont, lineHeight: highlight ? 22 : 17);
-    return labelH + valueH + 6;
+    final valueText = sanitizeEscPosText(value);
+    final maxValueW =
+        b._widthPx - b._marginH - b._padH - ReceiptRasterBuilder._checkInValueColumnX;
+    final rows = b.wrapText(valueText, img.arial_14, maxWidthPx: maxValueW);
+    return 17 + rows.length * 17 + 2;
   }
 
   @override
   int paint(ReceiptRasterBuilder b, img.Image out, int y) {
-    final x = b._marginH + b._padH;
-    final labelRows = b.wrapText(label.toUpperCase(), img.arial_14);
-    b.paintTextRows(out, labelRows, x, y, img.arial_14, lineHeight: 15);
+    final left = b._marginH + b._padH;
+    final valueX = ReceiptRasterBuilder._checkInValueColumnX;
+    final labelText = sanitizeEscPosText(label);
+    final valueText = sanitizeEscPosText(value);
+    final valueFont = img.arial_14;
 
-    var yy = y + labelRows.length * 15 + 2;
-    final valueFont = highlight ? img.arial_24 : img.arial_14;
-    final valueRows = b.wrapText(value, valueFont);
-    final valueLh = highlight ? 22 : 17;
-    b.paintTextRows(
-      out,
-      valueRows,
-      x + _labelIndent,
-      yy,
-      valueFont,
-      lineHeight: valueLh,
+    img.drawString(out, img.arial_14, left, y + 1, '$labelText ');
+
+    final maxValueW = b._widthPx - b._marginH - b._padH - valueX;
+    final valueRows = b.wrapText(valueText, valueFont, maxWidthPx: maxValueW);
+    b.paintTextRows(out, valueRows, valueX, y, valueFont, lineHeight: 17);
+    return measure(b);
+  }
+}
+
+class _LabeledWrapBlock extends _Block {
+  const _LabeledWrapBlock(this.label, this.value);
+
+  final String label;
+  final String value;
+
+  @override
+  int measure(ReceiptRasterBuilder b) {
+    final labelText = '${sanitizeEscPosText(label)}:';
+    final valueText = sanitizeEscPosText(value);
+    final labelH = b.textBlockHeight(labelText, img.arial_14, lineHeight: 17);
+    final valueH = b.textBlockHeight(
+      valueText,
+      img.arial_14,
+      lineHeight: 17,
     );
+    return labelH + valueH + 4;
+  }
+
+  @override
+  int paint(ReceiptRasterBuilder b, img.Image out, int y) {
+    final left = b._marginH + b._padH;
+    final labelText = '${sanitizeEscPosText(label)}:';
+    final valueText = sanitizeEscPosText(value);
+    img.drawString(out, img.arial_14, left, y + 1, labelText);
+    final labelH = b.textBlockHeight(labelText, img.arial_14, lineHeight: 17);
+    final rows = b.wrapText(valueText, img.arial_14);
+    b.paintTextRows(out, rows, left, y + labelH, img.arial_14, lineHeight: 17);
+    return measure(b);
+  }
+}
+
+class _TwoColumnFieldBlock extends _Block {
+  const _TwoColumnFieldBlock(
+    this.label,
+    this.value, {
+    this.boldValue = false,
+  });
+
+  final String label;
+  final String value;
+  final bool boldValue;
+
+  @override
+  int measure(ReceiptRasterBuilder b) {
+    final left = b._marginH + b._padH;
+    final right = b._widthPx - b._marginH - b._padH;
+    final labelText = '${sanitizeEscPosText(label)}:';
+    final valueText = sanitizeEscPosText(value);
+    final valueFont = boldValue ? img.arial_24 : img.arial_14;
+    final lineH = boldValue ? 22 : 17;
+    final labelW = b.textWidth(labelText, img.arial_14);
+    final valueW = b.textWidth(valueText, valueFont);
+    if (valueW <= right - left - labelW - 4) return lineH + 4;
+    final rows = b.wrapText(valueText, valueFont);
+    return lineH + rows.length * lineH + 4;
+  }
+
+  @override
+  int paint(ReceiptRasterBuilder b, img.Image out, int y) {
+    final left = b._marginH + b._padH;
+    final right = b._widthPx - b._marginH - b._padH;
+    final labelText = '${sanitizeEscPosText(label)}:';
+    final valueText = sanitizeEscPosText(value);
+    final valueFont = boldValue ? img.arial_24 : img.arial_14;
+    final lineH = boldValue ? 22 : 17;
+
+    img.drawString(out, img.arial_14, left, y + 1, labelText);
+
+    final labelW = b.textWidth(labelText, img.arial_14);
+    final valueW = b.textWidth(valueText, valueFont);
+    if (valueW <= right - left - labelW - 4) {
+      img.drawString(
+        out,
+        valueFont,
+        right - valueW,
+        y + 1,
+        valueText,
+      );
+      return measure(b);
+    }
+
+    final rows = b.wrapText(valueText, valueFont);
+    b.paintTextRows(out, rows, left, y + lineH, valueFont, lineHeight: lineH);
     return measure(b);
   }
 }
 
 class _QrBlock extends _Block {
-  const _QrBlock(this.data);
-  final String data;
+  const _QrBlock(this.data, {this.sizePx});
 
-  @override
-  int measure(ReceiptRasterBuilder b) {
+  final String data;
+  final int? sizePx;
+
+  int _qrPixelSize(ReceiptRasterBuilder b) {
     final qrCode = QrCode(4, QrErrorCorrectLevel.L)..addData(data);
     final qrImage = QrImage(qrCode);
     final maxQr = b._textWidthPx - 20;
-    final targetPx = math.min(maxQr, b.paperSize == PaperSize.mm58 ? 110 : 140);
+    final fallback = b.paperSize == PaperSize.mm58 ? 110 : 140;
+    final targetPx = sizePx ?? math.min(maxQr, fallback);
     final module = math.max(1, targetPx ~/ qrImage.moduleCount);
-    return qrImage.moduleCount * module + 8;
+    return qrImage.moduleCount * module;
   }
 
   @override
+  int measure(ReceiptRasterBuilder b) => _qrPixelSize(b);
+
+  @override
   int paint(ReceiptRasterBuilder b, img.Image out, int y) {
-    b.paintQr(out, data, y);
+    b.paintQr(out, data, y, sizePx: sizePx);
     return measure(b);
-  }
-}
-
-class _KeyTagBlock extends _Block {
-  const _KeyTagBlock({
-    required this.ticketId,
-    required this.plate,
-    required this.slot,
-  });
-
-  final String ticketId;
-  final String plate;
-  final String slot;
-
-  @override
-  int measure(ReceiptRasterBuilder b) {
-    var h = 12 + b.textBlockHeight('KEY TAG', img.arial_14, lineHeight: 16);
-    h += 6 + b.textBlockHeight(ticketId, img.arial_24, lineHeight: 26);
-    if (plate.isNotEmpty) {
-      h += 4 + b.textBlockHeight(plate, img.arial_14, lineHeight: 17);
-    }
-    if (slot.isNotEmpty) {
-      h += 2 + b.textBlockHeight(slot, img.arial_14, lineHeight: 17);
-    }
-    return h + 12;
-  }
-
-  @override
-  int paint(ReceiptRasterBuilder b, img.Image out, int y) {
-    final left = b._marginH;
-    final right = b._widthPx - b._marginH;
-    final totalH = measure(b);
-
-    img.drawLine(out, left, y, right, y, ReceiptRasterBuilder._black);
-    img.drawLine(out, left, y + totalH, right, y + totalH, ReceiptRasterBuilder._black);
-    img.drawLine(out, left, y, left, y + totalH, ReceiptRasterBuilder._black);
-    img.drawLine(out, right, y, right, y + totalH, ReceiptRasterBuilder._black);
-
-    var yy = y + 10;
-    b.paintCenteredRows(
-      out,
-      b.wrapText('KEY TAG', img.arial_14),
-      yy,
-      img.arial_14,
-      lineHeight: 16,
-    );
-    yy += 22;
-    b.paintCenteredRows(
-      out,
-      b.wrapText(ticketId, img.arial_24),
-      yy,
-      img.arial_24,
-      lineHeight: 26,
-    );
-    yy += 28;
-    if (plate.isNotEmpty) {
-      b.paintCenteredRows(
-        out,
-        b.wrapText(plate, img.arial_14),
-        yy,
-        img.arial_14,
-      );
-      yy += 18;
-    }
-    if (slot.isNotEmpty) {
-      b.paintCenteredRows(
-        out,
-        b.wrapText(slot, img.arial_14),
-        yy,
-        img.arial_14,
-      );
-    }
-    return totalH;
   }
 }

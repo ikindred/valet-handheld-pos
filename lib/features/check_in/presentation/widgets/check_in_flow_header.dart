@@ -17,11 +17,15 @@ class CheckInFlowHeader extends StatelessWidget {
     super.key,
     required this.stepIndex,
     this.totalSteps = 6,
+    this.allStepsComplete = false,
   });
 
   /// 0-based (step-1 → 0).
   final int stepIndex;
   final int totalSteps;
+
+  /// When true (e.g. all receipts printed on step 6), every dot shows completed.
+  final bool allStepsComplete;
 
   static const List<String> stepTitles = [
     'CUSTOMER AND VALET DETAILS',
@@ -71,6 +75,7 @@ class CheckInFlowHeader extends StatelessWidget {
                   CheckInDotStepper(
                     currentIndex: safeStep,
                     total: totalSteps,
+                    allComplete: allStepsComplete,
                     mainAxisAlignment: MainAxisAlignment.start,
                   ),
                 ],
@@ -151,11 +156,13 @@ class CheckInDotStepper extends StatelessWidget {
     super.key,
     required this.currentIndex,
     required this.total,
+    this.allComplete = false,
     this.mainAxisAlignment = MainAxisAlignment.start,
   });
 
   final int currentIndex;
   final int total;
+  final bool allComplete;
   final MainAxisAlignment mainAxisAlignment;
 
   static const Color _done = Color(0xFF27AE60);
@@ -174,9 +181,11 @@ class CheckInDotStepper extends StatelessWidget {
             width: 10,
             height: 10,
             decoration: BoxDecoration(
-              color: i < currentIndex
+              color: allComplete
                   ? _done
-                  : (i == currentIndex ? _current : _todo),
+                  : (i < currentIndex
+                      ? _done
+                      : (i == currentIndex ? _current : _todo)),
               shape: BoxShape.circle,
             ),
           ),

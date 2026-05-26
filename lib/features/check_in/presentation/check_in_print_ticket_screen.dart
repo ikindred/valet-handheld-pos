@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+
 import '../../../core/printing/check_in_receipt_data.dart';
 import '../../../core/printing/print_flow.dart';
 import '../../../core/theme/app_theme.dart';
@@ -11,6 +13,7 @@ import '../../../data/services/ticket_service.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../models/receipt_part.dart';
 import '../state/check_in_cubit.dart';
+import 'widgets/check_in_compact_tokens.dart';
 import 'widgets/check_in_step_body.dart';
 
 /// Step 6 — sequential 3-part print (tear-off between parts on HM-A300E).
@@ -26,6 +29,7 @@ class _CheckInPrintTicketScreenState extends State<CheckInPrintTicketScreen> {
   Future<CheckInReceiptData?>? _receiptDataFuture;
 
   static final _timeFmt = DateFormat('MMM dd, yyyy · hh:mm a');
+  static const _wideBreakpoint = 720.0;
 
   @override
   void didChangeDependencies() {
@@ -81,103 +85,55 @@ class _CheckInPrintTicketScreenState extends State<CheckInPrintTicketScreen> {
               snap.connectionState != ConnectionState.done;
 
           return BlocBuilder<CheckInCubit, CheckInState>(
+            buildWhen: (prev, next) =>
+                prev.receiptParts != next.receiptParts ||
+                prev.ticketNumber != next.ticketNumber ||
+                prev.plateNumber != next.plateNumber ||
+                prev.vehicleBrandMake != next.vehicleBrandMake ||
+                prev.vehicleModel != next.vehicleModel ||
+                prev.vehicleColor != next.vehicleColor ||
+                prev.dateTimeIn != next.dateTimeIn,
             builder: (context, state) {
               final cubit = context.read<CheckInCubit>();
               final id = state.ticketNumber.trim();
               final nextPart = cubit.nextPartToPrint;
               final allDone = state.allPartsPrinted;
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= _wideBreakpoint;
+                  final summary = _TicketSummaryCard(state: state, ticketId: id);
+                  final printPanel = _PrintReceiptPanel(
+                    loadingReceipt: loadingReceipt,
+                    receiptData: receiptData,
+                    state: state,
+                    nextPart: nextPart,
+                    allDone: allDone,
+                    onPrint: cubit.printPart,
+                    onReprint: cubit.reprintPart,
+                    onDone: () => _onDone(context),
+                  );
+
+                  if (wide) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: summary),
+                        const SizedBox(width: 20),
+                        Expanded(child: printPanel),
+                      ],
+                    );
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(child: _TicketSummaryColumn(state: state, ticketId: id)),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              'Print Receipt',
-                              style: GoogleFonts.poppins(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            if (loadingReceipt)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 24),
-                                child: Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                              )
-                            else if (receiptData == null)
-                              Text(
-                                'Ticket data unavailable. Re-open check-in from dashboard.',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  color: AppColors.textSecondary,
-                                ),
-                              )
-                            else
-                              ...state.receiptParts.map(
-                                (part) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _ReceiptPartCard(
-                                    part: part,
-                                    isNext: part.part == nextPart,
-                                    receiptData: receiptData,
-                                    onPrint: () => cubit.printPart(
-                                      context,
-                                      part.part,
-                                      receiptData,
-                                    ),
-                                    onReprint: () => cubit.reprintPart(
-                                      context,
-                                      part.part,
-                                      receiptData,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 54,
-                              child: FilledButton(
-                                onPressed: allDone && !loadingReceipt
-                                    ? () => _onDone(context)
-                                    : null,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: const Color(0xFFF68D00),
-                                  disabledBackgroundColor:
-                                      const Color(0xFFE0E0E0),
-                                  disabledForegroundColor:
-                                      const Color(0xFF9E9E9E),
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: Text(
-                                  'Done — Go to Dashboard',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      summary,
+                      const SizedBox(height: CheckInCompactTokens.blockGap),
+                      printPanel,
                     ],
-                  ),
-                ],
+                  );
+                },
               );
             },
           );
@@ -187,8 +143,28 @@ class _CheckInPrintTicketScreenState extends State<CheckInPrintTicketScreen> {
   }
 }
 
-class _TicketSummaryColumn extends StatelessWidget {
-  const _TicketSummaryColumn({
+class _SurfaceCard extends StatelessWidget {
+  const _SurfaceCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.13)),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _TicketSummaryCard extends StatelessWidget {
+  const _TicketSummaryCard({
     required this.state,
     required this.ticketId,
   });
@@ -196,83 +172,284 @@ class _TicketSummaryColumn extends StatelessWidget {
   final CheckInState state;
   final String ticketId;
 
+  static String _vehicleLine(CheckInState state) {
+    final brand = state.vehicleBrandMake.trim();
+    final model = state.vehicleModel.trim();
+    if (brand.isEmpty && model.isEmpty) return '—';
+    if (brand.isEmpty) return model;
+    if (model.isEmpty) return brand;
+    return '$brand · $model';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  LucideIcons.checkCircle,
+                  color: AppColors.success,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Ticket created',
+                      style: GoogleFonts.poppins(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Check-in saved. Print each receipt part in order.',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            ticketId.isEmpty ? '—' : ticketId,
+            style: GoogleFonts.poppins(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              height: 1.2,
+              color: DashboardStyles.orange,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: AppColors.divider),
+          const SizedBox(height: 12),
+          _DetailRow(
+            label: 'Plate',
+            value: state.plateNumber.trim().isEmpty
+                ? '—'
+                : state.plateNumber.trim(),
+            emphasize: true,
+          ),
+          _DetailRow(label: 'Vehicle', value: _vehicleLine(state)),
+          _DetailRow(
+            label: 'Color',
+            value: state.vehicleColor.trim().isEmpty
+                ? '—'
+                : state.vehicleColor.trim(),
+          ),
+          _DetailRow(
+            label: 'Check-in',
+            value: state.dateTimeIn != null
+                ? _CheckInPrintTicketScreenState._timeFmt
+                    .format(state.dateTimeIn!.toLocal())
+                : _CheckInPrintTicketScreenState._timeFmt
+                    .format(DateTime.now()),
+            showDivider: false,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({
+    required this.label,
+    required this.value,
+    this.emphasize = false,
+    this.showDivider = true,
+  });
+
+  final String label;
+  final String value;
+  final bool emphasize;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 88,
+              child: Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                value,
+                style: GoogleFonts.poppins(
+                  fontSize: emphasize ? 16 : 14,
+                  fontWeight: emphasize ? FontWeight.w700 : FontWeight.w600,
+                  height: 1.3,
+                  color: emphasize
+                      ? DashboardStyles.plateBlue
+                      : AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (showDivider) ...[
+          const SizedBox(height: 10),
+          Divider(height: 1, color: Colors.black.withValues(alpha: 0.08)),
+          const SizedBox(height: 10),
+        ],
+      ],
+    );
+  }
+}
+
+class _PrintReceiptPanel extends StatelessWidget {
+  const _PrintReceiptPanel({
+    required this.loadingReceipt,
+    required this.receiptData,
+    required this.state,
+    required this.nextPart,
+    required this.allDone,
+    required this.onPrint,
+    required this.onReprint,
+    required this.onDone,
+  });
+
+  final bool loadingReceipt;
+  final CheckInReceiptData? receiptData;
+  final CheckInState state;
+  final int? nextPart;
+  final bool allDone;
+  final Future<void> Function(
+    BuildContext context,
+    int part,
+    CheckInReceiptData data,
+  ) onPrint;
+  final Future<void> Function(
+    BuildContext context,
+    int part,
+    CheckInReceiptData data,
+  ) onReprint;
+  final VoidCallback onDone;
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Ticket created',
+          'Print receipt',
           style: GoogleFonts.poppins(
-            fontSize: 22,
+            fontSize: 20,
             fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Text(
-          ticketId.isEmpty ? '—' : ticketId,
+          'Print each part in order. Tear off between parts on the printer.',
           style: GoogleFonts.poppins(
-            fontSize: 28,
-            fontWeight: FontWeight.w700,
-            color: DashboardStyles.orange,
+            fontSize: 13,
+            height: 1.35,
+            color: AppColors.textSecondary,
           ),
         ),
-        const SizedBox(height: 24),
-        _line(
-          'Plate',
-          state.plateNumber.trim().isEmpty ? '—' : state.plateNumber.trim(),
-        ),
-        _line(
-          'Brand',
-          state.vehicleBrandMake.trim().isEmpty
-              ? '—'
-              : state.vehicleBrandMake.trim(),
-        ),
-        _line(
-          'Color',
-          state.vehicleColor.trim().isEmpty ? '—' : state.vehicleColor.trim(),
-        ),
-        _line(
-          'Check-in',
-          state.dateTimeIn != null
-              ? _CheckInPrintTicketScreenState._timeFmt
-                  .format(state.dateTimeIn!.toLocal())
-              : _CheckInPrintTicketScreenState._timeFmt.format(DateTime.now()),
-        ),
-      ],
-    );
-  }
-
-  static Widget _line(String k, String v) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
+        const SizedBox(height: 16),
+        if (loadingReceipt)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (receiptData == null)
+          _SurfaceCard(
             child: Text(
-              k,
+              'Ticket data unavailable. Re-open check-in from the dashboard.',
               style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
+                fontSize: 14,
+                height: 1.35,
                 color: AppColors.textSecondary,
               ),
             ),
-          ),
-          Expanded(
-            child: Text(
-              v,
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+          )
+        else
+          ...state.receiptParts.map(
+            (part) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _ReceiptPartCard(
+                part: part,
+                isNext: part.part == nextPart,
+                receiptData: receiptData!,
+                onPrint: () => onPrint(context, part.part, receiptData!),
+                onReprint: () => onReprint(context, part.part, receiptData!),
               ),
             ),
           ),
+        if (!loadingReceipt && receiptData != null && !allDone) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Print all three parts to finish and return to the dashboard.',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              height: 1.35,
+              color: AppColors.textSubtitleMuted,
+            ),
+          ),
         ],
-      ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: FilledButton.icon(
+            onPressed: allDone && !loadingReceipt && receiptData != null
+                ? onDone
+                : null,
+            icon: const Icon(LucideIcons.layoutDashboard, size: 20),
+            label: Text(
+              'Done — Go to Dashboard',
+              style: GoogleFonts.poppins(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              disabledBackgroundColor: const Color(0xFFE8EAED),
+              disabledForegroundColor: const Color(0xFF9DA4B0),
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -294,32 +471,51 @@ class _ReceiptPartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final highlighted = isNext && part.status == ReceiptPartStatus.pending;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: highlighted
+              ? AppColors.accent
+              : Colors.black.withValues(alpha: 0.13),
+          width: highlighted ? 1.5 : 1,
+        ),
+        boxShadow: highlighted
+            ? [
+                BoxShadow(
+                  color: AppColors.accent.withValues(alpha: 0.12),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
-            flex: 2,
-            child: Text(
-              part.label,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  part.label,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _StatusChip(status: part.status),
+              ],
             ),
           ),
-          Expanded(
-            flex: 2,
-            child: _StatusChip(status: part.status),
-          ),
-          const SizedBox(width: 8),
-          _ActionButton(
+          const SizedBox(width: 12),
+          _ReceiptActionButton(
             part: part,
             isNext: isNext,
             onPrint: onPrint,
@@ -338,35 +534,39 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (bg, fg, label, showSpinner) = switch (status) {
+    final (bg, fg, label, icon, showSpinner) = switch (status) {
       ReceiptPartStatus.pending => (
-          const Color(0xFFF0F0F0),
-          const Color(0xFF6E7584),
+          const Color(0xFFF4F5F7),
+          AppColors.textSecondary,
           'Not yet printed',
+          LucideIcons.clock,
           false,
         ),
       ReceiptPartStatus.printing => (
           const Color(0xFFFFF3E0),
-          const Color(0xFFF68D00),
-          'Printing...',
+          AppColors.accent,
+          'Printing…',
+          LucideIcons.printer,
           true,
         ),
       ReceiptPartStatus.printed => (
           const Color(0xFFE8F5E9),
-          const Color(0xFF2E7D32),
-          'Printed ✓',
+          AppColors.success,
+          'Printed',
+          LucideIcons.checkCircle,
           false,
         ),
       ReceiptPartStatus.failed => (
           const Color(0xFFFFEBEE),
-          const Color(0xFFC62828),
+          AppColors.error,
           'Failed',
+          LucideIcons.alertCircle,
           false,
         ),
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(100),
@@ -374,26 +574,21 @@ class _StatusChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (showSpinner) ...[
+          if (showSpinner)
             SizedBox(
-              width: 12,
-              height: 12,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: fg,
-              ),
-            ),
-            const SizedBox(width: 6),
-          ],
-          Flexible(
-            child: Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: fg,
-              ),
-              overflow: TextOverflow.ellipsis,
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2, color: fg),
+            )
+          else
+            Icon(icon, size: 14, color: fg),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: fg,
             ),
           ),
         ],
@@ -402,8 +597,8 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
+class _ReceiptActionButton extends StatelessWidget {
+  const _ReceiptActionButton({
     required this.part,
     required this.isNext,
     required this.onPrint,
@@ -415,37 +610,60 @@ class _ActionButton extends StatelessWidget {
   final VoidCallback onPrint;
   final VoidCallback onReprint;
 
+  static const _btnWidth = 108.0;
+  static const _btnHeight = 40.0;
+
+  static ButtonStyle _filledStyle() => FilledButton.styleFrom(
+        backgroundColor: AppColors.accent,
+        foregroundColor: AppColors.white,
+        minimumSize: const Size(_btnWidth, _btnHeight),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        textStyle: GoogleFonts.poppins(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+
+  static ButtonStyle _outlinedStyle({Color? foreground, Color? border}) =>
+      OutlinedButton.styleFrom(
+        foregroundColor: foreground ?? AppColors.accent,
+        side: BorderSide(color: border ?? AppColors.accent),
+        minimumSize: const Size(_btnWidth, _btnHeight),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        textStyle: GoogleFonts.poppins(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     return switch (part.status) {
       ReceiptPartStatus.pending when isNext => SizedBox(
-          width: 88,
-          height: 36,
-          child: FilledButton(
+          width: _btnWidth,
+          height: _btnHeight,
+          child: FilledButton.icon(
             onPressed: onPrint,
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFF68D00),
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.zero,
-            ),
-            child: Text(
-              'Print',
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            style: _filledStyle(),
+            icon: const Icon(LucideIcons.printer, size: 16),
+            label: const Text('Print'),
           ),
         ),
-      ReceiptPartStatus.pending => const SizedBox.shrink(),
+      ReceiptPartStatus.pending => const SizedBox(
+          width: _btnWidth,
+          height: _btnHeight,
+        ),
       ReceiptPartStatus.printing => SizedBox(
-          width: 88,
-          height: 36,
+          width: _btnWidth,
+          height: _btnHeight,
           child: FilledButton(
             onPressed: null,
+            style: _filledStyle(),
             child: const SizedBox(
-              width: 18,
-              height: 18,
+              width: 20,
+              height: 20,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
                 color: Colors.white,
@@ -454,35 +672,26 @@ class _ActionButton extends StatelessWidget {
           ),
         ),
       ReceiptPartStatus.printed => SizedBox(
-          width: 88,
-          height: 36,
-          child: OutlinedButton(
+          width: _btnWidth,
+          height: _btnHeight,
+          child: OutlinedButton.icon(
             onPressed: onReprint,
-            child: Text(
-              'Reprint',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            style: _outlinedStyle(),
+            icon: const Icon(LucideIcons.refreshCw, size: 16),
+            label: const Text('Reprint'),
           ),
         ),
       ReceiptPartStatus.failed => SizedBox(
-          width: 88,
-          height: 36,
-          child: OutlinedButton(
+          width: _btnWidth,
+          height: _btnHeight,
+          child: OutlinedButton.icon(
             onPressed: onReprint,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFFC62828),
-              side: const BorderSide(color: Color(0xFFC62828)),
+            style: _outlinedStyle(
+              foreground: AppColors.error,
+              border: AppColors.error,
             ),
-            child: Text(
-              'Retry',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            icon: const Icon(LucideIcons.refreshCw, size: 16),
+            label: const Text('Retry'),
           ),
         ),
     };

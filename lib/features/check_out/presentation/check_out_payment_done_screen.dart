@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-
 import '../../../core/formatting/peso_currency.dart';
 import '../../../core/printing/checkout_receipt_data.dart';
 import '../../../core/printing/print_flow.dart';
+import '../../../core/printing/printer_connection_notifier.dart';
 import '../domain/checkout_preview_format.dart';
 import '../models/checkout_preview_response.dart';
 import '../../check_in/presentation/widgets/check_in_compact_tokens.dart';
@@ -32,7 +32,6 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
   static const _plateBlue = Color(0xFF0068D3);
   static const _green = Color(0xFF27AE60);
   static const _orange = Color(0xFFF68D00);
-  static const _surfaceCard = Color(0xFFF8F9FB);
   static const _successSurface = Color(0xFFE2F9F1);
   static const List<String> _pesoGlyphFallback = ['Noto Sans', 'Roboto'];
 
@@ -138,7 +137,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
           ),
           child: LayoutBuilder(
             builder: (context, c) {
-              final wide = c.maxWidth >= 960;
+              final wide = c.maxWidth >= 720;
 
               final leftColumn = Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -154,6 +153,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
                   ),
                   const SizedBox(height: 16),
                   _printBluetoothCard(
+                    context: context,
                     printing: _printing,
                     onTap: _printing ? null : () => _printReceipt(context, state),
                   ),
@@ -167,7 +167,6 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
                 total: total,
                 change: change,
                 thankYou: thankYou,
-                branchName: branch,
                 mallHours: state.mallHours,
                 driverOut: state.driverOut,
               );
@@ -209,7 +208,16 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Icon(Icons.check_circle, color: _green, size: 32),
+          Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: _green,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check, color: Colors.white, size: 20),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -232,9 +240,13 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
   }
 
   Widget _printBluetoothCard({
+    required BuildContext context,
     required bool printing,
     required VoidCallback? onTap,
   }) {
+    final printerStatus = context.watch<PrinterConnectionNotifier>();
+    final subtitle = printerStatus.statusSubtitle;
+
     return SizedBox(
       width: double.infinity,
       child: Material(
@@ -251,12 +263,11 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
           child: Padding(
             padding: CheckOutUiTokens.cardPadding,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (printing)
                   SizedBox(
-                    width: 20,
-                    height: 20,
+                    width: 24,
+                    height: 24,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       color: Colors.white.withValues(alpha: 0.95),
@@ -264,16 +275,33 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
                   )
                 else
                   Icon(
-                    LucideIcons.bluetooth,
+                    LucideIcons.printer,
                     color: Colors.white.withValues(alpha: 0.95),
-                    size: 20,
+                    size: 24,
                   ),
-                const SizedBox(width: 8),
-                Text(
-                  printing ? 'Printing…' : 'Print Via Bluetooth',
-                  style: CheckOutUiTokens.body().copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        printing ? 'Printing…' : 'Print Via Bluetooth',
+                        style: CheckOutUiTokens.body().copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (!printing) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: CheckOutUiTokens.helper().copyWith(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ],
@@ -317,7 +345,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
     return Container(
       padding: CheckOutUiTokens.cardPadding,
       decoration: BoxDecoration(
-        color: _surfaceCard,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -404,7 +432,6 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
     required double total,
     required double change,
     required String thankYou,
-    required String branchName,
     required String mallHours,
     String? driverOut,
   }) {
@@ -421,10 +448,11 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
     final slot = pt != null && pt.parkingLocationLine.trim().isNotEmpty
         ? pt.parkingLocationLine.trim()
         : '—';
-    final valetIn = pt?.valetIn?.trim().isNotEmpty == true ? pt!.valetIn! : '—';
-    final valetOut = (driverOut?.trim().isNotEmpty == true)
+    final valetInOut = (driverOut?.trim().isNotEmpty == true)
         ? driverOut!.trim()
-        : (pt?.valetOut?.trim().isNotEmpty == true ? pt!.valetOut! : '—');
+        : (pt?.valetOut?.trim().isNotEmpty == true
+            ? pt!.valetOut!
+            : (pt?.valetIn?.trim().isNotEmpty == true ? pt!.valetIn! : '—'));
 
     final flatLabel = pt?.flatRateLabel?.trim().isNotEmpty == true
         ? pt!.flatRateLabel!.trim()
@@ -479,10 +507,10 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
       );
     }
 
-    return Container(
+  return Container(
       padding: CheckOutUiTokens.cardPadding,
       decoration: BoxDecoration(
-        color: _surfaceCard,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
@@ -495,50 +523,17 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Center(
-            child: Image.asset(
-              'assets/images/spid_logo1.png',
-              height: 42,
-              fit: BoxFit.contain,
-            ),
-          ),
-          if (branchName.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              branchName.toUpperCase(),
-              textAlign: TextAlign.center,
-              style: _poppins(9, FontWeight.w600, _grey500),
-            ),
-          ],
-          const SizedBox(height: 4),
-          Text(
-            'VALET MASTER',
-            textAlign: TextAlign.center,
-            style: _poppins(10, FontWeight.w700, _navy),
-          ),
-          const SizedBox(height: 12),
-          _dottedRule(),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            decoration: BoxDecoration(
-              color: _navy,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              'CHECKOUT RECEIPT',
-              textAlign: TextAlign.center,
-              style: _poppins(10, FontWeight.w600, Colors.white),
-            ),
-          ),
-          const SizedBox(height: 14),
           Text('TICKET NUMBER', style: CheckOutUiTokens.fieldLabel()),
           const SizedBox(height: 4),
           Text(
             localTicketId,
-            style: CheckOutUiTokens.plate().copyWith(color: _orange),
+            style: CheckOutUiTokens.plate().copyWith(
+              color: _orange,
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             plate,
             style: CheckOutUiTokens.body().copyWith(
@@ -547,20 +542,19 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
             ),
           ),
           if (vehicleLine != '—') ...[
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
-              vehicleLine,
-              style: _poppins(10, FontWeight.w400, Colors.black),
+              vehicleLine.toUpperCase(),
+              style: _poppins(10, FontWeight.w500, _grey500),
             ),
           ],
-          const SizedBox(height: 12),
-          smallRow('Parking Slot', slot),
+          const SizedBox(height: 14),
           smallRow('Time In', timeIn),
           smallRow('Time Out', timeOut),
           smallRow('Duration', duration),
-          smallRow('Valet In', valetIn),
-          smallRow('Valet Out', valetOut),
-          const SizedBox(height: 12),
+          smallRow('Parking Slot', slot),
+          smallRow('Valet In/Out', valetInOut),
+          const SizedBox(height: 4),
           _dottedRule(),
           const SizedBox(height: 12),
           feeRow(flatLabel, peso2.format(flatAmount > 0.009 ? flatAmount : total)),
@@ -586,17 +580,16 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
           ),
           const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
               color: _successSurface,
               borderRadius: BorderRadius.circular(100),
               border: Border.all(color: _green),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Change', style: _poppins(10, FontWeight.w600, _green)),
-                const SizedBox(width: 8),
                 Text(
                   peso2.format(change),
                   style: CheckOutUiTokens.money(
@@ -615,26 +608,19 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
             style: _poppins(8, FontWeight.w500, _grey500),
           ),
           const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
-            color: const Color(0xFFF2F3F5),
-            child: Column(
-              children: [
-                Text(
-                  thankYou,
-                  textAlign: TextAlign.center,
-                  style: _poppins(8, FontWeight.w500, _grey500),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  mallHours,
-                  textAlign: TextAlign.center,
-                  style: _poppins(8, FontWeight.w500, _grey500),
-                ),
-              ],
-            ),
+          Text(
+            thankYou,
+            textAlign: TextAlign.center,
+            style: _poppins(8, FontWeight.w500, _grey500),
           ),
+          if (mallHours.trim().isNotEmpty) ...[
+            const SizedBox(height: 5),
+            Text(
+              mallHours,
+              textAlign: TextAlign.center,
+              style: _poppins(8, FontWeight.w500, _grey500),
+            ),
+          ],
         ],
       ),
     );

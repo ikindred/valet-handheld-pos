@@ -19,12 +19,15 @@ class BluetoothValetPrintService implements ValetPrintService {
   }) async {
     final profile = await _printer.loadProfile();
     final width = await _printer.paperWidth;
+    final logo = await ReceiptBrandLogo.loadForReceipt(
+      maxWidthPx: width == PrinterPaperWidth.mm58 ? 160 : 220,
+    );
     if (width == PrinterPaperWidth.mm58) {
       return ReceiptRasterBuilder(paperSize: width.paperSize)
-          .buildCheckInPartEscPosBytes(data, profile, part);
+          .buildCheckInPartEscPosBytes(data, profile, part, logo: logo);
     }
     return EscPosReceiptBuilder(profile, paperSize: width.paperSize)
-        .buildCheckInPartReceipt(data, part: part);
+        .buildCheckInPartReceipt(data, part: part, logo: logo);
   }
 
   Future<List<int>> _buildTestBytes({
@@ -33,23 +36,31 @@ class BluetoothValetPrintService implements ValetPrintService {
   }) async {
     final profile = await _printer.loadProfile();
     final width = await _printer.paperWidth;
+    final logo = await ReceiptBrandLogo.loadForReceipt(
+      maxWidthPx: width == PrinterPaperWidth.mm58 ? 160 : 220,
+    );
     if (width == PrinterPaperWidth.mm58) {
       return ReceiptRasterBuilder(paperSize: width.paperSize)
           .buildTestEscPosBytes(
             profile: profile,
             branchName: branchName,
             staffLabel: staffLabel,
+            logo: logo,
           );
     }
     return EscPosReceiptBuilder(profile, paperSize: width.paperSize)
-        .buildTestReceipt(branchName: branchName, staffLabel: staffLabel);
+        .buildTestReceipt(
+          branchName: branchName,
+          staffLabel: staffLabel,
+          logo: logo,
+        );
   }
 
   Future<List<int>> _buildCheckoutBytes(CheckoutReceiptData data) async {
     final profile = await _printer.loadProfile();
     final width = await _printer.paperWidth;
     final logo = await ReceiptBrandLogo.loadForReceipt(
-      maxWidthPx: width == PrinterPaperWidth.mm58 ? 168 : 220,
+      maxWidthPx: width == PrinterPaperWidth.mm58 ? 160 : 220,
     );
     if (width == PrinterPaperWidth.mm58) {
       return ReceiptRasterBuilder(paperSize: width.paperSize)

@@ -6,7 +6,9 @@ import 'dart:typed_data';
 import 'package:bloc/bloc.dart';
 import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter/material.dart' show AlertDialog, BuildContext, Navigator, ScaffoldMessenger, SnackBar, Text, TextButton, showDialog;
+import 'package:flutter/material.dart' show BuildContext, ScaffoldMessenger, SnackBar, Text;
+
+import '../../../core/ui/app_alert_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
@@ -526,18 +528,13 @@ class CheckInCubit extends Cubit<CheckInState> {
     } on VehicleAlreadyCheckedInException catch (_) {
       emit(state.copyWith(isSubmitting: false));
       if (!context.mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Already checked in'),
-          content: const Text('This vehicle is already checked in.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
+      await showAppAlertDialog(
+        context,
+        title: 'Already checked in',
+        message:
+            'This vehicle is already checked in. Go to the dashboard or '
+            'retrieve the existing ticket before starting a new check-in.',
+        icon: AppAlertIcon.warning,
       );
     } on CheckInValidationException catch (e) {
       emit(state.copyWith(isSubmitting: false));

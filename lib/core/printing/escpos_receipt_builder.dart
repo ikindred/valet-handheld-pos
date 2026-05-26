@@ -8,6 +8,7 @@ import '../time/philippine_time.dart';
 import 'check_in_receipt_data.dart';
 import 'checkout_receipt_data.dart';
 import 'esc_pos_text_sanitize.dart';
+import 'receipt_print_format.dart';
 
 class EscPosReceiptBuilder {
   EscPosReceiptBuilder(this.profile, {this.paperSize = PaperSize.mm58});
@@ -27,7 +28,7 @@ class EscPosReceiptBuilder {
       };
 
   QRSize get _qrSize =>
-      paperSize == PaperSize.mm58 ? QRSize.Size2 : QRSize.Size5;
+      paperSize == PaperSize.mm58 ? QRSize.Size4 : QRSize.Size8;
 
   int _lineCharCount({PosTextSize width = PosTextSize.size1}) {
     final scale = width.value.clamp(1, 4);
@@ -37,20 +38,13 @@ class EscPosReceiptBuilder {
   List<int> buildTestReceipt({
     required String branchName,
     required String staffLabel,
+    img.Image? logo,
   }) {
     final gen = _generator();
     final bytes = <int>[];
     bytes.addAll(gen.reset());
     bytes.addAll(_printerInit());
-    bytes.addAll(
-      _printLines(
-        branchName,
-        align: PosAlign.center,
-        bold: true,
-      ),
-    );
-    bytes.addAll(_printLines('Valet Master', align: PosAlign.center));
-    bytes.addAll(_hr());
+    bytes.addAll(_brandHeader(gen, branchName));
     bytes.addAll(_printLines(staffLabel));
     bytes.addAll(gen.feed(2));
     bytes.addAll(gen.cut());
@@ -67,29 +61,24 @@ class EscPosReceiptBuilder {
 
     bytes.addAll(gen.reset());
     bytes.addAll(_printerInit());
-    bytes.addAll(_checkoutHeader(gen, data, logo: logo));
-    bytes.addAll(
-      _printLines('CHECKOUT RECEIPT', align: PosAlign.center, bold: true),
-    );
-    bytes.addAll(_hr());
-
-    bytes.addAll(_field('Ticket', data.ticketNumber));
-    bytes.addAll(_field('Plate', data.plateNumber));
+    bytes.addAll(_brandHeader(gen, data.branchName));
+    bytes.addAll(_checkoutSectionTitle());
+    bytes.addAll(_labeledRow('Ticket', data.ticketNumber));
+    bytes.addAll(_labeledRow('Plate', data.plateNumber));
     if (data.vehicleReceiptLine.isNotEmpty &&
+        data.vehicleReceiptLine != '-' &&
         data.vehicleReceiptLine != '—') {
-      bytes.addAll(_field('Vehicle', data.vehicleReceiptLine));
+      bytes.addAll(_labeledRow('Vehicle', data.vehicleReceiptLine));
     }
-    bytes.addAll(_field('Parking', data.slotLine));
     if (data.invoiceNumber != null && data.invoiceNumber!.isNotEmpty) {
-      bytes.addAll(_field('Invoice', data.invoiceNumber!));
+      bytes.addAll(_labeledRow('Invoice', data.invoiceNumber!));
     }
-
-    bytes.addAll(_field('Time in', data.timeInLabel));
-    bytes.addAll(_field('Time out', data.timeOutLabel));
-    bytes.addAll(_field('Duration', data.durationLabel));
-    bytes.addAll(_field('Valet in', data.valetInLabel));
-    bytes.addAll(_field('Valet out', data.valetOutLabel));
-
+    bytes.addAll(_labeledRow('Time in', data.timeInLabel));
+    bytes.addAll(_labeledRow('Time out', data.timeOutLabel));
+    bytes.addAll(_labeledRow('Duration', data.durationLabel));
+    bytes.addAll(_labeledRow('Parking', data.slotLine));
+    bytes.addAll(_labeledRow('Valet in', data.valetInLabel));
+    bytes.addAll(_labeledRow('Valet out', data.valetOutLabel));
     bytes.addAll(_hr());
     bytes.addAll(_moneyRow(data.flatRateLabel, data.flatPesosLabel));
     if (data.succeedingLabel.isNotEmpty) {
@@ -102,44 +91,73 @@ class EscPosReceiptBuilder {
     }
     bytes.addAll(_moneyRow('Total', data.totalPesosLabel, bold: true));
     bytes.addAll(_moneyRow('Cash tendered', data.tenderedPesosLabel));
-    bytes.addAll(_moneyRow('Change', data.changePesosLabel, bold: true));
-
-    bytes.addAll(_hr());
-    if (_isNarrow) {
-      bytes.addAll(
-        _printLines('NOT an Official Receipt', align: PosAlign.center),
-      );
-      bytes.addAll(_printLines('(OR).', align: PosAlign.center));
-    } else {
-      bytes.addAll(
-        _printLines(
-          'NOTE: This is not an Official Receipt (OR).',
-          align: PosAlign.center,
-        ),
-      );
-    }
     bytes.addAll(
-      _printLines(
-        'THANK YOU FOR USING VALET MASTER',
-        align: PosAlign.center,
-        bold: true,
+      _moneyRow(
+        'Change',
+        data.changePesosLabel,
+        bold: data.changeIsNonZero,
       ),
     );
-    bytes.addAll(_printLines(data.mallHours, align: PosAlign.center));
+    bytes.addAll(_checkoutFooter(mallHours: data.mallHours));
 
     bytes.addAll(gen.feed(3));
     bytes.addAll(gen.cut());
     return bytes;
   }
 
-  List<int> _moneyRow(String label, String amount, {bool bold = false}) {
-    if (!_isNarrow) {
-      return _printLines('$label: $amount', bold: bold);
+  List<int> _moneyRow(String label, String amount, {bool bold = false}) =>
+      _labeledRow(label, amount, bold: bold);
+
+  List<int> _checkoutSectionTitle() => [
+        ..._hr(),
+        ..._printLines(
+          'CHECKOUT RECEIPT',
+          align: PosAlign.center,
+          bold: true,
+        ),
+        ..._hr(),
+      ];
+
+  List<int> _checkoutFooter({required String mallHours}) => [
+        ..._hr(),
+        ..._printLines(
+          ReceiptTemplateCopy.orDisclaimerNote,
+          align: PosAlign.center,
+        ),
+        ..._printLines(
+          ReceiptTemplateCopy.thankYouLine,
+          align: PosAlign.center,
+          bold: true,
+        ),
+        ..._printLines(mallHours, align: PosAlign.center),
+      ];
+
+  /// Label left, value right (space-padded on wide paper).
+  List<int> _labeledRow(String label, String value, {bool bold = false}) {
+    if (_isNarrow) {
+      return [
+        ..._printLines(label, bold: true),
+        ..._printLines(value, bold: bold),
+      ];
     }
-    return [
-      ..._printLines(label, bold: true),
-      ..._printLines(amount, bold: bold),
-    ];
+    return _printLines(_twoColumnText('$label:', value), bold: bold);
+  }
+
+  String _twoColumnText(String label, String value) {
+    final l = sanitizeEscPosText(label);
+    final v = sanitizeEscPosText(value);
+    return _formatTwoColumn(l, v, _charsPerLine);
+  }
+
+  static String _formatTwoColumn(String label, String value, int width) {
+    final gap = width - label.length - value.length;
+    if (gap >= 1) {
+      return '$label${' ' * gap}$value';
+    }
+    if (label.length >= width) {
+      return '$label\n${value.length >= width ? value.substring(0, width) : value}';
+    }
+    return '$label\n${' ' * (width - value.length).clamp(0, width)}$value';
   }
 
   /// Check-in ticket: all three parts concatenated (legacy / tests).
@@ -152,7 +170,11 @@ class EscPosReceiptBuilder {
   }
 
   /// Single tear-off part (1 = attendant, 2 = customer+QR, 3 = key tag).
-  List<int> buildCheckInPartReceipt(CheckInReceiptData data, {required int part}) {
+  List<int> buildCheckInPartReceipt(
+    CheckInReceiptData data, {
+    required int part,
+    img.Image? logo,
+  }) {
     final gen = _generator();
     final bytes = <int>[];
 
@@ -168,7 +190,7 @@ class EscPosReceiptBuilder {
 
     bytes.addAll(gen.reset());
     bytes.addAll(_printerInit());
-    bytes.addAll(_header(data.branchName));
+    bytes.addAll(_brandHeader(gen, data.branchName));
 
     switch (part) {
       case 1:
@@ -177,6 +199,7 @@ class EscPosReceiptBuilder {
             gen,
             title: 'ATTENDANT COPY',
             ticketId: ticketId,
+            qrPayload: (data.qrCode ?? ticketId).trim(),
             plate: plate,
             vehicleLine: vehicleLine,
             slotLine: slotLine,
@@ -189,6 +212,8 @@ class EscPosReceiptBuilder {
             belongings: belongings,
             damage: damage,
             signatureSigned: data.hasSignature,
+            mallHours: data.mallHours,
+            includeThankYouFooter: false,
           ),
         );
       case 2:
@@ -197,6 +222,7 @@ class EscPosReceiptBuilder {
             gen,
             title: 'CUSTOMER COPY',
             ticketId: ticketId,
+            qrPayload: (data.qrCode ?? ticketId).trim(),
             plate: plate,
             vehicleLine: vehicleLine,
             slotLine: slotLine,
@@ -209,6 +235,8 @@ class EscPosReceiptBuilder {
             belongings: belongings,
             damage: damage,
             signatureSigned: data.hasSignature,
+            mallHours: data.mallHours,
+            includeThankYouFooter: true,
             includeQr: true,
           ),
         );
@@ -218,41 +246,62 @@ class EscPosReceiptBuilder {
         throw ArgumentError.value(part, 'part', 'must be 1, 2, or 3');
     }
 
-    bytes.addAll(gen.feed(3));
+    bytes.addAll(gen.feed(6));
     return bytes;
   }
 
-  List<int> _header(String branchName) {
-    return [
-      ..._printLines(branchName, align: PosAlign.center, bold: true),
-      ..._printLines('VALET MASTER', align: PosAlign.center, bold: true),
-      ..._hr(),
+  List<int> _brandHeader(Generator gen, String branchName) {
+    final out = <int>[
+      ..._printLines('SPiD', align: PosAlign.center, bold: true),
+      ..._printLines(
+        'SMART PARKING TECHNOLOGIES',
+        align: PosAlign.center,
+      ),
+      ...gen.feed(1),
+      ..._printLines(
+        ReceiptTemplateCopy.brandName,
+        align: PosAlign.center,
+        bold: true,
+      ),
     ];
+    final branch = sanitizeEscPosText(branchName);
+    if (branch.isNotEmpty && branch.toLowerCase() != 'valet master') {
+      out.addAll(_printLines(branch, align: PosAlign.center));
+    }
+    out.addAll(_hr());
+    return out;
   }
 
-  List<int> _checkoutHeader(
-    Generator gen,
-    CheckoutReceiptData data, {
-    img.Image? logo,
+  List<int> _receiptFooter({
+    required String mallHours,
+    required bool includeThankYou,
+    bool includePrintedAt = true,
   }) {
-    final out = <int>[];
-    if (logo != null) {
-      final targetW = _isNarrow ? 168 : 220;
-      final resized = logo.width == targetW
-          ? logo
-          : img.copyResize(logo, width: targetW);
-      out.addAll(gen.image(resized, align: PosAlign.center));
-      out.addAll(gen.feed(1));
-    }
-    final branch = sanitizeEscPosText(data.branchName);
-    if (branch.isNotEmpty &&
-        branch.toLowerCase() != 'valet master') {
-      out.addAll(_printLines(branch, align: PosAlign.center, bold: true));
-    }
+    final out = <int>[..._hr()];
     out.addAll(
-      _printLines('VALET MASTER', align: PosAlign.center, bold: true),
+      _printLines(
+        ReceiptTemplateCopy.orDisclaimerNote,
+        align: PosAlign.center,
+      ),
     );
-    out.addAll(_hr());
+    if (includeThankYou) {
+      out.addAll(
+        _printLines(
+          ReceiptTemplateCopy.thankYouLine,
+          align: PosAlign.center,
+          bold: true,
+        ),
+      );
+      out.addAll(_printLines(mallHours, align: PosAlign.center));
+    }
+    if (includePrintedAt) {
+      out.addAll(
+        _printLines(
+          ReceiptPrintFormat.printedAtLabel(),
+          align: PosAlign.center,
+        ),
+      );
+    }
     return out;
   }
 
@@ -260,6 +309,7 @@ class EscPosReceiptBuilder {
     Generator gen, {
     required String title,
     required String ticketId,
+    required String qrPayload,
     required String plate,
     required String vehicleLine,
     required String slotLine,
@@ -269,52 +319,81 @@ class EscPosReceiptBuilder {
     required String belongings,
     required String damage,
     required bool signatureSigned,
+    required String mallHours,
+    required bool includeThankYouFooter,
     String? customerName,
     String? valetType,
     String? special,
     bool includeQr = false,
   }) {
     final out = <int>[
+      ..._printLines('CHECK-IN', align: PosAlign.center, bold: true),
       ..._printLines(title, align: PosAlign.center, bold: true),
-      ..._field('Ticket', ticketId),
-      ..._field('Plate', plate.isEmpty ? 'N/A' : plate),
+      ..._highlightField('Ticket No.', ticketId),
+      ..._highlightField('Plate', plate.isEmpty ? 'N/A' : plate),
       if (vehicleLine.isNotEmpty) ..._field('Vehicle', vehicleLine),
       if (valetType != null && valetType.trim().isNotEmpty)
-        ..._field('Type', valetType.trim()),
-      if (slotLine.isNotEmpty) ..._field('Slot', slotLine),
+        ..._field('Valet type', valetType.trim()),
+      if (slotLine.isNotEmpty) ..._field('Parking', slotLine),
       ..._field('Time in', timeIn),
-      if (contact.isNotEmpty) ..._field('Contact', contact),
-      if (customerName != null && customerName.trim().isNotEmpty)
-        ..._field('Guest', customerName.trim()),
-      if (driver.isNotEmpty) ..._field('Valet', driver),
-      if (belongings.isNotEmpty) ..._field('Belongings', belongings),
-      if (damage.isNotEmpty) ..._field('Damage', damage),
-      if (special != null && special.trim().isNotEmpty)
-        ..._field('Notes', special.trim()),
-      ..._field('Signature', signatureSigned ? 'Signed' : 'N/A'),
     ];
 
-    if (includeQr && ticketId.isNotEmpty) {
+    if (contact.isNotEmpty ||
+        (customerName != null && customerName.trim().isNotEmpty) ||
+        driver.isNotEmpty) {
       out.addAll(gen.feed(1));
-      out.addAll(gen.qrcode(ticketId, size: _qrSize, align: PosAlign.center));
-      out.addAll(_printerInit());
-      out.addAll(_printLines('Scan at check-out', align: PosAlign.center));
+      if (contact.isNotEmpty) out.addAll(_field('Contact', contact));
+      if (customerName != null && customerName.trim().isNotEmpty) {
+        out.addAll(_field('Guest', customerName.trim()));
+      }
+      if (driver.isNotEmpty) out.addAll(_field('Valet driver', driver));
     }
 
-    if (_isNarrow) {
-      out.addAll(
-        _printLines('NOT an Official Receipt', align: PosAlign.center),
-      );
-      out.addAll(_printLines('(OR).', align: PosAlign.center));
-    } else {
+    out.addAll(gen.feed(1));
+    if (belongings.isNotEmpty) out.addAll(_field('Belongings', belongings));
+    if (damage.isNotEmpty) out.addAll(_field('Damage', damage));
+    if (special != null && special.trim().isNotEmpty) {
+      out.addAll(_field('Notes', special.trim()));
+    }
+    out.addAll(
+      _field('Signature', signatureSigned ? 'Signed' : 'Pending'),
+    );
+
+    if (includeQr && qrPayload.isNotEmpty) {
+      out.addAll(gen.feed(2));
+      out.addAll(gen.qrcode(qrPayload, size: _qrSize, align: PosAlign.center));
+      out.addAll(gen.feed(2));
+      out.addAll(_printerInit());
       out.addAll(
         _printLines(
-          'NOTE: This is not an Official Receipt (OR).',
+          ReceiptTemplateCopy.scanQrHint,
           align: PosAlign.center,
         ),
       );
     }
+
+    out.addAll(
+      _receiptFooter(
+        mallHours: mallHours,
+        includeThankYou: includeThankYouFooter,
+        includePrintedAt: false,
+      ),
+    );
     return out;
+  }
+
+  List<int> _highlightField(String label, String value) {
+    if (!_isNarrow) {
+      return _printLines(_twoColumnText('$label:', value), bold: true);
+    }
+    return [
+      ..._printLines(label, bold: true),
+      ..._printLines(
+        value,
+        bold: true,
+        height: PosTextSize.size2,
+      ),
+    ];
   }
 
   List<int> _keyTag({
@@ -323,6 +402,7 @@ class EscPosReceiptBuilder {
     required String slotLine,
   }) {
     return [
+      ..._printLines('CHECK-IN', align: PosAlign.center, bold: true),
       ..._printLines('KEY TAG', align: PosAlign.center, bold: true),
       ..._printLines(
         ticketId,
@@ -339,7 +419,7 @@ class EscPosReceiptBuilder {
   /// Narrow printers: label on one line, value on the next (fits 2 in receipt mode).
   List<int> _field(String label, String value) {
     if (!_isNarrow) {
-      return _printLines('$label: $value', align: PosAlign.left);
+      return _printLines(_twoColumnText('$label:', value));
     }
     return [
       ..._printLines(label, bold: true),

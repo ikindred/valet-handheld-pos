@@ -32,6 +32,7 @@ ThemeData appTheme() {
       onSecondary: AppColors.white,
       surface: AppColors.surface,
       onSurface: AppColors.textPrimary,
+      onSurfaceVariant: AppColors.textSecondary,
       error: AppColors.error,
       onError: AppColors.white,
     ),
@@ -93,6 +94,21 @@ ThemeData appTheme() {
         side: const BorderSide(color: AppColors.accent),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         textStyle: textTheme.labelLarge,
+      ),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: AppColors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      titleTextStyle: GoogleFonts.poppins(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+      ),
+      contentTextStyle: GoogleFonts.poppins(
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        height: 1.45,
+        color: AppColors.textSecondary,
       ),
     ),
   );

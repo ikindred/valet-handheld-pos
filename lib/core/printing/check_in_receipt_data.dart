@@ -1,4 +1,5 @@
 import '../../data/local/db/app_database.dart';
+import 'receipt_print_format.dart';
 
 /// Ticket row + optional UI fields not stored on [Ticket].
 class CheckInReceiptData {
@@ -13,6 +14,7 @@ class CheckInReceiptData {
     this.specialRequest,
     this.hasSignature = false,
     this.qrCode,
+    this.mallHours = ReceiptTemplateCopy.defaultMallHours,
   });
 
   final Ticket ticket;
@@ -27,4 +29,7 @@ class CheckInReceiptData {
 
   /// Server `qr_code` (or local ticket number when offline); used for receipt QR only.
   final String? qrCode;
+
+  /// Footer line (ASCII-safe; shown on customer copy).
+  final String mallHours;
 }

@@ -92,7 +92,18 @@ class _CheckInShellState extends State<CheckInShell> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  CheckInFlowHeader(stepIndex: stepIndex, totalSteps: 6),
+                  BlocBuilder<CheckInCubit, CheckInState>(
+                    buildWhen: (a, b) =>
+                        stepIndex == 5 && a.receiptParts != b.receiptParts,
+                    builder: (context, state) {
+                      return CheckInFlowHeader(
+                        stepIndex: stepIndex,
+                        totalSteps: 6,
+                        allStepsComplete:
+                            stepIndex == 5 && state.allPartsPrinted,
+                      );
+                    },
+                  ),
                   Expanded(child: widget.child),
                 ],
               ),
