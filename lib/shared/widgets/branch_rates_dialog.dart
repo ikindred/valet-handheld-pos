@@ -237,6 +237,12 @@ class _RatesOnlyDialogContentState extends State<_RatesOnlyDialogContent> {
                     'No vehicle-specific rates configured. Base rate applies to all types.',
                     style: branchRatesDialogSubtitleStyle(),
                   ),
+                ] else ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'No rates configured for this branch yet.',
+                    style: branchRatesDialogSubtitleStyle(),
+                  ),
                 ],
               ],
             ),

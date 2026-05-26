@@ -1,10 +1,12 @@
 import 'dart:convert';
 
 import 'package:flutter_esc_pos_utils_image_3/flutter_esc_pos_utils_image_3.dart';
+import 'package:image_v3/image_v3.dart' as img;
 import 'package:intl/intl.dart';
 
 import '../time/philippine_time.dart';
 import 'check_in_receipt_data.dart';
+import 'checkout_receipt_data.dart';
 import 'esc_pos_text_sanitize.dart';
 
 class EscPosReceiptBuilder {
@@ -53,6 +55,91 @@ class EscPosReceiptBuilder {
     bytes.addAll(gen.feed(2));
     bytes.addAll(gen.cut());
     return bytes;
+  }
+
+  /// Checkout payment receipt (single tear-off).
+  List<int> buildCheckoutReceipt(
+    CheckoutReceiptData data, {
+    img.Image? logo,
+  }) {
+    final gen = _generator();
+    final bytes = <int>[];
+
+    bytes.addAll(gen.reset());
+    bytes.addAll(_printerInit());
+    bytes.addAll(_checkoutHeader(gen, data, logo: logo));
+    bytes.addAll(
+      _printLines('CHECKOUT RECEIPT', align: PosAlign.center, bold: true),
+    );
+    bytes.addAll(_hr());
+
+    bytes.addAll(_field('Ticket', data.ticketNumber));
+    bytes.addAll(_field('Plate', data.plateNumber));
+    if (data.vehicleReceiptLine.isNotEmpty &&
+        data.vehicleReceiptLine != '—') {
+      bytes.addAll(_field('Vehicle', data.vehicleReceiptLine));
+    }
+    bytes.addAll(_field('Parking', data.slotLine));
+    if (data.invoiceNumber != null && data.invoiceNumber!.isNotEmpty) {
+      bytes.addAll(_field('Invoice', data.invoiceNumber!));
+    }
+
+    bytes.addAll(_field('Time in', data.timeInLabel));
+    bytes.addAll(_field('Time out', data.timeOutLabel));
+    bytes.addAll(_field('Duration', data.durationLabel));
+    bytes.addAll(_field('Valet in', data.valetInLabel));
+    bytes.addAll(_field('Valet out', data.valetOutLabel));
+
+    bytes.addAll(_hr());
+    bytes.addAll(_moneyRow(data.flatRateLabel, data.flatPesosLabel));
+    if (data.succeedingLabel.isNotEmpty) {
+      bytes.addAll(
+        _moneyRow(data.succeedingLabel, data.succeedingPesosLabel),
+      );
+    }
+    if (data.showOvernight) {
+      bytes.addAll(_moneyRow('Overnight', data.overnightPesosLabel));
+    }
+    bytes.addAll(_moneyRow('Total', data.totalPesosLabel, bold: true));
+    bytes.addAll(_moneyRow('Cash tendered', data.tenderedPesosLabel));
+    bytes.addAll(_moneyRow('Change', data.changePesosLabel, bold: true));
+
+    bytes.addAll(_hr());
+    if (_isNarrow) {
+      bytes.addAll(
+        _printLines('NOT an Official Receipt', align: PosAlign.center),
+      );
+      bytes.addAll(_printLines('(OR).', align: PosAlign.center));
+    } else {
+      bytes.addAll(
+        _printLines(
+          'NOTE: This is not an Official Receipt (OR).',
+          align: PosAlign.center,
+        ),
+      );
+    }
+    bytes.addAll(
+      _printLines(
+        'THANK YOU FOR USING VALET MASTER',
+        align: PosAlign.center,
+        bold: true,
+      ),
+    );
+    bytes.addAll(_printLines(data.mallHours, align: PosAlign.center));
+
+    bytes.addAll(gen.feed(3));
+    bytes.addAll(gen.cut());
+    return bytes;
+  }
+
+  List<int> _moneyRow(String label, String amount, {bool bold = false}) {
+    if (!_isNarrow) {
+      return _printLines('$label: $amount', bold: bold);
+    }
+    return [
+      ..._printLines(label, bold: true),
+      ..._printLines(amount, bold: bold),
+    ];
   }
 
   /// Check-in ticket: all three parts concatenated (legacy / tests).
@@ -141,6 +228,32 @@ class EscPosReceiptBuilder {
       ..._printLines('VALET MASTER', align: PosAlign.center, bold: true),
       ..._hr(),
     ];
+  }
+
+  List<int> _checkoutHeader(
+    Generator gen,
+    CheckoutReceiptData data, {
+    img.Image? logo,
+  }) {
+    final out = <int>[];
+    if (logo != null) {
+      final targetW = _isNarrow ? 168 : 220;
+      final resized = logo.width == targetW
+          ? logo
+          : img.copyResize(logo, width: targetW);
+      out.addAll(gen.image(resized, align: PosAlign.center));
+      out.addAll(gen.feed(1));
+    }
+    final branch = sanitizeEscPosText(data.branchName);
+    if (branch.isNotEmpty &&
+        branch.toLowerCase() != 'valet master') {
+      out.addAll(_printLines(branch, align: PosAlign.center, bold: true));
+    }
+    out.addAll(
+      _printLines('VALET MASTER', align: PosAlign.center, bold: true),
+    );
+    out.addAll(_hr());
+    return out;
   }
 
   List<int> _section(

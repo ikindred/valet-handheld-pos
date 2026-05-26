@@ -70,9 +70,15 @@ class CheckOutVehicleInfoScreen extends StatelessWidget {
           a.isLoadingPreview != b.isLoadingPreview ||
           a.driverOut != b.driverOut,
       builder: (context, state) {
-        if (state.ticket == null) {
+        if (state.needsScanStep) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (context.mounted) context.go('/check-out/step-1');
+          });
+          return const SizedBox.shrink();
+        }
+        if (state.isReceiptStep) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) context.go('/check-out/step-5');
           });
           return const SizedBox.shrink();
         }

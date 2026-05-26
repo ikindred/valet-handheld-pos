@@ -117,21 +117,12 @@ class BranchConfigService {
         final root = _asStringKeyedMap(res.data);
         final settings = _unwrapSettingsMap(root);
         if (settings != null) {
-          final start = _hhMmFromDynamic(
-            settings['overnight_start'] ??
-                settings['overnightStart'] ??
-                settings['overnightCutoff'] ??
-                settings['overnight_cutoff'] ??
-                settings['overnight_start_time'],
-          );
+          final overnight = OvernightWindow.parseTimesFromJson(settings);
+          final start = _hhMmFromDynamic(overnight.start);
           if (start != null) {
             entries.add((key: 'overnight_start_time', value: start));
           }
-          final end = _hhMmFromDynamic(
-            settings['overnight_end'] ??
-                settings['overnightEnd'] ??
-                settings['overnight_end_time'],
-          );
+          final end = _hhMmFromDynamic(overnight.end);
           if (end != null) {
             entries.add((key: 'overnight_end_time', value: end));
           } else {

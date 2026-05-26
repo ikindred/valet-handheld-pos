@@ -27,6 +27,42 @@ class OvernightWindow {
     return TimeOfDay(hour: h, minute: m);
   }
 
+  /// JSON keys for overnight window start/end (`HH:mm`, 24h military time).
+  static const overnightStartKeys = [
+    'overnightStartTime',
+    'overnight_start_time',
+    'overnight_start',
+    'overnightStart',
+    'overnight_cutoff',
+    'overnightCutoff',
+  ];
+
+  static const overnightEndKeys = [
+    'overnightEndTime',
+    'overnight_end_time',
+    'overnight_end',
+    'overnightEnd',
+  ];
+
+  /// Reads the first non-empty overnight start/end from [json].
+  static ({String? start, String? end}) parseTimesFromJson(
+    Map<String, dynamic> json,
+  ) =>
+      (
+        start: _pickTimeField(json, overnightStartKeys),
+        end: _pickTimeField(json, overnightEndKeys),
+      );
+
+  static String? _pickTimeField(Map<String, dynamic> json, List<String> keys) {
+    for (final k in keys) {
+      final v = json[k];
+      if (v == null) continue;
+      final s = v.toString().trim();
+      if (s.isNotEmpty) return s;
+    }
+    return null;
+  }
+
   /// Builds a window from API strings; null when [startRaw] is missing/invalid.
   static OvernightWindow? tryFromHhMm(String? startRaw, String? endRaw) {
     final start = parseHhMm(startRaw);

@@ -122,7 +122,7 @@ abstract final class DashboardStyles {
     fontWeight: FontWeight.w400,
     color: AppColors.textPrimary,
     height: 1.25,
-  );
+  ).copyWith(fontFamilyFallback: _pesoFallback);
 
   static TextStyle statusParked() => GoogleFonts.poppins(
     fontSize: 11,
@@ -204,7 +204,7 @@ class DashboardLeftRail extends StatelessWidget {
                             child: Padding(
                               padding: const EdgeInsets.all(4),
                               child: Image.asset(
-                                'assets/images/app_logo.png',
+                                'assets/images/spid_logo1.png',
                                 fit: BoxFit.contain,
                                 filterQuality: FilterQuality.high,
                               ),

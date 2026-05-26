@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/branch/overnight_window.dart';
 import '../../core/config/app_config.dart';
 import '../../core/logging/valet_log.dart';
 import '../../core/session/standard_parking_rates.dart';
@@ -60,6 +61,134 @@ class RateFetchService {
     } catch (e, st) {
       ValetLog.error('RateFetchService', 'GET area detail failed', e, st);
       return null;
+    }
+  }
+
+  /// `GET /branches/{branchId}` — nested `rate` object (Swagger branch detail).
+  Future<BranchRatesSnapshot?> fetchBranchRatesSnapshot(String branchId) async {
+    if (AppConfig.useStubApi) return null;
+    final token = await _bearer();
+    if (token == null) return null;
+
+    try {
+      final res = await _dio.get<dynamic>(
+        AppConfig.branchDetailUrl(branchId),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      if (res.statusCode != 200) {
+        ValetLog.warning(
+          'RateFetchService',
+          'GET branch detail HTTP ${res.statusCode}',
+        );
+        return null;
+      }
+      var snapshot = BranchRatesSnapshot.fromResponseData(
+        res.data,
+        defaultFlatBlockHours: CheckoutPricing.defaultFlatBlockHours,
+      );
+      if (snapshot == null) return null;
+
+      if (snapshot.vehicleTypeRates.isEmpty) {
+        final vehicleTypes = await _fetchVehicleTypeRateRows(branchId, token);
+        if (vehicleTypes.isNotEmpty) {
+          snapshot = BranchRatesSnapshot(
+            standard: snapshot.standard,
+            vehicleTypeRates: vehicleTypes,
+            overnightTimes: snapshot.overnightTimes,
+            flatBlockHours: snapshot.flatBlockHours,
+          );
+        }
+      }
+      return snapshot;
+    } catch (e, st) {
+      ValetLog.error('RateFetchService', 'GET branch detail failed', e, st);
+      return null;
+    }
+  }
+
+  Future<List<VehicleTypeRateRow>> _fetchVehicleTypeRateRows(
+    String branchId,
+    String token,
+  ) async {
+    try {
+      final res = await _dio.get<dynamic>(
+        AppConfig.branchVehicleTypeRatesUrl(branchId),
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      if (res.statusCode != 200) return const [];
+
+      final rows = <VehicleTypeRateRow>[];
+      for (final row in _asListOfMaps(res.data)) {
+        if (!_isActiveStatus(row['status'])) continue;
+        final name = row['name']?.toString().trim() ?? '';
+        if (name.isEmpty) continue;
+        final fees = ParkingRateFees.fromJson(row);
+        if (!fees.hasAny) continue;
+        rows.add(
+          VehicleTypeRateRow(
+            id: (row['id'] ?? name).toString(),
+            name: name,
+            fees: fees,
+          ),
+        );
+      }
+      return rows;
+    } catch (e, st) {
+      ValetLog.error(
+        'RateFetchService',
+        'GET vehicle-type rates failed',
+        e,
+        st,
+      );
+      return const [];
+    }
+  }
+
+  /// Persists branch detail + optional vehicle-type rates into Drift.
+  Future<void> cacheBranchRatesSnapshot({
+    required String branchId,
+    required BranchRatesSnapshot snapshot,
+  }) async {
+    await _persistOvernightWindowConfig(
+      branchId: branchId,
+      start: snapshot.overnightTimes.start,
+      end: snapshot.overnightTimes.end,
+    );
+    if (snapshot.standard.hasAny) {
+      await _upsertRateRow(
+        branchId: branchId,
+        vehicleType: 'Standard',
+        flatHours: snapshot.flatBlockHours,
+        flat: snapshot.standard.flatRate.toDouble(),
+        succeeding: snapshot.standard.succeedingRate.toDouble(),
+        overnight: snapshot.standard.overnightFee.toDouble(),
+        lost: snapshot.standard.lostTicketFee.toDouble(),
+        overnightCutoff: snapshot.overnightTimes.start,
+      );
+    }
+    for (final row in snapshot.vehicleTypeRates) {
+      final vt = _mapServerVehicleTypeName(row.name) ?? _vehicleTypeKey(row.name);
+      if (vt == null) continue;
+      await _upsertRateRow(
+        branchId: branchId,
+        vehicleType: vt,
+        flatHours: snapshot.flatBlockHours,
+        flat: row.fees.flatRate.toDouble(),
+        succeeding: row.fees.succeedingRate.toDouble(),
+        overnight: row.fees.overnightFee.toDouble(),
+        lost: row.fees.lostTicketFee.toDouble(),
+        overnightCutoff: snapshot.overnightTimes.start,
+      );
     }
   }
 
@@ -193,6 +322,14 @@ class RateFetchService {
       );
     }
 
+    if (standardRates == null) {
+      final snapshot = await fetchBranchRatesSnapshot(bid);
+      if (snapshot != null && snapshot.standard.hasAny) {
+        await cacheBranchRatesSnapshot(branchId: bid, snapshot: snapshot);
+        return;
+      }
+    }
+
     final lostFallback = (standardRates ?? StandardParkingRates.offlineDefault)
         .lostTicketFeePesos
         .toDouble();
@@ -284,27 +421,8 @@ class RateFetchService {
 
   static ({String? start, String? end}) _overnightTimesFromMap(
     Map<String, dynamic> m,
-  ) {
-    String? pick(List<String> keys) {
-      for (final k in keys) {
-        final v = m[k];
-        if (v == null) continue;
-        final s = v.toString().trim();
-        if (s.isNotEmpty) return s;
-      }
-      return null;
-    }
-
-    return (
-      start: pick(const [
-        'overnight_start',
-        'overnightStart',
-        'overnight_cutoff',
-        'overnightCutoff',
-      ]),
-      end: pick(const ['overnight_end', 'overnightEnd']),
-    );
-  }
+  ) =>
+      OvernightWindow.parseTimesFromJson(m);
 
   Future<void> _persistOvernightWindowConfig({
     required String branchId,

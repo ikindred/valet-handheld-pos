@@ -8,6 +8,7 @@ import 'package:qr/qr.dart';
 
 import '../time/philippine_time.dart';
 import 'check_in_receipt_data.dart';
+import 'checkout_receipt_data.dart';
 import 'esc_pos_text_sanitize.dart';
 
 /// Bitmap receipt tuned for 2 in (58 mm) portable printers (e.g. HPRT HM-A300).
@@ -54,6 +55,87 @@ class ReceiptRasterBuilder {
       ...gen.image(buildCheckInPartImage(data, part), align: PosAlign.center),
       ...gen.feed(3),
     ];
+  }
+
+  List<int> buildCheckoutEscPosBytes(
+    CheckoutReceiptData data,
+    CapabilityProfile profile, {
+    img.Image? logo,
+  }) {
+    final gen = Generator(paperSize, profile);
+    return [
+      ...gen.reset(),
+      ...gen.image(buildCheckoutImage(data, logo: logo), align: PosAlign.center),
+      ...gen.feed(3),
+      ...gen.cut(),
+    ];
+  }
+
+  img.Image buildCheckoutImage(
+    CheckoutReceiptData data, {
+    img.Image? logo,
+  }) {
+    return _render(_checkoutBlocks(data, logo: logo));
+  }
+
+  List<_Block> _checkoutBlocks(
+    CheckoutReceiptData data, {
+    img.Image? logo,
+  }) {
+    final branch = sanitizeEscPosText(data.branchName);
+    final blocks = <_Block>[
+      if (logo != null) _LogoBlock(logo),
+      if (branch.isNotEmpty && branch.toLowerCase() != 'valet master')
+        _TextBlock(branch, center: true, bold: true),
+      const _TextBlock('VALET MASTER', center: true, bold: true),
+      const _GapBlock(6),
+      const _RuleBlock(),
+      const _GapBlock(8),
+      const _SectionTitleBlock('CHECKOUT RECEIPT'),
+      const _GapBlock(4),
+      _FieldBlock('Ticket No.', data.ticketNumber, highlight: true),
+      _FieldBlock('Plate', data.plateNumber, highlight: true),
+      if (data.vehicleReceiptLine.isNotEmpty &&
+          data.vehicleReceiptLine != '—')
+        _FieldBlock('Vehicle', data.vehicleReceiptLine),
+      _FieldBlock('Parking', data.slotLine),
+      if (data.invoiceNumber != null && data.invoiceNumber!.isNotEmpty)
+        _FieldBlock('Invoice', data.invoiceNumber!),
+      _FieldBlock('Time in', data.timeInLabel),
+      _FieldBlock('Time out', data.timeOutLabel),
+      _FieldBlock('Duration', data.durationLabel),
+      _FieldBlock('Valet in', data.valetInLabel),
+      _FieldBlock('Valet out', data.valetOutLabel),
+      const _GapBlock(6),
+      const _RuleBlock(),
+      const _GapBlock(4),
+      _FieldBlock(data.flatRateLabel, data.flatPesosLabel),
+      if (data.succeedingLabel.isNotEmpty)
+        _FieldBlock(data.succeedingLabel, data.succeedingPesosLabel),
+      if (data.showOvernight)
+        _FieldBlock('Overnight', data.overnightPesosLabel),
+      _FieldBlock('Total', data.totalPesosLabel, highlight: true),
+      _FieldBlock('Cash tendered', data.tenderedPesosLabel),
+      _FieldBlock('Change', data.changePesosLabel, highlight: true),
+      const _GapBlock(6),
+      const _RuleBlock(),
+      const _GapBlock(4),
+      const _TextBlock(
+        'This is not an Official Receipt (OR).',
+        center: true,
+        small: true,
+      ),
+      const _GapBlock(4),
+      const _TextBlock(
+        'THANK YOU FOR USING VALET MASTER',
+        center: true,
+        bold: true,
+        small: true,
+      ),
+      _TextBlock(data.mallHours, center: true, small: true),
+      const _GapBlock(10),
+    ];
+    return blocks;
   }
 
   List<int> buildTestEscPosBytes({
@@ -496,6 +578,29 @@ class _TextBlock extends _Block {
     } else {
       b.paintTextRows(out, rows, x, y, font, lineHeight: lh);
     }
+    return measure(b);
+  }
+}
+
+class _LogoBlock extends _Block {
+  const _LogoBlock(this.image);
+  final img.Image image;
+
+  @override
+  int measure(ReceiptRasterBuilder b) {
+    final targetW = b._textWidthPx;
+    final h = (image.height * targetW / image.width).round();
+    return h + 10;
+  }
+
+  @override
+  int paint(ReceiptRasterBuilder b, img.Image out, int y) {
+    final targetW = b._textWidthPx;
+    final resized = image.width == targetW
+        ? image
+        : img.copyResize(image, width: targetW);
+    final x = (b._widthPx - resized.width) ~/ 2;
+    img.drawImage(out, resized, dstX: x, dstY: y);
     return measure(b);
   }
 }

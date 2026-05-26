@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../data/repositories/auth_repository.dart';
 import 'bluetooth_pos_printer.dart';
 import 'check_in_receipt_data.dart';
+import 'checkout_receipt_data.dart';
 import 'printer_connection_notifier.dart';
 import 'valet_print_service.dart';
 import 'widgets/printer_pairing_sheet.dart';
@@ -84,6 +85,18 @@ Future<bool> printCheckInFromContext(
         await service.printCheckIn(data, part: part);
       }
     },
+  );
+}
+
+/// Prints checkout payment receipt (Step 5).
+Future<bool> printCheckOutFromContext(
+  BuildContext context, {
+  required CheckoutReceiptData data,
+}) {
+  return runBluetoothPrint(
+    context,
+    printJob: () =>
+        context.read<ValetPrintService>().printCheckOut(data),
   );
 }
 

@@ -27,11 +27,11 @@ class CheckoutOrDivider extends StatelessWidget {
           if (stretch) {
             return Column(
               children: [
-                const Expanded(child: _Rule(axis: Axis.vertical)),
+                Expanded(child: _verticalRule()),
                 const SizedBox(height: 14),
                 _orLabel(),
                 const SizedBox(height: 14),
-                const Expanded(child: _Rule(axis: Axis.vertical)),
+                Expanded(child: _verticalRule()),
               ],
             );
           }
@@ -60,16 +60,37 @@ class CheckoutOrDivider extends StatelessWidget {
     );
   }
 
+  Widget _verticalRule() {
+    return Center(
+      child: Container(
+        width: 1,
+        constraints: const BoxConstraints(minHeight: 48),
+        color: _line,
+      ),
+    );
+  }
+
+  Widget _horizontalRule() {
+    return Align(
+      alignment: Alignment.center,
+      child: Container(
+        height: 1,
+        constraints: const BoxConstraints(minWidth: 24),
+        color: _line,
+      ),
+    );
+  }
+
   Widget _buildHorizontal() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          const Expanded(child: _Rule(axis: Axis.horizontal)),
+          Expanded(child: _horizontalRule()),
           const SizedBox(width: 14),
           _orLabel(),
           const SizedBox(width: 14),
-          const Expanded(child: _Rule(axis: Axis.horizontal)),
+          Expanded(child: _horizontalRule()),
         ],
       ),
     );
@@ -89,33 +110,6 @@ class CheckoutOrDivider extends StatelessWidget {
   }
 }
 
-class _Rule extends StatelessWidget {
-  const _Rule({required this.axis});
-
-  final Axis axis;
-
-  @override
-  Widget build(BuildContext context) {
-    if (axis == Axis.vertical) {
-      return Center(
-        child: Container(
-          width: 1,
-          constraints: const BoxConstraints(minHeight: 48),
-          color: CheckoutOrDivider._line,
-        ),
-      );
-    }
-    return Align(
-      alignment: Alignment.center,
-      child: Container(
-        height: 1,
-        constraints: const BoxConstraints(minWidth: 24),
-        color: CheckoutOrDivider._line,
-      ),
-    );
-  }
-}
-
 /// Horizontal **OR** between form fields with extra vertical breathing room.
 class CheckoutFieldOrDivider extends StatelessWidget {
   const CheckoutFieldOrDivider({super.key});
@@ -124,7 +118,7 @@ class CheckoutFieldOrDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 14),
-      child: const CheckoutOrDivider.horizontal(),
+      child: CheckoutOrDivider.horizontal(),
     );
   }
 }

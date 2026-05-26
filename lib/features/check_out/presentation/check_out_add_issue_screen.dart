@@ -84,9 +84,15 @@ class _CheckOutAddIssueScreenState extends State<CheckOutAddIssueScreen> {
     return BlocBuilder<CheckOutCubit, CheckOutState>(
       buildWhen: (a, b) => a.ticket != b.ticket,
       builder: (context, state) {
-        if (state.ticket == null) {
+        if (state.needsScanStep) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (context.mounted) context.go('/check-out/step-1');
+          });
+          return const SizedBox.shrink();
+        }
+        if (state.isReceiptStep) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) context.go('/check-out/step-5');
           });
           return const SizedBox.shrink();
         }

@@ -187,10 +187,28 @@ class DashboardCubit extends Cubit<DashboardState> {
       checkInsLastHour: checkInsLastHour,
       remainingSlots: remaining,
       totalSlots: total,
-      recent: summary.recent
-          .map((r) => DashboardRecentTx.fromSummaryRow(r.toRecentRow()))
-          .toList(),
+      recent: _sortRecentParkedFirst(
+        summary.recent
+            .map((r) => DashboardRecentTx.fromSummaryRow(r.toRecentRow()))
+            .toList(),
+      ),
     );
+  }
+
+  /// Parked rows first; checked-out order preserved within each group.
+  static List<DashboardRecentTx> _sortRecentParkedFirst(
+    List<DashboardRecentTx> items,
+  ) {
+    final parked = <DashboardRecentTx>[];
+    final checkedOut = <DashboardRecentTx>[];
+    for (final tx in items) {
+      if (tx.status == DashboardRecentStatus.parked) {
+        parked.add(tx);
+      } else {
+        checkedOut.add(tx);
+      }
+    }
+    return [...parked, ...checkedOut];
   }
 
   /// Slot capacity from area `levels[]` when branch/area UUIDs are set.
@@ -258,7 +276,9 @@ class DashboardCubit extends Cubit<DashboardState> {
       sinceIso8601: sinceIso,
     );
     final rawRecent = await _tickets.recentTicketsForShift(shiftId, limit: 10);
-    final recent = rawRecent.map(_recentFromTicket).toList();
+    final recent = _sortRecentParkedFirst(
+      rawRecent.map(_recentFromTicket).toList(),
+    );
 
     final areaSlots = await _slotCountsFromArea();
     final total = areaSlots != null && areaSlots.total > 0

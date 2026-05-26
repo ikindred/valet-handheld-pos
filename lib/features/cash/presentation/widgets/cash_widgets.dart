@@ -183,7 +183,7 @@ class _LogoMark extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(6),
         child: Image.asset(
-          'assets/images/app_logo.png',
+          'assets/images/spid_logo1.png',
           fit: BoxFit.contain,
           filterQuality: FilterQuality.high,
         ),

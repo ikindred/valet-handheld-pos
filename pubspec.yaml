@@ -134,7 +134,8 @@ flutter:
 
   assets:
     - .env
-    - assets/images/app_logo.png
+    - assets/images/spid_logo1.png
+    - assets/images/spid_logo.png
     - assets/images/vehicle_condition_car_top.png
     # Bundled Google Fonts (Poppins) — used when [GoogleFonts.config.allowRuntimeFetching] is false
     # so tablets without fonts.gstatic.com DNS still render typography.

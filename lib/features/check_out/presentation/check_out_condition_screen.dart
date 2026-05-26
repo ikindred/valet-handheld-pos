@@ -29,18 +29,26 @@ class CheckOutConditionScreen extends StatelessWidget {
     return BlocBuilder<CheckOutCubit, CheckOutState>(
       buildWhen: (a, b) =>
           a.ticket != b.ticket ||
+          a.receiptTicket != b.receiptTicket ||
           a.preview != b.preview ||
           a.isLoadingPreview != b.isLoadingPreview ||
           a.checkInDamage != b.checkInDamage ||
           a.checkoutAddedDamage != b.checkoutAddedDamage,
       builder: (context, state) {
-        final row = state.ticket;
-        if (row == null) {
+        if (state.needsScanStep) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (context.mounted) context.go('/check-out/step-1');
           });
           return const SizedBox.shrink();
         }
+        if (state.isReceiptStep) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) context.go('/check-out/step-5');
+          });
+          return const SizedBox.shrink();
+        }
+
+        final row = state.ticket!;
 
         final preview = state.preview;
         final signedIn = (row.signaturePng ?? '').trim().isNotEmpty;

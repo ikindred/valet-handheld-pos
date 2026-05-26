@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../core/branch/overnight_window.dart';
+
 /// Resolved fee schedule from checkout-preview `rates` (online only).
 class CheckoutPreviewRates extends Equatable {
   const CheckoutPreviewRates({
@@ -31,13 +33,9 @@ class CheckoutPreviewRates extends Equatable {
         : Map<String, dynamic>.from(raw);
     if (json.isEmpty) return null;
 
-    final start = _str(
-      json['overnight_start'] ??
-          json['overnightStart'] ??
-          json['overnight_cutoff'] ??
-          json['overnightCutoff'],
-    );
-    final end = _str(json['overnight_end'] ?? json['overnightEnd']);
+    final overnight = OvernightWindow.parseTimesFromJson(json);
+    final start = overnight.start ?? '';
+    final end = overnight.end ?? '';
 
     return CheckoutPreviewRates(
       flatRate: _dbl(json['flat_rate'] ?? json['flatRate']),
@@ -60,8 +58,6 @@ class CheckoutPreviewRates extends Equatable {
     if (v is num) return v.toDouble();
     return double.tryParse(v?.toString() ?? '') ?? 0;
   }
-
-  static String _str(dynamic v) => v?.toString().trim() ?? '';
 
   @override
   List<Object?> get props => [

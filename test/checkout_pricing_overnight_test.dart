@@ -78,4 +78,18 @@ void main() {
     expect(rates!.overnightStart, '01:30');
     expect(rates.overnightEnd, '05:30');
   });
+
+  test('CheckoutPreviewRates parses overnightStartTime and overnightEndTime', () {
+    final rates = CheckoutPreviewRates.fromJson({
+      'flatRate': 150,
+      'succeedingRate': 30,
+      'overnightFee': 500,
+      'lostTicketFee': 200,
+      'overnightStartTime': '01:30',
+      'overnightEndTime': '06:00',
+    });
+    expect(rates, isNotNull);
+    expect(rates!.overnightStart, '01:30');
+    expect(rates.overnightEnd, '06:00');
+  });
 }

@@ -241,8 +241,8 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                 child: Center(
                   child: Image.asset(
-                    'assets/images/app_logo.png',
-                    height: 56,
+                    'assets/images/spid_logo.png',
+                    height: 88,
                     fit: BoxFit.contain,
                   ),
                 ),

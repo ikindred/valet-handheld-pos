@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,6 +14,6 @@ void main() {
   testWidgets('ValetMasterApp builds and shows splash', (WidgetTester tester) async {
     await tester.pumpWidget(const ValetMasterApp());
     await tester.pump();
-    expect(find.text('Valet Master'), findsOneWidget);
+    expect(find.byType(Image), findsWidgets);
   });
 }

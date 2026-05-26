@@ -1,9 +1,6 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -165,46 +162,24 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
-  TextStyle _poppins(
-    double size,
-    FontWeight w,
-    Color color, {
-    double height = 1.0,
-  }) {
-    return GoogleFonts.poppins(
-      fontSize: size,
-      fontWeight: w,
-      color: color,
-      height: height,
-    );
-  }
+  static const _brandOrange = Color(0xFFE87722);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: const [
-              Color(0xFFFFFAF0),
-              Color(0xFFF1F5FF),
-            ],
-            transform: GradientRotation(105 * math.pi / 180),
-          ),
-        ),
-        child: Center(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 48),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Valet Master',
-                style: _poppins(40, FontWeight.w700, const Color(0xFFF68D00)),
+              Image.asset(
+                'assets/images/spid_logo.png',
+                fit: BoxFit.contain,
               ),
-              const SizedBox(height: 10),
-              Text(
-                'SMART PARKING TECHNOLOGIES',
-                style: _poppins(20, FontWeight.w500, const Color(0xFFAFAFAF)),
-              ),
+              const SizedBox(height: 32),
+              const CircularProgressIndicator(color: _brandOrange),
             ],
           ),
         ),

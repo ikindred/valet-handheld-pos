@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/formatting/peso_currency.dart';
+import '../../../core/printing/checkout_receipt_data.dart';
+import '../../../core/printing/print_flow.dart';
 import '../domain/checkout_preview_format.dart';
 import '../models/checkout_preview_response.dart';
 import '../../check_in/presentation/widgets/check_in_compact_tokens.dart';
@@ -14,8 +16,16 @@ import 'widgets/check_out_step_body.dart';
 import 'widgets/check_out_ui_tokens.dart';
 
 /// Step 5 — Complete + print
-class CheckOutPaymentDoneScreen extends StatelessWidget {
+class CheckOutPaymentDoneScreen extends StatefulWidget {
   const CheckOutPaymentDoneScreen({super.key});
+
+  @override
+  State<CheckOutPaymentDoneScreen> createState() =>
+      _CheckOutPaymentDoneScreenState();
+}
+
+class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
+  bool _printing = false;
 
   static const _grey500 = Color(0xFF6C7688);
   static const _navy = Color(0xFF0A1B39);
@@ -40,17 +50,31 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
     ).copyWith(fontFamilyFallback: _pesoGlyphFallback);
   }
 
-  void _printStub(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Bluetooth print is not connected yet.'),
-      ),
+  Future<void> _printReceipt(BuildContext context, CheckOutState state) async {
+    if (_printing) return;
+    final snap = state.receiptSnapshot;
+    if (snap == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Receipt data is not ready yet.')),
+      );
+      return;
+    }
+
+    setState(() => _printing = true);
+    final data = CheckoutReceiptData.fromSnapshot(
+      snap,
+      mallHours: state.mallHours,
+      branchDisplayName: state.branchName,
     );
+    await printCheckOutFromContext(context, data: data);
+    if (mounted) setState(() => _printing = false);
   }
 
   void _releaseDone(BuildContext context) {
-    context.read<CheckOutCubit>().reset();
+    // Navigate first — reset() before go() rebuilds step-5 and auto-redirects to
+    // step-1, which races with dashboard and can hit duplicate GlobalKey on OR divider.
     context.go('/dashboard');
+    context.read<CheckOutCubit>().reset();
   }
 
   @override
@@ -65,9 +89,14 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
           a.branchName != b.branchName ||
           a.mallHours != b.mallHours,
       builder: (context, state) {
-        if (state.receiptTicket == null) {
+        if (!state.isReceiptStep) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted) context.go('/check-out/step-1');
+            if (!context.mounted) return;
+            final path = GoRouterState.of(context).uri.path;
+            if (path == '/check-out/step-5') return;
+            context.go(
+              state.needsScanStep ? '/check-out/step-1' : '/check-out/step-4',
+            );
           });
           return const SizedBox.shrink();
         }
@@ -124,7 +153,10 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
                     change: change,
                   ),
                   const SizedBox(height: 16),
-                  _printBluetoothCard(onTap: () => _printStub(context)),
+                  _printBluetoothCard(
+                    printing: _printing,
+                    onTap: _printing ? null : () => _printReceipt(context, state),
+                  ),
                 ],
               );
 
@@ -135,6 +167,7 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
                 total: total,
                 change: change,
                 thankYou: thankYou,
+                branchName: branch,
                 mallHours: state.mallHours,
                 driverOut: state.driverOut,
               );
@@ -198,11 +231,14 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
     );
   }
 
-  Widget _printBluetoothCard({required VoidCallback onTap}) {
+  Widget _printBluetoothCard({
+    required bool printing,
+    required VoidCallback? onTap,
+  }) {
     return SizedBox(
       width: double.infinity,
       child: Material(
-        color: _orange,
+        color: _orange.withValues(alpha: onTap == null ? 0.65 : 1),
         elevation: 1,
         shadowColor: Colors.black.withValues(alpha: 0.08),
         shape: RoundedRectangleBorder(
@@ -217,14 +253,24 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  LucideIcons.bluetooth,
-                  color: Colors.white.withValues(alpha: 0.95),
-                  size: 20,
-                ),
+                if (printing)
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white.withValues(alpha: 0.95),
+                    ),
+                  )
+                else
+                  Icon(
+                    LucideIcons.bluetooth,
+                    color: Colors.white.withValues(alpha: 0.95),
+                    size: 20,
+                  ),
                 const SizedBox(width: 8),
                 Text(
-                  'Print Via Bluetooth',
+                  printing ? 'Printing…' : 'Print Via Bluetooth',
                   style: CheckOutUiTokens.body().copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -298,29 +344,56 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
             'Amount Paid',
             Text(
               peso2.format(total),
-              style: CheckOutUiTokens.body().copyWith(
-                color: _orange,
+              style: CheckOutUiTokens.money(
                 fontWeight: FontWeight.w700,
+                color: _orange,
               ),
             ),
           ),
           row(
             'Cash Tendered',
-            Text(peso2.format(tendered), style: CheckOutUiTokens.body()),
+            Text(
+              peso2.format(tendered),
+              style: CheckOutUiTokens.money(),
+            ),
           ),
           row(
             'Change Given',
             Text(
               peso2.format(change),
-              style: CheckOutUiTokens.body().copyWith(
-                color: _green,
+              style: CheckOutUiTokens.money(
                 fontWeight: FontWeight.w700,
+                color: _green,
               ),
             ),
             divider: false,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _dottedRule() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const dashWidth = 4.0;
+        const gap = 3.0;
+        final count =
+            ((constraints.maxWidth) / (dashWidth + gap)).floor().clamp(1, 80);
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var i = 0; i < count; i++) ...[
+              Container(
+                width: dashWidth,
+                height: 1,
+                color: Colors.black.withValues(alpha: 0.18),
+              ),
+              if (i < count - 1) SizedBox(width: gap),
+            ],
+          ],
+        );
+      },
     );
   }
 
@@ -331,6 +404,7 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
     required double total,
     required double change,
     required String thankYou,
+    required String branchName,
     required String mallHours,
     String? driverOut,
   }) {
@@ -392,7 +466,14 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(label, style: _poppins(10, FontWeight.w500, _grey500)),
-            Text(value, style: _poppins(10, FontWeight.w500, _navy)),
+            Text(
+              value,
+              style: CheckOutUiTokens.money(
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                color: _navy,
+              ),
+            ),
           ],
         ),
       );
@@ -414,6 +495,43 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Center(
+            child: Image.asset(
+              'assets/images/spid_logo1.png',
+              height: 42,
+              fit: BoxFit.contain,
+            ),
+          ),
+          if (branchName.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              branchName.toUpperCase(),
+              textAlign: TextAlign.center,
+              style: _poppins(9, FontWeight.w600, _grey500),
+            ),
+          ],
+          const SizedBox(height: 4),
+          Text(
+            'VALET MASTER',
+            textAlign: TextAlign.center,
+            style: _poppins(10, FontWeight.w700, _navy),
+          ),
+          const SizedBox(height: 12),
+          _dottedRule(),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            decoration: BoxDecoration(
+              color: _navy,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              'CHECKOUT RECEIPT',
+              textAlign: TextAlign.center,
+              style: _poppins(10, FontWeight.w600, Colors.white),
+            ),
+          ),
+          const SizedBox(height: 14),
           Text('TICKET NUMBER', style: CheckOutUiTokens.fieldLabel()),
           const SizedBox(height: 4),
           Text(
@@ -435,18 +553,22 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
               style: _poppins(10, FontWeight.w400, Colors.black),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          smallRow('Parking Slot', slot),
           smallRow('Time In', timeIn),
           smallRow('Time Out', timeOut),
           smallRow('Duration', duration),
-          smallRow('Parking Slot', slot),
           smallRow('Valet In', valetIn),
           smallRow('Valet Out', valetOut),
-          const SizedBox(height: 14),
-          feeRow(flatLabel, peso2.format(flatAmount)),
+          const SizedBox(height: 12),
+          _dottedRule(),
+          const SizedBox(height: 12),
+          feeRow(flatLabel, peso2.format(flatAmount > 0.009 ? flatAmount : total)),
           if (succeedingLabel.isNotEmpty && succeedingAmount > 0.009)
             feeRow(succeedingLabel, peso2.format(succeedingAmount)),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
+          _dottedRule(),
+          const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -454,7 +576,11 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
               Text('Total', style: _poppins(10, FontWeight.w500, _grey500)),
               Text(
                 peso2.format(total),
-                style: _poppins(20, FontWeight.w700, _orange),
+                style: CheckOutUiTokens.money(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: _orange,
+                ),
               ),
             ],
           ),
@@ -473,7 +599,11 @@ class CheckOutPaymentDoneScreen extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   peso2.format(change),
-                  style: _poppins(12, FontWeight.w700, _green),
+                  style: CheckOutUiTokens.money(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _green,
+                  ),
                 ),
               ],
             ),

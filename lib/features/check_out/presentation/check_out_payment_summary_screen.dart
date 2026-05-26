@@ -153,6 +153,7 @@ class _CheckOutPaymentSummaryScreenState
     return BlocBuilder<CheckOutCubit, CheckOutState>(
       buildWhen: (a, b) =>
           a.ticket != b.ticket ||
+          a.receiptTicket != b.receiptTicket ||
           a.preview != b.preview ||
           a.breakdown != b.breakdown ||
           a.serverTotal != b.serverTotal ||
@@ -163,9 +164,15 @@ class _CheckOutPaymentSummaryScreenState
           a.isLostTicket != b.isLostTicket ||
           a.rates != b.rates,
       builder: (context, state) {
-        if (state.ticket == null) {
+        if (state.needsScanStep) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (context.mounted) context.go('/check-out/step-1');
+          });
+          return const SizedBox.shrink();
+        }
+        if (state.isReceiptStep) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) context.go('/check-out/step-5');
           });
           return const SizedBox.shrink();
         }
@@ -366,10 +373,10 @@ class _PaymentRightPane extends StatelessWidget {
                 ),
                 child: Text(
                   'Use exact amount (${peso2.format(totalDue.toDouble())})',
-                  style: CheckOutUiTokens.helper().copyWith(
-                    color: _orange,
+                  style: CheckOutUiTokens.money(
+                    fontSize: CheckOutUiTokens.helper().fontSize,
                     fontWeight: FontWeight.w600,
-                    fontFamilyFallback: const ['Noto Sans', 'Roboto'],
+                    color: _orange,
                   ),
                 ),
               ),
@@ -393,7 +400,11 @@ class _PaymentRightPane extends StatelessWidget {
                   ),
                   Text(
                     changeLabel,
-                    style: CheckOutUiTokens.timeDisplay(color: _green),
+                    style: CheckOutUiTokens.money(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: _green,
+                    ),
                   ),
                 ],
               ),

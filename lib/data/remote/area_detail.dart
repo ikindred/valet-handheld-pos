@@ -1,3 +1,4 @@
+import '../../core/branch/overnight_window.dart';
 import '../../core/session/standard_parking_rates.dart';
 
 /// Fee row from area detail (`flatRate`, `succeedingRate`, etc.).
@@ -47,6 +48,26 @@ class ParkingRateFees {
       }
     }
     return 0;
+  }
+
+  /// Top-level fee fields, else nested `rate` / `rates` (branch detail API).
+  static Map<String, dynamic>? ratePayloadFrom(Map<String, dynamic> body) {
+    if (fromJson(body).hasAny) return body;
+    final nested = body['rate'] ?? body['rates'];
+    if (nested is Map<String, dynamic>) return nested;
+    if (nested is Map) return Map<String, dynamic>.from(nested);
+    return null;
+  }
+
+  static ParkingRateFees resolveFromBody(Map<String, dynamic> body) {
+    final payload = ratePayloadFrom(body);
+    if (payload != null) return fromJson(payload);
+    return const ParkingRateFees(
+      flatRate: 0,
+      succeedingRate: 0,
+      overnightFee: 0,
+      lostTicketFee: 0,
+    );
   }
 }
 
@@ -167,6 +188,65 @@ class AreaSlotCounts {
   static const empty = AreaSlotCounts(total: 0, available: 0, occupied: 0);
 }
 
+/// Branch standard rates from `GET /api/v1/branches/{id}` (`rate` object).
+class BranchRatesSnapshot {
+  const BranchRatesSnapshot({
+    required this.standard,
+    required this.vehicleTypeRates,
+    required this.overnightTimes,
+    required this.flatBlockHours,
+  });
+
+  final ParkingRateFees standard;
+  final List<VehicleTypeRateRow> vehicleTypeRates;
+  final ({String? start, String? end}) overnightTimes;
+  final int flatBlockHours;
+
+  static BranchRatesSnapshot? fromResponseData(
+    dynamic data, {
+    int defaultFlatBlockHours = 3,
+  }) {
+    final root = AreaDetail._asMapPublic(data);
+    if (root == null) return null;
+    final body = AreaDetail._unwrapPublic(body: root);
+
+    final standard = ParkingRateFees.resolveFromBody(body);
+    final vehicleRows = AreaDetail._parseVehicleTypeRatesPublic(body);
+    final overnight = AreaDetail._parseOvernightTimesPublic(body);
+    final ratePayload = ParkingRateFees.ratePayloadFrom(body);
+    var flatHours = defaultFlatBlockHours;
+    if (ratePayload != null) {
+      final fromApi = _flatHoursFromMap(ratePayload);
+      if (fromApi > 0) flatHours = fromApi;
+    } else {
+      final fromApi = _flatHoursFromMap(body);
+      if (fromApi > 0) flatHours = fromApi;
+    }
+
+    if (!standard.hasAny && vehicleRows.isEmpty) return null;
+
+    return BranchRatesSnapshot(
+      standard: standard,
+      vehicleTypeRates: vehicleRows,
+      overnightTimes: overnight,
+      flatBlockHours: flatHours,
+    );
+  }
+
+  static int _flatHoursFromMap(Map<String, dynamic> map) {
+    for (final key in const ['flatRateHours', 'flat_rate_hours']) {
+      final raw = map[key];
+      if (raw is int && raw > 0) return raw;
+      if (raw is num && raw > 0) return raw.round();
+      if (raw != null) {
+        final parsed = int.tryParse(raw.toString());
+        if (parsed != null && parsed > 0) return parsed;
+      }
+    }
+    return 0;
+  }
+}
+
 /// `GET /api/v1/branches/{branchId}/areas/{areaId}`.
 class AreaDetail {
   const AreaDetail({
@@ -209,7 +289,7 @@ class AreaDetail {
     if (root == null) return null;
     final body = _unwrap(body: root);
 
-    final standard = ParkingRateFees.fromJson(body);
+    final standard = ParkingRateFees.resolveFromBody(body);
     final vehicleRows = _parseVehicleTypeRates(body);
     final levels = _parseLevels(body);
 
@@ -228,28 +308,29 @@ class AreaDetail {
     );
   }
 
+  static Map<String, dynamic>? _asMapPublic(dynamic data) => _asMap(data);
+
+  static Map<String, dynamic> _unwrapPublic({required Map<String, dynamic> body}) =>
+      _unwrap(body: body);
+
+  static List<VehicleTypeRateRow> _parseVehicleTypeRatesPublic(
+    Map<String, dynamic> body,
+  ) =>
+      _parseVehicleTypeRates(body);
+
+  static ({String? start, String? end}) _parseOvernightTimesPublic(
+    Map<String, dynamic> body,
+  ) =>
+      _parseOvernightTimes(body);
+
   static ({String? start, String? end}) _parseOvernightTimes(
     Map<String, dynamic> body,
   ) {
-    String? pick(List<String> keys) {
-      for (final k in keys) {
-        final v = body[k];
-        if (v == null) continue;
-        final s = v.toString().trim();
-        if (s.isNotEmpty) return s;
-      }
-      return null;
-    }
-
-    return (
-      start: pick(const [
-        'overnight_start',
-        'overnightStart',
-        'overnight_cutoff',
-        'overnightCutoff',
-      ]),
-      end: pick(const ['overnight_end', 'overnightEnd']),
-    );
+    final direct = OvernightWindow.parseTimesFromJson(body);
+    if (direct.start != null || direct.end != null) return direct;
+    final payload = ParkingRateFees.ratePayloadFrom(body);
+    if (payload != null) return OvernightWindow.parseTimesFromJson(payload);
+    return direct;
   }
 
   static List<VehicleTypeRateRow> _parseVehicleTypeRates(

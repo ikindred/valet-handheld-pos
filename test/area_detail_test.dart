@@ -42,6 +42,39 @@ void main() {
     expect(detail.overnightTimes.end, '05:30');
   });
 
+  test('AreaDetail parses overnightStartTime and overnightEndTime', () {
+    final detail = AreaDetail.fromResponseData({
+      'flatRate': 100,
+      'overnightStartTime': '01:30',
+      'overnightEndTime': '06:00',
+    });
+    expect(detail, isNotNull);
+    expect(detail!.overnightTimes.start, '01:30');
+    expect(detail.overnightTimes.end, '06:00');
+  });
+
+  test('BranchRatesSnapshot parses nested rate from branch detail', () {
+    final snapshot = BranchRatesSnapshot.fromResponseData({
+      'id': 'branch-uuid',
+      'name': 'Jazz Mall',
+      'rate': {
+        'flatRate': 150,
+        'flatRateHours': 3,
+        'succeedingRate': 30,
+        'overnightFee': 200,
+        'lostTicketFee': 200,
+        'overnightStartTime': '01:30',
+        'overnightEndTime': '06:00',
+      },
+    });
+    expect(snapshot, isNotNull);
+    expect(snapshot!.standard.flatRate, 150);
+    expect(snapshot.standard.overnightFee, 200);
+    expect(snapshot.flatBlockHours, 3);
+    expect(snapshot.overnightTimes.start, '01:30');
+    expect(snapshot.overnightTimes.end, '06:00');
+  });
+
   test('AreaDetail parses levels and slot availability', () {
     final detail = AreaDetail.fromResponseData({
       'flatRate': 100,

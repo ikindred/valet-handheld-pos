@@ -26,13 +26,15 @@ abstract final class CheckOutUiTokens {
 
   static TextStyle body() => CheckInCompactTokens.fieldValue();
 
-  /// Amounts with ₱ — Poppins lacks U+20B1; Noto Sans renders the sign.
+  /// Amounts with ₱ — Poppins omits U+20B1; bundled Noto Sans renders the sign.
   static TextStyle money({double? fontSize, FontWeight? fontWeight, Color? color}) {
-    return body().copyWith(
-      fontSize: fontSize,
-      fontWeight: fontWeight,
-      color: color,
-      fontFamilyFallback: const ['Noto Sans', 'Roboto'],
+    final b = body();
+    return TextStyle(
+      fontFamily: 'Noto Sans',
+      fontSize: fontSize ?? b.fontSize,
+      fontWeight: fontWeight ?? b.fontWeight,
+      height: b.height,
+      color: color ?? b.color,
     );
   }
 
@@ -63,16 +65,15 @@ abstract final class CheckOutUiTokens {
         color: color ?? AppColors.textPrimary,
       ).copyWith(fontFamilyFallback: const ['Noto Sans', 'Roboto']);
 
-  static TextStyle amountHero({Color? color}) => GoogleFonts.poppins(
+  static TextStyle amountHero({Color? color}) => money(
         fontSize: 22,
         fontWeight: FontWeight.w700,
-        height: 1.15,
         color: color ?? const Color(0xFFF68D00),
-      ).copyWith(fontFamilyFallback: const ['Noto Sans', 'Roboto']);
+      );
 
-  static TextStyle pesoAccent(double size, Color color) => GoogleFonts.poppins(
+  static TextStyle pesoAccent(double size, Color color) => money(
         fontSize: size,
         fontWeight: FontWeight.w600,
         color: color,
-      ).copyWith(fontFamilyFallback: const ['Noto Sans', 'Roboto']);
+      );
 }

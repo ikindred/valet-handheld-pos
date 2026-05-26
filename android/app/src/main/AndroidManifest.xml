@@ -11,7 +11,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
 
     <application
-        android:label="valet_handheld_pos"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <!-- Landscape: stable when camera/QR initializes (see also lockLandscape in Dart). -->

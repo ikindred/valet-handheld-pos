@@ -32,7 +32,7 @@ class ValetMasterApp extends StatelessWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark,
       child: MaterialApp(
-        title: 'Valet Master',
+        title: 'SPiD Parking Valet',
         theme: appTheme(),
         debugShowCheckedModeBanner: false,
         home: AppProviders(

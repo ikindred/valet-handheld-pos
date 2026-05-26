@@ -9,7 +9,10 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/formatting/peso_currency.dart';
+import '../../../core/printing/checkout_receipt_data.dart';
+import '../../../core/printing/print_flow.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/ticket_service.dart';
 import '../../check_in/domain/vehicle_damage.dart';
 import '../../check_in/domain/vehicle_damage_zones.dart';
@@ -68,8 +71,10 @@ class TicketDetailScreen extends StatefulWidget {
 
 class _TicketDetailScreenState extends State<TicketDetailScreen> {
   Future<TicketDetailSnapshot?>? _future;
+  bool _printing = false;
 
   static final _dateFmt = DateFormat('MMM dd, yyyy, hh:mm a');
+  static const _defaultMallHours = 'MONDAY – SUNDAY · 10:00AM – 9:00PM';
 
   @override
   void didChangeDependencies() {
@@ -112,215 +117,321 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     return t;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: DashboardStyles.bg,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
-          onPressed: () => context.pop(),
+  Future<void> _reprintReceipt(TicketDetailSnapshot detail) async {
+    if (_printing) return;
+    final fee = detail.ticket.fee;
+    if (fee == null || fee < 0.009) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No payment amount on file for this ticket.'),
         ),
-        title: Text(
-          'Ticket details',
-          style: GoogleFonts.poppins(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
+      );
+      return;
+    }
+
+    setState(() => _printing = true);
+    try {
+      final auth = context.read<AuthRepository>();
+      final site = await auth.branchAndAreaFromDb();
+      final branch = site.branch.trim();
+      final area = site.area.trim();
+      final branchLabel = branch.isEmpty && area.isEmpty
+          ? null
+          : (area.isEmpty ? branch : '$branch · $area');
+
+      final data = CheckoutReceiptData.fromTicketDetail(
+        ticket: detail.ticket,
+        parking: detail.parking,
+        branchDisplayName: branchLabel,
+        mallHours: _defaultMallHours,
+      );
+      if (!mounted) return;
+      await printCheckOutFromContext(context, data: data);
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  Widget _buildBody(
+    AsyncSnapshot<TicketDetailSnapshot?> snap,
+    TicketDetailSnapshot? detail,
+  ) {
+    if (_future == null || snap.connectionState != ConnectionState.done) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (detail == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Ticket not found. Connect to load from server, or open this ticket on this device.',
+            style: DashboardStyles.statHint(),
+            textAlign: TextAlign.center,
           ),
         ),
-        centerTitle: false,
-      ),
-      body: FutureBuilder<TicketDetailSnapshot?>(
-        future: _future,
-        builder: (context, snap) {
-          if (_future == null ||
-              snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final detail = snap.data;
-          if (detail == null) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Ticket not found. Connect to load from server, or open this ticket on this device.',
-                  style: DashboardStyles.statHint(),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }
+      );
+    }
 
-          final t = detail.ticket;
-          final parking = detail.parking;
+    final t = detail.ticket;
+    final parking = detail.parking;
 
-          final checkIn = DateTime.tryParse(t.checkInAt);
-          final checkOut = DateTime.tryParse(t.checkOutAt ?? '');
-          final isCompleted = t.status == 'completed';
-          final isLost = t.status == 'lost';
+    final checkIn = DateTime.tryParse(t.checkInAt);
+    final checkOut = DateTime.tryParse(t.checkOutAt ?? '');
+    final isCompleted = t.status == 'completed';
+    final isLost = t.status == 'lost';
 
-          final checkInLabel =
-              checkIn != null ? _dateFmt.format(checkIn.toLocal()) : '—';
-          final checkOutLabel = checkOut != null
-              ? _dateFmt.format(checkOut.toLocal())
-              : '—';
+    final checkInLabel =
+        checkIn != null ? _dateFmt.format(checkIn.toLocal()) : '—';
+    final checkOutLabel =
+        checkOut != null ? _dateFmt.format(checkOut.toLocal()) : '—';
 
-          String durationLabel;
-          if (checkIn == null) {
-            durationLabel = '—';
-          } else if (isCompleted && checkOut != null) {
-            durationLabel = _formatDurationHm(checkOut.difference(checkIn));
-          } else {
-            durationLabel =
-                _formatDurationHm(DateTime.now().difference(checkIn));
-          }
+    String durationLabel;
+    if (checkIn == null) {
+      durationLabel = '—';
+    } else if (isCompleted && checkOut != null) {
+      durationLabel = _formatDurationHm(checkOut.difference(checkIn));
+    } else {
+      durationLabel = _formatDurationHm(DateTime.now().difference(checkIn));
+    }
 
-          final damageLines = parseTicketDamageMarkersForCheckout(t.damageMarkers)
-              .map(_damageLine)
-              .toList();
+    final damageLines = parseTicketDamageMarkersForCheckout(t.damageMarkers)
+        .map(_damageLine)
+        .toList();
 
-          final belongings = _belongingsList(t.personalBelongings);
-          final belongingsText =
-              belongings.isEmpty ? 'None' : belongings.join(', ');
+    final belongings = _belongingsList(t.personalBelongings);
+    final belongingsText =
+        belongings.isEmpty ? 'None' : belongings.join(', ');
 
-          final statusLabel = switch (t.status) {
-            'completed' => 'Completed',
-            'lost' => 'Lost',
-            _ => 'Active',
-          };
+    final statusLabel = switch (t.status) {
+      'completed' => 'Completed',
+      'lost' => 'Lost',
+      _ => 'Active',
+    };
 
-          final statusColor = isCompleted
-              ? const Color(0xFF6E7584)
-              : isLost
-                  ? const Color(0xFFB45309)
-                  : DashboardStyles.green;
+    final statusColor = isCompleted
+        ? const Color(0xFF6E7584)
+        : isLost
+            ? const Color(0xFFB45309)
+            : DashboardStyles.green;
 
-          final plate = t.plateNumber.trim().isEmpty ? '—' : t.plateNumber.trim();
-          final driverIn = _plainDriverName(t.driverIn);
-          final driverOut = _plainDriverName(t.driverOut);
+    final plate = t.plateNumber.trim().isEmpty ? '—' : t.plateNumber.trim();
+    final driverIn = _plainDriverName(t.driverIn);
+    final driverOut = _plainDriverName(t.driverOut);
 
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+      children: [
+        _HeroHeaderCard(
+          ticketId: t.id,
+          plate: plate,
+          statusLabel: statusLabel,
+          statusColor: statusColor,
+        ),
+        const SizedBox(height: 16),
+        if (parking != null && parking.hasAny)
+          _ParkingLocationCard(parking: parking)
+        else
+          _DetailCard(
+            icon: LucideIcons.mapPin,
+            title: 'Parking location',
+            child: Text(
+              'No parking details on file.',
+              style: _detailHintStyle(),
+            ),
+          ),
+        const SizedBox(height: 12),
+        _DetailCard(
+          icon: LucideIcons.car,
+          title: 'Vehicle',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _HeroHeaderCard(
-                ticketId: t.id,
-                plate: plate,
-                statusLabel: statusLabel,
-                statusColor: statusColor,
+              _detailKv('Plate', plate),
+              _detailKv(
+                'Make / model',
+                t.vehicleBrand.trim().isEmpty ? '—' : t.vehicleBrand.trim(),
               ),
-              const SizedBox(height: 16),
-              if (parking != null && parking.hasAny)
-                _ParkingLocationCard(parking: parking)
-              else
-                _DetailCard(
-                  icon: LucideIcons.mapPin,
-                  title: 'Parking location',
-                  child: Text(
-                    'No parking details on file.',
-                    style: _detailHintStyle(),
-                  ),
-                ),
-              const SizedBox(height: 12),
-              _DetailCard(
-                icon: LucideIcons.car,
-                title: 'Vehicle',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _detailKv('Plate', plate),
-                    _detailKv(
-                      'Make / model',
-                      t.vehicleBrand.trim().isEmpty ? '—' : t.vehicleBrand.trim(),
-                    ),
-                    _detailKv(
-                      'Color',
-                      t.vehicleColor.trim().isEmpty ? '—' : t.vehicleColor.trim(),
-                    ),
-                    _detailKv(
-                      'Type',
-                      t.vehicleType.trim().isEmpty ? '—' : t.vehicleType.trim(),
-                    ),
-                  ],
-                ),
+              _detailKv(
+                'Color',
+                t.vehicleColor.trim().isEmpty ? '—' : t.vehicleColor.trim(),
               ),
-              const SizedBox(height: 12),
-              _DetailCard(
-                icon: LucideIcons.phone,
-                title: 'Contact',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _detailKv(
-                      'Cellphone',
-                      t.cellphoneNumber.trim().isEmpty
-                          ? '—'
-                          : t.cellphoneNumber.trim(),
-                    ),
-                    if (driverIn != null) _detailKv('Driver in', driverIn),
-                    if (driverOut != null) _detailKv('Driver out', driverOut),
-                  ],
-                ),
+              _detailKv(
+                'Type',
+                t.vehicleType.trim().isEmpty ? '—' : t.vehicleType.trim(),
               ),
-              const SizedBox(height: 12),
-              _DetailCard(
-                icon: LucideIcons.clock,
-                title: 'Times',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _detailKv('Check-in', checkInLabel),
-                    _detailKv('Check-out', checkOutLabel),
-                    _detailKv(
-                      isCompleted ? 'Total duration' : 'Elapsed duration',
-                      durationLabel,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              _DetailCard(
-                icon: LucideIcons.alertCircle,
-                title: 'Damage markers',
-                child: damageLines.isEmpty
-                    ? Text('None', style: _detailValueStyle())
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final line in damageLines)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 6),
-                              child: Text(line, style: _detailValueStyle()),
-                            ),
-                        ],
-                      ),
-              ),
-              const SizedBox(height: 12),
-              _DetailCard(
-                icon: LucideIcons.briefcase,
-                title: 'Personal belongings',
-                child: Text(belongingsText, style: _detailValueStyle()),
-              ),
-              if (isCompleted && t.fee != null) ...[
-                const SizedBox(height: 12),
-                _DetailCard(
-                  icon: LucideIcons.creditCard,
-                  title: 'Payment',
-                  child: _detailKv(
-                    'Fee paid',
-                    PesoCurrency.currency(decimalDigits: 2).format(t.fee),
-                  ),
-                ),
-              ],
             ],
-          );
-        },
-      ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _DetailCard(
+          icon: LucideIcons.phone,
+          title: 'Contact',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _detailKv(
+                'Cellphone',
+                t.cellphoneNumber.trim().isEmpty
+                    ? '—'
+                    : t.cellphoneNumber.trim(),
+              ),
+              if (driverIn != null) _detailKv('Driver in', driverIn),
+              if (driverOut != null) _detailKv('Driver out', driverOut),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _DetailCard(
+          icon: LucideIcons.clock,
+          title: 'Times',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _detailKv('Check-in', checkInLabel),
+              _detailKv('Check-out', checkOutLabel),
+              _detailKv(
+                isCompleted ? 'Total duration' : 'Elapsed duration',
+                durationLabel,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _DetailCard(
+          icon: LucideIcons.alertCircle,
+          title: 'Damage markers',
+          child: damageLines.isEmpty
+              ? Text('None', style: _detailValueStyle())
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final line in damageLines)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text(line, style: _detailValueStyle()),
+                      ),
+                  ],
+                ),
+        ),
+        const SizedBox(height: 12),
+        _DetailCard(
+          icon: LucideIcons.briefcase,
+          title: 'Personal belongings',
+          child: Text(belongingsText, style: _detailValueStyle()),
+        ),
+        if (isCompleted && t.fee != null) ...[
+          const SizedBox(height: 12),
+          _DetailCard(
+            icon: LucideIcons.creditCard,
+            title: 'Payment',
+            child: _detailKv(
+              'Fee paid',
+              PesoCurrency.currency(decimalDigits: 2).format(t.fee),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<TicketDetailSnapshot?>(
+      future: _future,
+      builder: (context, snap) {
+        final detail =
+            snap.connectionState == ConnectionState.done ? snap.data : null;
+        final canReprint = detail != null &&
+            (detail.ticket.status == 'completed' ||
+                detail.ticket.status == 'lost');
+
+        return Scaffold(
+          backgroundColor: DashboardStyles.bg,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(
+                Icons.arrow_back_rounded,
+                color: AppColors.textPrimary,
+              ),
+              onPressed: () => context.pop(),
+            ),
+            title: Text(
+              'Ticket details',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            centerTitle: false,
+            actions: [
+              if (canReprint)
+                _ReprintAppBarAction(
+                  printing: _printing,
+                  onPressed:
+                      _printing ? null : () => _reprintReceipt(detail),
+                ),
+            ],
+          ),
+          body: _buildBody(snap, detail),
+        );
+      },
+    );
+  }
+
+}
+
+class _ReprintAppBarAction extends StatelessWidget {
+  const _ReprintAppBarAction({
+    required this.printing,
+    required this.onPressed,
+  });
+
+  final bool printing;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    if (printing) {
+      return const Padding(
+        padding: EdgeInsets.only(right: 16),
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: DashboardStyles.orange,
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: TextButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(
+          LucideIcons.printer,
+          size: 18,
+          color: DashboardStyles.orange,
+        ),
+        label: Text(
+          'Reprint',
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: DashboardStyles.orange,
+          ),
+        ),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          minimumSize: const Size(0, 40),
+        ),
+      ),
+    );
+  }
 }
 
 class _HeroHeaderCard extends StatelessWidget {

@@ -748,8 +748,8 @@ class _CloseCashKeypad extends StatelessWidget {
                   ),
                 ),
               if (keys[r].length == 1) ...[
-                const Expanded(child: SizedBox()),
-                const Expanded(child: SizedBox()),
+                Spacer(),
+                Spacer(),
               ],
             ],
           ),

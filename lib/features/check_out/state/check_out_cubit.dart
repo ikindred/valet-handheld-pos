@@ -109,6 +109,12 @@ class CheckOutState extends Equatable {
     return parking;
   }
 
+  /// True when the user must return to scan (no in-progress or completed receipt).
+  bool get needsScanStep => ticket == null && receiptTicket == null;
+
+  /// Step 5 receipt screen is showing.
+  bool get isReceiptStep => receiptTicket != null;
+
   CheckOutState copyWith({
     Ticket? ticket,
     CheckoutPreviewResponse? preview,
@@ -993,18 +999,11 @@ class CheckOutCubit extends Cubit<CheckOutState> {
                 );
 
       emit(
-        CheckOutState(
-          rates: state.rates,
-          flatBlockHours: state.flatBlockHours,
-          branchName: state.branchName,
-          mallHours: state.mallHours,
-          preview: preview,
-          serverTicketId: state.serverTicketId,
+        state.copyWith(
+          isSubmitting: false,
           serverTotal: serverTotal.toDouble(),
           invoiceNumber: invoice,
           checkOutResponse: response,
-          amountTenderedInput: state.amountTenderedInput,
-          driverOut: state.driverOut,
           receiptTicket: t.id,
           receiptTotalPesos: serverTotal.toDouble(),
           receiptChangePesos: change,
