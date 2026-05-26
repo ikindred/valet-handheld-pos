@@ -21,11 +21,11 @@ class EscPosReceiptBuilder {
   bool get _isNarrow => paperSize == PaperSize.mm58;
 
   int get _charsPerLine => switch (paperSize) {
-        PaperSize.mm80 => 48,
-        PaperSize.mm72 => 38,
-        PaperSize.mm58 => 32,
-        _ => 32,
-      };
+    PaperSize.mm80 => 48,
+    PaperSize.mm72 => 38,
+    PaperSize.mm58 => 32,
+    _ => 32,
+  };
 
   QRSize get _qrSize =>
       paperSize == PaperSize.mm58 ? QRSize.Size4 : QRSize.Size8;
@@ -44,7 +44,7 @@ class EscPosReceiptBuilder {
     final bytes = <int>[];
     bytes.addAll(gen.reset());
     bytes.addAll(_printerInit());
-    bytes.addAll(_brandHeader(gen, branchName));
+    bytes.addAll(_brandHeader(gen, branchName, logo: logo));
     bytes.addAll(_printLines(staffLabel));
     bytes.addAll(gen.feed(2));
     bytes.addAll(gen.cut());
@@ -52,16 +52,13 @@ class EscPosReceiptBuilder {
   }
 
   /// Checkout payment receipt (single tear-off).
-  List<int> buildCheckoutReceipt(
-    CheckoutReceiptData data, {
-    img.Image? logo,
-  }) {
+  List<int> buildCheckoutReceipt(CheckoutReceiptData data, {img.Image? logo}) {
     final gen = _generator();
     final bytes = <int>[];
 
     bytes.addAll(gen.reset());
     bytes.addAll(_printerInit());
-    bytes.addAll(_brandHeader(gen, data.branchName));
+    bytes.addAll(_brandHeader(gen, data.branchName, logo: logo));
     bytes.addAll(_checkoutSectionTitle());
     bytes.addAll(_labeledRow('Ticket', data.ticketNumber));
     bytes.addAll(_labeledRow('Plate', data.plateNumber));
@@ -82,9 +79,7 @@ class EscPosReceiptBuilder {
     bytes.addAll(_hr());
     bytes.addAll(_moneyRow(data.flatRateLabel, data.flatPesosLabel));
     if (data.succeedingLabel.isNotEmpty) {
-      bytes.addAll(
-        _moneyRow(data.succeedingLabel, data.succeedingPesosLabel),
-      );
+      bytes.addAll(_moneyRow(data.succeedingLabel, data.succeedingPesosLabel));
     }
     if (data.showOvernight) {
       bytes.addAll(_moneyRow('Overnight', data.overnightPesosLabel));
@@ -92,11 +87,7 @@ class EscPosReceiptBuilder {
     bytes.addAll(_moneyRow('Total', data.totalPesosLabel, bold: true));
     bytes.addAll(_moneyRow('Cash tendered', data.tenderedPesosLabel));
     bytes.addAll(
-      _moneyRow(
-        'Change',
-        data.changePesosLabel,
-        bold: data.changeIsNonZero,
-      ),
+      _moneyRow('Change', data.changePesosLabel, bold: data.changeIsNonZero),
     );
     bytes.addAll(_checkoutFooter(mallHours: data.mallHours));
 
@@ -109,28 +100,24 @@ class EscPosReceiptBuilder {
       _labeledRow(label, amount, bold: bold);
 
   List<int> _checkoutSectionTitle() => [
-        ..._hr(),
-        ..._printLines(
-          'CHECKOUT RECEIPT',
-          align: PosAlign.center,
-          bold: true,
-        ),
-        ..._hr(),
-      ];
+    ..._hr(),
+    ..._printLines('CHECKOUT RECEIPT', align: PosAlign.center, bold: true),
+    ..._hr(),
+  ];
 
   List<int> _checkoutFooter({required String mallHours}) => [
-        ..._hr(),
-        ..._printLines(
-          ReceiptTemplateCopy.orDisclaimerNote,
-          align: PosAlign.center,
-        ),
-        ..._printLines(
-          ReceiptTemplateCopy.thankYouLine,
-          align: PosAlign.center,
-          bold: true,
-        ),
-        ..._printLines(mallHours, align: PosAlign.center),
-      ];
+    ..._hr(),
+    ..._printLines(
+      ReceiptTemplateCopy.orDisclaimerNote,
+      align: PosAlign.center,
+    ),
+    ..._printLines(
+      ReceiptTemplateCopy.thankYouLine,
+      align: PosAlign.center,
+      bold: true,
+    ),
+    ..._printLines(mallHours, align: PosAlign.center),
+  ];
 
   /// Label left, value right (space-padded on wide paper).
   List<int> _labeledRow(String label, String value, {bool bold = false}) {
@@ -190,7 +177,7 @@ class EscPosReceiptBuilder {
 
     bytes.addAll(gen.reset());
     bytes.addAll(_printerInit());
-    bytes.addAll(_brandHeader(gen, data.branchName));
+    bytes.addAll(_brandHeader(gen, data.branchName, logo: logo));
 
     switch (part) {
       case 1:
@@ -241,7 +228,9 @@ class EscPosReceiptBuilder {
           ),
         );
       case 3:
-        bytes.addAll(_keyTag(ticketId: ticketId, plate: plate, slotLine: slotLine));
+        bytes.addAll(
+          _keyTag(ticketId: ticketId, plate: plate, slotLine: slotLine),
+        );
       default:
         throw ArgumentError.value(part, 'part', 'must be 1, 2, or 3');
     }
@@ -250,20 +239,29 @@ class EscPosReceiptBuilder {
     return bytes;
   }
 
-  List<int> _brandHeader(Generator gen, String branchName) {
-    final out = <int>[
-      ..._printLines('SPiD', align: PosAlign.center, bold: true),
-      ..._printLines(
-        'SMART PARKING TECHNOLOGIES',
-        align: PosAlign.center,
-      ),
-      ...gen.feed(1),
-      ..._printLines(
+  List<int> _brandHeader(Generator gen, String branchName, {img.Image? logo}) {
+    final out = <int>[];
+    if (logo != null) {
+      const targetW = 220;
+      final resized = logo.width == targetW
+          ? logo
+          : img.copyResize(logo, width: targetW);
+      final grayscale = img.grayscale(resized);
+      out.addAll(gen.imageRaster(grayscale, align: PosAlign.center));
+      out.addAll(gen.feed(1));
+    }
+    out.addAll(_printLines('SPiD', align: PosAlign.center, bold: true));
+    out.addAll(
+      _printLines('SMART PARKING TECHNOLOGIES', align: PosAlign.center),
+    );
+    out.addAll(gen.feed(1));
+    out.addAll(
+      _printLines(
         ReceiptTemplateCopy.brandName,
         align: PosAlign.center,
         bold: true,
       ),
-    ];
+    );
     final branch = sanitizeEscPosText(branchName);
     if (branch.isNotEmpty && branch.toLowerCase() != 'valet master') {
       out.addAll(_printLines(branch, align: PosAlign.center));
@@ -279,10 +277,7 @@ class EscPosReceiptBuilder {
   }) {
     final out = <int>[..._hr()];
     out.addAll(
-      _printLines(
-        ReceiptTemplateCopy.orDisclaimerNote,
-        align: PosAlign.center,
-      ),
+      _printLines(ReceiptTemplateCopy.orDisclaimerNote, align: PosAlign.center),
     );
     if (includeThankYou) {
       out.addAll(
@@ -355,20 +350,16 @@ class EscPosReceiptBuilder {
     if (special != null && special.trim().isNotEmpty) {
       out.addAll(_field('Notes', special.trim()));
     }
-    out.addAll(
-      _field('Signature', signatureSigned ? 'Signed' : 'Pending'),
-    );
+    out.addAll(_field('Signature', signatureSigned ? 'Signed' : 'Pending'));
 
     if (includeQr && qrPayload.isNotEmpty) {
       out.addAll(gen.feed(2));
+      out.addAll(_escAlign(PosAlign.center));
       out.addAll(gen.qrcode(qrPayload, size: _qrSize, align: PosAlign.center));
       out.addAll(gen.feed(2));
-      out.addAll(_printerInit());
+      out.addAll(_escAlign(PosAlign.left));
       out.addAll(
-        _printLines(
-          ReceiptTemplateCopy.scanQrHint,
-          align: PosAlign.center,
-        ),
+        _printLines(ReceiptTemplateCopy.scanQrHint, align: PosAlign.center),
       );
     }
 
@@ -388,11 +379,7 @@ class EscPosReceiptBuilder {
     }
     return [
       ..._printLines(label, bold: true),
-      ..._printLines(
-        value,
-        bold: true,
-        height: PosTextSize.size2,
-      ),
+      ..._printLines(value, bold: true, height: PosTextSize.size2),
     ];
   }
 
@@ -421,16 +408,13 @@ class EscPosReceiptBuilder {
     if (!_isNarrow) {
       return _printLines(_twoColumnText('$label:', value));
     }
-    return [
-      ..._printLines(label, bold: true),
-      ..._printLines(value),
-    ];
+    return [..._printLines(label, bold: true), ..._printLines(value)];
   }
 
   List<int> _hr() => _printLines(
-        List.filled(_charsPerLine, '-').join(),
-        align: PosAlign.center,
-      );
+    List.filled(_charsPerLine, '-').join(),
+    align: PosAlign.center,
+  );
 
   /// Plain ESC/POS lines (no GS absolute positioning — works on HPRT / most BT printers).
   List<int> _printLines(
@@ -456,9 +440,7 @@ class EscPosReceiptBuilder {
     }
 
     for (final line in _wrapText(sanitizeEscPosText(text), maxChars)) {
-      final printed = usePaddedAlign
-          ? _padLine(line, maxChars, align)
-          : line;
+      final printed = usePaddedAlign ? _padLine(line, maxChars, align) : line;
       out.addAll('$printed\n'.codeUnits);
     }
 

@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:image_v3/image_v3.dart' as img;
 
 abstract final class ReceiptBrandLogo {
-  static const assetPath = 'assets/images/spid_logo.png';
+  static const assetPath = 'assets/images/spid_black.png';
   static img.Image? _cache;
   static int _cacheMaxWidth = 0;
 
