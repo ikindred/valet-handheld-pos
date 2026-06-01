@@ -56,9 +56,8 @@ The tablet app is the **cashier and valet attendant-facing component** of the Va
 
 ### 📊 Reports
 
-- **Today Tab** — Live summary of the current shift (vehicles in, total collections)
-- **Transactions Tab** — Per-ticket log with plate numbers, time in/out, and amounts
-- **Cash Tab** — Running cash position across the shift
+- **Transactions** — Per-ticket log with search, filters, plate, time in/out, duration, slot, and status
+- **Cash** — Open / close cash screens (separate routes, not under Reports)
 
 ### ⚙️ Settings
 
@@ -161,7 +160,7 @@ Rates are fetched from the server and cached locally for offline use. No rates a
 | 10  | Check-Out Step 3 | Fee computation breakdown                                                       |
 | 11  | Check-Out Step 4 | Payment confirmation + receipt print                                            |
 | 12  | Close Cash       | End-of-shift cash tally and remittance                                          |
-| 13  | Reports          | Today / Transactions / Cash tabs                                                |
+| 13  | Reports          | Transactions list (search, filters, export placeholder)                           |
 | 14  | Settings         | Printer, branch, user config                                                    |
 
 ---

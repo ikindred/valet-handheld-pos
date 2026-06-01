@@ -9,7 +9,6 @@ import '../../../features/check_in/presentation/widgets/check_in_compact_tokens.
 import '../../storage/printer_prefs.dart';
 import '../../theme/app_theme.dart';
 import '../bluetooth_pos_printer.dart';
-import '../printer_config.dart';
 import '../printer_connection_notifier.dart';
 import '../printer_service.dart';
 import '../valet_print_service.dart';
@@ -36,7 +35,6 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
   bool _scanning = false;
   String? _error;
   PrinterDevice? _selected;
-  PrinterPaperWidth _paperWidth = PrinterPaperWidth.mm80;
   bool _preferBle = false;
   PrinterPrefs? _prefs;
 
@@ -63,7 +61,6 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
 
     setState(() {
       _prefs = prefs;
-      _paperWidth = prefs.paperWidth;
       _preferBle = prefs.useBle;
       _selected = savedDevice;
       if (savedDevice != null && !(_devices.any((d) => d.id == savedDevice!.id))) {
@@ -114,13 +111,6 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
         _error = e.toString();
       });
     }
-  }
-
-  Future<void> _savePaperWidth(PrinterPaperWidth width) async {
-    setState(() => _paperWidth = width);
-    final prefs = _prefs ?? await PrinterPrefs.load();
-    await prefs.setPaperWidth(width);
-    _prefs = prefs;
   }
 
   Future<void> _savePreferBle(bool value) async {
@@ -195,7 +185,7 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
           const SizedBox(height: 4),
           Text(
             'HPRT HM-A300: set printer menu Paper to Receipt (not Label). '
-            'App paper: 2 in (58 mm).',
+            'App paper: 3 in (80 mm).',
             style: CheckInCompactTokens.helperText(),
           ),
             const SizedBox(height: 4),
@@ -204,21 +194,6 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
               style: CheckInCompactTokens.bodyHint(),
             ),
             const SizedBox(height: 12),
-            Text('Paper width', style: CheckInCompactTokens.sectionTitle()),
-            const SizedBox(height: 6),
-            SegmentedButton<PrinterPaperWidth>(
-              segments: PrinterPaperWidth.values
-                  .map(
-                    (w) => ButtonSegment(
-                      value: w,
-                      label: Text(w.label, style: const TextStyle(fontSize: 12)),
-                    ),
-                  )
-                  .toList(),
-              selected: {_paperWidth},
-              onSelectionChanged: (s) => _savePaperWidth(s.first),
-            ),
-            const SizedBox(height: 8),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               dense: true,

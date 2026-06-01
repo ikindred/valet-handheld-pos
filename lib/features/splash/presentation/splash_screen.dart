@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../core/ui/app_background.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -162,25 +164,27 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
-  static const _brandOrange = Color(0xFFE87722);
+  static const _brandOrange = Color(0xFFF68D00);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 48),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset(
-                'assets/images/spid_logo.png',
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(height: 32),
-              const CircularProgressIndicator(color: _brandOrange),
-            ],
+      body: AppBackground(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 48),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/spid_logo.png',
+                  height: 72,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 32),
+                const CircularProgressIndicator(color: _brandOrange),
+              ],
+            ),
           ),
         ),
       ),

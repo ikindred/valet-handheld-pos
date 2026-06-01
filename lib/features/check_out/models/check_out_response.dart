@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../core/api/transaction_payment_fields.dart';
+
 /// POST `/transactions/{id}/check-out` — `{ invoice_number, transaction, preview }`.
 class CheckOutResponse extends Equatable {
   const CheckOutResponse({
@@ -7,6 +9,8 @@ class CheckOutResponse extends Equatable {
     required this.transactionId,
     required this.status,
     required this.total,
+    this.cashTendered,
+    this.changePesos,
   });
 
   final String invoiceNumber;
@@ -15,6 +19,9 @@ class CheckOutResponse extends Equatable {
 
   /// Authoritative amount from `transaction.amount`.
   final double total;
+
+  final double? cashTendered;
+  final double? changePesos;
 
   factory CheckOutResponse.fromResponseBody(Map<String, dynamic> root) {
     final invoice =
@@ -27,19 +34,20 @@ class CheckOutResponse extends Equatable {
 
     final transactionId = tx['id']?.toString() ?? '';
     final status = tx['status']?.toString() ?? '';
-    final amountRaw = tx['amount'] ?? tx['total_amount'] ?? tx['totalAmount'];
-    final total = amountRaw is num
-        ? amountRaw.toDouble()
-        : double.tryParse(amountRaw?.toString() ?? '') ?? 0.0;
+    final total = TransactionPaymentFields.amountFrom(tx) ?? 0.0;
+    final payment = TransactionPaymentFields.resolve(json: tx, amount: total);
 
     return CheckOutResponse(
       invoiceNumber: invoice,
       transactionId: transactionId,
       status: status,
       total: total,
+      cashTendered: payment.cashTendered,
+      changePesos: payment.change,
     );
   }
 
   @override
-  List<Object?> get props => [invoiceNumber, transactionId, status, total];
+  List<Object?> get props =>
+      [invoiceNumber, transactionId, status, total, cashTendered, changePesos];
 }

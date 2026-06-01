@@ -79,7 +79,7 @@ class RateService {
     final hours = pick.flatRateHours <= 0
         ? CheckoutPricing.defaultFlatBlockHours
         : pick.flatRateHours;
-    final overnight = await _resolveOvernightWindow(
+    final overnight = await resolveOvernightWindow(
       branchId: bid,
       driftRate: pick,
     );
@@ -112,7 +112,7 @@ class RateService {
       final hours = pick.flatRateHours <= 0
           ? CheckoutPricing.defaultFlatBlockHours
           : pick.flatRateHours;
-      final overnight = await _resolveOvernightWindow(
+      final overnight = await resolveOvernightWindow(
         branchId: bid,
         driftRate: pick,
       );
@@ -124,7 +124,7 @@ class RateService {
       );
     }
 
-    final overnight = await _resolveOvernightWindow(branchId: bid);
+    final overnight = await resolveOvernightWindow(branchId: bid);
     return (
       rates: StandardParkingRates.offlineDefault,
       flatBlockHours: CheckoutPricing.defaultFlatBlockHours,
@@ -154,8 +154,8 @@ class RateService {
         lostTicketFeePesos: pick.lostTicketFee.round(),
       );
 
-  /// Overnight window (`HH:mm`) from Drift + branch_config.
-  Future<({String start, String end})> _resolveOvernightWindow({
+  /// Overnight window (`HH:mm`) from rates row + `branch_config` cache.
+  Future<({String start, String end})> resolveOvernightWindow({
     required String branchId,
     Rate? driftRate,
   }) async {
@@ -179,8 +179,6 @@ class RateService {
       }
     }
 
-    if (start.isEmpty) start = CheckoutPricing.defaultOvernightStart;
-    if (end.isEmpty) end = CheckoutPricing.defaultOvernightEnd;
     return (start: start, end: end);
   }
 

@@ -8,6 +8,7 @@ import '../../data/repositories/auth_repository.dart';
 import '../../data/services/rate_fetch_service.dart';
 import '../../data/services/rate_service.dart';
 import '../../features/dashboard/presentation/widgets/dashboard_widgets.dart';
+import 'area_detail_dialog_data.dart';
 import 'area_dialog_loader.dart';
 import 'area_dialog_shell.dart';
 import 'area_parking_layout_section.dart';
@@ -31,6 +32,7 @@ Future<void> showAreaParkingSlotsDialog(
           authRepository: authRepository,
           rateFetchService: rateFetchService,
           rateService: rateService,
+          purpose: BranchAreaDialogPurpose.parkingSlots,
           allowOfflineFallback: false,
           builder: (context, result, retry) {
             if (result.hasError) {

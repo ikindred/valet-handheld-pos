@@ -1,7 +1,8 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../core/time/philippine_time.dart';
+import '../../../core/printing/receipt_print_format.dart';
 import '../../../data/local/db/app_database.dart';
-import '../models/checkout_preview_response.dart';
 import 'checkout_pricing.dart';
 
 /// Immutable receipt data captured at checkout finalize (ticket row is cleared from state after).
@@ -26,6 +27,8 @@ class CheckoutReceiptSnapshot extends Equatable {
     required this.succeedingExtraMinutes,
     required this.overnightApplied,
     required this.overnightPesos,
+    this.overnightStart = '',
+    this.overnightEnd = '',
     required this.totalPesos,
     required this.amountTendered,
     required this.changePesos,
@@ -52,6 +55,10 @@ class CheckoutReceiptSnapshot extends Equatable {
   final int succeedingExtraMinutes;
   final bool overnightApplied;
   final double overnightPesos;
+  /// Overnight window start in `HH:mm` 24-hour format (e.g. `"21:00"`).
+  final String overnightStart;
+  /// Overnight window end in `HH:mm` 24-hour format (e.g. `"05:00"`).
+  final String overnightEnd;
   final double totalPesos;
   final double amountTendered;
   final double changePesos;
@@ -78,47 +85,61 @@ class CheckoutReceiptSnapshot extends Equatable {
     return '$h hrs $m mins';
   }
 
-  factory CheckoutReceiptSnapshot.fromPreview({
+  /// Receipt snapshot at finalize — duration and fee lines from local rates.
+  factory CheckoutReceiptSnapshot.fromCheckoutFinalize({
     required String localTicketId,
-    required CheckoutPreviewResponse preview,
+    required Ticket ticket,
+    required CheckoutBreakdown breakdown,
+    required int flatBlockHours,
     required double totalPesos,
     required double tendered,
     required double change,
+    required int timeOutUnix,
     String? invoiceNumber,
     String? branchName,
+    String? plateNumber,
+    String? vehicleReceiptLine,
+    String? slotLine,
+    String? valetIn,
+    String? valetOut,
+    String overnightStart = '',
+    String overnightEnd = '',
   }) {
-    final pt = preview.ticket;
-    final parsedIn = DateTime.tryParse(pt.timeIn)?.toUtc();
-    final parsedOut = DateTime.tryParse(pt.timeOut ?? '')?.toUtc();
+    final parsedIn = PhilippineTime.fromApiIso(ticket.checkInAt);
+    final parsedOut = PhilippineTime.fromUnixSeconds(timeOutUnix);
     final timeInUnix = parsedIn != null
         ? parsedIn.millisecondsSinceEpoch ~/ 1000
-        : 0;
-    final timeOutUnix = parsedOut != null
-        ? parsedOut.millisecondsSinceEpoch ~/ 1000
-        : DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+        : timeOutUnix;
+    final durationMinutes = parsedIn != null
+        ? CheckoutPricing.durationMinutesCeil(parsedIn, parsedOut)
+        : breakdown.durationMinutes;
+    final flatMins = flatBlockHours * 60;
+    final extraMins = (durationMinutes - flatMins).clamp(0, 1 << 30);
 
     return CheckoutReceiptSnapshot(
       ticketNumber: localTicketId,
-      plateNumber: pt.plate.isNotEmpty ? pt.plate : preview.releaseSummary.plate,
-      vehicleReceiptLine: pt.vehicleReceiptLine,
-      customerName: preview.releaseSummary.customer,
+      plateNumber: plateNumber ?? ticket.plateNumber.trim(),
+      vehicleReceiptLine:
+          vehicleReceiptLine ?? vehicleReceiptLineFromTicket(ticket),
       timeInUnix: timeInUnix,
       timeOutUnix: timeOutUnix,
-      durationMinutes: 0,
-      durationLabel: pt.duration.isNotEmpty
-          ? pt.duration
-          : preview.releaseSummary.duration,
-      slotLine: pt.parkingLocationLine.isNotEmpty ? pt.parkingLocationLine : '—',
-      valetName: pt.valetIn,
-      valetOutName: pt.valetOut,
-      flatBlockHours: CheckoutPricing.defaultFlatBlockHours,
-      flatPesos: pt.flatRateAmount,
-      flatRateLabel: pt.flatRateLabel,
-      succeedingPesos: pt.succeedingRateAmount,
-      succeedingTimeLabel: pt.succeedingTimeLabel,
-      succeedingExtraMinutes: 0,
-      overnightApplied: false,
-      overnightPesos: 0,
+      durationMinutes: durationMinutes,
+      durationLabel: ReceiptPrintFormat.durationLabel(durationMinutes),
+      slotLine: slotLine ?? slotLineFromTicket(ticket),
+      valetName: valetIn,
+      valetOutName: valetOut,
+      flatBlockHours: flatBlockHours,
+      flatPesos: breakdown.flatRateAmount,
+      flatRateLabel: 'Flat rate (${flatBlockHours}h)',
+      succeedingPesos: breakdown.succeedingAmount,
+      succeedingTimeLabel: extraMins > 0
+          ? ReceiptPrintFormat.durationLabel(extraMins)
+          : null,
+      succeedingExtraMinutes: extraMins,
+      overnightApplied: breakdown.overnightApplied,
+      overnightPesos: breakdown.overnightAmount,
+      overnightStart: overnightStart,
+      overnightEnd: overnightEnd,
       totalPesos: totalPesos,
       amountTendered: tendered,
       changePesos: change,
@@ -135,11 +156,13 @@ class CheckoutReceiptSnapshot extends Equatable {
     required int timeOutUnix,
     int flatBlockHours = CheckoutPricing.defaultFlatBlockHours,
     double? totalPesos,
+    String overnightStart = '',
+    String overnightEnd = '',
   }) {
     final flatMins = flatBlockHours * 60;
     final extraMins = (b.durationMinutes - flatMins).clamp(0, 1 << 30);
     final branch = ticket.branchId.trim();
-    final parsedIn = DateTime.tryParse(ticket.checkInAt)?.toUtc();
+    final parsedIn = PhilippineTime.fromApiIso(ticket.checkInAt);
     final timeInUnix = parsedIn != null
         ? parsedIn.millisecondsSinceEpoch ~/ 1000
         : timeOutUnix;
@@ -159,6 +182,8 @@ class CheckoutReceiptSnapshot extends Equatable {
       succeedingExtraMinutes: extraMins,
       overnightApplied: b.overnightApplied,
       overnightPesos: b.overnightAmount,
+      overnightStart: overnightStart,
+      overnightEnd: overnightEnd,
       totalPesos: totalPesos ?? b.total,
       amountTendered: tendered,
       changePesos: change,
@@ -209,6 +234,8 @@ class CheckoutReceiptSnapshot extends Equatable {
         succeedingExtraMinutes,
         overnightApplied,
         overnightPesos,
+        overnightStart,
+        overnightEnd,
         totalPesos,
         amountTendered,
         changePesos,

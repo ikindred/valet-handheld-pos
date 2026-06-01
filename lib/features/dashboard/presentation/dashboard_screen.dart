@@ -61,7 +61,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: DashboardStyles.bg,
+        backgroundColor: null,
         body: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -220,9 +220,9 @@ class _HeaderRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(greeting, style: DashboardStyles.greeting()),
+              Text(greeting, style: DashboardStyles.greetingOf(context)),
               const SizedBox(height: 3),
-              Text(subtitle, style: DashboardStyles.headerSubtitle()),
+              Text(subtitle, style: DashboardStyles.headerSubtitleOf(context)),
             ],
           ),
         ),
@@ -269,7 +269,7 @@ class _StatsRow extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(
           (dashboard as DashboardError).message,
-          style: DashboardStyles.statHint(),
+          style: DashboardStyles.statHintOf(context),
         ),
       );
     }
@@ -448,23 +448,23 @@ class _RecentTransactionsCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
-      decoration: DashboardStyles.cardDecoration(),
+      decoration: DashboardStyles.cardDecorationOf(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('RECENT TRANSACTION', style: DashboardStyles.sectionTitle()),
+          Text('RECENT TRANSACTION', style: DashboardStyles.sectionTitleOf(context)),
           const SizedBox(height: 8),
           const Divider(height: 1, color: _dividerColor),
           if (rows.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Text(
-                dashboard is DashboardLoading
-                    ? 'Loading…'
-                    : 'No recent transactions for this shift.',
-                style: DashboardStyles.statHint(),
-                textAlign: TextAlign.center,
-              ),
+              child:           Text(
+            dashboard is DashboardLoading
+                ? 'Loading…'
+                : 'No recent transactions for this shift.',
+            style: DashboardStyles.statHintOf(context),
+            textAlign: TextAlign.center,
+          ),
             )
           else
             for (var i = 0; i < rows.length; i++) ...[

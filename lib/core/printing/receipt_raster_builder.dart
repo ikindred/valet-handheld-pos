@@ -118,7 +118,7 @@ class ReceiptRasterBuilder {
       if (data.succeedingLabel.isNotEmpty)
         _TwoColumnFieldBlock(data.succeedingLabel, data.succeedingPesosLabel),
       if (data.showOvernight)
-        _TwoColumnFieldBlock('Overnight', data.overnightPesosLabel),
+        _TwoColumnFieldBlock(data.overnightRowLabel, data.overnightPesosLabel),
       _TwoColumnFieldBlock('Total', data.totalPesosLabel, boldValue: true),
       _TwoColumnFieldBlock('Cash tendered', data.tenderedPesosLabel),
       _TwoColumnFieldBlock(
@@ -127,7 +127,7 @@ class ReceiptRasterBuilder {
         boldValue: data.changeIsNonZero,
       ),
       ..._checkoutFooter(mallHours: data.mallHours),
-      const _GapBlock(10),
+      const _GapBlock(4),
     ];
   }
 
@@ -151,12 +151,6 @@ class ReceiptRasterBuilder {
   List<_Block> _checkoutFooter({required String mallHours}) => [
         const _GapBlock(6),
         const _RuleBlock(),
-        const _GapBlock(4),
-        const _TextBlock(
-          ReceiptTemplateCopy.orDisclaimerNote,
-          center: true,
-          small: true,
-        ),
         const _GapBlock(4),
         const _TextBlock(
           ReceiptTemplateCopy.thankYouLine,
@@ -253,7 +247,7 @@ class ReceiptRasterBuilder {
             includeQr: true,
             includeThankYouFooter: true,
           ),
-          const _GapBlock(10),
+          const _GapBlock(32),
         ],
       3 => [
           ...header,
@@ -343,13 +337,6 @@ class ReceiptRasterBuilder {
       ]);
     }
 
-    blocks.add(
-      const _TextBlock(
-        ReceiptTemplateCopy.orDisclaimerNote,
-        center: true,
-        small: true,
-      ),
-    );
     return blocks;
   }
 

@@ -5,7 +5,18 @@ class PhilippineTime {
   static const Duration _utcOffset = Duration(hours: 8);
 
   /// Current date/time in Asia/Manila as a local [DateTime] (components are PH wall time).
-  static DateTime now() => DateTime.now().toUtc().add(_utcOffset);
+  /// Returns a non-UTC DateTime so wallClock() does not double-shift it.
+  static DateTime now() => fromUtc(DateTime.now().toUtc());
+
+  /// Current instant in UTC (for API `time_out` and receipt unix).
+  static DateTime utcNow() => DateTime.now().toUtc();
+
+  /// UTC ISO-8601 with `Z` for `POST …/check-out` `time_out`.
+  static String apiIsoInstant([DateTime? utc]) =>
+      (utc ?? utcNow()).toIso8601String();
+
+  static int unixSecondsUtc([DateTime? utc]) =>
+      (utc ?? utcNow()).millisecondsSinceEpoch ~/ 1000;
 
   /// ISO-8601 wall time in Manila (no `Z` / offset — stored as-is in Drift).
   static String iso8601Now() => formatIso(now());

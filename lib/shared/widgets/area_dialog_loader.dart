@@ -14,6 +14,7 @@ class AreaDialogLoader extends StatefulWidget {
     required this.rateFetchService,
     required this.rateService,
     required this.allowOfflineFallback,
+    this.purpose = BranchAreaDialogPurpose.rates,
     required this.builder,
   });
 
@@ -21,6 +22,7 @@ class AreaDialogLoader extends StatefulWidget {
   final RateFetchService rateFetchService;
   final RateService rateService;
   final bool allowOfflineFallback;
+  final BranchAreaDialogPurpose purpose;
   final Widget Function(
     BuildContext context,
     BranchAreaLoadResult result,
@@ -44,6 +46,7 @@ class _AreaDialogLoaderState extends State<AreaDialogLoader> {
         authRepository: widget.authRepository,
         rateFetchService: widget.rateFetchService,
         rateService: widget.rateService,
+        purpose: widget.purpose,
         allowOfflineFallback: widget.allowOfflineFallback,
       );
 

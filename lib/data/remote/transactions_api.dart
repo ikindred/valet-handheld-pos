@@ -8,6 +8,7 @@ import '../../features/check_in/models/check_in_response.dart';
 import '../../features/check_out/models/check_out_response.dart';
 import '../../features/check_out/models/checkout_preview_rates.dart';
 import '../../features/check_out/models/checkout_preview_response.dart';
+import '../../features/reports/domain/reports_transactions_page.dart';
 import 'api_error_message.dart';
 import 'check_in_exceptions.dart';
 import 'checkout_exceptions.dart';
@@ -57,6 +58,73 @@ class TransactionsApi {
       options: Options(headers: {'Authorization': 'Bearer $token'}),
     );
     return _parseList(res.data);
+  }
+
+  /// GET [AppConfig.reportsTransactions] — mobile Reports tab (paginated, filtered).
+  ///
+  /// Requires open shift (Bearer token). Query: `search`, `status`, `date_from`,
+  /// `date_to` (`YYYY-MM-DD`, inclusive range), `sort`, `limit`, `page`.
+  Future<ReportsTransactionsPage> fetchReportsTransactions({
+    required String token,
+    String? search,
+    String? status,
+    String? dateFrom,
+    String? dateTo,
+    String sort = 'desc',
+    int limit = 20,
+    int page = 1,
+  }) async {
+    if (AppConfig.useStubApi) {
+      return ReportsTransactionsPage(
+        total: 1,
+        page: 1,
+        limit: limit,
+        totalPages: 1,
+        rows: [
+          ReportsTicketRowMapper.fromApi({
+            'id': '00000000-0000-4000-8000-000000000099',
+            'ticket_number': 'TKT-0123',
+            'plate_number': 'ABC1234',
+            'vehicle': 'Toyota Vios',
+            'color': 'White',
+            'time_in': '8:00 AM',
+            'duration_display': '1h 20m',
+            'duration_minutes': 80,
+            'slot': 'A-12',
+            'status': 'active',
+            'amount': 150,
+          }),
+        ],
+      );
+    }
+    final params = <String, dynamic>{
+      'limit': limit,
+      'page': page,
+      'sort': sort,
+    };
+    final q = search?.trim();
+    if (q != null && q.isNotEmpty) params['search'] = q;
+    final st = status?.trim();
+    if (st != null && st.isNotEmpty) params['status'] = st;
+    final from = dateFrom?.trim();
+    if (from != null && from.isNotEmpty) params['date_from'] = from;
+    final to = dateTo?.trim();
+    if (to != null && to.isNotEmpty) params['date_to'] = to;
+
+    try {
+      final res = await _dio.get<dynamic>(
+        AppConfig.reportsTransactions,
+        queryParameters: params,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (_) => true,
+        ),
+      );
+      _throwIfBadResponse(res, 'GET reports/transactions');
+      return ReportsTransactionsPage.fromJson(res.data);
+    } on DioException catch (e) {
+      throw _fromDio(e, 'GET reports/transactions');
+    }
   }
 
   /// GET [AppConfig.transactionGetUrl] — single transaction by server UUID.
@@ -159,6 +227,7 @@ class TransactionsApi {
     required String timeOut,
     required bool isOvernight,
     required bool ticketLost,
+    double? cashTendered,
     String? driverOut,
     List<Map<String, dynamic>>? conditionCheckout,
   }) async {
@@ -184,6 +253,9 @@ class TransactionsApi {
       'preview': <String, dynamic>{},
       'condition_checkout': conditionCheckout ?? const [],
     };
+    if (cashTendered != null && cashTendered > 0.009) {
+      body['cash_tendered'] = cashTendered;
+    }
     final driver = driverOut?.trim();
     if (driver != null && driver.isNotEmpty) {
       body['driver_out'] = driver;
@@ -373,7 +445,10 @@ class TransactionsApi {
         'color': '',
         'type': '',
       },
-      'status': 'active',
+      'status': 'completed',
+      'amount': 150,
+      'cash_tendered': 200,
+      'change': {},
     };
   }
 

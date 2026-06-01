@@ -5,6 +5,12 @@ import '../../data/services/rate_fetch_service.dart';
 import '../../data/services/rate_service.dart';
 import '../../features/check_out/domain/checkout_pricing.dart';
 
+/// Whether the dialog needs fee rows or parking levels from area detail.
+enum BranchAreaDialogPurpose {
+  rates,
+  parkingSlots,
+}
+
 /// Rates + parking layout — area detail first; branch detail `rate` as fallback.
 class BranchAreaDialogData {
   const BranchAreaDialogData({
@@ -12,6 +18,8 @@ class BranchAreaDialogData {
     required this.standard,
     required this.vehicleTypeRates,
     required this.levels,
+    this.overnightStart = '',
+    this.overnightEnd = '',
     this.fromAreaApi = false,
   });
 
@@ -19,6 +27,10 @@ class BranchAreaDialogData {
   final ParkingRateFees standard;
   final List<VehicleTypeRateRow> vehicleTypeRates;
   final List<AreaParkingLevel> levels;
+
+  /// Overnight billing window (`HH:mm`, 24h) from branch/area rates API.
+  final String overnightStart;
+  final String overnightEnd;
   final bool fromAreaApi;
 }
 
@@ -41,6 +53,7 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
   required AuthRepository authRepository,
   required RateFetchService rateFetchService,
   required RateService rateService,
+  BranchAreaDialogPurpose purpose = BranchAreaDialogPurpose.rates,
   bool allowOfflineFallback = true,
 }) async {
   final branchUuid = await authRepository.branchUuidForApi();
@@ -71,6 +84,8 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
         );
     var vehicleTypeRates = detail?.vehicleTypeRates ?? const [];
     var flatHours = defaultFlatHours;
+    var overnightStart = '';
+    var overnightEnd = '';
     BranchRatesSnapshot? branchRates;
 
     if (!standard.hasAny || vehicleTypeRates.isEmpty) {
@@ -83,6 +98,19 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
           vehicleTypeRates = branchRates.vehicleTypeRates;
         }
         flatHours = branchRates.flatBlockHours;
+      }
+    }
+
+    if (detail != null) {
+      overnightStart = detail.overnightTimes.start?.trim() ?? '';
+      overnightEnd = detail.overnightTimes.end?.trim() ?? '';
+    }
+    if (branchRates != null) {
+      if (overnightStart.isEmpty) {
+        overnightStart = branchRates.overnightTimes.start?.trim() ?? '';
+      }
+      if (overnightEnd.isEmpty) {
+        overnightEnd = branchRates.overnightTimes.end?.trim() ?? '';
       }
     }
 
@@ -110,13 +138,39 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
       );
     }
 
-    if (standard.hasAny || vehicleTypeRates.isNotEmpty) {
+    final levels = detail?.levels ?? const <AreaParkingLevel>[];
+    final hasRates = standard.hasAny || vehicleTypeRates.isNotEmpty;
+    final hasSlots = levels.isNotEmpty;
+
+    if (purpose == BranchAreaDialogPurpose.parkingSlots) {
+      if (hasSlots) {
+        return BranchAreaLoadResult(
+          data: BranchAreaDialogData(
+            flatBlockHours: flatHours,
+            standard: standard,
+            vehicleTypeRates: vehicleTypeRates,
+            levels: levels,
+            overnightStart: overnightStart,
+            overnightEnd: overnightEnd,
+            fromAreaApi: detail != null,
+          ),
+        );
+      }
+      return const BranchAreaLoadResult(
+        errorMessage:
+            'No parking slots configured for this area. Check admin settings and try again.',
+      );
+    }
+
+    if (hasRates) {
       return BranchAreaLoadResult(
         data: BranchAreaDialogData(
           flatBlockHours: flatHours,
           standard: standard,
           vehicleTypeRates: vehicleTypeRates,
-          levels: detail?.levels ?? const [],
+          levels: levels,
+          overnightStart: overnightStart,
+          overnightEnd: overnightEnd,
           fromAreaApi: detail != null,
         ),
       );
@@ -156,6 +210,8 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
       ),
       vehicleTypeRates: const [],
       levels: const [],
+      overnightStart: resolved.overnightStart,
+      overnightEnd: resolved.overnightEnd,
       fromAreaApi: false,
     ),
   );

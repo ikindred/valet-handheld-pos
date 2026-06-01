@@ -266,6 +266,11 @@ class AppConfig {
   static String get reportsShifts =>
       baseUrl + (_env('API_REPORTS_SHIFTS') ?? '/api/v1/reports/shifts');
 
+  /// GET `/api/v1/reports/transactions` — mobile Transactions tab (paginated).
+  static String get reportsTransactions =>
+      baseUrl +
+      (_env('API_REPORTS_TRANSACTIONS') ?? '/api/v1/reports/transactions');
+
   /// GET historical transactions (Tier 2 background sync).
   static String get transactionsList =>
       baseUrl + (_env('API_TRANSACTIONS') ?? '/api/v1/transactions');

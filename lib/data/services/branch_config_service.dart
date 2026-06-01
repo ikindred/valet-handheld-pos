@@ -125,8 +125,6 @@ class BranchConfigService {
           final end = _hhMmFromDynamic(overnight.end);
           if (end != null) {
             entries.add((key: 'overnight_end_time', value: end));
-          } else {
-            entries.add((key: 'overnight_end_time', value: '06:00'));
           }
         }
       } else {

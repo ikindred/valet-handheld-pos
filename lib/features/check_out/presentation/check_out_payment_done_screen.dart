@@ -5,10 +5,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/formatting/peso_currency.dart';
+import '../../../core/time/philippine_time.dart';
 import '../../../core/printing/checkout_receipt_data.dart';
 import '../../../core/printing/print_flow.dart';
 import '../../../core/printing/printer_connection_notifier.dart';
 import '../domain/checkout_preview_format.dart';
+import '../domain/checkout_receipt_snapshot.dart';
 import '../models/checkout_preview_response.dart';
 import '../../check_in/presentation/widgets/check_in_compact_tokens.dart';
 import '../state/check_out_cubit.dart';
@@ -64,6 +66,8 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
       snap,
       mallHours: state.mallHours,
       branchDisplayName: state.branchName,
+      isLostTicket: state.isLostTicket,
+      lostTicketFee: state.lostTicketFeePesos,
     );
     await printCheckOutFromContext(context, data: data);
     if (mounted) setState(() => _printing = false);
@@ -81,8 +85,10 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
     return BlocBuilder<CheckOutCubit, CheckOutState>(
       buildWhen: (a, b) =>
           a.receiptTicket != b.receiptTicket ||
+          a.receiptSnapshot != b.receiptSnapshot ||
           a.preview != b.preview ||
           a.serverTotal != b.serverTotal ||
+          a.isLostTicket != b.isLostTicket ||
           a.amountTenderedInput != b.amountTenderedInput ||
           a.invoiceNumber != b.invoiceNumber ||
           a.branchName != b.branchName ||
@@ -102,11 +108,15 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
 
         final cubit = context.read<CheckOutCubit>();
         final preview = state.preview;
+        final snap = state.receiptSnapshot;
         final peso2 = PesoCurrency.currency(decimalDigits: 2);
-        final total =
-            state.receiptTotalPesos ?? state.authoritativeTotal ?? 0;
-        final tendered = cubit.parsedTendered() ?? total;
-        final change = cubit.changeDue() ?? 0;
+        final total = snap?.totalPesos ??
+            state.receiptTotalPesos ??
+            state.authoritativeTotal ??
+            0;
+        final tendered = snap?.amountTendered ?? cubit.parsedTendered() ?? total;
+        final change =
+            snap?.changePesos ?? state.receiptChangePesos ?? cubit.changeDue() ?? 0;
         final branch = (state.branchName ?? '').trim();
         final thankYou = branch.isEmpty
             ? 'THANK YOU FOR USING VALET MASTER'
@@ -146,6 +156,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
                   const SizedBox(height: 16),
                   _releaseSummaryCard(
                     preview: preview,
+                    snapshot: snap,
                     peso2: peso2,
                     total: total,
                     tendered: tendered,
@@ -161,14 +172,13 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
               );
 
               final receipt = _receiptPreview(
-                localTicketId: state.receiptTicket!,
+                snapshot: snap,
                 preview: preview,
                 peso2: peso2,
-                total: total,
-                change: change,
+                isLostTicket: state.isLostTicket,
+                lostTicketFee: state.lostTicketFeePesos,
                 thankYou: thankYou,
                 mallHours: state.mallHours,
-                driverOut: state.driverOut,
               );
 
               if (wide) {
@@ -314,15 +324,20 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
 
   Widget _releaseSummaryCard({
     required CheckoutPreviewResponse? preview,
+    required CheckoutReceiptSnapshot? snapshot,
     required NumberFormat peso2,
     required double total,
     required double tendered,
     required double change,
   }) {
     final rs = preview?.releaseSummary;
-    final plate = rs?.plate.trim().isNotEmpty == true ? rs!.plate : '—';
+    final plate = snapshot?.plateNumber.trim().isNotEmpty == true
+        ? snapshot!.plateNumber
+        : (rs?.plate.trim().isNotEmpty == true ? rs!.plate : '—');
     final customer = rs?.customer.trim().isNotEmpty == true ? rs!.customer : '—';
-    final duration = rs?.duration.trim().isNotEmpty == true ? rs!.duration : '—';
+    final duration = snapshot?.durationLabel?.trim().isNotEmpty == true
+        ? snapshot!.durationLabel!
+        : (rs?.duration.trim().isNotEmpty == true ? rs!.duration : '—');
 
     Widget row(String label, Widget right, {bool divider = true}) {
       return Column(
@@ -425,41 +440,73 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
     );
   }
 
+  static String _formatSnapshotDateTime(int unixSeconds) {
+    if (unixSeconds <= 0) return '—';
+    return formatPreviewDateTime(
+      PhilippineTime.fromUnixSeconds(unixSeconds).toIso8601String(),
+    );
+  }
+
   Widget _receiptPreview({
-    required String localTicketId,
+    required CheckoutReceiptSnapshot? snapshot,
     required CheckoutPreviewResponse? preview,
     required NumberFormat peso2,
-    required double total,
-    required double change,
+    required bool isLostTicket,
+    required double lostTicketFee,
     required String thankYou,
     required String mallHours,
-    String? driverOut,
   }) {
     final pt = preview?.ticket;
-    final plate = pt?.plate.isNotEmpty == true
-        ? pt!.plate
-        : preview?.releaseSummary.plate ?? '—';
-    final vehicleLine = pt?.vehicleReceiptLine ?? '—';
-    final timeIn = pt != null ? formatPreviewDateTime(pt.timeIn) : '—';
-    final timeOut = pt?.timeOut != null ? formatPreviewDateTime(pt!.timeOut) : '—';
-    final duration = pt?.duration.isNotEmpty == true
-        ? pt!.duration
-        : preview?.releaseSummary.duration ?? '—';
-    final slot = pt != null && pt.parkingLocationLine.trim().isNotEmpty
-        ? pt.parkingLocationLine.trim()
+    final ticketNo = snapshot?.ticketNumber.trim().isNotEmpty == true
+        ? snapshot!.ticketNumber
+        : (pt?.ticketNumber ?? '—');
+    final plate = snapshot?.plateNumber.trim().isNotEmpty == true
+        ? snapshot!.plateNumber
+        : (pt?.plate.isNotEmpty == true
+            ? pt!.plate
+            : preview?.releaseSummary.plate ?? '—');
+    final vehicleLine = snapshot?.vehicleReceiptLine.trim().isNotEmpty == true
+        ? snapshot!.vehicleReceiptLine
+        : (pt?.vehicleReceiptLine ?? '—');
+    final timeIn = snapshot != null && snapshot.timeInUnix > 0
+        ? _formatSnapshotDateTime(snapshot.timeInUnix)
+        : (pt != null ? formatPreviewDateTime(pt.timeIn) : '—');
+    final timeOut = snapshot != null && snapshot.timeOutUnix > 0
+        ? _formatSnapshotDateTime(snapshot.timeOutUnix)
         : '—';
-    final valetInOut = (driverOut?.trim().isNotEmpty == true)
-        ? driverOut!.trim()
-        : (pt?.valetOut?.trim().isNotEmpty == true
-            ? pt!.valetOut!
-            : (pt?.valetIn?.trim().isNotEmpty == true ? pt!.valetIn! : '—'));
+    final duration = snapshot?.durationLabel?.trim().isNotEmpty == true
+        ? snapshot!.durationLabel!
+        : '—';
+    final slot = snapshot?.slotLine.trim().isNotEmpty == true
+        ? snapshot!.slotLine.trim()
+        : (pt != null && pt.parkingLocationLine.trim().isNotEmpty
+            ? pt.parkingLocationLine.trim()
+            : '—');
+    final valetIn = snapshot?.valetName?.trim().isNotEmpty == true
+        ? snapshot!.valetName!
+        : (pt?.valetIn?.trim().isNotEmpty == true ? pt!.valetIn! : '—');
+    final valetOut = snapshot?.valetOutName?.trim().isNotEmpty == true
+        ? snapshot!.valetOutName!
+        : (pt?.valetOut?.trim().isNotEmpty == true ? pt!.valetOut! : '—');
+    final valetInOut = valetOut.trim().isNotEmpty && valetOut != '—'
+        ? valetOut
+        : valetIn;
 
-    final flatLabel = pt?.flatRateLabel?.trim().isNotEmpty == true
-        ? pt!.flatRateLabel!.trim()
-        : 'Flat rate';
-    final succeedingLabel = pt?.succeedingTimeLabel?.trim() ?? '';
-    final flatAmount = pt?.flatRateAmount ?? total;
-    final succeedingAmount = pt?.succeedingRateAmount ?? 0;
+    final flatHours = snapshot?.flatBlockHours ?? 3;
+    final flatLabel = snapshot?.flatRateLabel?.trim().isNotEmpty == true
+        ? snapshot!.flatRateLabel!.trim()
+        : 'Flat rate ($flatHours h)';
+    final flatAmount = snapshot?.flatPesos ?? 0;
+    final succeedingAmount = snapshot?.succeedingPesos ?? 0;
+    final succeedingLabel = succeedingAmount > 0.009
+        ? (snapshot?.succeedingTimeLabel?.trim().isNotEmpty == true
+            ? snapshot!.succeedingTimeLabel!.trim()
+            : 'Succeeding hours')
+        : '';
+    final overnightAmount =
+        snapshot != null && snapshot.overnightApplied ? snapshot.overnightPesos : 0;
+    final total = snapshot?.totalPesos ?? 0;
+    final change = snapshot?.changePesos ?? 0;
 
     Widget smallRow(String label, String value) {
       return Padding(
@@ -526,7 +573,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
           Text('TICKET NUMBER', style: CheckOutUiTokens.fieldLabel()),
           const SizedBox(height: 4),
           Text(
-            localTicketId,
+            ticketNo,
             style: CheckOutUiTokens.plate().copyWith(
               color: _orange,
               fontSize: 22,
@@ -557,9 +604,13 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
           const SizedBox(height: 4),
           _dottedRule(),
           const SizedBox(height: 12),
-          feeRow(flatLabel, peso2.format(flatAmount > 0.009 ? flatAmount : total)),
+          if (flatAmount > 0.009) feeRow(flatLabel, peso2.format(flatAmount)),
           if (succeedingLabel.isNotEmpty && succeedingAmount > 0.009)
             feeRow(succeedingLabel, peso2.format(succeedingAmount)),
+          if (overnightAmount > 0.009)
+            feeRow('Overnight fee', peso2.format(overnightAmount)),
+          if (isLostTicket && lostTicketFee > 0.009)
+            feeRow('Lost ticket fee', peso2.format(lostTicketFee)),
           const SizedBox(height: 10),
           _dottedRule(),
           const SizedBox(height: 10),

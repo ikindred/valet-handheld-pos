@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/session/standard_parking_rates.dart';
 import '../../data/repositories/auth_repository.dart';
 import 'bluetooth_pos_printer.dart';
 import 'check_in_receipt_data.dart';
@@ -116,14 +117,16 @@ Future<bool> printCheckInPartFromContext(
 /// Builds [CheckInReceiptData] with branch name from [AuthRepository].
 Future<CheckInReceiptData> withBranchName(
   AuthRepository auth,
-  CheckInReceiptData data,
-) async {
+  CheckInReceiptData data, {
+  StandardParkingRates? standardRates,
+}) async {
   final site = await auth.branchAndAreaFromDb();
   final branch = site.branch.trim();
   final area = site.area.trim();
   final label = branch.isEmpty && area.isEmpty
       ? 'Valet Master'
       : (area.isEmpty ? branch : '$branch / $area');
+  final rates = standardRates;
   return CheckInReceiptData(
     ticket: data.ticket,
     branchName: label,
@@ -136,6 +139,12 @@ Future<CheckInReceiptData> withBranchName(
     hasSignature: data.hasSignature,
     qrCode: data.qrCode,
     mallHours: data.mallHours,
+    flatRatePesos: rates?.flatRatePesos ?? data.flatRatePesos,
+    flatRateHours: data.flatRateHours,
+    succeedingHourPesos: rates?.succeedingHourPesos ?? data.succeedingHourPesos,
+    overnightFeePesos: rates?.overnightFeePesos ?? data.overnightFeePesos,
+    lostTicketFeePesos: rates?.lostTicketFeePesos ?? data.lostTicketFeePesos,
+    overnightCutoff: data.overnightCutoff,
   );
 }
 

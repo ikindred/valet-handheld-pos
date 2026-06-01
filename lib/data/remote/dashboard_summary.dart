@@ -1,3 +1,4 @@
+import '../../core/api/transaction_payment_fields.dart';
 import '../../features/dashboard/domain/dashboard_recent_format.dart';
 
 /// Default area capacity when API omits `total_slots`.
@@ -143,12 +144,14 @@ class DashboardSummaryRecent {
     required this.plateNumber,
     required this.status,
     this.amount,
+    this.cashTendered,
     this.timeIn,
     this.timeOut,
     this.vehicleBrand,
     this.vehicleModel,
     this.vehicleColor,
     this.parkingSlot,
+    this.rawJson,
   });
 
   final String id;
@@ -156,12 +159,37 @@ class DashboardSummaryRecent {
   final String plateNumber;
   final String status;
   final num? amount;
+  final double? cashTendered;
   final String? timeIn;
   final String? timeOut;
   final String? vehicleBrand;
   final String? vehicleModel;
   final String? vehicleColor;
   final String? parkingSlot;
+
+  /// Original API row from `recent_transactions` (full transaction shape).
+  final Map<String, dynamic>? rawJson;
+
+  Map<String, dynamic> toTransactionJson() {
+    if (rawJson != null && rawJson!.isNotEmpty) {
+      return Map<String, dynamic>.from(rawJson!);
+    }
+    return <String, dynamic>{
+      'id': id,
+      'ticket_number': ticketNumber,
+      'status': status,
+      if (amount != null) 'amount': amount,
+      if (cashTendered != null) 'cash_tendered': cashTendered,
+      if (timeIn != null) 'time_in': timeIn,
+      if (timeOut != null) 'time_out': timeOut,
+    };
+  }
+
+  bool matchesKey(String key) {
+    final k = key.trim();
+    if (k.isEmpty) return false;
+    return id == k || ticketNumber == k;
+  }
 
   static DashboardSummaryRecent? fromJson(Map<String, dynamic> json) {
     final id = (json['id'] ?? json['ticket_id'] ?? json['ticketId'] ?? '')
@@ -199,12 +227,14 @@ class DashboardSummaryRecent {
       amount: json['amount'] is num
           ? json['amount'] as num
           : num.tryParse('${json['amount']}'),
+      cashTendered: TransactionPaymentFields.cashTenderedFrom(json),
       timeIn: (json['time_in'] ?? json['timeIn'])?.toString(),
       timeOut: (json['time_out'] ?? json['timeOut'])?.toString(),
       vehicleBrand: brand,
       vehicleModel: model,
       vehicleColor: color,
       parkingSlot: slot,
+      rawJson: json,
     );
   }
 
@@ -232,11 +262,21 @@ class DashboardSummaryRecent {
 
     if (completed) {
       final out = DateTime.tryParse(timeOut ?? '') ?? DateTime.now();
+      final amt = amount?.toDouble();
+      final payment = TransactionPaymentFields.resolve(
+        amount: amt,
+        cashTendered: cashTendered,
+      );
       return DashboardRecentRow(
         ticketId: id,
         plate: plate,
         line1: line1,
-        line2: DashboardRecentFormat.checkedOutSubline(out.toLocal(), amount),
+        line2: DashboardRecentFormat.checkedOutSubline(
+          out.toLocal(),
+          amount,
+          cashTendered: payment.cashTendered,
+          change: payment.change,
+        ),
         isCheckedOut: true,
       );
     }

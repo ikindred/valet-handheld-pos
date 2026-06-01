@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../../data/local/db/app_database.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/offline_login_screen.dart';
-import '../../features/cash/presentation/cash_screen.dart';
 import '../../features/cash/presentation/close_cash_screen.dart';
 import '../../features/cash/presentation/open_cash_screen.dart';
 import '../../features/check_in/presentation/check_in_customer_valet_screen.dart';
@@ -173,10 +172,6 @@ GoRouter createAppRouter(
         ],
       ),
       GoRoute(path: '/cash', redirect: (_, __) => '/cash/open'),
-      GoRoute(
-        path: '/cash/activity',
-        builder: (context, state) => const CashScreen(),
-      ),
       GoRoute(
         path: '/reports',
         builder: (context, state) => const ReportsScreen(),

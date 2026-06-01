@@ -58,8 +58,14 @@ class EscPosReceiptBuilder {
 
     bytes.addAll(gen.reset());
     bytes.addAll(_printerInit());
+
+    // ── Header ──
     bytes.addAll(_brandHeader(gen, data.branchName, logo: logo));
+
+    // ── Section title ──
     bytes.addAll(_checkoutSectionTitle());
+
+    // ── Ticket details ──
     bytes.addAll(_labeledRow('Ticket', data.ticketNumber));
     bytes.addAll(_labeledRow('Plate', data.plateNumber));
     if (data.vehicleReceiptLine.isNotEmpty &&
@@ -76,21 +82,36 @@ class EscPosReceiptBuilder {
     bytes.addAll(_labeledRow('Parking', data.slotLine));
     bytes.addAll(_labeledRow('Valet in', data.valetInLabel));
     bytes.addAll(_labeledRow('Valet out', data.valetOutLabel));
+
     bytes.addAll(_hr());
-    bytes.addAll(_moneyRow(data.flatRateLabel, data.flatPesosLabel));
-    if (data.succeedingLabel.isNotEmpty) {
-      bytes.addAll(_moneyRow(data.succeedingLabel, data.succeedingPesosLabel));
-    }
+    bytes.addAll(gen.feed(1));
+
+    bytes.addAll(_moneyRow(data.flatRateHoursLabel, data.flatPesosLabel));
+
+    bytes.addAll(_labeledRow('Succeeding hours', data.succeedingHoursLabel));
+    bytes.addAll(_labeledRow('Succeeding rate', data.succeedingRateLabel));
+    bytes.addAll(_moneyRow('Succeeding total', data.succeedingTotalLabel));
+
     if (data.showOvernight) {
-      bytes.addAll(_moneyRow('Overnight', data.overnightPesosLabel));
+      bytes.addAll(_moneyRow(data.overnightRowLabel, data.overnightFeeLabel));
     }
+
+    if (data.isLostTicket) {
+      bytes.addAll(_moneyRow('Lost ticket fee', data.lostFeePesosLabel));
+    }
+
+    bytes.addAll(gen.feed(1));
+    bytes.addAll(_hr());
+    bytes.addAll(gen.feed(1));
+
     bytes.addAll(_moneyRow('Total', data.totalPesosLabel, bold: true));
     bytes.addAll(_moneyRow('Cash tendered', data.tenderedPesosLabel));
     bytes.addAll(
       _moneyRow('Change', data.changePesosLabel, bold: data.changeIsNonZero),
     );
-    bytes.addAll(_checkoutFooter(mallHours: data.mallHours));
 
+    bytes.addAll(gen.feed(1));
+    bytes.addAll(_checkoutFooter(mallHours: data.mallHours));
     bytes.addAll(gen.feed(3));
     bytes.addAll(gen.cut());
     return bytes;
@@ -100,17 +121,12 @@ class EscPosReceiptBuilder {
       _labeledRow(label, amount, bold: bold);
 
   List<int> _checkoutSectionTitle() => [
-    ..._hr(),
     ..._printLines('CHECKOUT RECEIPT', align: PosAlign.center, bold: true),
     ..._hr(),
   ];
 
   List<int> _checkoutFooter({required String mallHours}) => [
     ..._hr(),
-    ..._printLines(
-      ReceiptTemplateCopy.orDisclaimerNote,
-      align: PosAlign.center,
-    ),
     ..._printLines(
       ReceiptTemplateCopy.thankYouLine,
       align: PosAlign.center,
@@ -225,6 +241,8 @@ class EscPosReceiptBuilder {
             mallHours: data.mallHours,
             includeThankYouFooter: true,
             includeQr: true,
+            termsData: data,
+            compactLayout: true,
           ),
         );
       case 3:
@@ -250,11 +268,6 @@ class EscPosReceiptBuilder {
       out.addAll(gen.imageRaster(grayscale, align: PosAlign.center));
       out.addAll(gen.feed(1));
     }
-    out.addAll(_printLines('SPiD', align: PosAlign.center, bold: true));
-    out.addAll(
-      _printLines('SMART PARKING TECHNOLOGIES', align: PosAlign.center),
-    );
-    out.addAll(gen.feed(1));
     out.addAll(
       _printLines(
         ReceiptTemplateCopy.brandName,
@@ -276,9 +289,6 @@ class EscPosReceiptBuilder {
     bool includePrintedAt = true,
   }) {
     final out = <int>[..._hr()];
-    out.addAll(
-      _printLines(ReceiptTemplateCopy.orDisclaimerNote, align: PosAlign.center),
-    );
     if (includeThankYou) {
       out.addAll(
         _printLines(
@@ -320,6 +330,8 @@ class EscPosReceiptBuilder {
     String? valetType,
     String? special,
     bool includeQr = false,
+    CheckInReceiptData? termsData,
+    bool compactLayout = false,
   }) {
     final out = <int>[
       ..._printLines('CHECK-IN', align: PosAlign.center, bold: true),
@@ -336,7 +348,7 @@ class EscPosReceiptBuilder {
     if (contact.isNotEmpty ||
         (customerName != null && customerName.trim().isNotEmpty) ||
         driver.isNotEmpty) {
-      out.addAll(gen.feed(1));
+      if (!compactLayout) out.addAll(gen.feed(1));
       if (contact.isNotEmpty) out.addAll(_field('Contact', contact));
       if (customerName != null && customerName.trim().isNotEmpty) {
         out.addAll(_field('Guest', customerName.trim()));
@@ -344,13 +356,17 @@ class EscPosReceiptBuilder {
       if (driver.isNotEmpty) out.addAll(_field('Valet driver', driver));
     }
 
-    out.addAll(gen.feed(1));
+    if (!compactLayout) out.addAll(gen.feed(1));
     if (belongings.isNotEmpty) out.addAll(_field('Belongings', belongings));
     if (damage.isNotEmpty) out.addAll(_field('Damage', damage));
     if (special != null && special.trim().isNotEmpty) {
       out.addAll(_field('Notes', special.trim()));
     }
     out.addAll(_field('Signature', signatureSigned ? 'Signed' : 'Pending'));
+
+    if (termsData != null && includeQr) {
+      out.addAll(_checkInCustomerTerms(termsData));
+    }
 
     if (includeQr && qrPayload.isNotEmpty) {
       out.addAll(gen.feed(2));
@@ -372,6 +388,63 @@ class EscPosReceiptBuilder {
     );
     return out;
   }
+
+  List<int> _checkInCustomerTerms(CheckInReceiptData data) {
+    final flat = data.flatRatePesos;
+    final succeeding = data.succeedingHourPesos;
+    final lost = data.lostTicketFeePesos;
+    final overnight = data.overnightFeePesos;
+    final flatHours = data.flatRateHours;
+    final overnightWindow = data.overnightCutoff.trim();
+    final hours = data.mallHours.trim().isEmpty
+        ? ReceiptTemplateCopy.defaultMallHours
+        : data.mallHours.trim();
+
+    return [
+      ..._hr(),
+      ..._printLines('TERMS & CONDITIONS', align: PosAlign.center, bold: true),
+      ..._hr(),
+      ..._printLines('RATES:', bold: true),
+      ..._termsBody('Flat rate: PHP $flat.00 (${flatHours}h)'),
+      ..._termsBody(
+        'Succeeding: PHP $succeeding.00/hr after ${flatHours}h',
+      ),
+      ..._termsBody('Lost ticket: PHP $lost.00'),
+      ..._termsBody(
+        overnightWindow.isEmpty
+            ? 'Overnight: PHP $overnight.00'
+            : 'Overnight: PHP $overnight.00 ($overnightWindow)',
+      ),
+      ..._printLines('OPERATING HOURS:', bold: true),
+      ..._termsBody(hours),
+      ..._printLines('LIABILITY & CLAIMS:', bold: true),
+      ..._termsBody(
+        '* Not liable for loss of cash, gadgets,\n'
+        '  documents in vehicle.\n'
+        '* Not responsible for pre-existing damage,\n'
+        '  mechanical failure, or force majeure.\n'
+        '* Claims must be reported before vehicle\n'
+        '  leaves the premises.\n'
+        '* Claim stub required for vehicle release.\n'
+        '* Lost tickets: valid ID + proof of ownership.',
+      ),
+      ..._printLines('ACKNOWLEDGMENT:', bold: true),
+      ..._termsBody(
+        'By availing of this service, the vehicle owner\n'
+        'acknowledges and agrees to the Terms and\n'
+        'Conditions printed on this claim stub.',
+      ),
+      ..._hr(),
+    ];
+  }
+
+  /// Minimum-size body copy for customer T&C (48 chars/line on 80mm).
+  List<int> _termsBody(String text) => _printLines(
+        text,
+        align: PosAlign.left,
+        height: PosTextSize.size1,
+        width: PosTextSize.size1,
+      );
 
   List<int> _highlightField(String label, String value) {
     if (!_isNarrow) {

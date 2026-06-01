@@ -199,6 +199,10 @@ class Tickets extends Table {
   /// JSON: `{"area","level","slot"}` from server or check-in.
   TextColumn get parkingInfo => text().nullable()();
 
+  /// JSON snapshot of checkout payment lines (fee breakdown + cash tendered).
+  TextColumn get paymentSummaryJson =>
+      text().named('payment_summary_json').nullable()();
+
   /// Parking slot UUID from area detail (`levels[].slots[].id`).
   TextColumn get slotId => text().named('slot_id').nullable()();
 
@@ -327,7 +331,7 @@ class AppDatabase extends _$AppDatabase {
   final bool _skipDevOfflineSeed;
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -396,6 +400,9 @@ FROM offline_accounts''');
           }
           if (from < 10) {
             await m.addColumn(tickets, tickets.slotId);
+          }
+          if (from < 11) {
+            await m.addColumn(tickets, tickets.paymentSummaryJson);
           }
         },
       );

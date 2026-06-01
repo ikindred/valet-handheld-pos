@@ -155,6 +155,104 @@ abstract final class DashboardStyles {
       ],
     );
   }
+
+  // ── Context-aware variants ──────────────────────────────────────────────────
+
+  static TextStyle greetingOf(BuildContext context) {
+    final c = AppThemeColors.of(context);
+    return GoogleFonts.poppins(
+      fontSize: 17,
+      fontWeight: FontWeight.w600,
+      color: c.textPrimary,
+      height: 1.2,
+    );
+  }
+
+  static TextStyle headerSubtitleOf(BuildContext context) {
+    final c = AppThemeColors.of(context);
+    return GoogleFonts.poppins(
+      fontSize: 11,
+      fontWeight: FontWeight.w400,
+      color: c.textSubtitleMuted,
+      height: 1.2,
+    );
+  }
+
+  static TextStyle sectionTitleOf(BuildContext context) {
+    final c = AppThemeColors.of(context);
+    return GoogleFonts.poppins(
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.4,
+      color: c.textSecondary,
+    );
+  }
+
+  static TextStyle statTitleOf(BuildContext context) {
+    final c = AppThemeColors.of(context);
+    return GoogleFonts.poppins(
+      fontSize: 10,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.35,
+      color: c.textSecondary,
+    );
+  }
+
+  static TextStyle statValueOf(BuildContext context, {Color? color}) {
+    final c = AppThemeColors.of(context);
+    return GoogleFonts.poppins(
+      fontSize: 22,
+      fontWeight: FontWeight.w600,
+      height: 1.05,
+      color: color ?? c.textPrimary,
+    ).copyWith(fontFamilyFallback: _pesoFallback);
+  }
+
+  static TextStyle statHintOf(BuildContext context) {
+    final c = AppThemeColors.of(context);
+    return GoogleFonts.poppins(
+      fontSize: 11,
+      fontWeight: FontWeight.w400,
+      color: c.textSecondary,
+      height: 1.25,
+    );
+  }
+
+  static TextStyle transactionLinePrimaryOf(BuildContext context) {
+    final c = AppThemeColors.of(context);
+    return GoogleFonts.poppins(
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+      color: c.textPrimary,
+      height: 1.2,
+    );
+  }
+
+  static TextStyle transactionLineSecondaryOf(BuildContext context) {
+    final c = AppThemeColors.of(context);
+    return GoogleFonts.poppins(
+      fontSize: 12,
+      fontWeight: FontWeight.w400,
+      color: c.textPrimary,
+      height: 1.25,
+    ).copyWith(fontFamilyFallback: _pesoFallback);
+  }
+
+  static BoxDecoration cardDecorationOf(BuildContext context, {Color? color}) {
+    final c = AppThemeColors.of(context);
+    return BoxDecoration(
+      color: color ?? c.cardBg,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: c.cardBorder),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x0C000000),
+          blurRadius: 1,
+          offset: Offset(0, 1),
+        ),
+      ],
+    );
+  }
 }
 
 class DashboardLeftRail extends StatelessWidget {
@@ -166,12 +264,13 @@ class DashboardLeftRail extends StatelessWidget {
   Widget build(BuildContext context) {
     final path = GoRouterState.of(context).uri.path;
 
+    final tc = AppThemeColors.of(context);
     return Container(
       width: _width,
       decoration: BoxDecoration(
-        color: const Color(0xFFFAFAFA),
+        color: tc.railBg,
         border: Border(
-          right: BorderSide(color: Colors.black.withValues(alpha: 0.13)),
+          right: BorderSide(color: tc.railBorder),
         ),
       ),
       child: SafeArea(
@@ -194,11 +293,9 @@ class DashboardLeftRail extends StatelessWidget {
                             width: 44,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: tc.cardBg,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Colors.black.withValues(alpha: 0.13),
-                              ),
+                              border: Border.all(color: tc.cardBorder),
                             ),
                             clipBehavior: Clip.antiAlias,
                             child: Padding(
@@ -222,14 +319,7 @@ class DashboardLeftRail extends StatelessWidget {
                             selected: path == '/reports',
                             icon: Icons.bar_chart_rounded,
                             onTap: () => context.go('/reports'),
-                            accentSelection: false,
-                          ),
-                          const SizedBox(height: 10),
-                          _RailIcon(
-                            selected: path == '/cash/activity',
-                            icon: Icons.payments_rounded,
-                            onTap: () => context.go('/cash/activity'),
-                            accentSelection: false,
+                            accentSelection: true,
                           ),
                           const SizedBox(height: 10),
                           _RailIcon(
@@ -273,15 +363,16 @@ class _RailIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     final accent = accentSelection && selected;
     final bg = accent
         ? DashboardStyles.railAccentBg
         : (selected
-              ? Colors.black.withValues(alpha: 0.06)
+              ? tc.textPrimary.withValues(alpha: 0.08)
               : Colors.transparent);
     final fg = accent
         ? DashboardStyles.orange
-        : (selected ? AppColors.textPrimary : AppColors.textSecondary);
+        : (selected ? tc.textPrimary : tc.textSecondary);
 
     return Material(
       color: bg,
@@ -423,20 +514,20 @@ class DashboardStatCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: DashboardStyles.cardDecoration(),
+      decoration: DashboardStyles.cardDecorationOf(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(title.toUpperCase(), style: DashboardStyles.statTitle()),
+          Text(title.toUpperCase(), style: DashboardStyles.statTitleOf(context)),
           const SizedBox(height: 8),
-          Text(valueText, style: DashboardStyles.statValue(color: valueColor)),
+          Text(valueText, style: DashboardStyles.statValueOf(context, color: valueColor)),
           if (deltaText != null) ...[
             const SizedBox(height: 4),
             Text(deltaText!, style: DashboardStyles.statDeltaGreen()),
           ] else if (subtitle != null) ...[
             const SizedBox(height: 4),
-            Text(subtitle!, style: DashboardStyles.statHint()),
+            Text(subtitle!, style: DashboardStyles.statHintOf(context)),
           ],
         ],
       ),
@@ -476,7 +567,7 @@ class DashboardActionTile extends StatelessWidget {
         ],
       ),
       child: Material(
-        color: primary ? DashboardStyles.orange : const Color(0xFFFAFAFA),
+        color: primary ? DashboardStyles.orange : AppThemeColors.of(context).cardBg,
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           onTap: onTap,
@@ -545,8 +636,8 @@ class DashboardTransactionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isParked = status == TransactionStatusKind.parked;
-    final line1Style = DashboardStyles.transactionLinePrimary();
-    final line2Style = DashboardStyles.transactionLineSecondary();
+    final line1Style = DashboardStyles.transactionLinePrimaryOf(context);
+    final line2Style = DashboardStyles.transactionLineSecondaryOf(context);
 
     final plateBadge = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

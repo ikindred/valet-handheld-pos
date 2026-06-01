@@ -2487,6 +2487,12 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
   late final GeneratedColumn<String> parkingInfo = GeneratedColumn<String>(
       'parking_info', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _paymentSummaryJsonMeta =
+      const VerificationMeta('paymentSummaryJson');
+  @override
+  late final GeneratedColumn<String> paymentSummaryJson =
+      GeneratedColumn<String>('payment_summary_json', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _slotIdMeta = const VerificationMeta('slotId');
   @override
   late final GeneratedColumn<String> slotId = GeneratedColumn<String>(
@@ -2516,6 +2522,7 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
         driverIn,
         driverOut,
         parkingInfo,
+        paymentSummaryJson,
         slotId
       ];
   @override
@@ -2671,6 +2678,12 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
           parkingInfo.isAcceptableOrUnknown(
               data['parking_info']!, _parkingInfoMeta));
     }
+    if (data.containsKey('payment_summary_json')) {
+      context.handle(
+          _paymentSummaryJsonMeta,
+          paymentSummaryJson.isAcceptableOrUnknown(
+              data['payment_summary_json']!, _paymentSummaryJsonMeta));
+    }
     if (data.containsKey('slot_id')) {
       context.handle(_slotIdMeta,
           slotId.isAcceptableOrUnknown(data['slot_id']!, _slotIdMeta));
@@ -2728,6 +2741,8 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
           .read(DriftSqlType.string, data['${effectivePrefix}driver_out']),
       parkingInfo: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}parking_info']),
+      paymentSummaryJson: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}payment_summary_json']),
       slotId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}slot_id']),
     );
@@ -2781,6 +2796,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
   /// JSON: `{"area","level","slot"}` from server or check-in.
   final String? parkingInfo;
 
+  /// JSON snapshot of checkout payment lines (fee breakdown + cash tendered).
+  final String? paymentSummaryJson;
+
   /// Parking slot UUID from area detail (`levels[].slots[].id`).
   final String? slotId;
   const Ticket(
@@ -2806,6 +2824,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       this.driverIn,
       this.driverOut,
       this.parkingInfo,
+      this.paymentSummaryJson,
       this.slotId});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2845,6 +2864,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
     }
     if (!nullToAbsent || parkingInfo != null) {
       map['parking_info'] = Variable<String>(parkingInfo);
+    }
+    if (!nullToAbsent || paymentSummaryJson != null) {
+      map['payment_summary_json'] = Variable<String>(paymentSummaryJson);
     }
     if (!nullToAbsent || slotId != null) {
       map['slot_id'] = Variable<String>(slotId);
@@ -2888,6 +2910,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       parkingInfo: parkingInfo == null && nullToAbsent
           ? const Value.absent()
           : Value(parkingInfo),
+      paymentSummaryJson: paymentSummaryJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paymentSummaryJson),
       slotId:
           slotId == null && nullToAbsent ? const Value.absent() : Value(slotId),
     );
@@ -2920,6 +2945,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       driverIn: serializer.fromJson<String?>(json['driverIn']),
       driverOut: serializer.fromJson<String?>(json['driverOut']),
       parkingInfo: serializer.fromJson<String?>(json['parkingInfo']),
+      paymentSummaryJson:
+          serializer.fromJson<String?>(json['paymentSummaryJson']),
       slotId: serializer.fromJson<String?>(json['slotId']),
     );
   }
@@ -2949,6 +2976,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       'driverIn': serializer.toJson<String?>(driverIn),
       'driverOut': serializer.toJson<String?>(driverOut),
       'parkingInfo': serializer.toJson<String?>(parkingInfo),
+      'paymentSummaryJson': serializer.toJson<String?>(paymentSummaryJson),
       'slotId': serializer.toJson<String?>(slotId),
     };
   }
@@ -2976,6 +3004,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           Value<String?> driverIn = const Value.absent(),
           Value<String?> driverOut = const Value.absent(),
           Value<String?> parkingInfo = const Value.absent(),
+          Value<String?> paymentSummaryJson = const Value.absent(),
           Value<String?> slotId = const Value.absent()}) =>
       Ticket(
         id: id ?? this.id,
@@ -3002,6 +3031,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
         driverIn: driverIn.present ? driverIn.value : this.driverIn,
         driverOut: driverOut.present ? driverOut.value : this.driverOut,
         parkingInfo: parkingInfo.present ? parkingInfo.value : this.parkingInfo,
+        paymentSummaryJson: paymentSummaryJson.present
+            ? paymentSummaryJson.value
+            : this.paymentSummaryJson,
         slotId: slotId.present ? slotId.value : this.slotId,
       );
   Ticket copyWithCompanion(TicketsCompanion data) {
@@ -3047,6 +3079,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       driverOut: data.driverOut.present ? data.driverOut.value : this.driverOut,
       parkingInfo:
           data.parkingInfo.present ? data.parkingInfo.value : this.parkingInfo,
+      paymentSummaryJson: data.paymentSummaryJson.present
+          ? data.paymentSummaryJson.value
+          : this.paymentSummaryJson,
       slotId: data.slotId.present ? data.slotId.value : this.slotId,
     );
   }
@@ -3076,6 +3111,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           ..write('driverIn: $driverIn, ')
           ..write('driverOut: $driverOut, ')
           ..write('parkingInfo: $parkingInfo, ')
+          ..write('paymentSummaryJson: $paymentSummaryJson, ')
           ..write('slotId: $slotId')
           ..write(')'))
         .toString();
@@ -3105,6 +3141,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
         driverIn,
         driverOut,
         parkingInfo,
+        paymentSummaryJson,
         slotId
       ]);
   @override
@@ -3133,6 +3170,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           other.driverIn == this.driverIn &&
           other.driverOut == this.driverOut &&
           other.parkingInfo == this.parkingInfo &&
+          other.paymentSummaryJson == this.paymentSummaryJson &&
           other.slotId == this.slotId);
 }
 
@@ -3159,6 +3197,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
   final Value<String?> driverIn;
   final Value<String?> driverOut;
   final Value<String?> parkingInfo;
+  final Value<String?> paymentSummaryJson;
   final Value<String?> slotId;
   final Value<int> rowid;
   const TicketsCompanion({
@@ -3184,6 +3223,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     this.driverIn = const Value.absent(),
     this.driverOut = const Value.absent(),
     this.parkingInfo = const Value.absent(),
+    this.paymentSummaryJson = const Value.absent(),
     this.slotId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -3210,6 +3250,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     this.driverIn = const Value.absent(),
     this.driverOut = const Value.absent(),
     this.parkingInfo = const Value.absent(),
+    this.paymentSummaryJson = const Value.absent(),
     this.slotId = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
@@ -3250,6 +3291,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     Expression<String>? driverIn,
     Expression<String>? driverOut,
     Expression<String>? parkingInfo,
+    Expression<String>? paymentSummaryJson,
     Expression<String>? slotId,
     Expression<int>? rowid,
   }) {
@@ -3276,6 +3318,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       if (driverIn != null) 'driver_in': driverIn,
       if (driverOut != null) 'driver_out': driverOut,
       if (parkingInfo != null) 'parking_info': parkingInfo,
+      if (paymentSummaryJson != null)
+        'payment_summary_json': paymentSummaryJson,
       if (slotId != null) 'slot_id': slotId,
       if (rowid != null) 'rowid': rowid,
     });
@@ -3304,6 +3348,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       Value<String?>? driverIn,
       Value<String?>? driverOut,
       Value<String?>? parkingInfo,
+      Value<String?>? paymentSummaryJson,
       Value<String?>? slotId,
       Value<int>? rowid}) {
     return TicketsCompanion(
@@ -3329,6 +3374,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       driverIn: driverIn ?? this.driverIn,
       driverOut: driverOut ?? this.driverOut,
       parkingInfo: parkingInfo ?? this.parkingInfo,
+      paymentSummaryJson: paymentSummaryJson ?? this.paymentSummaryJson,
       slotId: slotId ?? this.slotId,
       rowid: rowid ?? this.rowid,
     );
@@ -3403,6 +3449,9 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     if (parkingInfo.present) {
       map['parking_info'] = Variable<String>(parkingInfo.value);
     }
+    if (paymentSummaryJson.present) {
+      map['payment_summary_json'] = Variable<String>(paymentSummaryJson.value);
+    }
     if (slotId.present) {
       map['slot_id'] = Variable<String>(slotId.value);
     }
@@ -3437,6 +3486,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
           ..write('driverIn: $driverIn, ')
           ..write('driverOut: $driverOut, ')
           ..write('parkingInfo: $parkingInfo, ')
+          ..write('paymentSummaryJson: $paymentSummaryJson, ')
           ..write('slotId: $slotId, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -5852,6 +5902,7 @@ typedef $$TicketsTableCreateCompanionBuilder = TicketsCompanion Function({
   Value<String?> driverIn,
   Value<String?> driverOut,
   Value<String?> parkingInfo,
+  Value<String?> paymentSummaryJson,
   Value<String?> slotId,
   Value<int> rowid,
 });
@@ -5878,6 +5929,7 @@ typedef $$TicketsTableUpdateCompanionBuilder = TicketsCompanion Function({
   Value<String?> driverIn,
   Value<String?> driverOut,
   Value<String?> parkingInfo,
+  Value<String?> paymentSummaryJson,
   Value<String?> slotId,
   Value<int> rowid,
 });
@@ -5921,6 +5973,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             Value<String?> driverIn = const Value.absent(),
             Value<String?> driverOut = const Value.absent(),
             Value<String?> parkingInfo = const Value.absent(),
+            Value<String?> paymentSummaryJson = const Value.absent(),
             Value<String?> slotId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -5947,6 +6000,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             driverIn: driverIn,
             driverOut: driverOut,
             parkingInfo: parkingInfo,
+            paymentSummaryJson: paymentSummaryJson,
             slotId: slotId,
             rowid: rowid,
           ),
@@ -5973,6 +6027,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             Value<String?> driverIn = const Value.absent(),
             Value<String?> driverOut = const Value.absent(),
             Value<String?> parkingInfo = const Value.absent(),
+            Value<String?> paymentSummaryJson = const Value.absent(),
             Value<String?> slotId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -5999,6 +6054,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             driverIn: driverIn,
             driverOut: driverOut,
             parkingInfo: parkingInfo,
+            paymentSummaryJson: paymentSummaryJson,
             slotId: slotId,
             rowid: rowid,
           ),
@@ -6110,6 +6166,11 @@ class $$TicketsTableFilterComposer
 
   ColumnFilters<String> get parkingInfo => $state.composableBuilder(
       column: $state.table.parkingInfo,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get paymentSummaryJson => $state.composableBuilder(
+      column: $state.table.paymentSummaryJson,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -6236,6 +6297,11 @@ class $$TicketsTableOrderingComposer
 
   ColumnOrderings<String> get parkingInfo => $state.composableBuilder(
       column: $state.table.parkingInfo,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get paymentSummaryJson => $state.composableBuilder(
+      column: $state.table.paymentSummaryJson,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 

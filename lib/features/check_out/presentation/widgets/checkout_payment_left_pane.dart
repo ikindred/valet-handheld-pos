@@ -19,6 +19,7 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
     required this.dateInLabel,
     required this.timeOutLabel,
     required this.durationLabel,
+    required this.flatBlockHours,
     required this.driverOutController,
     required this.isLostTicket,
     required this.lostTicketFee,
@@ -37,6 +38,7 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
   final String dateInLabel;
   final String timeOutLabel;
   final String durationLabel;
+  final int flatBlockHours;
   final TextEditingController driverOutController;
 
   static const _plateBlue = Color(0xFF0068D3);
@@ -65,17 +67,12 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final b = breakdown;
-    final flatHours = CheckoutPricing.defaultFlatBlockHours;
-    final flatLabel = b != null
-        ? 'First $flatHours hrs (flat)'
-        : (preview?.ticket.flatRateLabel?.trim().isNotEmpty == true
-            ? preview!.ticket.flatRateLabel!.trim()
-            : 'Flat rate');
+    final flatHours = flatBlockHours;
+    final flatLabel = 'First $flatHours hrs (flat)';
     final flatAmount = b?.flatRateAmount ?? serverTotal;
     final succeedingAmount = b?.succeedingAmount ?? 0;
-    final succeedingLabel = b != null && succeedingAmount > 0.009
-        ? 'Succeeding hours'
-        : (preview?.ticket.succeedingTimeLabel?.trim() ?? '');
+    final succeedingLabel =
+        b != null && succeedingAmount > 0.009 ? 'Succeeding hours' : '';
     final overnightAmount = b?.overnightAmount ?? 0;
 
     return Column(

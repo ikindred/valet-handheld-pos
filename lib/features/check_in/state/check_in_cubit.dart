@@ -638,6 +638,7 @@ class CheckInCubit extends Cubit<CheckInState> {
         VehicleBodyType.van => 'van',
         VehicleBodyType.luxury => 'luxury',
         VehicleBodyType.evPhev => 'ev_phev',
+        VehicleBodyType.motorcycle => 'motorcycle',
       };
 
   CheckInFormData _buildFormData() {

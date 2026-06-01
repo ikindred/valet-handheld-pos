@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../core/api/transaction_payment_summary.dart';
 import '../../../data/local/db/app_database.dart';
 
 /// Where the vehicle is parked (from `GET /transactions/:id` or local check-in).
@@ -90,8 +91,15 @@ class TicketDetailSnapshot {
   const TicketDetailSnapshot({
     required this.ticket,
     this.parking,
+    this.payment,
   });
 
   final Ticket ticket;
   final TicketParkingInfo? parking;
+
+  /// Parsed from transaction JSON — fee breakdown + cash tendered / change.
+  final TransactionPaymentSummary? payment;
+
+  double? get cashTendered => payment?.cashTendered;
+  double? get changePesos => payment?.change;
 }

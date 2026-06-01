@@ -6,18 +6,24 @@ import 'package:drift/drift.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/api/transaction_payment_fields.dart';
+import '../../core/api/transaction_payment_summary.dart';
+import '../../core/pricing/transaction_payment_calculator.dart';
 import '../../core/config/app_config.dart';
 import '../../core/services/device_id_service.dart';
 import '../../core/time/philippine_time.dart';
 import '../../features/check_out/domain/checkout_ticket_display.dart';
 import '../../features/check_out/models/check_out_response.dart';
 import '../../features/dashboard/domain/ticket_parking_info.dart';
+import '../../features/check_in/domain/check_in_form_data.dart';
 import '../../features/check_in/models/check_in_response.dart';
 import '../../core/connectivity/internet_reachability.dart';
 import '../../core/logging/valet_log.dart';
-import '../../features/check_in/domain/check_in_form_data.dart';
 import '../local/db/app_database.dart';
+import '../remote/dashboard_api.dart';
 import '../remote/transactions_api.dart';
+import 'rate_fetch_service.dart';
+import 'rate_service.dart';
 
 Map<String, dynamic>? _asStringKeyedMap(dynamic data) {
   if (data is Map<String, dynamic>) return data;
@@ -69,7 +75,9 @@ CheckoutTicketDisplay? _checkoutDisplayFromDriverOutMeta(String? raw) {
     return CheckoutTicketDisplay(
       customerName: (name == null || name.isEmpty) ? null : name,
       parkingLine: parkingParts.isEmpty ? null : parkingParts.join(' · '),
-      valetTypeLabel: valetRaw.isEmpty ? null : TicketService._prettyValetType(valetRaw),
+      valetTypeLabel: valetRaw.isEmpty
+          ? null
+          : TicketService._prettyValetType(valetRaw),
     );
   } catch (_) {
     return null;
@@ -78,13 +86,42 @@ CheckoutTicketDisplay? _checkoutDisplayFromDriverOutMeta(String? raw) {
 
 /// `tickets` + `sync_queue` persistence and best-effort REST.
 class TicketService {
-  TicketService(this._db, this._dio, this._transactionsApi);
+  TicketService(
+    this._db,
+    this._dio,
+    this._transactionsApi,
+    this._dashboardApi,
+    RateService rates,
+    this._rateFetch,
+  ) : _paymentCalculator = TransactionPaymentCalculator(rates);
 
   final AppDatabase _db;
   final Dio _dio;
   final TransactionsApi _transactionsApi;
+  final DashboardApi _dashboardApi;
+  final RateFetchService _rateFetch;
+  final TransactionPaymentCalculator _paymentCalculator;
 
   static const _uuid = Uuid();
+
+  static final _uuidPattern = RegExp(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    caseSensitive: false,
+  );
+
+  /// Returns [s] if it is a valid UUID, otherwise null.
+  static String? _validUuidOrNull(String s) {
+    final t = s.trim();
+    return _uuidPattern.hasMatch(t) ? t : null;
+  }
+
+  /// Branch UUID from the device identity row (guaranteed to be a UUID).
+  Future<String?> get _deviceBranchId async {
+    final identity = await (_db.select(_db.deviceIdentity)..limit(1))
+        .getSingleOrNull();
+    final bid = identity?.branchId.trim() ?? '';
+    return _validUuidOrNull(bid);
+  }
 
   /// Inserts a `status = draft` row (no sync queue) so the sequential id is known
   /// before the guest completes check-in. [finalizeDraftTicket] or [deleteDraftTicket].
@@ -96,7 +133,9 @@ class TicketService {
     final bid = branchId.trim().isEmpty ? '_' : branchId.trim();
     final id = await generateTicketId(shiftId);
     final now = PhilippineTime.iso8601Now();
-    await _db.into(_db.tickets).insert(
+    await _db
+        .into(_db.tickets)
+        .insert(
           TicketsCompanion.insert(
             id: id,
             shiftId: shiftId,
@@ -131,9 +170,9 @@ class TicketService {
   Future<void> purgeOrphanedDrafts(String shiftId) async {
     final sid = shiftId.trim();
     if (sid.isEmpty) return;
-    await (_db.delete(_db.tickets)
-          ..where((t) => t.shiftId.equals(sid) & t.status.equals('draft')))
-        .go();
+    await (_db.delete(
+      _db.tickets,
+    )..where((t) => t.shiftId.equals(sid) & t.status.equals('draft'))).go();
   }
 
   /// Promotes a draft row to `active` and enqueues sync (same as [createTicket]).
@@ -155,8 +194,9 @@ class TicketService {
     final now = PhilippineTime.iso8601Now();
 
     await _db.transaction(() async {
-      await (_db.update(_db.tickets)..where((t) => t.id.equals(ticketId.trim())))
-          .write(
+      await (_db.update(
+        _db.tickets,
+      )..where((t) => t.id.equals(ticketId.trim()))).write(
         TicketsCompanion(
           branchId: Value(bid),
           plateNumber: Value(data.plateNumber),
@@ -174,8 +214,9 @@ class TicketService {
       );
     });
 
-    return (_db.select(_db.tickets)..where((t) => t.id.equals(ticketId.trim())))
-        .getSingle();
+    return (_db.select(
+      _db.tickets,
+    )..where((t) => t.id.equals(ticketId.trim()))).getSingle();
   }
 
   /// `TKT-{YYMMDD}-{DEVICE}-{HHmmss}` — PH wall date/time, last 4 of [android_id_hash].
@@ -197,13 +238,16 @@ class TicketService {
 
   /// Last 4 chars of stored `android_id_hash` (uppercase hex), else `0000`.
   Future<String> _deviceTicketSuffix() async {
-    final identity = await (_db.select(_db.deviceIdentity)..limit(1))
-        .getSingleOrNull();
+    final identity = await (_db.select(
+      _db.deviceIdentity,
+    )..limit(1)).getSingleOrNull();
     var hash = identity?.androidIdHash.trim() ?? '';
     if (hash.isEmpty) {
       hash = await DeviceIdService.sha256RawAndroidId();
     }
-    final normalized = hash.replaceAll(RegExp(r'[^0-9A-Fa-f]'), '').toUpperCase();
+    final normalized = hash
+        .replaceAll(RegExp(r'[^0-9A-Fa-f]'), '')
+        .toUpperCase();
     if (normalized.length >= 4) {
       return normalized.substring(normalized.length - 4);
     }
@@ -221,7 +265,9 @@ class TicketService {
     final now = PhilippineTime.iso8601Now();
 
     await _db.transaction(() async {
-      await _db.into(_db.tickets).insert(
+      await _db
+          .into(_db.tickets)
+          .insert(
             TicketsCompanion.insert(
               id: id,
               shiftId: shiftId,
@@ -321,10 +367,15 @@ class TicketService {
       ),
     );
 
-    return (_db.select(_db.tickets)..where((t) => t.id.equals(tid))).getSingle();
+    return (_db.select(
+      _db.tickets,
+    )..where((t) => t.id.equals(tid))).getSingle();
   }
 
-  Future<void> updateServerTicketId(String localTicketId, String serverId) async {
+  Future<void> updateServerTicketId(
+    String localTicketId,
+    String serverId,
+  ) async {
     final tid = localTicketId.trim();
     final sid = serverId.trim();
     if (tid.isEmpty || sid.isEmpty) return;
@@ -344,17 +395,19 @@ class TicketService {
     final tid = localTicketId.trim();
     if (tid.isEmpty) return;
     final now = DateTime.now().toIso8601String();
-    await _db.into(_db.syncQueue).insert(
-      SyncQueueCompanion.insert(
-        id: _uuid.v4(),
-        operation: 'checkin',
-        queueTableName: 'tickets',
-        recordId: tid,
-        payload: jsonEncode(payload),
-        syncStatus: 'pending',
-        createdAt: now,
-      ),
-    );
+    await _db
+        .into(_db.syncQueue)
+        .insert(
+          SyncQueueCompanion.insert(
+            id: _uuid.v4(),
+            operation: 'checkin',
+            queueTableName: 'tickets',
+            recordId: tid,
+            payload: jsonEncode(payload),
+            syncStatus: 'pending',
+            createdAt: now,
+          ),
+        );
   }
 
   /// Processes a queued check-in row via `POST /transactions/check-in`.
@@ -475,8 +528,10 @@ class TicketService {
     if (raw is List) {
       return [
         for (final e in raw)
-          if (e is Map<String, dynamic>) e
-          else if (e is Map) Map<String, dynamic>.from(e),
+          if (e is Map<String, dynamic>)
+            e
+          else if (e is Map)
+            Map<String, dynamic>.from(e),
       ];
     }
     if (raw is String && raw.trim().isNotEmpty) {
@@ -489,7 +544,9 @@ class TicketService {
   }
 
   /// Guest name, parking, and valet type from [Tickets.driverOut] JSON or sync queue.
-  Future<CheckoutTicketDisplay?> checkoutDisplayForTicket(String ticketId) async {
+  Future<CheckoutTicketDisplay?> checkoutDisplayForTicket(
+    String ticketId,
+  ) async {
     final id = ticketId.trim();
     if (id.isEmpty) return null;
 
@@ -499,15 +556,15 @@ class TicketService {
       if (fromMeta != null) return fromMeta;
     }
 
-    final row = await (_db.select(_db.syncQueue)
-          ..where(
-            (q) =>
-                q.recordId.equals(id) &
-                q.queueTableName.equals('tickets'),
-          )
-          ..orderBy([(q) => OrderingTerm.desc(q.createdAt)])
-          ..limit(1))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.syncQueue)
+              ..where(
+                (q) =>
+                    q.recordId.equals(id) & q.queueTableName.equals('tickets'),
+              )
+              ..orderBy([(q) => OrderingTerm.desc(q.createdAt)])
+              ..limit(1))
+            .getSingleOrNull();
     if (row == null) return null;
     try {
       final body = jsonDecode(row.payload);
@@ -557,20 +614,24 @@ class TicketService {
 
   /// Most recent open ticket for [plate] (spaces ignored, case-insensitive).
   Future<Ticket?> activeTicketByPlate(String plate) async {
-    final normalized =
-        plate.trim().replaceAll(RegExp(r'\s+'), '').toUpperCase();
+    final normalized = plate
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '')
+        .toUpperCase();
     if (normalized.isEmpty) return null;
-    final row = await _db.customSelect(
-      '''
+    final row = await _db
+        .customSelect(
+          '''
 SELECT id FROM tickets
 WHERE status = 'active'
   AND REPLACE(UPPER(plate_number), ' ', '') = ?
 ORDER BY check_in_at DESC
 LIMIT 1
 ''',
-      variables: <Variable<Object>>[Variable.withString(normalized)],
-      readsFrom: {_db.tickets},
-    ).getSingleOrNull();
+          variables: <Variable<Object>>[Variable.withString(normalized)],
+          readsFrom: {_db.tickets},
+        )
+        .getSingleOrNull();
     if (row == null) return null;
     final tid = row.read<String>('id');
     return ticketById(tid);
@@ -584,22 +645,31 @@ LIMIT 1
     required String damageMarkersJson,
     String? driverOut,
     String status = 'completed',
+    TransactionPaymentSummary? paymentSummary,
   }) async {
     ValetLog.info(
       'TicketService.completeTicketCheckout',
       'ticketId=$ticketId fee=$totalFee (local)',
     );
+    final paymentJson = paymentSummary != null
+        ? jsonEncode(paymentSummary.toJson())
+        : null;
     await _db.transaction(() async {
-      await (_db.update(_db.tickets)..where((t) => t.id.equals(ticketId))).write(
-            TicketsCompanion(
-              checkOutAt: Value(checkOutAtIso),
-              fee: Value(totalFee),
-              status: Value(status),
-              damageMarkers: Value(damageMarkersJson),
-              syncStatus: const Value('pending'),
-              driverOut: Value(_normalizedDriverName(driverOut)),
-            ),
-          );
+      await (_db.update(
+        _db.tickets,
+      )..where((t) => t.id.equals(ticketId))).write(
+        TicketsCompanion(
+          checkOutAt: Value(checkOutAtIso),
+          fee: Value(totalFee),
+          status: Value(status),
+          damageMarkers: Value(damageMarkersJson),
+          syncStatus: const Value('pending'),
+          driverOut: Value(_normalizedDriverName(driverOut)),
+          paymentSummaryJson: paymentJson != null
+              ? Value(paymentJson)
+              : const Value.absent(),
+        ),
+      );
     });
   }
 
@@ -613,6 +683,7 @@ LIMIT 1
     required bool ticketLost,
     required List<Map<String, dynamic>> conditionCheckout,
     String? driverOut,
+    double? cashTendered,
   }) async {
     final tid = ticketId.trim();
     if (tid.isEmpty) return;
@@ -627,8 +698,12 @@ LIMIT 1
       'condition_checkout': conditionCheckout,
       if (driverOut != null && driverOut.trim().isNotEmpty)
         'driver_out': driverOut.trim(),
+      if (cashTendered != null && cashTendered > 0.009)
+        'cash_tendered': cashTendered,
     });
-    await _db.into(_db.syncQueue).insert(
+    await _db
+        .into(_db.syncQueue)
+        .insert(
           SyncQueueCompanion.insert(
             id: _uuid.v4(),
             operation: 'checkout/finalize',
@@ -677,6 +752,10 @@ LIMIT 1
         : <Map<String, dynamic>>[];
 
     final driverOut = body['driver_out']?.toString();
+    final cashTenderedRaw = body['cash_tendered'] ?? body['cashTendered'];
+    final cashTendered = cashTenderedRaw is num
+        ? cashTenderedRaw.toDouble()
+        : double.tryParse('$cashTenderedRaw');
 
     return _transactionsApi.submitCheckOut(
       token: token,
@@ -685,6 +764,7 @@ LIMIT 1
       timeOut: timeOut,
       isOvernight: isOvernight,
       ticketLost: ticketLost,
+      cashTendered: cashTendered,
       driverOut: driverOut,
       conditionCheckout: conditionList,
     );
@@ -693,14 +773,16 @@ LIMIT 1
   Future<int> countActiveTicketsForShift(String shiftId) async {
     final sid = shiftId.trim();
     if (sid.isEmpty) return 0;
-    final row = await _db.customSelect(
-      '''
+    final row = await _db
+        .customSelect(
+          '''
 SELECT COUNT(*) AS c FROM tickets
 WHERE shift_id = ? AND status = 'active'
 ''',
-      variables: <Variable<Object>>[Variable.withString(sid)],
-      readsFrom: {_db.tickets},
-    ).getSingle();
+          variables: <Variable<Object>>[Variable.withString(sid)],
+          readsFrom: {_db.tickets},
+        )
+        .getSingle();
     return (row.data['c'] as num?)?.toInt() ?? 0;
   }
 
@@ -711,47 +793,53 @@ WHERE shift_id = ? AND status = 'active'
   }) async {
     final sid = shiftId.trim();
     if (sid.isEmpty) return 0;
-    final row = await _db.customSelect(
-      '''
+    final row = await _db
+        .customSelect(
+          '''
 SELECT COUNT(*) AS c FROM tickets
 WHERE shift_id = ?
   AND check_in_at >= ?
   AND status != 'draft'
 ''',
-      variables: <Variable<Object>>[
-        Variable.withString(sid),
-        Variable.withString(sinceIso8601),
-      ],
-      readsFrom: {_db.tickets},
-    ).getSingle();
+          variables: <Variable<Object>>[
+            Variable.withString(sid),
+            Variable.withString(sinceIso8601),
+          ],
+          readsFrom: {_db.tickets},
+        )
+        .getSingle();
     return (row.data['c'] as num?)?.toInt() ?? 0;
   }
 
   Future<int> countCompletedCheckoutsForShift(String shiftId) async {
     final sid = shiftId.trim();
     if (sid.isEmpty) return 0;
-    final row = await _db.customSelect(
-      '''
+    final row = await _db
+        .customSelect(
+          '''
 SELECT COUNT(*) AS c FROM tickets
 WHERE shift_id = ? AND status = 'completed'
 ''',
-      variables: <Variable<Object>>[Variable.withString(sid)],
-      readsFrom: {_db.tickets},
-    ).getSingle();
+          variables: <Variable<Object>>[Variable.withString(sid)],
+          readsFrom: {_db.tickets},
+        )
+        .getSingle();
     return (row.data['c'] as num?)?.toInt() ?? 0;
   }
 
   Future<double> sumFeesForCompletedShift(String shiftId) async {
     final sid = shiftId.trim();
     if (sid.isEmpty) return 0;
-    final row = await _db.customSelect(
-      '''
+    final row = await _db
+        .customSelect(
+          '''
 SELECT COALESCE(SUM(fee), 0) AS s FROM tickets
 WHERE shift_id = ? AND status = 'completed'
 ''',
-      variables: <Variable<Object>>[Variable.withString(sid)],
-      readsFrom: {_db.tickets},
-    ).getSingle();
+          variables: <Variable<Object>>[Variable.withString(sid)],
+          readsFrom: {_db.tickets},
+        )
+        .getSingle();
     return (row.data['s'] as num?)?.toDouble() ?? 0.0;
   }
 
@@ -796,10 +884,7 @@ WHERE shift_id = ? AND status = 'completed'
   }
 
   /// Recent tickets for dashboard: same shift, mixed status, cap [limit].
-  Future<List<Ticket>> recentTicketsForShift(
-    String shiftId, {
-    int limit = 10,
-  }) {
+  Future<List<Ticket>> recentTicketsForShift(String shiftId, {int limit = 10}) {
     final sid = shiftId.trim();
     return (_db.select(_db.tickets)
           ..where((t) => t.shiftId.equals(sid) & t.status.equals('draft').not())
@@ -809,11 +894,16 @@ WHERE shift_id = ? AND status = 'completed'
   }
 
   Future<Ticket?> ticketById(String id) {
-    return (_db.select(_db.tickets)..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    return (_db.select(
+      _db.tickets,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
   /// Recent-transaction detail: `GET /transactions/{id}` when online, else local Drift.
+  ///
+  /// When online, rates are synced from the API before computing the payment
+  /// breakdown so the correct vehicle-type rates (e.g. Sedan ₱100) are used
+  /// instead of the offline default (₱150). Drift is always the final fallback.
   ///
   /// [idOrTicketNumber] is the server UUID or `TKT-XXXX` from the dashboard list.
   Future<TicketDetailSnapshot?> loadTicketForDetail(
@@ -822,60 +912,272 @@ WHERE shift_id = ? AND status = 'completed'
     final key = idOrTicketNumber.trim();
     if (key.isEmpty) return null;
 
-    if (!AppConfig.useStubApi &&
-        await InternetReachability.hasInternet()) {
-      final token = await _activeBearer();
-      if (token != null && token.isNotEmpty) {
-        try {
-          final map = await _transactionsApi.getTransactionById(
-            token: token,
-            id: key,
-          );
-          final parking = TicketService._parkingFromTransactionJson(map);
-          final ticket = await _upsertFromServerTransactionJson(map);
-          return TicketDetailSnapshot(
-            ticket: ticket,
-            parking: parking ?? TicketService._parkingFromTicketRow(ticket),
-          );
-        } on TransactionsApiException catch (e, st) {
-          ValetLog.error(
-            'TicketService.loadTicketForDetail',
-            'GET /transactions/$key failed — local fallback',
-            e,
-            st,
-          );
-        } catch (e, st) {
-          ValetLog.error(
-            'TicketService.loadTicketForDetail',
-            'GET /transactions/$key failed — local fallback',
-            e,
-            st,
-          );
-        }
+    final isOnline =
+        !AppConfig.useStubApi && await InternetReachability.hasInternet();
+    final token = isOnline ? await _activeBearer() : null;
+
+    if (isOnline && token != null && token.isNotEmpty) {
+      final map = await _fetchTransactionJsonForDetail(
+        key: key,
+        token: token,
+      );
+
+      // Determine the ticket (from server response or existing Drift row).
+      final Ticket ticket;
+      final Map<String, dynamic>? transactionJson;
+      if (map != null) {
+        ticket = await _upsertFromServerTransactionJson(map);
+        transactionJson = map;
+      } else {
+        final local = await _localTicketByKey(key);
+        if (local == null) return null;
+        ticket = local;
+        transactionJson = null;
       }
+
+      // Refresh Drift rates from the API before computing the breakdown so the
+      // correct per-vehicle-type fees (e.g. Sedan ₱100, not offline default
+      // ₱150) are used. Errors are swallowed — Drift fallback still applies.
+      // Guard: only sync when branchId is a valid UUID — legacy tickets may
+      // store the branch name instead, which causes 400 from the API.
+      final syncBranchId =
+          _validUuidOrNull(ticket.branchId) ?? await _deviceBranchId;
+      if (syncBranchId != null) {
+        await _rateFetch.syncRatesForBranch(syncBranchId);
+      }
+
+      final parking = map != null
+          ? TicketService._parkingFromTransactionJson(map)
+          : null;
+      final payment = await _resolvePaymentForTicket(
+        ticket,
+        transactionJson: transactionJson,
+      );
+      if (payment != null) {
+        await _persistPaymentSummary(ticket.id, payment);
+      }
+      return TicketDetailSnapshot(
+        ticket: ticket,
+        parking: parking ?? TicketService._parkingFromTicketRow(ticket),
+        payment: payment,
+      );
     }
 
     return _localDetailSnapshot(key);
   }
+
+  /// `GET /transactions/{id}` — returns null on any failure so the caller falls
+  /// back to local Drift. No secondary API hops (dashboard/summary or reports)
+  /// because those rarely contain the specific ticket and add unnecessary latency.
+  Future<Map<String, dynamic>?> _fetchTransactionJsonForDetail({
+    required String key,
+    required String token,
+  }) async {
+    try {
+      return await _transactionsApi.getTransactionById(token: token, id: key);
+    } on TransactionsApiException catch (e, st) {
+      ValetLog.error(
+        'TicketService.loadTicketForDetail',
+        'GET /transactions/$key failed (${e.statusCode}) — using local Drift',
+        e,
+        st,
+      );
+    } catch (e, st) {
+      ValetLog.error(
+        'TicketService.loadTicketForDetail',
+        'GET /transactions/$key failed — using local Drift',
+        e,
+        st,
+      );
+    }
+    return null;
+  }
+
 
   Future<TicketDetailSnapshot?> _localDetailSnapshot(String key) async {
     final ticket = await _localTicketByKey(key);
     if (ticket == null) return null;
     var parking = TicketService._parkingFromTicketRow(ticket);
     parking ??= await _parkingFromSyncQueue(ticket.id);
-    return TicketDetailSnapshot(ticket: ticket, parking: parking);
+    var payment = await _resolvePaymentForTicket(ticket);
+    if (payment != null) {
+      await _persistPaymentSummary(ticket.id, payment);
+    }
+    return TicketDetailSnapshot(
+      ticket: ticket,
+      parking: parking,
+      payment: payment,
+    );
+  }
+
+  /// Resolves fee breakdown for ticket detail display.
+  ///
+  /// Prefers the stored [paymentSummaryJson] written at checkout time (which
+  /// uses the actual server preview rates). Only falls back to recomputing from
+  /// local Drift rates when no stored breakdown exists. Cash tendered / change
+  /// are always merged from the best available source regardless.
+  Future<TransactionPaymentSummary?> _resolvePaymentForTicket(
+    Ticket ticket, {
+    Map<String, dynamic>? transactionJson,
+  }) async {
+    final stored = TransactionPaymentSummary.fromStoredJson(
+      ticket.paymentSummaryJson,
+    );
+    final syncQueuePayment = await _paymentFromSyncQueueCheckout(ticket);
+
+    final json = <String, dynamic>{
+      if (ticket.fee != null) 'amount': ticket.fee,
+      if (ticket.status == 'lost') 'ticket_lost': true,
+      ...?transactionJson,
+    };
+
+    final cashTendered =
+        TransactionPaymentFields.cashTenderedFrom(json) ??
+        syncQueuePayment?.cashTendered ??
+        stored?.cashTendered;
+
+    final amount = TransactionPaymentFields.amountFrom(json);
+    if (amount == null || amount < 0.009) return null;
+
+    // Prefer stored breakdown — it was computed with the actual preview rates at
+    // checkout time (e.g. flat ₱100 + overnight ₱500). Recomputing from local
+    // Drift fallback rates would produce different flat-rate values.
+    //
+    // Guard: only trust the stored breakdown when the fee parts add up to the
+    // total within ±₱1. If they don't match (e.g. flatRate was overwritten with
+    // a stale offline default but overnight was not), the stored summary is
+    // corrupt — fall through to recompute from local Drift rates.
+    if (stored != null && stored.hasFlatRate && _storedBreakdownIsConsistent(stored, amount)) {
+      final change = TransactionPaymentCalculator.computedChange(
+        amount: amount,
+        cashTendered: cashTendered,
+      );
+      return TransactionPaymentSummary(
+        totalDue: amount,
+        flatRate: stored.flatRate,
+        flatRateLabel: stored.flatRateLabel,
+        flatBlockHours: stored.flatBlockHours,
+        succeedingHoursLabel: stored.succeedingHoursLabel,
+        succeedingLineLabel: stored.succeedingLineLabel,
+        succeedingRatePerHour: stored.succeedingRatePerHour,
+        succeedingTotal: stored.succeedingTotal,
+        overnightFee: stored.overnightFee,
+        overnightStart: stored.overnightStart,
+        overnightEnd: stored.overnightEnd,
+        lostTicketFee: stored.lostTicketFee,
+        cashTendered: cashTendered,
+        change: change,
+        isLostTicket: stored.isLostTicket,
+        isOvernight: stored.isOvernight,
+        durationMinutes: stored.durationMinutes,
+      );
+    }
+
+    if (cashTendered != null) {
+      json['cash_tendered'] = cashTendered;
+    }
+
+    final vehicleType = _vehicleTypeForPayment(ticket, transactionJson);
+
+    return _paymentCalculator.fromTransactionJson(
+      json: json,
+      branchId: ticket.branchId,
+      vehicleType: vehicleType,
+      timeInOverride: PhilippineTime.fromApiIso(ticket.checkInAt),
+      timeOutOverride:
+          ticket.checkOutAt != null && ticket.checkOutAt!.isNotEmpty
+          ? PhilippineTime.fromApiIso(ticket.checkOutAt!)
+          : null,
+    );
+  }
+
+  /// Returns true when fee parts (flat + overnight + succeeding + lost) add up
+  /// to [totalDue] within ±₱1. A mismatch means the stored breakdown was
+  /// overwritten by a stale recompute that used incorrect offline-default rates.
+  static bool _storedBreakdownIsConsistent(
+    TransactionPaymentSummary s,
+    double totalDue,
+  ) {
+    final parts = s.flatRate + s.overnightFee + s.succeedingTotal + s.lostTicketFee;
+    return (parts - totalDue).abs() < 1.5;
+  }
+
+  static String? _vehicleTypeForPayment(
+    Ticket ticket,
+    Map<String, dynamic>? transactionJson,
+  ) {
+    if (transactionJson != null) {
+      final vehicle = _mapField(transactionJson['vehicle']);
+      final fromApi = vehicle['type']?.toString().trim();
+      if (fromApi != null && fromApi.isNotEmpty) return fromApi;
+    }
+    final fromTicket = ticket.vehicleType.trim();
+    if (fromTicket.isNotEmpty) return fromTicket;
+    return null;
+  }
+
+  Future<void> _persistPaymentSummary(
+    String ticketId,
+    TransactionPaymentSummary payment,
+  ) async {
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(ticketId))).write(
+      TicketsCompanion(paymentSummaryJson: Value(jsonEncode(payment.toJson()))),
+    );
+  }
+
+  Future<TransactionPaymentSummary?> _paymentFromSyncQueueCheckout(
+    Ticket ticket,
+  ) async {
+    final ticketId = ticket.id;
+    final rows =
+        await (_db.select(_db.syncQueue)
+              ..where(
+                (q) =>
+                    q.recordId.equals(ticketId.trim()) &
+                    q.operation.equals('checkout/finalize'),
+              )
+              ..orderBy([(q) => OrderingTerm.desc(q.createdAt)])
+              ..limit(1))
+            .get();
+    if (rows.isEmpty) return null;
+    try {
+      final body = jsonDecode(rows.first.payload);
+      if (body is! Map) return null;
+      final map = Map<String, dynamic>.from(body);
+      final amount = TransactionPaymentFields.optionalMoney(
+        map['amount'] ?? map['amount_paid'],
+      );
+      if (amount == null) return null;
+      return _paymentCalculator.fromTransactionJson(
+        json: {
+          'amount': amount,
+          'cash_tendered': map['cash_tendered'],
+          'ticket_lost': map['ticket_lost'] == true,
+        },
+        branchId: ticket.branchId,
+        vehicleType: ticket.vehicleType,
+        timeInOverride: PhilippineTime.fromApiIso(ticket.checkInAt),
+        timeOutOverride:
+            ticket.checkOutAt != null && ticket.checkOutAt!.isNotEmpty
+            ? PhilippineTime.fromApiIso(ticket.checkOutAt!)
+            : null,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<TicketParkingInfo?> _parkingFromSyncQueue(String ticketId) async {
-    final row = await (_db.select(_db.syncQueue)
-          ..where(
-            (q) =>
-                q.recordId.equals(ticketId.trim()) &
-                q.queueTableName.equals('tickets'),
-          )
-          ..orderBy([(q) => OrderingTerm.desc(q.createdAt)])
-          ..limit(1))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.syncQueue)
+              ..where(
+                (q) =>
+                    q.recordId.equals(ticketId.trim()) &
+                    q.queueTableName.equals('tickets'),
+              )
+              ..orderBy([(q) => OrderingTerm.desc(q.createdAt)])
+              ..limit(1))
+            .getSingleOrNull();
     if (row == null) return null;
     try {
       final body = jsonDecode(row.payload);
@@ -946,8 +1248,9 @@ WHERE shift_id = ? AND status = 'completed'
       notes: notes,
     );
     final fee = _feeFromLostResponse(map);
-    final lostStatus =
-        _normalizeTicketStatus(map['status']?.toString() ?? 'lost');
+    final lostStatus = _normalizeTicketStatus(
+      map['status']?.toString() ?? 'lost',
+    );
     await (_db.update(_db.tickets)..where((t) => t.id.equals(row.id))).write(
       TicketsCompanion(
         status: Value(lostStatus),
@@ -961,42 +1264,48 @@ WHERE shift_id = ? AND status = 'completed'
   Future<Ticket?> _ticketByServerId(String serverUuid) async {
     final u = serverUuid.trim();
     if (u.isEmpty) return null;
-    return (_db.select(_db.tickets)..where((t) => t.serverTicketId.equals(u)))
-        .getSingleOrNull();
+    return (_db.select(
+      _db.tickets,
+    )..where((t) => t.serverTicketId.equals(u))).getSingleOrNull();
   }
 
   Future<({String shiftId, String userId, String branchId})?>
-      _ticketUpsertContext() async {
-    final session = await (_db.select(_db.sessions)
-          ..where((x) => x.isActive.equals(true))
-          ..limit(1))
-        .getSingleOrNull();
+  _ticketUpsertContext() async {
+    final session =
+        await (_db.select(_db.sessions)
+              ..where((x) => x.isActive.equals(true))
+              ..limit(1))
+            .getSingleOrNull();
     if (session == null) return null;
-    final account = await (_db.select(_db.offlineAccounts)
-          ..where((a) => a.id.equals(session.userId))
-          ..limit(1))
-        .getSingleOrNull();
+    final account =
+        await (_db.select(_db.offlineAccounts)
+              ..where((a) => a.id.equals(session.userId))
+              ..limit(1))
+            .getSingleOrNull();
     if (account == null) return null;
     final userIdStr = account.serverUserId.toString();
-    final shift = await (_db.select(_db.shifts)
-          ..where((s) => s.userId.equals(userIdStr) & s.status.equals('open'))
-          ..orderBy([(s) => OrderingTerm.desc(s.openedAt)])
-          ..limit(1))
-        .getSingleOrNull();
+    final shift =
+        await (_db.select(_db.shifts)
+              ..where(
+                (s) => s.userId.equals(userIdStr) & s.status.equals('open'),
+              )
+              ..orderBy([(s) => OrderingTerm.desc(s.openedAt)])
+              ..limit(1))
+            .getSingleOrNull();
     if (shift == null) return null;
-    return (
-      shiftId: shift.id,
-      userId: userIdStr,
-      branchId: shift.branchId,
-    );
+    return (shiftId: shift.id, userId: userIdStr, branchId: shift.branchId);
   }
 
-  Future<Ticket> _upsertFromServerTransactionJson(Map<String, dynamic> json) async {
+  Future<Ticket> _upsertFromServerTransactionJson(
+    Map<String, dynamic> json, {
+    TransactionPaymentSummary? paymentSummary,
+  }) async {
     final serverUuid = json['id']?.toString().trim() ?? '';
     if (serverUuid.isEmpty) {
       throw TransactionsApiException('Server response missing id.');
     }
-    final ticketNum = json['ticket_number']?.toString().trim() ??
+    final ticketNum =
+        json['ticket_number']?.toString().trim() ??
         json['ticketNumber']?.toString().trim() ??
         json['qr_code']?.toString().trim() ??
         '';
@@ -1005,12 +1314,16 @@ WHERE shift_id = ? AND status = 'completed'
     }
 
     final fields = _fieldsFromServerTransactionJson(json);
+    final paymentJson = paymentSummary != null
+        ? jsonEncode(paymentSummary.toJson())
+        : null;
 
     final existing =
         await _ticketByServerId(serverUuid) ?? await ticketById(ticketNum);
     if (existing != null) {
-      await (_db.update(_db.tickets)..where((t) => t.id.equals(existing.id)))
-          .write(
+      await (_db.update(
+        _db.tickets,
+      )..where((t) => t.id.equals(existing.id))).write(
         TicketsCompanion(
           serverTicketId: Value(serverUuid),
           plateNumber: Value(fields.plateNumber),
@@ -1028,6 +1341,9 @@ WHERE shift_id = ? AND status = 'completed'
           driverIn: Value(fields.driverIn),
           driverOut: Value(fields.driverOut),
           parkingInfo: Value(fields.parkingInfo),
+          paymentSummaryJson: paymentJson != null
+              ? Value(paymentJson)
+              : const Value.absent(),
           syncStatus: const Value('synced'),
         ),
       );
@@ -1045,7 +1361,9 @@ WHERE shift_id = ? AND status = 'completed'
       );
     }
     final now = DateTime.now().toIso8601String();
-    await _db.into(_db.tickets).insert(
+    await _db
+        .into(_db.tickets)
+        .insert(
           TicketsCompanion.insert(
             id: ticketNum,
             shiftId: ctx.shiftId,
@@ -1069,6 +1387,9 @@ WHERE shift_id = ? AND status = 'completed'
             driverIn: Value(fields.driverIn),
             driverOut: Value(fields.driverOut),
             parkingInfo: Value(fields.parkingInfo),
+            paymentSummaryJson: paymentJson != null
+                ? Value(paymentJson)
+                : const Value.absent(),
           ),
         );
     final out = await ticketById(ticketNum);
@@ -1090,7 +1411,8 @@ WHERE shift_id = ? AND status = 'completed'
     final color = vm['color']?.toString() ?? '';
     final vtype = vm['type']?.toString() ?? '';
     final customer = _asStringKeyedMap(json['customer']) ?? const {};
-    final phone = _scalarString(
+    final phone =
+        _scalarString(
           customer['contact_number'] ?? customer['contactNumber'],
         ) ??
         '';
@@ -1101,8 +1423,9 @@ WHERE shift_id = ? AND status = 'completed'
     }
 
     final parkingMap = _mapField(json['parking']);
-    final parkingJson =
-        TicketParkingInfo.fromParkingMap(parkingMap).toJsonString();
+    final parkingJson = TicketParkingInfo.fromParkingMap(
+      parkingMap,
+    ).toJsonString();
 
     return _ServerTicketFields(
       plateNumber: plate,
@@ -1131,7 +1454,8 @@ WHERE shift_id = ? AND status = 'completed'
   }
 
   static String _parseCheckInTime(Map<String, dynamic> json) {
-    final raw = json['time_in'] ??
+    final raw =
+        json['time_in'] ??
         json['check_in_time'] ??
         json['checkInTime'] ??
         json['check_in_at'] ??
@@ -1162,18 +1486,8 @@ WHERE shift_id = ? AND status = 'completed'
     return s.isEmpty ? null : s;
   }
 
-  static double? _feeFromTransaction(Map<String, dynamic> json) {
-    for (final key in const ['amount', 'amount_paid', 'amountPaid', 'fee']) {
-      final raw = json[key];
-      if (raw is num) return raw.toDouble();
-      if (raw is Map && raw.isEmpty) continue;
-      if (raw != null) {
-        final parsed = double.tryParse(raw.toString());
-        if (parsed != null) return parsed;
-      }
-    }
-    return null;
-  }
+  static double? _feeFromTransaction(Map<String, dynamic> json) =>
+      TransactionPaymentFields.amountFrom(json);
 
   static String _encodeBelongings(Map<String, dynamic> json) {
     final raw = json['belongings'];
@@ -1187,7 +1501,8 @@ WHERE shift_id = ? AND status = 'completed'
   }
 
   static String _encodeCheckInDamages(Map<String, dynamic> json) {
-    final cond = _asStringKeyedMap(json['condition_checkin']) ??
+    final cond =
+        _asStringKeyedMap(json['condition_checkin']) ??
         _asStringKeyedMap(json['conditionCheckin']);
     if (cond == null) return '[]';
     final damages = cond['damages'];
@@ -1207,7 +1522,8 @@ WHERE shift_id = ? AND status = 'completed'
   }
 
   static String? _checkInSignature(Map<String, dynamic> json) {
-    final cond = _asStringKeyedMap(json['condition_checkin']) ??
+    final cond =
+        _asStringKeyedMap(json['condition_checkin']) ??
         _asStringKeyedMap(json['conditionCheckin']);
     if (cond == null) return null;
     return _scalarString(cond['signature']);
@@ -1230,10 +1546,11 @@ WHERE shift_id = ? AND status = 'completed'
   }
 
   Future<String?> _activeBearer() async {
-    final s = await (_db.select(_db.sessions)
-          ..where((x) => x.isActive.equals(true))
-          ..limit(1))
-        .getSingleOrNull();
+    final s =
+        await (_db.select(_db.sessions)
+              ..where((x) => x.isActive.equals(true))
+              ..limit(1))
+            .getSingleOrNull();
     final t = s?.authToken;
     if (t == null || t.isEmpty) return null;
     return t;

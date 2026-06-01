@@ -895,6 +895,62 @@ Results are scoped to the authenticated cashier's branch automatically. Used for
 
 ---
 
+### `GET /reports/transactions` — Reports Transactions tab (mobile)
+
+Paginated transaction list for the tablet **Reports → Transactions** screen. Scoped to the authenticated cashier; **requires an open cash shift** (same as the app gate before calling this endpoint).
+
+**Request**
+
+```
+GET /api/v1/reports/transactions?date_from=2026-05-30&date_to=2026-05-30&limit=20&page=1&sort=desc
+Authorization: Bearer <token>
+```
+
+| Query param | Type | Notes |
+|---|---|---|
+| `search` | string | Plate search |
+| `status` | string | `active`, `completed`, `lost`, `parked`, `long_stay` |
+| `date_from` | `YYYY-MM-DD` | Start of range (inclusive) |
+| `date_to` | `YYYY-MM-DD` | End of range (inclusive) |
+| `sort` | string | `asc` or `desc` (default `desc`) |
+| `limit` | number | Page size (app uses `20`) |
+| `page` | number | 1-based |
+
+**Response 200**
+
+```json
+{
+  "total": 42,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 3,
+  "data": [
+    {
+      "id": "uuid",
+      "ticket_number": "TKT-0123",
+      "plate_number": "ABC1234",
+      "vehicle": "Toyota Vios",
+      "color": "White",
+      "time_in": "08:00",
+      "time_out": "10:30",
+      "duration_minutes": 150,
+      "duration_display": "1h 20m",
+      "slot": "A-12",
+      "status": "active",
+      "amount": 150
+    }
+  ]
+}
+```
+
+**Mobile mapping** (`ReportsCubit` / `TransactionsApi.fetchReportsTransactions`):
+
+- Status dropdown: All Status → omit param; Parked → `active`; Long Stay → `long_stay`; Checked Out → `completed`
+- Date range: both `date_from` and `date_to` sent as inclusive `YYYY-MM-DD` (Manila calendar days)
+- Row tap → `GET /api/v1/transactions/{id}` via `detailId` (server UUID)
+
+---
+
 ## 6. Transaction Lookup
 
 Returns the full transaction shape. The app resolves from local Drift first; this is a fallback for cross-device lookups. **Check-out** uses `GET /transactions/:id/checkout-preview` instead (see §5); `GET /tickets/by-number/{ticketNumber}` is not used.

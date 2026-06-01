@@ -9,6 +9,7 @@ import '../../../core/time/philippine_time.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../domain/checkout_preview_format.dart';
+import '../domain/checkout_receipt_snapshot.dart';
 import '../state/check_out_cubit.dart';
 import 'widgets/check_out_step_body.dart';
 import 'widgets/check_out_ui_tokens.dart';
@@ -68,6 +69,10 @@ class _CheckOutPaymentSummaryScreenState
     super.initState();
     _driverOutCtrl = TextEditingController();
     _driverOutCtrl.addListener(_onDriverOutChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<CheckOutCubit>().refreshBreakdown();
+    });
   }
 
   @override
@@ -189,19 +194,15 @@ class _CheckOutPaymentSummaryScreenState
             ? peso2.format(0)
             : peso2.format(change.toDouble());
 
-        final pt = preview?.ticket;
-        final timeInLabel = pt != null
-            ? formatPreviewTime(pt.timeIn)
-            : formatPreviewTime(row.checkInAt);
-        final dateInLabel = pt != null
-            ? formatPreviewDate(pt.timeIn)
-            : formatPreviewDate(row.checkInAt);
-        final timeOutLabel = pt?.timeOut != null
-            ? formatPreviewTime(pt!.timeOut)
-            : DateFormat('h:mm a').format(PhilippineTime.now());
-        final durationLabel = pt?.duration ??
-            preview?.releaseSummary.duration ??
-            '—';
+        final timeInLabel = formatPreviewTime(row.checkInAt);
+        final dateInLabel = formatPreviewDate(row.checkInAt);
+        final timeOutLabel =
+            DateFormat('h:mm a').format(PhilippineTime.now());
+        final durationLabel = state.breakdown != null
+            ? CheckoutReceiptSnapshot.durationLabelFromMinutes(
+                state.breakdown!.durationMinutes,
+              )
+            : '—';
 
         final canConfirm = !state.isSubmitting &&
             !state.isLoadingPreview &&
@@ -246,6 +247,7 @@ class _CheckOutPaymentSummaryScreenState
                       dateInLabel: dateInLabel,
                       timeOutLabel: timeOutLabel,
                       durationLabel: durationLabel,
+                      flatBlockHours: state.flatBlockHours,
                       driverOutController: _driverOutCtrl,
                       isLostTicket: state.isLostTicket,
                       lostTicketFee: state.lostTicketFeePesos,

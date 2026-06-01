@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
+<!-- Light splash — matches AppBackground / login gradient top tone -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/black" />
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFAF0" />
+        </shape>
+    </item>
     <item>
         <bitmap
             android:gravity="center"

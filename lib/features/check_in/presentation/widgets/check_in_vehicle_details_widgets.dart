@@ -85,6 +85,7 @@ class CheckInVehicleBodyTypeGrid extends StatelessWidget {
   static const _row2 = [
     VehicleBodyType.luxury,
     VehicleBodyType.evPhev,
+    VehicleBodyType.motorcycle,
   ];
 
   @override
@@ -123,11 +124,12 @@ class CheckInVehicleBodyTypeGrid extends StatelessWidget {
                 ),
                 const SizedBox(height: gap),
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     card(_row2[0]),
                     const SizedBox(width: gap),
                     card(_row2[1]),
+                    const SizedBox(width: gap),
+                    card(_row2[2]),
                   ],
                 ),
               ],

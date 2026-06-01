@@ -8,7 +8,9 @@ import '../../../core/time/philippine_time.dart';
 import '../../check_in/presentation/widgets/check_in_compact_tokens.dart';
 import '../../check_in/presentation/widgets/check_in_vehicle_details_widgets.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
+import '../domain/checkout_pricing.dart';
 import '../domain/checkout_preview_format.dart';
+import '../domain/checkout_receipt_snapshot.dart';
 import '../models/checkout_preview_response.dart';
 import '../state/check_out_cubit.dart';
 import 'widgets/check_out_step_body.dart';
@@ -116,6 +118,7 @@ class _PreviewVehicleBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final row = state.ticket!;
     final pt = preview.ticket;
     final rs = preview.releaseSummary;
 
@@ -124,14 +127,12 @@ class _PreviewVehicleBody extends StatelessWidget {
         ? '—'
         : preview.customerContact!.trim();
 
-    final timeInLabel = formatPreviewTime(pt.timeIn);
-    final dateInLabel = formatPreviewDate(pt.timeIn);
-    final timeOutLabel = pt.timeOut != null
-        ? formatPreviewTime(pt.timeOut)
-        : formatPreviewTime(PhilippineTime.iso8601Now());
-    final durationLabel = pt.duration.isNotEmpty
-        ? pt.duration
-        : (rs.duration.isNotEmpty ? rs.duration : '—');
+    final timeInLabel = formatPreviewTime(row.checkInAt);
+    final dateInLabel = formatPreviewDate(row.checkInAt);
+    final timeOutLabel = formatPreviewTime(PhilippineTime.iso8601Now());
+    final durationLabel = CheckoutReceiptSnapshot.durationLabelFromMinutes(
+      CheckoutPricing.pricingWindow(checkInRaw: row.checkInAt).durationMinutes,
+    );
 
     final plateDisplay = pt.plate.isNotEmpty ? pt.plate : rs.plate;
     final makeModel = [

@@ -49,8 +49,8 @@ class CheckoutPreviewRates extends Equatable {
       lostTicketFee: _dbl(
         json['lost_ticket_fee'] ?? json['lostTicketFee'],
       ),
-      overnightStart: start.isEmpty ? '01:30' : start,
-      overnightEnd: end.isEmpty ? '06:00' : end,
+      overnightStart: start,
+      overnightEnd: end,
     );
   }
 

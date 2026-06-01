@@ -39,6 +39,24 @@ void main() {
     expect(row.line2, contains('₱150.00'));
   });
 
+  test('checked-out recent row shows cash tendered when present', () {
+    final row = DashboardSummaryRecent.fromJson({
+      'id': 'ticket-uuid',
+      'ticket_number': 'TKT-0123',
+      'plate_number': 'ABC1234',
+      'status': 'COMPLETED',
+      'amount': 150,
+      'cash_tendered': 200,
+      'change': {},
+      'time_out': '2026-05-08T02:30:00.000Z',
+    })!.toRecentRow();
+
+    expect(row.line2, contains('Cash'));
+    expect(row.line2, contains('₱200.00'));
+    expect(row.line2, contains('Chg'));
+    expect(row.line2, contains('₱50.00'));
+  });
+
   test('toRecentRow uses vehicle and slot fields when present', () {
     final row = DashboardSummaryRecent.fromJson({
       'id': 'ticket-uuid',

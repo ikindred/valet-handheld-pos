@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/connectivity/internet_reachability.dart';
+import '../../../core/pricing/transaction_payment_calculator.dart';
 import '../../../core/time/philippine_time.dart';
 import '../../../core/formatting/plate_number.dart';
 import '../../../core/logging/valet_log.dart';
@@ -27,6 +28,7 @@ import '../domain/checkout_pricing.dart';
 import '../domain/checkout_receipt_snapshot.dart';
 import '../domain/ticket_damage_markers.dart';
 import '../models/check_out_response.dart';
+import '../models/checkout_preview_rates.dart';
 import '../models/checkout_preview_response.dart';
 
 class CheckOutState extends Equatable {
@@ -93,9 +95,9 @@ class CheckOutState extends Equatable {
   final String mallHours;
 
   List<VehicleDamageEntry> get diagramEntries => [
-        ...checkInDamage,
-        ...checkoutAddedDamage,
-      ];
+    ...checkInDamage,
+    ...checkoutAddedDamage,
+  ];
 
   double get lostTicketFeePesos =>
       preview?.rates?.lostTicketFee ??
@@ -169,23 +171,29 @@ class CheckOutState extends Equatable {
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isLostTicket: isLostTicket ?? this.isLostTicket,
       previewError: previewError ?? this.previewError,
-      serverTicketId:
-          clearServerTicketId ? null : (serverTicketId ?? this.serverTicketId),
-      serverTotal:
-          clearServerTotal ? null : (serverTotal ?? this.serverTotal),
+      serverTicketId: clearServerTicketId
+          ? null
+          : (serverTicketId ?? this.serverTicketId),
+      serverTotal: clearServerTotal ? null : (serverTotal ?? this.serverTotal),
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
-      checkOutResponse:
-          clearCheckOutResponse ? null : (checkOutResponse ?? this.checkOutResponse),
+      checkOutResponse: clearCheckOutResponse
+          ? null
+          : (checkOutResponse ?? this.checkOutResponse),
       flatBlockHours: flatBlockHours ?? this.flatBlockHours,
       overnightStart: overnightStart ?? this.overnightStart,
       overnightEnd: overnightEnd ?? this.overnightEnd,
-      receiptTicket: clearReceipt ? null : (receiptTicket ?? this.receiptTicket),
-      receiptTotalPesos:
-          clearReceipt ? null : (receiptTotalPesos ?? this.receiptTotalPesos),
-      receiptChangePesos:
-          clearReceipt ? null : (receiptChangePesos ?? this.receiptChangePesos),
-      receiptSnapshot:
-          clearReceipt ? null : (receiptSnapshot ?? this.receiptSnapshot),
+      receiptTicket: clearReceipt
+          ? null
+          : (receiptTicket ?? this.receiptTicket),
+      receiptTotalPesos: clearReceipt
+          ? null
+          : (receiptTotalPesos ?? this.receiptTotalPesos),
+      receiptChangePesos: clearReceipt
+          ? null
+          : (receiptChangePesos ?? this.receiptChangePesos),
+      receiptSnapshot: clearReceipt
+          ? null
+          : (receiptSnapshot ?? this.receiptSnapshot),
       branchName: branchName ?? this.branchName,
       mallHours: mallHours ?? this.mallHours,
     );
@@ -193,45 +201,41 @@ class CheckOutState extends Equatable {
 
   @override
   List<Object?> get props => [
-        ticket,
-        preview,
-        checkInDamage,
-        checkoutAddedDamage,
-        selectedDamageType,
-        rates,
-        breakdown,
-        amountTenderedInput,
-        driverIn,
-        driverOut,
-        scanError,
-        isLookupBusy,
-        isLoadingPreview,
-        isSubmitting,
-        isLostTicket,
-        previewError,
-        serverTicketId,
-        serverTotal,
-        invoiceNumber,
-        checkOutResponse,
-        flatBlockHours,
-        overnightStart,
-        overnightEnd,
-        receiptTicket,
-        receiptTotalPesos,
-        receiptChangePesos,
-        receiptSnapshot,
-        branchName,
-        mallHours,
-      ];
+    ticket,
+    preview,
+    checkInDamage,
+    checkoutAddedDamage,
+    selectedDamageType,
+    rates,
+    breakdown,
+    amountTenderedInput,
+    driverIn,
+    driverOut,
+    scanError,
+    isLookupBusy,
+    isLoadingPreview,
+    isSubmitting,
+    isLostTicket,
+    previewError,
+    serverTicketId,
+    serverTotal,
+    invoiceNumber,
+    checkOutResponse,
+    flatBlockHours,
+    overnightStart,
+    overnightEnd,
+    receiptTicket,
+    receiptTotalPesos,
+    receiptChangePesos,
+    receiptSnapshot,
+    branchName,
+    mallHours,
+  ];
 }
 
 class CheckOutCubit extends Cubit<CheckOutState> {
-  CheckOutCubit(
-    this._tickets,
-    this._rates,
-    this._auth,
-    this._transactionsApi,
-  ) : super(const CheckOutState());
+  CheckOutCubit(this._tickets, this._rates, this._auth, this._transactionsApi)
+    : super(const CheckOutState());
 
   final TicketService _tickets;
   final RateService _rates;
@@ -239,15 +243,15 @@ class CheckOutCubit extends Cubit<CheckOutState> {
   final TransactionsApi _transactionsApi;
 
   void reset() => emit(
-        CheckOutState(
-          rates: state.rates,
-          flatBlockHours: state.flatBlockHours,
-          overnightStart: state.overnightStart,
-          overnightEnd: state.overnightEnd,
-          branchName: state.branchName,
-          mallHours: state.mallHours,
-        ),
-      );
+    CheckOutState(
+      rates: state.rates,
+      flatBlockHours: state.flatBlockHours,
+      overnightStart: state.overnightStart,
+      overnightEnd: state.overnightEnd,
+      branchName: state.branchName,
+      mallHours: state.mallHours,
+    ),
+  );
 
   void setRates(StandardParkingRates? rates) {
     emit(state.copyWith(rates: rates));
@@ -279,8 +283,8 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         state.copyWith(
           rates: fallback,
           flatBlockHours: CheckoutPricing.defaultFlatBlockHours,
-          overnightStart: CheckoutPricing.defaultOvernightStart,
-          overnightEnd: CheckoutPricing.defaultOvernightEnd,
+          overnightStart: '',
+          overnightEnd: '',
         ),
       );
     }
@@ -314,8 +318,8 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         state.copyWith(
           rates: fallback,
           flatBlockHours: CheckoutPricing.defaultFlatBlockHours,
-          overnightStart: CheckoutPricing.defaultOvernightStart,
-          overnightEnd: CheckoutPricing.defaultOvernightEnd,
+          overnightStart: '',
+          overnightEnd: '',
         ),
       );
       _recomputeBreakdown();
@@ -363,7 +367,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
   }
 
   ({List<VehicleDamageEntry> checkIn, List<VehicleDamageEntry> checkout})
-      _damageFromPreview(CheckoutPreviewResponse preview) {
+  _damageFromPreview(CheckoutPreviewResponse preview) {
     final checkIn = [
       ...damageEntriesFromComparison(preview.checkInConditions),
       for (final c in preview.conditionComparison)
@@ -376,15 +380,43 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     return (checkIn: checkIn, checkout: checkoutOnly);
   }
 
+  static const _offlinePreviewMessage = 'Offline — showing saved ticket data.';
+  static const _previewApiFallbackMessage =
+      'Preview unavailable — using saved rates on this device.';
+  static const _previewMissingRatesMessage =
+      'Preview has no rates — using saved rates on this device.';
+
+  /// Drift-backed checkout when offline or checkout-preview cannot supply rates.
+  void _beginDriftCheckout(Ticket ticket, {required String previewError}) {
+    beginFromTicket(ticket);
+    if (isClosed) return;
+    emit(
+      state.copyWith(
+        isLookupBusy: false,
+        isLoadingPreview: false,
+        previewError: previewError,
+      ),
+    );
+  }
+
+  Future<bool> _tryDriftCheckoutFallback({
+    required Ticket ticket,
+    required String previewError,
+  }) async {
+    _beginDriftCheckout(ticket, previewError: previewError);
+    return true;
+  }
+
   void _emitPreviewLoaded({
     required CheckoutPreviewResponse preview,
     required Ticket ticket,
   }) {
     final dmg = _damageFromPreview(preview);
+    final hasPreviewRates = preview.rates != null;
     emit(
       state.copyWith(
         preview: preview,
-        previewError: '',
+        previewError: hasPreviewRates ? '' : _previewMissingRatesMessage,
         serverTicketId: preview.transactionId,
         clearServerTotal: true,
         ticket: ticket,
@@ -396,7 +428,11 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         clearBreakdown: true,
       ),
     );
-    _recomputeBreakdown();
+    if (hasPreviewRates) {
+      _recomputeBreakdown();
+    } else {
+      unawaited(hydrateRatesFromDrift());
+    }
   }
 
   Ticket _mergeTicketWithPreview(Ticket base, CheckoutPreviewResponse preview) {
@@ -410,9 +446,15 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       userId: base.userId,
       branchId: base.branchId,
       plateNumber: pt.plate.isNotEmpty ? pt.plate : base.plateNumber,
-      vehicleBrand: pt.vehicleMake.isNotEmpty ? pt.vehicleMake : base.vehicleBrand,
-      vehicleColor: pt.vehicleColor.isNotEmpty ? pt.vehicleColor : base.vehicleColor,
-      vehicleType: pt.vehicleType.isNotEmpty ? pt.vehicleType : base.vehicleType,
+      vehicleBrand: pt.vehicleMake.isNotEmpty
+          ? pt.vehicleMake
+          : base.vehicleBrand,
+      vehicleColor: pt.vehicleColor.isNotEmpty
+          ? pt.vehicleColor
+          : base.vehicleColor,
+      vehicleType: pt.vehicleType.isNotEmpty
+          ? pt.vehicleType
+          : base.vehicleType,
       cellphoneNumber: preview.customerContact ?? base.cellphoneNumber,
       damageMarkers: base.damageMarkers,
       personalBelongings: belongingsJson,
@@ -429,14 +471,17 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     );
   }
 
-  Future<Ticket?> _minimalTicketFromPreview(CheckoutPreviewResponse preview) async {
+  Future<Ticket?> _minimalTicketFromPreview(
+    CheckoutPreviewResponse preview,
+  ) async {
     final session = await _auth.getActiveSession();
     if (session == null) return null;
     final site = await _auth.branchAndAreaFromDb();
     final shift = await _auth.getOpenShiftForUser(session.userId);
     final pt = preview.ticket;
-    final ticketId =
-        pt.ticketNumber.isNotEmpty ? pt.ticketNumber : 'TKT-UNKNOWN';
+    final ticketId = pt.ticketNumber.isNotEmpty
+        ? pt.ticketNumber
+        : 'TKT-UNKNOWN';
     return Ticket(
       id: ticketId,
       shiftId: shift?.id ?? '',
@@ -460,7 +505,9 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     );
   }
 
-  Future<CheckoutPreviewResponse> _fetchCheckoutPreview(String lookupKey) async {
+  Future<CheckoutPreviewResponse> _fetchCheckoutPreview(
+    String lookupKey,
+  ) async {
     final session = await _auth.getActiveSession();
     final token = session?.authToken;
     if (token == null || token.isEmpty) {
@@ -485,9 +532,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       zoneLabel: label,
     );
     emit(
-      state.copyWith(
-        checkoutAddedDamage: [...state.checkoutAddedDamage, e],
-      ),
+      state.copyWith(checkoutAddedDamage: [...state.checkoutAddedDamage, e]),
     );
   }
 
@@ -535,7 +580,10 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     );
     try {
       final lookupKey = _normalizeQrPayload(code);
-      ValetLog.debug('CheckOutCubit.lookupByTicketCode', 'lookupKey=$lookupKey');
+      ValetLog.debug(
+        'CheckOutCubit.lookupByTicketCode',
+        'lookupKey=$lookupKey',
+      );
 
       if (await InternetReachability.hasInternet()) {
         try {
@@ -549,7 +597,8 @@ class CheckOutCubit extends Cubit<CheckOutState> {
           final ticketNumber = preview.ticket.ticketNumber.isNotEmpty
               ? preview.ticket.ticketNumber
               : lookupKey;
-          final local = await _tickets.activeTicketByTicketNumber(ticketNumber) ??
+          final local =
+              await _tickets.activeTicketByTicketNumber(ticketNumber) ??
               await _tickets.activeTicketByTicketNumber(lookupKey);
           final ticket = local != null
               ? _mergeTicketWithPreview(local, preview)
@@ -585,6 +634,16 @@ class CheckOutCubit extends Cubit<CheckOutState> {
           );
           return;
         } on CheckoutApiException catch (e) {
+          final local =
+              await _tickets.activeTicketByTicketNumber(lookupKey) ??
+              await _tickets.activeTicketByTicketNumber(code);
+          if (local != null &&
+              await _tryDriftCheckoutFallback(
+                ticket: local,
+                previewError: _previewApiFallbackMessage,
+              )) {
+            return;
+          }
           emit(
             state.copyWith(
               scanError: e.message,
@@ -593,20 +652,39 @@ class CheckOutCubit extends Cubit<CheckOutState> {
             ),
           );
           return;
+        } catch (e, st) {
+          ValetLog.error(
+            'CheckOutCubit.lookupByTicketCode',
+            'checkout-preview failed',
+            e,
+            st,
+          );
+          final local =
+              await _tickets.activeTicketByTicketNumber(lookupKey) ??
+              await _tickets.activeTicketByTicketNumber(code);
+          if (local != null &&
+              await _tryDriftCheckoutFallback(
+                ticket: local,
+                previewError: _previewApiFallbackMessage,
+              )) {
+            return;
+          }
+          emit(
+            state.copyWith(
+              scanError: 'Could not load preview. Try again.',
+              isLookupBusy: false,
+              isLoadingPreview: false,
+            ),
+          );
+          return;
         }
       }
 
-      final vt = await _tickets.activeTicketByTicketNumber(lookupKey) ??
+      final vt =
+          await _tickets.activeTicketByTicketNumber(lookupKey) ??
           await _tickets.activeTicketByTicketNumber(code);
       if (vt != null) {
-        beginFromTicket(vt);
-        emit(
-          state.copyWith(
-            isLookupBusy: false,
-            isLoadingPreview: false,
-            previewError: 'Offline — showing saved ticket data.',
-          ),
-        );
+        _beginDriftCheckout(vt, previewError: _offlinePreviewMessage);
         return;
       }
 
@@ -656,19 +734,15 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       }
 
       if (!await InternetReachability.hasInternet()) {
-        beginFromTicket(vt);
-        emit(
-          state.copyWith(
-            isLookupBusy: false,
-            isLoadingPreview: false,
-            previewError: 'Offline — showing saved ticket data.',
-          ),
-        );
+        _beginDriftCheckout(vt, previewError: _offlinePreviewMessage);
         return;
       }
 
       try {
-        ValetLog.info('CheckOutCubit.lookupByPlate', 'GET checkout-preview/$plate');
+        ValetLog.info(
+          'CheckOutCubit.lookupByPlate',
+          'GET checkout-preview/$plate',
+        );
         final preview = await _fetchCheckoutPreview(plate);
         if (isClosed) return;
         _emitPreviewLoaded(
@@ -692,9 +766,35 @@ class CheckOutCubit extends Cubit<CheckOutState> {
           ),
         );
       } on CheckoutApiException catch (e) {
+        if (await _tryDriftCheckoutFallback(
+          ticket: vt,
+          previewError: _previewApiFallbackMessage,
+        )) {
+          return;
+        }
         emit(
           state.copyWith(
             scanError: e.message,
+            isLookupBusy: false,
+            isLoadingPreview: false,
+          ),
+        );
+      } catch (e, st) {
+        ValetLog.error(
+          'CheckOutCubit.lookupByPlate',
+          'checkout-preview failed',
+          e,
+          st,
+        );
+        if (await _tryDriftCheckoutFallback(
+          ticket: vt,
+          previewError: _previewApiFallbackMessage,
+        )) {
+          return;
+        }
+        emit(
+          state.copyWith(
+            scanError: 'Could not load preview. Try again.',
             isLookupBusy: false,
             isLoadingPreview: false,
           ),
@@ -728,21 +828,43 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     return code.trim();
   }
 
+  /// Fee lines: checkout-preview `rates` when online preview includes them;
+  /// otherwise Drift (`rates` + `branch_config`). Times always from ticket check-in → now.
   void _recomputeBreakdown() {
+    final t = state.ticket;
+    if (t == null) {
+      emit(state.copyWith(clearBreakdown: true));
+      return;
+    }
+    final checkInRaw = t.checkInAt.trim();
+    if (checkInRaw.isEmpty) {
+      emit(state.copyWith(clearBreakdown: true));
+      return;
+    }
+
+    final window = CheckoutPricing.pricingWindow(checkInRaw: checkInRaw);
     final previewRates = state.preview?.rates;
+
     if (previewRates != null) {
-      final timeInRaw = state.preview!.ticket.timeIn.trim();
-      if (timeInRaw.isEmpty) {
-        emit(state.copyWith(clearBreakdown: true));
-        return;
-      }
-      final timeIn = PhilippineTime.fromApiIso(timeInRaw);
-      final timeOut = PhilippineTime.now();
+      final overnight = CheckoutPricing.mergeOvernightTimes(
+        previewStart: previewRates.overnightStart,
+        previewEnd: previewRates.overnightEnd,
+        cachedStart: state.overnightStart,
+        cachedEnd: state.overnightEnd,
+      );
+      final effectivePreview = CheckoutPreviewRates(
+        flatRate: previewRates.flatRate,
+        succeedingRate: previewRates.succeedingRate,
+        overnightFee: previewRates.overnightFee,
+        lostTicketFee: previewRates.lostTicketFee,
+        overnightStart: overnight.start,
+        overnightEnd: overnight.end,
+      );
       final b = CheckoutPricing.computeFromPreviewRates(
-        timeIn: timeIn,
-        timeOut: timeOut,
-        rates: previewRates,
-        flatBlockHours: CheckoutPricing.defaultFlatBlockHours,
+        timeIn: window.timeIn,
+        timeOut: window.timeOut,
+        rates: effectivePreview,
+        flatBlockHours: state.flatBlockHours,
       );
       emit(
         state.copyWith(
@@ -753,31 +875,23 @@ class CheckOutCubit extends Cubit<CheckOutState> {
             overnightFeePesos: previewRates.overnightFee.round(),
             lostTicketFeePesos: previewRates.lostTicketFee.round(),
           ),
+          overnightStart: overnight.start,
+          overnightEnd: overnight.end,
         ),
       );
       return;
     }
 
-    final t = state.ticket;
     final rates = state.rates;
-    if (t == null || rates == null) {
+    if (rates == null) {
       emit(state.copyWith(clearBreakdown: true));
       return;
     }
-    final checkInRaw = t.checkInAt.trim();
-    if (checkInRaw.isEmpty) {
-      emit(state.copyWith(clearBreakdown: true));
-      return;
-    }
-    final start = state.overnightStart.trim().isNotEmpty
-        ? state.overnightStart.trim()
-        : CheckoutPricing.defaultOvernightStart;
-    final end = state.overnightEnd.trim().isNotEmpty
-        ? state.overnightEnd.trim()
-        : CheckoutPricing.defaultOvernightEnd;
+    final start = state.overnightStart.trim();
+    final end = state.overnightEnd.trim();
     final b = CheckoutPricing.compute(
-      timeIn: PhilippineTime.fromApiIso(checkInRaw),
-      timeOut: PhilippineTime.now(),
+      timeIn: window.timeIn,
+      timeOut: window.timeOut,
       rates: rates,
       flatBlockHours: state.flatBlockHours,
       overnightStart: start,
@@ -787,6 +901,69 @@ class CheckOutCubit extends Cubit<CheckOutState> {
   }
 
   void refreshBreakdown() => _recomputeBreakdown();
+
+  /// Rates + window captured during payment (preview or Drift).
+  ({
+    StandardParkingRates rates,
+    int flatBlockHours,
+    String overnightStart,
+    String overnightEnd,
+  })
+  _ratesResolvedForReceipt() {
+    final rates = state.rates ?? StandardParkingRates.offlineDefault;
+    final start = state.overnightStart.trim();
+    final end = state.overnightEnd.trim();
+    return (
+      rates: rates,
+      flatBlockHours: state.flatBlockHours,
+      overnightStart: start,
+      overnightEnd: end,
+    );
+  }
+
+  /// Same breakdown shown on payment — do not recompute from Drift at finalize.
+  CheckoutBreakdown _breakdownForFinalize(Ticket ticket, int timeOutUnix) {
+    final existing = state.breakdown;
+    if (existing != null) return existing;
+
+    final checkOut = PhilippineTime.fromUnixSeconds(timeOutUnix);
+    final previewRates = state.preview?.rates;
+    if (previewRates != null) {
+      final window = CheckoutPricing.pricingWindow(
+        checkInRaw: ticket.checkInAt,
+      );
+      final overnight = CheckoutPricing.mergeOvernightTimes(
+        previewStart: previewRates.overnightStart,
+        previewEnd: previewRates.overnightEnd,
+        cachedStart: state.overnightStart,
+        cachedEnd: state.overnightEnd,
+      );
+      return CheckoutPricing.computeFromPreviewRates(
+        timeIn: window.timeIn,
+        timeOut: checkOut,
+        rates: CheckoutPreviewRates(
+          flatRate: previewRates.flatRate,
+          succeedingRate: previewRates.succeedingRate,
+          overnightFee: previewRates.overnightFee,
+          lostTicketFee: previewRates.lostTicketFee,
+          overnightStart: overnight.start,
+          overnightEnd: overnight.end,
+        ),
+        flatBlockHours: state.flatBlockHours,
+      );
+    }
+
+    final resolved = _ratesResolvedForReceipt();
+    final window = CheckoutPricing.pricingWindow(checkInRaw: ticket.checkInAt);
+    return CheckoutPricing.compute(
+      timeIn: window.timeIn,
+      timeOut: checkOut,
+      rates: resolved.rates,
+      flatBlockHours: resolved.flatBlockHours,
+      overnightStart: resolved.overnightStart,
+      overnightEnd: resolved.overnightEnd,
+    );
+  }
 
   double? parsedTendered() {
     final s = state.amountTenderedInput.trim().replaceAll(',', '');
@@ -810,11 +987,12 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     required String ticketId,
     required String? serverTicketId,
     required double amount,
+    required String timeOutIso,
     required List<Map<String, dynamic>> conditionBody,
     required bool isOvernight,
     required bool ticketLost,
+    required double cashTendered,
   }) async {
-    final timeOutIso = PhilippineTime.now().toUtc().toIso8601String();
     await _tickets.enqueueCheckoutFinalize(
       ticketId: ticketId,
       serverTicketId: serverTicketId,
@@ -824,6 +1002,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       ticketLost: ticketLost,
       driverOut: state.driverOut,
       conditionCheckout: conditionBody,
+      cashTendered: cashTendered,
     );
   }
 
@@ -844,11 +1023,17 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     }
 
     final change = tendered - total;
-    final timeOut = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    var receiptTendered = tendered;
+    var receiptChange = change;
+    // One checkout instant for API, Drift, receipt snapshot, and summary UI.
+    final checkoutUtc = PhilippineTime.utcNow();
+    final timeOutUnix = PhilippineTime.unixSecondsUtc(checkoutUtc);
+    final timeOutApiIso = PhilippineTime.apiIsoInstant(checkoutUtc);
+    final checkOutWallIso = PhilippineTime.formatIso(
+      PhilippineTime.fromUtc(checkoutUtc),
+    );
     final merged = [...state.checkInDamage, ...state.checkoutAddedDamage];
     final markersJson = encodeTicketDamageMarkersForCheckout(merged);
-    final checkOutIso =
-        DateTime.fromMillisecondsSinceEpoch(timeOut * 1000).toIso8601String();
     final driverOut = state.driverOut ?? '';
 
     emit(state.copyWith(isSubmitting: true));
@@ -888,21 +1073,29 @@ class CheckOutCubit extends Cubit<CheckOutState> {
               emit(state.copyWith(isSubmitting: false));
               return 'Checkout preview is not loaded.';
             }
-            final timeOutIso =
-                PhilippineTime.now().toUtc().toIso8601String();
             response = await _transactionsApi.submitCheckOut(
               token: token,
               ticketId: pathId,
               amount: total,
-              timeOut: timeOutIso,
+              timeOut: timeOutApiIso,
               isOvernight: isOvernight,
               ticketLost: ticketLost,
+              cashTendered: tendered,
               driverOut: state.driverOut,
               conditionCheckout: conditionBody,
             );
             invoice = response.invoiceNumber;
-            // Lost fee is additive — keep full total due, not server lost-fee-only.
-            serverTotal = ticketLost ? total : response.total;
+            // Amount collected stays what the POS computed and tendered against.
+            serverTotal = total;
+            if (response.cashTendered != null) {
+              receiptTendered = response.cashTendered!;
+            }
+            receiptChange =
+                TransactionPaymentCalculator.computedChange(
+                  amount: serverTotal.toDouble(),
+                  cashTendered: receiptTendered,
+                ) ??
+                receiptChange;
           } on SocketException {
             if (state.isLostTicket) {
               emit(state.copyWith(isSubmitting: false));
@@ -912,9 +1105,11 @@ class CheckOutCubit extends Cubit<CheckOutState> {
               ticketId: t.id,
               serverTicketId: pathId,
               amount: total,
+              timeOutIso: timeOutApiIso,
               conditionBody: conditionBody,
               isOvernight: isOvernight,
               ticketLost: ticketLost,
+              cashTendered: tendered,
             );
           } on DioException catch (e) {
             if (_isOfflineDio(e)) {
@@ -926,9 +1121,11 @@ class CheckOutCubit extends Cubit<CheckOutState> {
                 ticketId: t.id,
                 serverTicketId: pathId,
                 amount: total,
+                timeOutIso: timeOutApiIso,
                 conditionBody: conditionBody,
                 isOvernight: isOvernight,
                 ticketLost: ticketLost,
+                cashTendered: tendered,
               );
             } else {
               rethrow;
@@ -943,9 +1140,11 @@ class CheckOutCubit extends Cubit<CheckOutState> {
             ticketId: t.id,
             serverTicketId: pathId,
             amount: total,
+            timeOutIso: timeOutApiIso,
             conditionBody: conditionBody,
             isOvernight: isOvernight,
             ticketLost: ticketLost,
+            cashTendered: tendered,
           );
         }
       } else {
@@ -957,56 +1156,82 @@ class CheckOutCubit extends Cubit<CheckOutState> {
           ticketId: t.id,
           serverTicketId: pathId ?? state.serverTicketId,
           amount: total,
+          timeOutIso: timeOutApiIso,
           conditionBody: conditionBody,
           isOvernight: isOvernight,
           ticketLost: ticketLost,
+          cashTendered: tendered,
         );
       }
 
+      final breakdown = _breakdownForFinalize(t, timeOutUnix);
+      final ratesRow = _ratesResolvedForReceipt();
+      final resolved = (
+        rates: ratesRow.rates,
+        flatBlockHours: ratesRow.flatBlockHours,
+        overnightStart: ratesRow.overnightStart,
+        overnightEnd: ratesRow.overnightEnd,
+      );
+      final chargedTotal = total.toDouble();
+      receiptChange =
+          TransactionPaymentCalculator.computedChange(
+            amount: chargedTotal,
+            cashTendered: receiptTendered,
+          ) ??
+          receiptChange;
+
+      final paymentSummary = TransactionPaymentCalculator(_rates)
+          .fromCheckoutBreakdown(
+            breakdown: breakdown,
+            rates: resolved,
+            totalDue: chargedTotal,
+            cashTendered: receiptTendered,
+            isLostTicket: state.isLostTicket,
+          );
+
       await _tickets.completeTicketCheckout(
         ticketId: t.id,
-        checkOutAtIso: checkOutIso,
-        totalFee: serverTotal.toDouble(),
+        checkOutAtIso: checkOutWallIso,
+        totalFee: chargedTotal,
         damageMarkersJson: markersJson,
         driverOut: driverOut,
         status: state.isLostTicket ? 'lost' : 'completed',
+        paymentSummary: paymentSummary,
       );
 
       final preview = state.preview;
-      final snap = preview != null
-          ? CheckoutReceiptSnapshot.fromPreview(
-              localTicketId: t.id,
-              preview: preview,
-              totalPesos: serverTotal.toDouble(),
-              tendered: tendered,
-              change: change,
-              invoiceNumber: invoice,
-              branchName: state.branchName,
-            )
-          : state.breakdown != null
-              ? CheckoutReceiptSnapshot.capture(
-                  ticket: t,
-                  b: state.breakdown!,
-                  tendered: tendered,
-                  change: change,
-                  timeOutUnix: timeOut,
-                  totalPesos: total,
-                )
-              : CheckoutReceiptSnapshot.minimal(
-                  ticketNumber: t.id,
-                  totalPesos: serverTotal.toDouble(),
-                  changePesos: change,
-                );
+      final pt = preview?.ticket;
+      final snap = CheckoutReceiptSnapshot.fromCheckoutFinalize(
+        localTicketId: t.id,
+        ticket: t,
+        breakdown: breakdown,
+        flatBlockHours: resolved.flatBlockHours,
+        totalPesos: chargedTotal,
+        tendered: receiptTendered,
+        change: receiptChange,
+        timeOutUnix: timeOutUnix,
+        invoiceNumber: invoice,
+        branchName: state.branchName,
+        plateNumber: pt?.plate.isNotEmpty == true ? pt!.plate : null,
+        vehicleReceiptLine: pt?.vehicleReceiptLine,
+        slotLine: pt?.parkingLocationLine.isNotEmpty == true
+            ? pt!.parkingLocationLine
+            : null,
+        valetIn: pt?.valetIn ?? state.driverIn,
+        valetOut: state.driverOut,
+        overnightStart: resolved.overnightStart,
+        overnightEnd: resolved.overnightEnd,
+      );
 
       emit(
         state.copyWith(
           isSubmitting: false,
-          serverTotal: serverTotal.toDouble(),
+          serverTotal: chargedTotal,
           invoiceNumber: invoice,
           checkOutResponse: response,
           receiptTicket: t.id,
-          receiptTotalPesos: serverTotal.toDouble(),
-          receiptChangePesos: change,
+          receiptTotalPesos: chargedTotal,
+          receiptChangePesos: receiptChange,
           receiptSnapshot: snap,
         ),
       );

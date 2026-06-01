@@ -7,9 +7,14 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/printing/check_in_receipt_data.dart';
 import '../../../core/printing/print_flow.dart';
+import '../../../core/printing/receipt_print_format.dart';
+import '../../../core/session/standard_parking_rates.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/branch_config_service.dart';
+import '../../../data/services/rate_service.dart';
 import '../../../data/services/ticket_service.dart';
+import '../../auth/state/auth_bloc.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../models/receipt_part.dart';
 import '../state/check_in_cubit.dart';
@@ -39,12 +44,44 @@ class _CheckInPrintTicketScreenState extends State<CheckInPrintTicketScreen> {
 
   Future<CheckInReceiptData?> _loadReceiptData(BuildContext context) async {
     final cubit = context.read<CheckInCubit>();
+    final tickets = context.read<TicketService>();
+    final auth = context.read<AuthRepository>();
+    final rateService = context.read<RateService>();
+    final branchConfig = context.read<BranchConfigService>();
+    final authState = context.read<AuthBloc>().state;
+
     final id = cubit.state.ticketNumber.trim();
     if (id.isEmpty) return null;
-    final row = await context.read<TicketService>().ticketById(id);
+    final row = await tickets.ticketById(id);
+    if (!context.mounted) return null;
     if (row == null) return null;
     final state = cubit.state;
-    final auth = context.read<AuthRepository>();
+    StandardParkingRates? standardRates;
+    if (authState is AuthAuthenticated) {
+      standardRates = authState.standardRates;
+    }
+
+    var mallHours = ReceiptTemplateCopy.defaultMallHours;
+    var overnightCutoff = '';
+    var flatRateHours = 3;
+    try {
+      final branchId = await auth.branchUuidForApi();
+      final resolved = await rateService.checkoutRatesForOffline(
+        branchId: branchId,
+      );
+      standardRates ??= resolved.rates;
+      flatRateHours = resolved.flatBlockHours;
+      overnightCutoff = ReceiptPrintFormat.overnightWindowLabel(
+        startHhMm24: resolved.overnightStart,
+        endHhMm24: resolved.overnightEnd,
+      );
+
+      final config = await branchConfig.getConfig(branchId);
+      mallHours =
+          ReceiptPrintFormat.mallHoursFromBranchConfig(config) ?? mallHours;
+    } catch (_) {}
+
+    final rates = standardRates;
     final base = CheckInReceiptData(
       ticket: row,
       branchName: '',
@@ -56,8 +93,15 @@ class _CheckInPrintTicketScreenState extends State<CheckInPrintTicketScreen> {
       specialRequest: state.specialInstructions,
       hasSignature: state.isCustomerSignatureComplete,
       qrCode: state.ticketNumber,
+      mallHours: mallHours,
+      flatRatePesos: rates?.flatRatePesos ?? 0,
+      flatRateHours: flatRateHours,
+      succeedingHourPesos: rates?.succeedingHourPesos ?? 0,
+      overnightFeePesos: rates?.overnightFeePesos ?? 0,
+      lostTicketFeePesos: rates?.lostTicketFeePesos ?? 0,
+      overnightCutoff: overnightCutoff,
     );
-    return withBranchName(auth, base);
+    return withBranchName(auth, base, standardRates: standardRates);
   }
 
   static String _valetTypeLabel(ValetServiceType t) {
@@ -423,6 +467,30 @@ class _PrintReceiptPanel extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 16),
+        // TODO: Remove temporary skip-print bypass before production release.
+        if (!loadingReceipt && !allDone)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton(
+                onPressed: onDone,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textSecondary,
+                  side: BorderSide(color: Colors.black.withValues(alpha: 0.2)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  textStyle: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                child: const Text('Skip printing'),
+              ),
+            ),
+          ),
         SizedBox(
           width: double.infinity,
           height: 52,

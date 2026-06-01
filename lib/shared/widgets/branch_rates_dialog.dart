@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/formatting/peso_currency.dart';
+import '../../core/printing/receipt_print_format.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/remote/area_detail.dart';
 import '../../data/repositories/auth_repository.dart';
@@ -125,6 +126,8 @@ Future<void> showBranchRatesDialog(
               flatBlockHours: data.flatBlockHours,
               standard: data.standard,
               vehicleTypeRates: data.vehicleTypeRates,
+              overnightStart: data.overnightStart,
+              overnightEnd: data.overnightEnd,
               offlineCache: result.offlineCache,
             );
           },
@@ -140,6 +143,8 @@ class _RatesOnlyDialogContent extends StatefulWidget {
     required this.flatBlockHours,
     required this.standard,
     required this.vehicleTypeRates,
+    this.overnightStart = '',
+    this.overnightEnd = '',
     this.offlineCache = false,
   });
 
@@ -147,6 +152,8 @@ class _RatesOnlyDialogContent extends StatefulWidget {
   final int flatBlockHours;
   final ParkingRateFees standard;
   final List<VehicleTypeRateRow> vehicleTypeRates;
+  final String overnightStart;
+  final String overnightEnd;
   final bool offlineCache;
 
   @override
@@ -207,6 +214,8 @@ class _RatesOnlyDialogContentState extends State<_RatesOnlyDialogContent> {
                   _RateFeeBlock(
                     fees: widget.standard,
                     flatBlockHours: widget.flatBlockHours,
+                    overnightStart: widget.overnightStart,
+                    overnightEnd: widget.overnightEnd,
                   ),
                 ],
                 if (hasVehicleTypes) ...[
@@ -229,6 +238,8 @@ class _RatesOnlyDialogContentState extends State<_RatesOnlyDialogContent> {
                     _RateFeeBlock(
                       fees: selected.fees,
                       flatBlockHours: widget.flatBlockHours,
+                      overnightStart: widget.overnightStart,
+                      overnightEnd: widget.overnightEnd,
                     ),
                   ],
                 ] else if (widget.standard.hasAny) ...[
@@ -323,10 +334,14 @@ class _RateFeeBlock extends StatelessWidget {
   const _RateFeeBlock({
     required this.fees,
     required this.flatBlockHours,
+    required this.overnightStart,
+    required this.overnightEnd,
   });
 
   final ParkingRateFees fees;
   final int flatBlockHours;
+  final String overnightStart;
+  final String overnightEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -343,7 +358,10 @@ class _RateFeeBlock extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         _AmountRow(
-          label: 'Overnight Fee (after 1:30AM)',
+          label: ReceiptPrintFormat.overnightFeeRowLabel(
+            startHhMm24: overnightStart,
+            endHhMm24: overnightEnd,
+          ),
           amountPesos: fees.overnightFee,
         ),
         const SizedBox(height: 8),

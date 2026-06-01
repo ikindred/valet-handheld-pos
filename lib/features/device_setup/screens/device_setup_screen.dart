@@ -3,26 +3,26 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/services/device_id_service.dart';
-import '../../../core/storage/device_claim_restore.dart';
-import '../../../core/storage/prefs_keys.dart';
-import '../../../data/local/db/app_database.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/app_background.dart';
 import '../cubit/device_setup_cubit.dart';
 import '../cubit/device_setup_state.dart';
 
+/// Light palette aligned with [LoginScreen] / [AppBackground].
 abstract final class _T {
-  static const bg = Color(0xFF1C1C1A);
-  static const orange = Color(0xFFE87722);
-  static const greyMuted = Color(0xFF9E9E9E);
+  static const orange = Color(0xFFF68D00);
+  static const textPrimary = AppColors.textPrimary;
+  static const greyMuted = Color(0xFF9DA4B0);
   static const greySubtitle = Color(0xFFAEAEAE);
-  static const white = Color(0xFFFFFFFF);
+  static const onOrange = Color(0xFFFFFFFF);
   static const badgeActive = Color(0xFF2E7D32);
   static const badgeInactive = Color(0xFF757575);
-  static const cardBorder = Color(0xFF3C3434);
-  static const cardBg = Color(0xFF252522);
-  static const skeleton = Color(0xFF3A3A36);
+  static const cardBorder = Color(0xFFE7E8EB);
+  static const cardBorderStrong = Color(0xFFD0D4DC);
+  static const cardBg = Color(0xFFFFFFFF);
+  static const chipSelectedBg = Color(0xFFFFF3E0);
+  static const skeleton = Color(0xFFE8EAED);
   static const errorTint = Color(0xFFC62828);
 }
 
@@ -41,21 +41,8 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
   void initState() {
     super.initState();
     _search.addListener(() => setState(() {}));
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final prefs = await SharedPreferences.getInstance();
-      var claimed = prefs.getString(PrefsKeys.deviceIdentityKey)?.trim() ?? '';
-      if (claimed.isEmpty) {
-        final db = context.read<AppDatabase>();
-        if (!mounted) return;
-        final restored = await DeviceClaimRestore.tryRestoreFromDatabase(db);
-        claimed = restored?.serverDeviceId.trim() ?? '';
-      }
-      if (!mounted) return;
-      if (claimed.isNotEmpty) {
-        context.go('/login');
-        return;
-      }
       context.read<DeviceSetupCubit>().fetchDevices();
     });
   }
@@ -133,6 +120,36 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
     });
   }
 
+  Widget _branchFilterChip({
+    required String label,
+    required bool selected,
+    required ValueChanged<bool> onSelected,
+  }) {
+    return FilterChip(
+      label: Text(
+        label,
+        style: poppins(
+          13,
+          selected ? FontWeight.w700 : FontWeight.w500,
+          selected ? _T.orange : _T.textPrimary,
+        ),
+      ),
+      selected: selected,
+      onSelected: onSelected,
+      selectedColor: _T.chipSelectedBg,
+      checkmarkColor: _T.orange,
+      backgroundColor: _T.cardBg,
+      side: BorderSide(
+        color: selected ? _T.orange : _T.cardBorderStrong,
+        width: selected ? 2 : 1,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
   Future<void> _showClaimSheet(
     BuildContext context,
     DeviceModel device,
@@ -142,7 +159,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
         device.deviceLabel.trim().isEmpty ? device.serverDeviceId : device.deviceLabel;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: _T.cardBg,
+      backgroundColor: Colors.white,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -157,7 +174,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
             children: [
               Text(
                 'Set up as $label?',
-                style: poppins(18, FontWeight.w700, _T.white),
+                style: poppins(18, FontWeight.w700, _T.textPrimary),
               ),
               const SizedBox(height: 16),
               Text(
@@ -179,8 +196,8 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
                     child: OutlinedButton(
                       onPressed: () => Navigator.of(ctx).pop(),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: _T.white,
-                        side: const BorderSide(color: _T.cardBorder),
+                        foregroundColor: _T.textPrimary,
+                        side: const BorderSide(color: _T.cardBorderStrong),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -188,7 +205,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
                       ),
                       child: Text(
                         'Cancel',
-                        style: poppins(15, FontWeight.w600, _T.white),
+                        style: poppins(15, FontWeight.w600, _T.textPrimary),
                       ),
                     ),
                   ),
@@ -201,7 +218,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
                       },
                       style: FilledButton.styleFrom(
                         backgroundColor: _T.orange,
-                        foregroundColor: _T.white,
+                        foregroundColor: _T.onOrange,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -209,7 +226,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
                       ),
                       child: Text(
                         'Confirm',
-                        style: poppins(15, FontWeight.w700, _T.white),
+                        style: poppins(15, FontWeight.w700, _T.onOrange),
                       ),
                     ),
                   ),
@@ -232,9 +249,9 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: _T.bg,
-        body: SafeArea(
-          child: Column(
+        body: AppBackground(
+          child: SafeArea(
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
@@ -254,7 +271,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
                   children: [
                     Text(
                       'Select Your Device',
-                      style: poppins(24, FontWeight.w700, _T.white),
+                      style: poppins(24, FontWeight.w700, _T.textPrimary),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -285,7 +302,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
                       DeviceSetupError(:final message) => _ErrorBody(
                           message: message,
                           poppins: poppins,
-                          onRetry: () =>
+                          onRefresh: () =>
                               context.read<DeviceSetupCubit>().fetchDevices(),
                         ),
                     };
@@ -295,6 +312,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
             ],
           ),
         ),
+        ),
       ),
     );
   }
@@ -303,10 +321,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
     if (devices.isEmpty) {
       return _EmptyDevicesBody(
         poppins: poppins,
-        mono: mono,
-        onRetry: () => context.read<DeviceSetupCubit>().fetchDevices(),
-        onContinueClaimed: () =>
-            context.read<DeviceSetupCubit>().continueIfAlreadyClaimed(),
+        onRefresh: () => context.read<DeviceSetupCubit>().fetchDevices(),
       );
     }
 
@@ -320,7 +335,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: TextField(
             controller: _search,
-            style: poppins(15, FontWeight.w400, _T.white),
+            style: poppins(15, FontWeight.w400, _T.textPrimary),
             cursorColor: _T.orange,
             decoration: InputDecoration(
               isDense: true,
@@ -336,7 +351,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: _T.cardBorder),
+                borderSide: const BorderSide(color: _T.cardBorderStrong),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -349,40 +364,26 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 40,
+          height: 44,
           child: ListView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             children: [
               Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: FilterChip(
-                  label: Text(
-                    'All branches',
-                    style: poppins(13, FontWeight.w500, _T.white),
-                  ),
+                child: _branchFilterChip(
+                  label: 'All branches',
                   selected: _branchFilter == null,
                   onSelected: (_) => setState(() => _branchFilter = null),
-                  selectedColor: _T.orange.withValues(alpha: 0.22),
-                  checkmarkColor: _T.orange,
-                  backgroundColor: _T.cardBg,
-                  side: const BorderSide(color: _T.cardBorder),
                 ),
               ),
               ...branches.map(
                 (b) => Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    label: Text(
-                      b,
-                      style: poppins(13, FontWeight.w500, _T.white),
-                    ),
+                  child: _branchFilterChip(
+                    label: b,
                     selected: _branchFilter == b,
                     onSelected: (_) => setState(() => _branchFilter = b),
-                    selectedColor: _T.orange.withValues(alpha: 0.22),
-                    checkmarkColor: _T.orange,
-                    backgroundColor: _T.cardBg,
-                    side: const BorderSide(color: _T.cardBorder),
                   ),
                 ),
               ),
@@ -504,15 +505,11 @@ class _ClaimingBody extends StatelessWidget {
 class _EmptyDevicesBody extends StatelessWidget {
   const _EmptyDevicesBody({
     required this.poppins,
-    required this.mono,
-    required this.onRetry,
-    required this.onContinueClaimed,
+    required this.onRefresh,
   });
 
   final TextStyle Function(double, FontWeight, Color, {double height}) poppins;
-  final TextStyle Function(double, FontWeight, Color) mono;
-  final VoidCallback onRetry;
-  final VoidCallback onContinueClaimed;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -534,12 +531,12 @@ class _EmptyDevicesBody extends StatelessWidget {
                   Text(
                     'No devices available',
                     textAlign: TextAlign.center,
-                    style: poppins(20, FontWeight.w700, _T.white),
+                    style: poppins(20, FontWeight.w700, _T.textPrimary),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Unclaimed slots appear here. If this tablet is already '
-                    'claimed in the portal, continue to login.',
+                    'Unclaimed device identities appear here. Select one '
+                    'to set up this tablet.',
                     textAlign: TextAlign.center,
                     style: poppins(
                       14,
@@ -548,70 +545,27 @@ class _EmptyDevicesBody extends StatelessWidget {
                       height: 1.45,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Hardware fingerprint (for admin):',
-                    textAlign: TextAlign.center,
-                    style: poppins(
-                      12,
-                      FontWeight.w500,
-                      _T.greyMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  FutureBuilder<String>(
-                    future: DeviceIdService.getOrCreate(),
-                    builder: (context, snap) {
-                      final id = snap.data ?? (snap.hasError ? '(unavailable)' : '…');
-                      return DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: _T.cardBg,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: _T.cardBorder),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: SelectableText(
-                            id,
-                            style: mono(13, FontWeight.w500, _T.white),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
                 ],
               ),
             ),
           ),
-          FilledButton(
-            onPressed: onContinueClaimed,
-            style: FilledButton.styleFrom(
-              backgroundColor: _T.orange,
-              foregroundColor: _T.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: onRefresh,
+              style: FilledButton.styleFrom(
+                backgroundColor: _T.orange,
+                foregroundColor: _T.onOrange,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                minimumSize: const Size(0, 52),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-            ),
-            child: Text(
-              'Already claimed — continue to login',
-              style: poppins(16, FontWeight.w700, _T.white),
-            ),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton(
-            onPressed: onRetry,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: _T.white,
-              side: const BorderSide(color: _T.cardBorder),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+              child: Text(
+                'Refresh',
+                style: poppins(16, FontWeight.w700, _T.onOrange),
               ),
-            ),
-            child: Text(
-              'Retry',
-              style: poppins(15, FontWeight.w600, _T.white),
             ),
           ),
           const SizedBox(height: 16),
@@ -647,14 +601,14 @@ class _NoFilterResultsBody extends StatelessWidget {
             Text(
               'No devices match your search',
               textAlign: TextAlign.center,
-              style: poppins(17, FontWeight.w600, _T.white),
+              style: poppins(17, FontWeight.w600, _T.textPrimary),
             ),
             const SizedBox(height: 20),
             FilledButton(
               onPressed: onClear,
               style: FilledButton.styleFrom(
                 backgroundColor: _T.orange,
-                foregroundColor: _T.white,
+                foregroundColor: _T.onOrange,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
                   vertical: 14,
@@ -665,7 +619,7 @@ class _NoFilterResultsBody extends StatelessWidget {
               ),
               child: Text(
                 'Clear filters',
-                style: poppins(15, FontWeight.w700, _T.white),
+                style: poppins(15, FontWeight.w700, _T.onOrange),
               ),
             ),
           ],
@@ -708,10 +662,18 @@ class _DeviceTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: siteInvalid
-                  ? _T.errorTint.withValues(alpha: 0.65)
-                  : _T.cardBorder,
+                  ? _T.errorTint.withValues(alpha: 0.85)
+                  : _T.cardBorderStrong,
+              width: siteInvalid ? 1.5 : 1.25,
             ),
             color: _T.cardBg,
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x14000000),
+                blurRadius: 12,
+                offset: Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -722,7 +684,7 @@ class _DeviceTile extends StatelessWidget {
                   Expanded(
                     child: Text(
                       label,
-                      style: poppins(18, FontWeight.w700, _T.white),
+                      style: poppins(18, FontWeight.w700, _T.textPrimary),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -732,7 +694,7 @@ class _DeviceTile extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 serial.isEmpty ? '—' : serial,
-                style: mono(12, FontWeight.w500, _T.greyMuted),
+                style: mono(13, FontWeight.w500, _T.greySubtitle),
               ),
               const SizedBox(height: 12),
               if (siteInvalid)
@@ -764,26 +726,26 @@ class _DeviceTile extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(LucideIcons.mapPin, size: 16, color: _T.greySubtitle),
-                    const SizedBox(width: 6),
+                    Icon(LucideIcons.mapPin, size: 18, color: _T.orange),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         device.branchName,
-                        style: poppins(14, FontWeight.w500, _T.white),
+                        style: poppins(15, FontWeight.w600, _T.textPrimary),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(LucideIcons.layers, size: 16, color: _T.greySubtitle),
-                    const SizedBox(width: 6),
+                    Icon(LucideIcons.layers, size: 18, color: _T.orange),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         device.areaName,
-                        style: poppins(14, FontWeight.w500, _T.white),
+                        style: poppins(15, FontWeight.w600, _T.textPrimary),
                       ),
                     ),
                   ],
@@ -829,12 +791,12 @@ class _ErrorBody extends StatelessWidget {
   const _ErrorBody({
     required this.message,
     required this.poppins,
-    required this.onRetry,
+    required this.onRefresh,
   });
 
   final String message;
   final TextStyle Function(double, FontWeight, Color, {double height}) poppins;
-  final VoidCallback onRetry;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -867,19 +829,23 @@ class _ErrorBody extends StatelessWidget {
               ),
             ),
           ),
-          FilledButton(
-            onPressed: onRetry,
-            style: FilledButton.styleFrom(
-              backgroundColor: _T.orange,
-              foregroundColor: _T.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: onRefresh,
+              style: FilledButton.styleFrom(
+                backgroundColor: _T.orange,
+                foregroundColor: _T.onOrange,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                minimumSize: const Size(0, 52),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-            ),
-            child: Text(
-              'Retry',
-              style: poppins(16, FontWeight.w700, _T.white),
+              child: Text(
+                'Refresh',
+                style: poppins(16, FontWeight.w700, _T.onOrange),
+              ),
             ),
           ),
           const SizedBox(height: 16),

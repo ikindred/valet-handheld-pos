@@ -43,11 +43,32 @@ abstract final class DashboardRecentFormat {
     return 'In at ${DateFormat.jm().format(timeLocal)} — $slotLabel';
   }
 
-  static String checkedOutSubline(DateTime timeLocal, num? amount) {
+  static String checkedOutSubline(
+    DateTime timeLocal,
+    num? amount, {
+    double? cashTendered,
+    double? change,
+  }) {
     final feeStr = amount != null
         ? '${PesoCurrency.symbol}${NumberFormat(_amountFmt).format(amount)}'
         : '—';
-    return 'Out at ${DateFormat.jm().format(timeLocal)} — $feeStr';
+    final timePart = 'Out at ${DateFormat.jm().format(timeLocal)}';
+    final tendered = cashTendered;
+    if (tendered != null && tendered > 0.009) {
+      final tenderedStr =
+          '${PesoCurrency.symbol}${NumberFormat(_amountFmt).format(tendered)}';
+      final ch = change ??
+          (amount != null && tendered > (amount as num).toDouble() + 1e-6
+              ? tendered - (amount as num).toDouble()
+              : 0.0);
+      if (ch > 0.009) {
+        final changeStr =
+            '${PesoCurrency.symbol}${NumberFormat(_amountFmt).format(ch)}';
+        return '$timePart — $feeStr · Cash $tenderedStr · Chg $changeStr';
+      }
+      return '$timePart — $feeStr · Cash $tenderedStr';
+    }
+    return '$timePart — $feeStr';
   }
 
   static String _vehicleMake({

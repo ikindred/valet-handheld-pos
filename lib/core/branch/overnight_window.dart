@@ -78,7 +78,11 @@ class OvernightWindow {
   bool stayOverlaps(DateTime timeIn, DateTime timeOut) {
     if (!timeOut.isAfter(timeIn)) return false;
 
-    var day = DateTime(timeIn.year, timeIn.month, timeIn.day);
+    // Start one day before check-in so a window that began the previous
+    // evening (e.g. 9 PM → 5 AM) is still checked when the car parks after
+    // midnight.
+    var day = DateTime(timeIn.year, timeIn.month, timeIn.day)
+        .subtract(const Duration(days: 1));
     final lastDay = DateTime(timeOut.year, timeOut.month, timeOut.day);
 
     while (!day.isAfter(lastDay)) {

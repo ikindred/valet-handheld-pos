@@ -8,10 +8,15 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/api/transaction_payment_summary.dart';
 import '../../../core/formatting/peso_currency.dart';
 import '../../../core/printing/checkout_receipt_data.dart';
 import '../../../core/printing/print_flow.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/time/philippine_time.dart';
+import '../../../core/printing/receipt_print_format.dart';
+import '../../check_out/domain/checkout_pricing.dart';
+import '../../../data/local/db/app_database.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/ticket_service.dart';
 import '../../check_in/domain/vehicle_damage.dart';
@@ -23,25 +28,25 @@ import 'widgets/dashboard_widgets.dart';
 const _pesoFallback = ['Noto Sans', 'Roboto'];
 
 TextStyle _detailLabelStyle() => GoogleFonts.poppins(
-      fontSize: 13,
-      fontWeight: FontWeight.w500,
-      color: DashboardStyles.grey500,
-      height: 1.35,
-    );
+  fontSize: 13,
+  fontWeight: FontWeight.w500,
+  color: DashboardStyles.grey500,
+  height: 1.35,
+);
 
 TextStyle _detailValueStyle() => GoogleFonts.poppins(
-      fontSize: 15,
-      fontWeight: FontWeight.w500,
-      color: AppColors.textPrimary,
-      height: 1.4,
-    ).copyWith(fontFamilyFallback: _pesoFallback);
+  fontSize: 15,
+  fontWeight: FontWeight.w500,
+  color: AppColors.textPrimary,
+  height: 1.4,
+).copyWith(fontFamilyFallback: _pesoFallback);
 
 TextStyle _detailHintStyle() => GoogleFonts.poppins(
-      fontSize: 14,
-      fontWeight: FontWeight.w400,
-      color: DashboardStyles.grey500,
-      height: 1.4,
-    );
+  fontSize: 14,
+  fontWeight: FontWeight.w400,
+  color: DashboardStyles.grey500,
+  height: 1.4,
+);
 
 Widget _detailKv(String label, String value) {
   return Padding(
@@ -49,10 +54,7 @@ Widget _detailKv(String label, String value) {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 118,
-          child: Text(label, style: _detailLabelStyle()),
-        ),
+        SizedBox(width: 118, child: Text(label, style: _detailLabelStyle())),
         Expanded(child: Text(value, style: _detailValueStyle())),
       ],
     ),
@@ -79,8 +81,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _future ??=
-        context.read<TicketService>().loadTicketForDetail(widget.ticketId.trim());
+    _future ??= context.read<TicketService>().loadTicketForDetail(
+      widget.ticketId.trim(),
+    );
   }
 
   static List<String> _belongingsList(String raw) {
@@ -99,16 +102,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   static String _damageLine(VehicleDamageEntry e) {
     final z = (e.zoneLabel?.trim().isNotEmpty ?? false)
         ? e.zoneLabel!.trim()
-        : (lookupVehicleZoneLabel(e.normalizedX, e.normalizedY) ?? 'Unknown area');
+        : (lookupVehicleZoneLabel(e.normalizedX, e.normalizedY) ??
+              'Unknown area');
     return '$z — ${e.type.label}';
-  }
-
-  static String _formatDurationHm(Duration d) {
-    final totalM = d.inMinutes;
-    final h = totalM ~/ 60;
-    final m = totalM % 60;
-    if (h < 1) return '${totalM}m';
-    return '${h}h ${m}m';
   }
 
   static String? _plainDriverName(String? raw) {
@@ -117,10 +113,23 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     return t;
   }
 
+  static bool _showPaymentSummary(
+    TicketDetailSnapshot detail,
+    Ticket t,
+    bool isCompleted,
+    bool isLost,
+    DateTime? checkOut,
+  ) {
+    if (detail.payment != null) return true;
+    final fee = t.fee;
+    if (fee == null || fee < 0.009) return false;
+    return isCompleted || isLost || checkOut != null;
+  }
+
   Future<void> _reprintReceipt(TicketDetailSnapshot detail) async {
     if (_printing) return;
-    final fee = detail.ticket.fee;
-    if (fee == null || fee < 0.009) {
+    final total = detail.payment?.totalDue ?? detail.ticket.fee;
+    if (total == null || total < 0.009) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No payment amount on file for this ticket.'),
@@ -144,6 +153,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         parking: detail.parking,
         branchDisplayName: branchLabel,
         mallHours: _defaultMallHours,
+        payment: detail.payment,
       );
       if (!mounted) return;
       await printCheckOutFromContext(context, data: data);
@@ -165,7 +175,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           padding: const EdgeInsets.all(24),
           child: Text(
             'Ticket not found. Connect to load from server, or open this ticket on this device.',
-            style: DashboardStyles.statHint(),
+            style: DashboardStyles.statHintOf(context),
             textAlign: TextAlign.center,
           ),
         ),
@@ -175,32 +185,34 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     final t = detail.ticket;
     final parking = detail.parking;
 
-    final checkIn = DateTime.tryParse(t.checkInAt);
-    final checkOut = DateTime.tryParse(t.checkOutAt ?? '');
+    final checkIn = PhilippineTime.fromApiIso(t.checkInAt);
+    final checkOut = t.checkOutAt != null && t.checkOutAt!.trim().isNotEmpty
+        ? PhilippineTime.fromApiIso(t.checkOutAt!)
+        : null;
     final isCompleted = t.status == 'completed';
     final isLost = t.status == 'lost';
 
-    final checkInLabel =
-        checkIn != null ? _dateFmt.format(checkIn.toLocal()) : '—';
-    final checkOutLabel =
-        checkOut != null ? _dateFmt.format(checkOut.toLocal()) : '—';
+    final checkInLabel = _dateFmt.format(checkIn);
+    final checkOutLabel = checkOut != null ? _dateFmt.format(checkOut) : '—';
 
     String durationLabel;
-    if (checkIn == null) {
-      durationLabel = '—';
-    } else if (isCompleted && checkOut != null) {
-      durationLabel = _formatDurationHm(checkOut.difference(checkIn));
+    if (isCompleted && checkOut != null) {
+      final minutes = CheckoutPricing.durationMinutesCeil(checkIn, checkOut);
+      durationLabel = ReceiptPrintFormat.durationLabel(minutes);
     } else {
-      durationLabel = _formatDurationHm(DateTime.now().difference(checkIn));
+      final minutes = CheckoutPricing.durationMinutesCeil(
+        checkIn,
+        PhilippineTime.now(),
+      );
+      durationLabel = ReceiptPrintFormat.durationLabel(minutes);
     }
 
-    final damageLines = parseTicketDamageMarkersForCheckout(t.damageMarkers)
-        .map(_damageLine)
-        .toList();
+    final damageLines = parseTicketDamageMarkersForCheckout(
+      t.damageMarkers,
+    ).map(_damageLine).toList();
 
     final belongings = _belongingsList(t.personalBelongings);
-    final belongingsText =
-        belongings.isEmpty ? 'None' : belongings.join(', ');
+    final belongingsText = belongings.isEmpty ? 'None' : belongings.join(', ');
 
     final statusLabel = switch (t.status) {
       'completed' => 'Completed',
@@ -211,8 +223,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     final statusColor = isCompleted
         ? const Color(0xFF6E7584)
         : isLost
-            ? const Color(0xFFB45309)
-            : DashboardStyles.green;
+        ? const Color(0xFFB45309)
+        : DashboardStyles.green;
 
     final plate = t.plateNumber.trim().isEmpty ? '—' : t.plateNumber.trim();
     final driverIn = _plainDriverName(t.driverIn);
@@ -319,16 +331,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           title: 'Personal belongings',
           child: Text(belongingsText, style: _detailValueStyle()),
         ),
-        if (isCompleted && t.fee != null) ...[
+        if (_showPaymentSummary(detail, t, isCompleted, isLost, checkOut)) ...[
           const SizedBox(height: 12),
-          _DetailCard(
-            icon: LucideIcons.creditCard,
-            title: 'Payment',
-            child: _detailKv(
-              'Fee paid',
-              PesoCurrency.currency(decimalDigits: 2).format(t.fee),
-            ),
-          ),
+          _PaymentSummaryCard(payment: detail.payment, ticket: t),
         ],
       ],
     );
@@ -339,14 +344,16 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     return FutureBuilder<TicketDetailSnapshot?>(
       future: _future,
       builder: (context, snap) {
-        final detail =
-            snap.connectionState == ConnectionState.done ? snap.data : null;
-        final canReprint = detail != null &&
+        final detail = snap.connectionState == ConnectionState.done
+            ? snap.data
+            : null;
+        final canReprint =
+            detail != null &&
             (detail.ticket.status == 'completed' ||
                 detail.ticket.status == 'lost');
 
         return Scaffold(
-          backgroundColor: DashboardStyles.bg,
+          backgroundColor: null,
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0,
@@ -370,8 +377,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               if (canReprint)
                 _ReprintAppBarAction(
                   printing: _printing,
-                  onPressed:
-                      _printing ? null : () => _reprintReceipt(detail),
+                  onPressed: _printing ? null : () => _reprintReceipt(detail),
                 ),
             ],
           ),
@@ -380,14 +386,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       },
     );
   }
-
 }
 
 class _ReprintAppBarAction extends StatelessWidget {
-  const _ReprintAppBarAction({
-    required this.printing,
-    required this.onPressed,
-  });
+  const _ReprintAppBarAction({required this.printing, required this.onPressed});
 
   final bool printing;
   final VoidCallback? onPressed;
@@ -500,11 +502,16 @@ class _HeroHeaderCard extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(100),
-                  border: Border.all(color: statusColor.withValues(alpha: 0.45)),
+                  border: Border.all(
+                    color: statusColor.withValues(alpha: 0.45),
+                  ),
                 ),
                 child: Text(
                   statusLabel,
@@ -636,17 +643,11 @@ class _ParkingLocationCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _ParkingChip(
-                  label: 'Area',
-                  value: parking.areaLabel,
-                ),
+                child: _ParkingChip(label: 'Area', value: parking.areaLabel),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _ParkingChip(
-                  label: 'Level',
-                  value: parking.levelLabel,
-                ),
+                child: _ParkingChip(label: 'Level', value: parking.levelLabel),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -716,6 +717,181 @@ class _ParkingChip extends StatelessWidget {
   }
 }
 
+class _PaymentSummaryCard extends StatelessWidget {
+  const _PaymentSummaryCard({required this.payment, required this.ticket});
+
+  final TransactionPaymentSummary? payment;
+  final Ticket ticket;
+
+  @override
+  Widget build(BuildContext context) {
+    final peso = PesoCurrency.currency(decimalDigits: 2);
+    final p = payment;
+    final total = p?.totalDue ?? ticket.fee ?? 0;
+
+    final hasSucceeding =
+        p != null && (p.hasSucceedingTotal || p.succeedingTotal > 0.009);
+    final hasOvernight = p != null && (p.hasOvernightFee || p.isOvernight);
+    final hasLost = p != null && (p.hasLostTicketFee || p.isLostTicket);
+    final hasDuration = p != null && p.durationMinutes > 0;
+
+    return _DetailCard(
+      icon: LucideIcons.creditCard,
+      title: 'Payment summary',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (hasDuration)
+            _detailKv(
+              'Duration',
+              ReceiptPrintFormat.durationLabel(p.durationMinutes),
+            ),
+          if (p != null && p.hasFlatRate)
+            _detailKv(p.flatRateLabel, peso.format(p.flatRate)),
+          if (hasSucceeding) ...[
+            _detailKv('Succeeding hours', p.succeedingHoursLabel),
+            _detailKv('Succeeding total', peso.format(p.succeedingTotal)),
+          ],
+          if (hasOvernight)
+            _OvernightFeeRow(
+              label: ReceiptPrintFormat.overnightFeeRowLabel(
+                startHhMm24: p.overnightStart,
+                endHhMm24: p.overnightEnd,
+              ),
+              amount: peso.format(p.overnightFee),
+            ),
+          if (hasLost)
+            _detailKv('Lost ticket fee', peso.format(p.lostTicketFee)),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(height: 1, thickness: 1, color: Color(0x14000000)),
+          ),
+          _TotalDueRow(amount: peso.format(total)),
+          const SizedBox(height: 8),
+          _detailKv(
+            'Cash tendered',
+            p != null && p.hasCashTendered ? peso.format(p.cashTendered) : '—',
+          ),
+          _detailKv(
+            'Change',
+            p != null && p.hasChange ? peso.format(p.change) : '—',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OvernightFeeRow extends StatelessWidget {
+  const _OvernightFeeRow({required this.label, required this.amount});
+
+  final String label;
+  final String amount;
+
+  @override
+  Widget build(BuildContext context) {
+    // Extract window substring "(…)" to display on a second line so the row
+    // never overflows when the label is long.
+    String mainLabel = label;
+    String? windowSuffix;
+    final parenStart = label.indexOf('(');
+    if (parenStart > 0) {
+      mainLabel = label.substring(0, parenStart).trim();
+      windowSuffix = label.substring(parenStart).trim();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      LucideIcons.moon,
+                      size: 13,
+                      color: Color(0xFF7C5DB5),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      mainLabel,
+                      style: _detailLabelStyle().copyWith(
+                        color: const Color(0xFF7C5DB5),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                if (windowSuffix != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 17, top: 2),
+                    child: Text(
+                      windowSuffix,
+                      style: _detailLabelStyle().copyWith(
+                        color: const Color(0xFF9E7ED4),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Text(
+            amount,
+            style: _detailValueStyle().copyWith(
+              color: const Color(0xFF7C5DB5),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TotalDueRow extends StatelessWidget {
+  const _TotalDueRow({required this.amount});
+
+  final String amount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 118,
+            child: Text(
+              'Total due',
+              style: _detailLabelStyle().copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              amount,
+              style: _detailValueStyle().copyWith(
+                color: DashboardStyles.orange,
+                fontWeight: FontWeight.w700,
+                fontSize: 17,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DetailCard extends StatelessWidget {
   const _DetailCard({
     required this.icon,
@@ -743,10 +919,7 @@ class _DetailCard extends StatelessWidget {
             children: [
               Icon(icon, size: 18, color: DashboardStyles.plateBlue),
               const SizedBox(width: 8),
-              Text(
-                title.toUpperCase(),
-                style: DashboardStyles.sectionTitle(),
-              ),
+              Text(title.toUpperCase(), style: DashboardStyles.sectionTitleOf(context)),
             ],
           ),
           const SizedBox(height: 12),

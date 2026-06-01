@@ -10,6 +10,7 @@ import 'package:valet_handheld_pos/data/remote/auth_api.dart';
 import 'package:valet_handheld_pos/data/repositories/auth_repository.dart';
 import 'package:valet_handheld_pos/data/services/rate_fetch_service.dart';
 import 'package:valet_handheld_pos/data/services/rate_service.dart';
+import 'package:valet_handheld_pos/data/remote/dashboard_api.dart';
 import 'package:valet_handheld_pos/data/remote/transactions_api.dart';
 import 'package:valet_handheld_pos/data/services/shift_service.dart';
 import 'package:valet_handheld_pos/data/services/ticket_service.dart';
@@ -37,7 +38,14 @@ void main() {
       final api = AuthApi(Dio());
       final refresh = RouterRefreshNotifier();
       final dio = Dio();
-      final tickets = TicketService(db, dio, TransactionsApi(dio));
+      final tickets = TicketService(
+        db,
+        dio,
+        TransactionsApi(dio),
+        DashboardApi(dio),
+        RateService(db),
+        RateFetchService(db, dio),
+      );
       shifts = ShiftService(
         db,
         dio,
