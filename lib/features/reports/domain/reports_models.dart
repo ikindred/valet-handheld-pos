@@ -18,6 +18,8 @@ class ReportsTicketRow extends Equatable {
     this.timeOut,
     this.fee,
     this.cashTendered,
+    this.hasPendingVoid = false,
+    this.isVoided = false,
   });
 
   /// Display ticket number (e.g. `TKT-0123`).
@@ -46,6 +48,12 @@ class ReportsTicketRow extends Equatable {
   /// API `cash_tendered` when checkout recorded cash payment.
   final double? cashTendered;
 
+  /// True when the transaction has a pending void request.
+  final bool hasPendingVoid;
+
+  /// True when the void request has been approved (transaction is voided).
+  final bool isVoided;
+
   /// Route / detail key: server id when available, else local ticket number.
   String get detailId {
     final sid = serverTransactionId?.trim() ?? '';
@@ -57,6 +65,9 @@ class ReportsTicketRow extends Equatable {
       timeInDisplay?.trim().isNotEmpty == true
           ? timeInDisplay!.trim()
           : ReportsFormat.timeInLabel(timeIn);
+
+  String get timeOutLabel =>
+      timeOut != null ? ReportsFormat.timeInLabel(timeOut!) : '—';
 
   String get durationLabel =>
       durationDisplay?.trim().isNotEmpty == true
@@ -80,6 +91,8 @@ class ReportsTicketRow extends Equatable {
         status,
         fee,
         cashTendered,
+        hasPendingVoid,
+        isVoided,
       ];
 }
 

@@ -86,6 +86,15 @@ class BranchConfigService {
           if (close != null) {
             entries.add((key: 'mall_close_time', value: close));
           }
+          final overnight = OvernightWindow.parseTimesFromJson(branch);
+          final overnightStart = _hhMmFromDynamic(overnight.start);
+          if (overnightStart != null) {
+            entries.add((key: 'overnight_start_time', value: overnightStart));
+          }
+          final overnightEnd = _hhMmFromDynamic(overnight.end);
+          if (overnightEnd != null) {
+            entries.add((key: 'overnight_end_time', value: overnightEnd));
+          }
         }
       } else if (status == 401 || status == 403) {
         ValetLog.warning(
@@ -107,39 +116,6 @@ class BranchConfigService {
         st,
       );
     }
-    }
-
-    try {
-      final settingsUrl = AppConfig.config;
-      final res = await _dio.get<dynamic>(settingsUrl, options: opts);
-      final status = res.statusCode ?? 0;
-      if (status >= 200 && status < 300) {
-        final root = _asStringKeyedMap(res.data);
-        final settings = _unwrapSettingsMap(root);
-        if (settings != null) {
-          final overnight = OvernightWindow.parseTimesFromJson(settings);
-          final start = _hhMmFromDynamic(overnight.start);
-          if (start != null) {
-            entries.add((key: 'overnight_start_time', value: start));
-          }
-          final end = _hhMmFromDynamic(overnight.end);
-          if (end != null) {
-            entries.add((key: 'overnight_end_time', value: end));
-          }
-        }
-      } else {
-        ValetLog.warning(
-          'BranchConfigService.syncFromServer',
-          'warn: HTTP $status for $settingsUrl',
-        );
-      }
-    } catch (e, st) {
-      ValetLog.error(
-        'BranchConfigService.syncFromServer',
-        'settings request failed',
-        e,
-        st,
-      );
     }
 
     if (entries.isEmpty) {
@@ -206,6 +182,7 @@ class BranchConfigService {
     return root;
   }
 
+  // ignore: unused_element — kept for reference if admin settings are reintroduced.
   static Map<String, dynamic>? _unwrapSettingsMap(Map<String, dynamic>? root) {
     if (root == null) return null;
     for (final key in const ['data', 'settings', 'result']) {

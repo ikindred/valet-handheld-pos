@@ -110,7 +110,7 @@ class ReceiptRasterBuilder {
       _TwoColumnFieldBlock('Duration', data.durationLabel),
       _TwoColumnFieldBlock('Parking', data.slotLine),
       _TwoColumnFieldBlock('Valet in', data.valetInLabel),
-      _TwoColumnFieldBlock('Valet out', data.valetOutLabel),
+      _TwoColumnFieldBlock('Returning Valet Attendant', data.valetOutLabel),
       const _GapBlock(4),
       const _RuleBlock(),
       const _GapBlock(4),

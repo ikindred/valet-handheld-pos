@@ -135,10 +135,7 @@ class _PreviewVehicleBody extends StatelessWidget {
     );
 
     final plateDisplay = pt.plate.isNotEmpty ? pt.plate : rs.plate;
-    final makeModel = [
-      pt.vehicleMake.trim(),
-      pt.vehicleModel.trim(),
-    ].where((s) => s.isNotEmpty).join(' ');
+    final makeModel = pt.vehicleMake.trim().isEmpty ? '—' : pt.vehicleMake.trim();
     final colorDisplay = pt.vehicleColor.trim().isEmpty ? '—' : pt.vehicleColor.trim();
     final typeDisplay = pt.vehicleType.trim().isEmpty ? '—' : pt.vehicleType.trim();
     final parkingLabel = pt.parkingLocationLine.trim().isEmpty
@@ -358,11 +355,11 @@ class _CustomerCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('CUSTOMER', style: CheckOutUiTokens.sectionTitle()),
+          Text('CUSTOMER', style: CheckOutUiTokens.sectionTitleOf(context)),
           const SizedBox(height: 8),
-          Text(name, style: CheckOutUiTokens.timeDisplay()),
+          Text(name, style: CheckOutUiTokens.timeDisplayOf(context)),
           const SizedBox(height: 4),
-          Text(contact, style: CheckOutUiTokens.body()),
+          Text(contact, style: CheckOutUiTokens.bodyOf(context)),
         ],
       ),
     );
@@ -390,12 +387,17 @@ class _TimeCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: CheckOutUiTokens.sectionTitle()),
+          Text(title, style: CheckOutUiTokens.sectionTitleOf(context)),
           const SizedBox(height: 6),
-          Text(primary, style: CheckOutUiTokens.timeDisplay(color: primaryColor)),
+          Text(
+            primary,
+            style: CheckOutUiTokens.timeDisplay(color: primaryColor),
+          ),
           Text(
             secondary,
-            style: CheckOutUiTokens.body().copyWith(color: secondaryColor),
+            style: CheckOutUiTokens.bodyOf(context).copyWith(
+              color: secondaryColor,
+            ),
           ),
         ],
       ),
@@ -424,12 +426,12 @@ class _VehicleCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('VEHICLE', style: CheckOutUiTokens.sectionTitle()),
+          Text('VEHICLE', style: CheckOutUiTokens.sectionTitleOf(context)),
           const SizedBox(height: CheckInCompactTokens.sectionGap),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            color: CheckOutUiTokens.plateBarBg,
+            color: CheckOutUiTokens.plateBarBgOf(context),
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
@@ -443,14 +445,14 @@ class _VehicleCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Text('Make / Model', style: CheckOutUiTokens.fieldLabel()),
-          Text(makeModel, style: CheckOutUiTokens.body()),
+          Text('Make / Model', style: CheckOutUiTokens.fieldLabelOf(context)),
+          Text(makeModel, style: CheckOutUiTokens.bodyOf(context)),
           const SizedBox(height: 6),
-          Text('Color', style: CheckOutUiTokens.fieldLabel()),
-          Text(color, style: CheckOutUiTokens.body()),
+          Text('Color', style: CheckOutUiTokens.fieldLabelOf(context)),
+          Text(color, style: CheckOutUiTokens.bodyOf(context)),
           const SizedBox(height: 6),
-          Text('Type', style: CheckOutUiTokens.fieldLabel()),
-          Text(type, style: CheckOutUiTokens.body()),
+          Text('Type', style: CheckOutUiTokens.fieldLabelOf(context)),
+          Text(type, style: CheckOutUiTokens.bodyOf(context)),
           const SizedBox(height: 10),
           _OrangeChip(text: slot),
         ],
@@ -471,13 +473,17 @@ class _StaffCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('STAFF', style: CheckOutUiTokens.sectionTitle()),
+          Text('STAFF', style: CheckOutUiTokens.sectionTitleOf(context)),
           const SizedBox(height: 10),
           _StaffRow(label: 'Valet In', name: valetIn),
           const SizedBox(height: 6),
-          const Divider(height: 1, thickness: 1, color: CheckOutUiTokens.hairline),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: CheckOutUiTokens.hairlineOf(context),
+          ),
           const SizedBox(height: 6),
-          _StaffRow(label: 'Valet Out', name: valetOut),
+          _StaffRow(label: 'Returning Valet Attendant', name: valetOut),
         ],
       ),
     );
@@ -495,10 +501,13 @@ class _BelongingsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('DECLARED BELONGINGS', style: CheckOutUiTokens.sectionTitle()),
+          Text(
+            'DECLARED BELONGINGS',
+            style: CheckOutUiTokens.sectionTitleOf(context),
+          ),
           const SizedBox(height: 10),
           if (belongings.isEmpty)
-            Text('None declared', style: CheckOutUiTokens.hint())
+            Text('None declared', style: CheckOutUiTokens.hintOf(context))
           else
             Wrap(
               spacing: 8,
@@ -524,8 +533,9 @@ class _ReviewCard extends StatelessWidget {
       width: double.infinity,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        color: CheckOutUiTokens.cardBgOf(context),
+        borderRadius: BorderRadius.circular(CheckOutUiTokens.cardRadius),
+        border: Border.all(color: CheckOutUiTokens.cardBorderOf(context)),
       ),
       padding: CheckOutUiTokens.cardPadding,
       child: child,
@@ -543,7 +553,7 @@ class _OrangeChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF7EC),
+        color: CheckOutUiTokens.chipFillOf(context),
         borderRadius: BorderRadius.circular(5),
         border: Border.all(color: DashboardStyles.orange),
       ),
@@ -569,12 +579,14 @@ class _StaffRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: Text(label, style: CheckOutUiTokens.fieldLabel())),
+        Expanded(
+          child: Text(label, style: CheckOutUiTokens.fieldLabelOf(context)),
+        ),
         Expanded(
           child: Text(
             name,
             textAlign: TextAlign.right,
-            style: CheckOutUiTokens.body(),
+            style: CheckOutUiTokens.bodyOf(context),
           ),
         ),
       ],

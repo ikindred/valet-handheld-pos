@@ -133,8 +133,7 @@ class _CheckInPrintTicketScreenState extends State<CheckInPrintTicketScreen> {
                 prev.receiptParts != next.receiptParts ||
                 prev.ticketNumber != next.ticketNumber ||
                 prev.plateNumber != next.plateNumber ||
-                prev.vehicleBrandMake != next.vehicleBrandMake ||
-                prev.vehicleModel != next.vehicleModel ||
+                prev.vehicleBrand != next.vehicleBrand ||
                 prev.vehicleColor != next.vehicleColor ||
                 prev.dateTimeIn != next.dateTimeIn,
             builder: (context, state) {
@@ -194,13 +193,14 @@ class _SurfaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: tc.cardBg,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.13)),
+        border: Border.all(color: tc.cardBorder),
       ),
       child: child,
     );
@@ -217,16 +217,13 @@ class _TicketSummaryCard extends StatelessWidget {
   final String ticketId;
 
   static String _vehicleLine(CheckInState state) {
-    final brand = state.vehicleBrandMake.trim();
-    final model = state.vehicleModel.trim();
-    if (brand.isEmpty && model.isEmpty) return '—';
-    if (brand.isEmpty) return model;
-    if (model.isEmpty) return brand;
-    return '$brand · $model';
+    final brand = state.vehicleBrand.trim();
+    return brand.isEmpty ? '—' : brand;
   }
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return _SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -258,7 +255,7 @@ class _TicketSummaryCard extends StatelessWidget {
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
                         height: 1.2,
-                        color: AppColors.textPrimary,
+                        color: tc.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -267,7 +264,7 @@ class _TicketSummaryCard extends StatelessWidget {
                       style: GoogleFonts.poppins(
                         fontSize: 13,
                         height: 1.35,
-                        color: AppColors.textSecondary,
+                        color: tc.textSecondary,
                       ),
                     ),
                   ],
@@ -286,7 +283,7 @@ class _TicketSummaryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const Divider(height: 1, color: AppColors.divider),
+          Divider(height: 1, color: tc.divider),
           const SizedBox(height: 12),
           _DetailRow(
             label: 'Plate',
@@ -332,6 +329,7 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -345,7 +343,7 @@ class _DetailRow extends StatelessWidget {
                 style: GoogleFonts.poppins(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
+                  color: tc.textSecondary,
                 ),
               ),
             ),
@@ -358,7 +356,7 @@ class _DetailRow extends StatelessWidget {
                   height: 1.3,
                   color: emphasize
                       ? DashboardStyles.plateBlue
-                      : AppColors.textPrimary,
+                      : tc.textPrimary,
                 ),
               ),
             ),
@@ -366,7 +364,7 @@ class _DetailRow extends StatelessWidget {
         ),
         if (showDivider) ...[
           const SizedBox(height: 10),
-          Divider(height: 1, color: Colors.black.withValues(alpha: 0.08)),
+          Divider(height: 1, color: tc.divider),
           const SizedBox(height: 10),
         ],
       ],
@@ -405,6 +403,7 @@ class _PrintReceiptPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -413,7 +412,7 @@ class _PrintReceiptPanel extends StatelessWidget {
           style: GoogleFonts.poppins(
             fontSize: 20,
             fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+            color: tc.textPrimary,
           ),
         ),
         const SizedBox(height: 6),
@@ -422,7 +421,7 @@ class _PrintReceiptPanel extends StatelessWidget {
           style: GoogleFonts.poppins(
             fontSize: 13,
             height: 1.35,
-            color: AppColors.textSecondary,
+            color: tc.textSecondary,
           ),
         ),
         const SizedBox(height: 16),
@@ -438,7 +437,7 @@ class _PrintReceiptPanel extends StatelessWidget {
               style: GoogleFonts.poppins(
                 fontSize: 14,
                 height: 1.35,
-                color: AppColors.textSecondary,
+                color: tc.textSecondary,
               ),
             ),
           )
@@ -462,7 +461,7 @@ class _PrintReceiptPanel extends StatelessWidget {
             style: GoogleFonts.poppins(
               fontSize: 12,
               height: 1.35,
-              color: AppColors.textSubtitleMuted,
+              color: tc.textSubtitleMuted,
             ),
           ),
         ],
@@ -477,8 +476,8 @@ class _PrintReceiptPanel extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: onDone,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textSecondary,
-                  side: BorderSide(color: Colors.black.withValues(alpha: 0.2)),
+                  foregroundColor: tc.textPrimary,
+                  side: BorderSide(color: tc.cardBorder),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -508,8 +507,8 @@ class _PrintReceiptPanel extends StatelessWidget {
             ),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.accent,
-              disabledBackgroundColor: const Color(0xFFE8EAED),
-              disabledForegroundColor: const Color(0xFF9DA4B0),
+              disabledBackgroundColor: tc.cardBorder,
+              disabledForegroundColor: tc.textSecondary,
               foregroundColor: AppColors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
@@ -539,17 +538,16 @@ class _ReceiptPartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     final highlighted = isNext && part.status == ReceiptPartStatus.pending;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: tc.cardBg,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: highlighted
-              ? AppColors.accent
-              : Colors.black.withValues(alpha: 0.13),
+          color: highlighted ? AppColors.accent : tc.cardBorder,
           width: highlighted ? 1.5 : 1,
         ),
         boxShadow: highlighted
@@ -574,7 +572,7 @@ class _ReceiptPartCard extends StatelessWidget {
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: tc.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -602,30 +600,31 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppThemeColors.isDark(context);
     final (bg, fg, label, icon, showSpinner) = switch (status) {
       ReceiptPartStatus.pending => (
-          const Color(0xFFF4F5F7),
-          AppColors.textSecondary,
+          isDark ? const Color(0xFF1E293B) : const Color(0xFFF4F5F7),
+          AppThemeColors.of(context).textSecondary,
           'Not yet printed',
           LucideIcons.clock,
           false,
         ),
       ReceiptPartStatus.printing => (
-          const Color(0xFFFFF3E0),
+          isDark ? const Color(0xFF422006) : const Color(0xFFFFF3E0),
           AppColors.accent,
           'Printing…',
           LucideIcons.printer,
           true,
         ),
       ReceiptPartStatus.printed => (
-          const Color(0xFFE8F5E9),
+          isDark ? const Color(0xFF14532D) : const Color(0xFFE8F5E9),
           AppColors.success,
           'Printed',
           LucideIcons.checkCircle,
           false,
         ),
       ReceiptPartStatus.failed => (
-          const Color(0xFFFFEBEE),
+          isDark ? const Color(0xFF3D1F24) : const Color(0xFFFFEBEE),
           AppColors.error,
           'Failed',
           LucideIcons.alertCircle,

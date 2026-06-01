@@ -76,12 +76,9 @@ class CheckOutStepBody extends StatelessWidget {
           );
         },
       );
-    } else if (keyboardOpen) {
-      body = Padding(
-        padding: EdgeInsets.only(bottom: insetBottom),
-        child: child,
-      );
     }
+    // When [scrollable] is false, rely on [Scaffold.resizeToAvoidBottomInset] to
+    // shrink the viewport — avoid double-applying keyboard inset padding.
 
     return Padding(
       padding: EdgeInsets.fromLTRB(

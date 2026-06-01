@@ -62,15 +62,18 @@ class _TypeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     /// Selected (either type): cream `#FFEED7`, orange `#F68D00` border + label.
-    /// Unselected: white, grey `#C0C0BF` border, dark label.
+    /// Unselected: card surface + adaptive border.
     const orange = Color(0xFFF68D00);
-    const grey = Color(0xFFC0C0BF);
     const creamSelected = Color(0xFFFFEED7);
+    final tc = AppThemeColors.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final bg = selected ? creamSelected : Colors.white;
-    final borderColor = selected ? orange : grey;
+    final bg = selected
+        ? (isDark ? tc.inputFill : creamSelected)
+        : tc.cardBg;
+    final borderColor = selected ? orange : tc.cardBorder;
     final borderWidth = selected ? 2.0 : 1.0;
-    final labelColor = selected ? orange : AppColors.textPrimary;
+    final labelColor = selected ? orange : tc.textPrimary;
 
     return Material(
       color: Colors.transparent,
@@ -93,7 +96,7 @@ class _TypeCard extends StatelessWidget {
                 style: GoogleFonts.poppins(
                   fontSize: 22,
                   fontWeight: FontWeight.w500,
-                  color: Colors.black,
+                  color: tc.textPrimary,
                 ),
               ),
               const SizedBox(height: 6),

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../state/check_in_cubit.dart';
 import 'widgets/check_in_compact_tokens.dart';
@@ -233,7 +234,7 @@ class _CheckInCustomerValetScreenState
                         VerticalDivider(
                           width: CheckInCompactTokens.columnDividerWidth,
                           thickness: 1,
-                          color: Colors.black.withValues(alpha: 0.13),
+                          color: AppThemeColors.of(context).cardBorder,
                         ),
                         Expanded(child: _columnValetAssignmentAndSpecial()),
                       ],

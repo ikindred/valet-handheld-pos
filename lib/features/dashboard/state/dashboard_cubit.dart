@@ -75,26 +75,49 @@ final class DashboardError extends DashboardState {
   List<Object?> get props => [message];
 }
 
-/// One row for [DashboardTransactionRow] (API summary or local [Ticket]).
+/// One row for the dashboard recent-transaction table.
 final class DashboardRecentTx extends Equatable {
   const DashboardRecentTx({
     required this.ticketId,
     required this.plate,
+    required this.plateNumber,
+    required this.ticketNumber,
     required this.line1,
     required this.line2,
     required this.status,
+    this.timeIn,
+    this.timeOut,
+    this.slot = '—',
+    this.hasPendingVoid = false,
+    this.isVoided = false,
   });
 
   final String ticketId;
+  /// Blue badge label — plate number if available, else ticket number.
   final String plate;
+  /// Actual plate number (empty string if unknown); shown in blue badge.
+  final String plateNumber;
+  /// Formatted ticket number (e.g. TKT-0123); shown in orange badge.
+  final String ticketNumber;
   final String line1;
   final String line2;
   final DashboardRecentStatus status;
+  final DateTime? timeIn;
+  final DateTime? timeOut;
+  /// Raw slot code (e.g. "LT101"); "—" when unknown.
+  final String slot;
+  /// True when the API reports a pending void request on this ticket.
+  final bool hasPendingVoid;
+
+  /// True when the void request has been approved (transaction is voided).
+  final bool isVoided;
 
   factory DashboardRecentTx.fromSummaryRow(DashboardRecentRow row) {
     return DashboardRecentTx(
       ticketId: row.ticketId,
       plate: row.plate,
+      plateNumber: row.plateNumber,
+      ticketNumber: row.ticketNumber,
       line1: row.line1,
       line2: row.line2,
       status: row.isCheckedOut
@@ -103,8 +126,71 @@ final class DashboardRecentTx extends Equatable {
     );
   }
 
+  factory DashboardRecentTx.fromSummaryRecent(DashboardSummaryRecent r) {
+    final actualPlate =
+        r.plateNumber.isNotEmpty && r.plateNumber != '—' ? r.plateNumber : '';
+    final badgePlate = actualPlate.isNotEmpty ? actualPlate : r.ticketNumber;
+    final upper = r.status.toUpperCase();
+    final completed = upper == 'COMPLETED' || upper == 'LOST';
+    final line1 = DashboardRecentFormat.vehicleLine(
+      brand: r.vehicleBrand,
+      color: r.vehicleColor,
+    );
+    final timeIn = DateTime.tryParse(r.timeIn ?? '')?.toLocal();
+    final timeOut = DateTime.tryParse(r.timeOut ?? '')?.toLocal();
+    final rawSlot = r.parkingSlot?.trim() ?? '';
+    final slot = rawSlot.isEmpty ? '—' : rawSlot;
+
+    if (completed) {
+      final inn = timeIn ?? DateTime.now();
+      final out = timeOut ?? inn;
+      return DashboardRecentTx(
+        ticketId: r.id,
+        plate: badgePlate,
+        plateNumber: actualPlate,
+        ticketNumber: r.ticketNumber,
+        line1: line1,
+        line2: DashboardRecentFormat.checkedOutSubline(inn, out),
+        status: DashboardRecentStatus.checkedOut,
+        timeIn: inn,
+        timeOut: out,
+        slot: slot,
+        hasPendingVoid: r.hasPendingVoid,
+        isVoided: r.isVoided,
+      );
+    }
+
+    final inn = timeIn ?? DateTime.now();
+    return DashboardRecentTx(
+      ticketId: r.id,
+      plate: badgePlate,
+      plateNumber: actualPlate,
+      ticketNumber: r.ticketNumber,
+      line1: line1,
+      line2: DashboardRecentFormat.parkedSubline(inn, slot: r.parkingSlot),
+      status: DashboardRecentStatus.parked,
+      timeIn: inn,
+      slot: slot,
+      hasPendingVoid: r.hasPendingVoid,
+      isVoided: r.isVoided,
+    );
+  }
+
   @override
-  List<Object?> get props => [ticketId, plate, line1, line2, status];
+  List<Object?> get props => [
+        ticketId,
+        plate,
+        plateNumber,
+        ticketNumber,
+        line1,
+        line2,
+        status,
+        timeIn,
+        timeOut,
+        slot,
+        hasPendingVoid,
+        isVoided,
+      ];
 }
 
 class DashboardCubit extends Cubit<DashboardState> {
@@ -189,7 +275,7 @@ class DashboardCubit extends Cubit<DashboardState> {
       totalSlots: total,
       recent: _sortRecentParkedFirst(
         summary.recent
-            .map((r) => DashboardRecentTx.fromSummaryRow(r.toRecentRow()))
+            .map((r) => DashboardRecentTx.fromSummaryRecent(r))
             .toList(),
       ),
     );
@@ -301,31 +387,50 @@ class DashboardCubit extends Cubit<DashboardState> {
   }
 
   static DashboardRecentTx _recentFromTicket(Ticket t) {
-    final plate =
-        t.plateNumber.trim().isNotEmpty ? t.plateNumber.trim() : t.id;
+    final actualPlate = t.plateNumber.trim();
+    final badgePlate = actualPlate.isNotEmpty ? actualPlate : t.id;
     final line1 = DashboardRecentFormat.vehicleLineFromTicket(t);
     final inLocal =
-        DateTime.tryParse(t.checkInAt) ??
+        DateTime.tryParse(t.checkInAt)?.toLocal() ??
             DateTime.fromMillisecondsSinceEpoch(0);
+    final rawSlot = DashboardRecentFormat.slotSuffix(parkingJson: t.parkingInfo);
+    final slot = rawSlot == '—'
+        ? '—'
+        : rawSlot.toLowerCase().startsWith('slot ')
+            ? rawSlot.substring(5).trim()
+            : rawSlot;
     if (t.status == 'completed') {
-      final outLocal = DateTime.tryParse(t.checkOutAt ?? '') ?? inLocal;
+      final outLocal =
+          DateTime.tryParse(t.checkOutAt ?? '')?.toLocal() ?? inLocal;
       return DashboardRecentTx(
         ticketId: t.id,
-        plate: plate,
+        plate: badgePlate,
+        plateNumber: actualPlate,
+        ticketNumber: t.id,
         line1: line1,
-        line2: DashboardRecentFormat.checkedOutSubline(outLocal, t.fee),
+        line2: DashboardRecentFormat.checkedOutSubline(inLocal, outLocal),
         status: DashboardRecentStatus.checkedOut,
+        timeIn: inLocal,
+        timeOut: outLocal,
+        slot: slot,
+        hasPendingVoid: t.pendingVoidRequest,
       );
     }
     return DashboardRecentTx(
       ticketId: t.id,
-      plate: plate,
+      plate: badgePlate,
+      plateNumber: actualPlate,
+      ticketNumber: t.id,
       line1: line1,
       line2: DashboardRecentFormat.parkedSubline(
         inLocal,
         parkingJson: t.parkingInfo,
       ),
       status: DashboardRecentStatus.parked,
+      timeIn: inLocal,
+      slot: slot,
+      hasPendingVoid: t.pendingVoidRequest,
     );
   }
+
 }

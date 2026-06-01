@@ -31,18 +31,18 @@ abstract final class ReportsStyles {
 
   static TextStyle ticketId() => DashboardStyles.transactionLinePrimary().copyWith(
         color: DashboardStyles.orange,
-        fontSize: 11,
+        fontSize: 10,
       );
 
   static TextStyle tableHeader() => GoogleFonts.poppins(
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: FontWeight.w600,
-        letterSpacing: 0.35,
+        letterSpacing: 0.3,
         color: AppColors.textSecondary,
         height: 1.2,
       );
 
-  static TextStyle tableCell() => DashboardStyles.transactionLine();
+  static TextStyle tableCell() => DashboardStyles.transactionLine().copyWith(fontSize: 11);
 
   static TextStyle durationNormal() =>
       DashboardStyles.transactionLine().copyWith(color: DashboardStyles.green);
@@ -57,6 +57,46 @@ abstract final class ReportsStyles {
       border: Border.all(color: Colors.black.withValues(alpha: 0.13)),
     );
   }
+
+  static BoxDecoration filterBoxDecorationOf(BuildContext context, {Color? fill}) {
+    final c = AppThemeColors.of(context);
+    return BoxDecoration(
+      color: fill ?? c.inputFill,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: c.cardBorder),
+    );
+  }
+
+  static TextStyle tableHeaderOf(BuildContext context) => tableHeader().copyWith(
+        color: AppThemeColors.of(context).textSecondary,
+      );
+
+  static TextStyle tableCellOf(BuildContext context) =>
+      GoogleFonts.poppins(
+        fontSize: 11,
+        fontWeight: FontWeight.w400,
+        color: AppThemeColors.of(context).textSecondary,
+        height: 1.25,
+      );
+
+  static TextStyle filterValueOf(BuildContext context) =>
+      GoogleFonts.poppins(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: AppThemeColors.of(context).textPrimary,
+        height: 1.25,
+      );
+
+  static TextStyle ticketIdOf(BuildContext context) =>
+      GoogleFonts.poppins(
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+        color: DashboardStyles.orange,
+        height: 1.2,
+      );
+
+  static TextStyle cardSectionTitleOf(BuildContext context) =>
+      DashboardStyles.sectionTitleOf(context);
 
   static const _noBorder = InputBorder.none;
 }
@@ -73,7 +113,7 @@ class _FilterControlShell extends StatelessWidget {
     return SizedBox(
       height: h,
       child: DecoratedBox(
-        decoration: ReportsStyles.filterBoxDecoration(),
+        decoration: ReportsStyles.filterBoxDecorationOf(context),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Align(
@@ -92,12 +132,11 @@ class ReportsTransactionsTabStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Colors.black.withValues(alpha: 0.13)),
-        ),
+        border: Border(bottom: BorderSide(color: tc.cardBorder)),
       ),
       child: IntrinsicWidth(
         child: Column(
@@ -143,7 +182,7 @@ class ReportsTransactionsFilterBar extends StatelessWidget {
         final search = _FilterControlShell(
           child: TextField(
             controller: searchController,
-            style: ReportsStyles.filterValue(),
+            style: ReportsStyles.filterValueOf(context),
             maxLines: 1,
             textAlignVertical: TextAlignVertical.center,
             decoration: InputDecoration(
@@ -233,7 +272,7 @@ class ReportsTransactionsTableCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Text(
               'TRANSACTIONS ($rowCount)'.toUpperCase(),
-              style: ReportsStyles.cardSectionTitle(),
+              style: ReportsStyles.cardSectionTitleOf(context),
             ),
           ),
           if (rows.isEmpty)
@@ -280,7 +319,7 @@ class _FilterDropdown extends StatelessWidget {
           value: value,
           isExpanded: true,
           isDense: true,
-          style: ReportsStyles.filterValue(),
+          style: ReportsStyles.filterValueOf(context),
           icon: Icon(Icons.expand_more, color: DashboardStyles.grey500, size: 20),
           items: items
               .map((e) => DropdownMenuItem(value: e, child: Text(e)))
@@ -316,7 +355,7 @@ class _DateRangeField extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: hasLabel
-                      ? ReportsStyles.filterValue().copyWith(fontSize: 11)
+                      ? ReportsStyles.filterValueOf(context).copyWith(fontSize: 11)
                       : ReportsStyles.filterHint().copyWith(fontSize: 11),
                 ),
               ),
@@ -370,6 +409,7 @@ class _ReportsTransactionsTable extends StatelessWidget {
     'Plate',
     'Vehicle',
     'Time In',
+    'Check Out',
     'Duration',
     'Slot',
     'Status',
@@ -419,10 +459,10 @@ class _HeaderRow extends StatelessWidget {
             Expanded(
               flex: _flexForColumn(i),
               child: Padding(
-                padding: EdgeInsets.only(right: i < 6 ? 8 : 0),
+                padding: EdgeInsets.only(right: i < 7 ? 8 : 0),
                 child: Text(
                   _ReportsTransactionsTable._headers[i],
-                  style: ReportsStyles.tableHeader(),
+                  style: ReportsStyles.tableHeaderOf(context),
                 ),
               ),
             ),
@@ -453,7 +493,7 @@ class _DataRow extends StatelessWidget {
                 row.ticketId,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: ReportsStyles.ticketId(),
+                style: ReportsStyles.ticketIdOf(context),
               ),
             ),
           ),
@@ -475,7 +515,7 @@ class _DataRow extends StatelessWidget {
                 row.vehicle,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: ReportsStyles.tableCell(),
+                style: ReportsStyles.tableCellOf(context),
               ),
             ),
           ),
@@ -485,7 +525,7 @@ class _DataRow extends StatelessWidget {
               padding: const EdgeInsets.only(right: 8),
               child: Text(
                 row.timeInLabel,
-                style: ReportsStyles.tableCell(),
+                style: ReportsStyles.tableCellOf(context),
               ),
             ),
           ),
@@ -493,18 +533,28 @@ class _DataRow extends StatelessWidget {
             flex: _flexForColumn(4),
             child: Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: _DurationCell(row: row),
+              child: Text(
+                row.timeOutLabel,
+                style: ReportsStyles.tableCellOf(context),
+              ),
             ),
           ),
           Expanded(
             flex: _flexForColumn(5),
             child: Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: Text(row.slot, style: ReportsStyles.tableCell()),
+              child: _DurationCell(row: row),
             ),
           ),
           Expanded(
             flex: _flexForColumn(6),
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(row.slot, style: ReportsStyles.tableCellOf(context)),
+            ),
+          ),
+          Expanded(
+            flex: _flexForColumn(7),
             child: Align(
               alignment: Alignment.centerLeft,
               child: _StatusPaymentCell(row: row),
@@ -527,13 +577,14 @@ class _DataRow extends StatelessWidget {
 }
 
 int _flexForColumn(int index) => switch (index) {
-      0 => 14,
-      1 => 11,
-      2 => 16,
-      3 => 9,
-      4 => 9,
-      5 => 8,
-      _ => 11,
+      0 => 13, // Ticket
+      1 => 10, // Plate
+      2 => 14, // Vehicle
+      3 => 8,  // Time In
+      4 => 8,  // Check Out
+      5 => 8,  // Duration
+      6 => 7,  // Slot
+      _ => 10, // Status
     };
 
 class _FixedTable extends StatelessWidget {
@@ -544,7 +595,7 @@ class _FixedTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const colW = <double>[100, 96, 128, 72, 72, 56, 100];
+    const colW = <double>[96, 88, 120, 62, 62, 62, 50, 96];
     return Table(
       defaultVerticalAlignment: TableCellVerticalAlignment.middle,
       columnWidths: {
@@ -556,7 +607,7 @@ class _FixedTable extends StatelessWidget {
               .map(
                 (h) => Padding(
                   padding: const EdgeInsets.only(bottom: 8, right: 8),
-                  child: Text(h, style: ReportsStyles.tableHeader()),
+                  child: Text(h, style: ReportsStyles.tableHeaderOf(context)),
                 ),
               )
               .toList(),
@@ -567,24 +618,30 @@ class _FixedTable extends StatelessWidget {
               _cell(
                 _maybeTap(
                   r,
-                  Text(r.ticketId, style: ReportsStyles.ticketId(), maxLines: 1),
+                  Text(r.ticketId, style: ReportsStyles.ticketIdOf(context), maxLines: 1),
                 ),
               ),
               _cell(_maybeTap(r, _PlateBadge(plate: r.plate))),
               _cell(
                 _maybeTap(
                   r,
-                  Text(r.vehicle, style: ReportsStyles.tableCell(), maxLines: 2),
+                  Text(r.vehicle, style: ReportsStyles.tableCellOf(context), maxLines: 2),
                 ),
               ),
               _cell(
                 _maybeTap(
                   r,
-                  Text(r.timeInLabel, style: ReportsStyles.tableCell()),
+                  Text(r.timeInLabel, style: ReportsStyles.tableCellOf(context)),
+                ),
+              ),
+              _cell(
+                _maybeTap(
+                  r,
+                  Text(r.timeOutLabel, style: ReportsStyles.tableCellOf(context)),
                 ),
               ),
               _cell(_maybeTap(r, _DurationCell(row: r))),
-              _cell(_maybeTap(r, Text(r.slot, style: ReportsStyles.tableCell()))),
+              _cell(_maybeTap(r, Text(r.slot, style: ReportsStyles.tableCellOf(context)))),
               _cell(_maybeTap(r, _StatusPaymentCell(row: r))),
             ],
           ),
@@ -617,10 +674,11 @@ class _PlateBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: DashboardStyles.plateBg,
+        color: tc.plateBadgeBg,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: DashboardStyles.plateBlue),
       ),
@@ -674,7 +732,74 @@ class _StatusPaymentCell extends StatelessWidget {
   final ReportsTicketRow row;
 
   @override
-  Widget build(BuildContext context) => _StatusBadge(status: row.status);
+  Widget build(BuildContext context) {
+    final suppressStatus = row.hasPendingVoid || row.isVoided;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!suppressStatus) _StatusBadge(status: row.status),
+        if (row.isVoided) ...[
+          if (!suppressStatus) const SizedBox(height: 4),
+          _VoidedBadge(),
+        ] else if (row.hasPendingVoid) ...[
+          if (!suppressStatus) const SizedBox(height: 4),
+          _VoidPendingBadge(),
+        ],
+      ],
+    );
+  }
+}
+
+class _VoidPendingBadge extends StatelessWidget {
+  const _VoidPendingBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(color: const Color(0xFFFCD34D)),
+      ),
+      child: Text(
+        'Void pending',
+        style: GoogleFonts.poppins(
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          color: const Color(0xFFB45309),
+          height: 1.1,
+        ),
+      ),
+    );
+  }
+}
+
+class _VoidedBadge extends StatelessWidget {
+  const _VoidedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(color: const Color(0xFFFCA5A5)),
+      ),
+      child: Text(
+        'Voided',
+        style: GoogleFonts.poppins(
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          color: const Color(0xFFDC2626),
+          height: 1.1,
+        ),
+      ),
+    );
+  }
 }
 
 class _StatusBadge extends StatelessWidget {
@@ -693,14 +818,14 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeColors.of(context).chipBg,
         borderRadius: BorderRadius.circular(100),
         border: Border.all(color: color),
       ),
       child: Text(
         status.label,
         style: GoogleFonts.poppins(
-          fontSize: 10,
+          fontSize: 9,
           fontWeight: FontWeight.w600,
           color: color,
           height: 1.1,

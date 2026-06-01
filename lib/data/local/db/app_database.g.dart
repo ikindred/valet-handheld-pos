@@ -2498,6 +2498,57 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
   late final GeneratedColumn<String> slotId = GeneratedColumn<String>(
       'slot_id', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _vrNoMeta = const VerificationMeta('vrNo');
+  @override
+  late final GeneratedColumn<String> vrNo = GeneratedColumn<String>(
+      'vr_no', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isOvernightMeta =
+      const VerificationMeta('isOvernight');
+  @override
+  late final GeneratedColumn<bool> isOvernight = GeneratedColumn<bool>(
+      'is_overnight', aliasedName, true,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_overnight" IN (0, 1))'));
+  static const VerificationMeta _ticketLostMeta =
+      const VerificationMeta('ticketLost');
+  @override
+  late final GeneratedColumn<bool> ticketLost = GeneratedColumn<bool>(
+      'ticket_lost', aliasedName, true,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("ticket_lost" IN (0, 1))'));
+  static const VerificationMeta _appliedRateJsonMeta =
+      const VerificationMeta('appliedRateJson');
+  @override
+  late final GeneratedColumn<String> appliedRateJson = GeneratedColumn<String>(
+      'applied_rate_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _voidRequestJsonMeta =
+      const VerificationMeta('voidRequestJson');
+  @override
+  late final GeneratedColumn<String> voidRequestJson = GeneratedColumn<String>(
+      'void_request_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _pendingVoidRequestMeta =
+      const VerificationMeta('pendingVoidRequest');
+  @override
+  late final GeneratedColumn<bool> pendingVoidRequest = GeneratedColumn<bool>(
+      'pending_void_request', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("pending_void_request" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _pendingVoidReasonMeta =
+      const VerificationMeta('pendingVoidReason');
+  @override
+  late final GeneratedColumn<String> pendingVoidReason =
+      GeneratedColumn<String>('pending_void_reason', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -2523,7 +2574,14 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
         driverOut,
         parkingInfo,
         paymentSummaryJson,
-        slotId
+        slotId,
+        vrNo,
+        isOvernight,
+        ticketLost,
+        appliedRateJson,
+        voidRequestJson,
+        pendingVoidRequest,
+        pendingVoidReason
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2688,6 +2746,46 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
       context.handle(_slotIdMeta,
           slotId.isAcceptableOrUnknown(data['slot_id']!, _slotIdMeta));
     }
+    if (data.containsKey('vr_no')) {
+      context.handle(
+          _vrNoMeta, vrNo.isAcceptableOrUnknown(data['vr_no']!, _vrNoMeta));
+    }
+    if (data.containsKey('is_overnight')) {
+      context.handle(
+          _isOvernightMeta,
+          isOvernight.isAcceptableOrUnknown(
+              data['is_overnight']!, _isOvernightMeta));
+    }
+    if (data.containsKey('ticket_lost')) {
+      context.handle(
+          _ticketLostMeta,
+          ticketLost.isAcceptableOrUnknown(
+              data['ticket_lost']!, _ticketLostMeta));
+    }
+    if (data.containsKey('applied_rate_json')) {
+      context.handle(
+          _appliedRateJsonMeta,
+          appliedRateJson.isAcceptableOrUnknown(
+              data['applied_rate_json']!, _appliedRateJsonMeta));
+    }
+    if (data.containsKey('void_request_json')) {
+      context.handle(
+          _voidRequestJsonMeta,
+          voidRequestJson.isAcceptableOrUnknown(
+              data['void_request_json']!, _voidRequestJsonMeta));
+    }
+    if (data.containsKey('pending_void_request')) {
+      context.handle(
+          _pendingVoidRequestMeta,
+          pendingVoidRequest.isAcceptableOrUnknown(
+              data['pending_void_request']!, _pendingVoidRequestMeta));
+    }
+    if (data.containsKey('pending_void_reason')) {
+      context.handle(
+          _pendingVoidReasonMeta,
+          pendingVoidReason.isAcceptableOrUnknown(
+              data['pending_void_reason']!, _pendingVoidReasonMeta));
+    }
     return context;
   }
 
@@ -2745,6 +2843,20 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
           DriftSqlType.string, data['${effectivePrefix}payment_summary_json']),
       slotId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}slot_id']),
+      vrNo: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}vr_no']),
+      isOvernight: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_overnight']),
+      ticketLost: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}ticket_lost']),
+      appliedRateJson: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}applied_rate_json']),
+      voidRequestJson: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}void_request_json']),
+      pendingVoidRequest: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}pending_void_request'])!,
+      pendingVoidReason: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}pending_void_reason']),
     );
   }
 
@@ -2801,6 +2913,27 @@ class Ticket extends DataClass implements Insertable<Ticket> {
 
   /// Parking slot UUID from area detail (`levels[].slots[].id`).
   final String? slotId;
+
+  /// Valet receipt number from check-in or server.
+  final String? vrNo;
+
+  /// Whether overnight fee was applied at checkout.
+  final bool? isOvernight;
+
+  /// Whether lost ticket surcharge was applied at checkout.
+  final bool? ticketLost;
+
+  /// JSON snapshot of `applied_rate` for offline display.
+  final String? appliedRateJson;
+
+  /// Latest `void_request` from server (for offline display).
+  final String? voidRequestJson;
+
+  /// Offline void intent — cashier requested void while offline.
+  final bool pendingVoidRequest;
+
+  /// Reason for the offline void request.
+  final String? pendingVoidReason;
   const Ticket(
       {required this.id,
       required this.shiftId,
@@ -2825,7 +2958,14 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       this.driverOut,
       this.parkingInfo,
       this.paymentSummaryJson,
-      this.slotId});
+      this.slotId,
+      this.vrNo,
+      this.isOvernight,
+      this.ticketLost,
+      this.appliedRateJson,
+      this.voidRequestJson,
+      required this.pendingVoidRequest,
+      this.pendingVoidReason});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -2871,6 +3011,25 @@ class Ticket extends DataClass implements Insertable<Ticket> {
     if (!nullToAbsent || slotId != null) {
       map['slot_id'] = Variable<String>(slotId);
     }
+    if (!nullToAbsent || vrNo != null) {
+      map['vr_no'] = Variable<String>(vrNo);
+    }
+    if (!nullToAbsent || isOvernight != null) {
+      map['is_overnight'] = Variable<bool>(isOvernight);
+    }
+    if (!nullToAbsent || ticketLost != null) {
+      map['ticket_lost'] = Variable<bool>(ticketLost);
+    }
+    if (!nullToAbsent || appliedRateJson != null) {
+      map['applied_rate_json'] = Variable<String>(appliedRateJson);
+    }
+    if (!nullToAbsent || voidRequestJson != null) {
+      map['void_request_json'] = Variable<String>(voidRequestJson);
+    }
+    map['pending_void_request'] = Variable<bool>(pendingVoidRequest);
+    if (!nullToAbsent || pendingVoidReason != null) {
+      map['pending_void_reason'] = Variable<String>(pendingVoidReason);
+    }
     return map;
   }
 
@@ -2915,6 +3074,23 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           : Value(paymentSummaryJson),
       slotId:
           slotId == null && nullToAbsent ? const Value.absent() : Value(slotId),
+      vrNo: vrNo == null && nullToAbsent ? const Value.absent() : Value(vrNo),
+      isOvernight: isOvernight == null && nullToAbsent
+          ? const Value.absent()
+          : Value(isOvernight),
+      ticketLost: ticketLost == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ticketLost),
+      appliedRateJson: appliedRateJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(appliedRateJson),
+      voidRequestJson: voidRequestJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(voidRequestJson),
+      pendingVoidRequest: Value(pendingVoidRequest),
+      pendingVoidReason: pendingVoidReason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pendingVoidReason),
     );
   }
 
@@ -2948,6 +3124,14 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       paymentSummaryJson:
           serializer.fromJson<String?>(json['paymentSummaryJson']),
       slotId: serializer.fromJson<String?>(json['slotId']),
+      vrNo: serializer.fromJson<String?>(json['vrNo']),
+      isOvernight: serializer.fromJson<bool?>(json['isOvernight']),
+      ticketLost: serializer.fromJson<bool?>(json['ticketLost']),
+      appliedRateJson: serializer.fromJson<String?>(json['appliedRateJson']),
+      voidRequestJson: serializer.fromJson<String?>(json['voidRequestJson']),
+      pendingVoidRequest: serializer.fromJson<bool>(json['pendingVoidRequest']),
+      pendingVoidReason:
+          serializer.fromJson<String?>(json['pendingVoidReason']),
     );
   }
   @override
@@ -2978,6 +3162,13 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       'parkingInfo': serializer.toJson<String?>(parkingInfo),
       'paymentSummaryJson': serializer.toJson<String?>(paymentSummaryJson),
       'slotId': serializer.toJson<String?>(slotId),
+      'vrNo': serializer.toJson<String?>(vrNo),
+      'isOvernight': serializer.toJson<bool?>(isOvernight),
+      'ticketLost': serializer.toJson<bool?>(ticketLost),
+      'appliedRateJson': serializer.toJson<String?>(appliedRateJson),
+      'voidRequestJson': serializer.toJson<String?>(voidRequestJson),
+      'pendingVoidRequest': serializer.toJson<bool>(pendingVoidRequest),
+      'pendingVoidReason': serializer.toJson<String?>(pendingVoidReason),
     };
   }
 
@@ -3005,7 +3196,14 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           Value<String?> driverOut = const Value.absent(),
           Value<String?> parkingInfo = const Value.absent(),
           Value<String?> paymentSummaryJson = const Value.absent(),
-          Value<String?> slotId = const Value.absent()}) =>
+          Value<String?> slotId = const Value.absent(),
+          Value<String?> vrNo = const Value.absent(),
+          Value<bool?> isOvernight = const Value.absent(),
+          Value<bool?> ticketLost = const Value.absent(),
+          Value<String?> appliedRateJson = const Value.absent(),
+          Value<String?> voidRequestJson = const Value.absent(),
+          bool? pendingVoidRequest,
+          Value<String?> pendingVoidReason = const Value.absent()}) =>
       Ticket(
         id: id ?? this.id,
         shiftId: shiftId ?? this.shiftId,
@@ -3035,6 +3233,19 @@ class Ticket extends DataClass implements Insertable<Ticket> {
             ? paymentSummaryJson.value
             : this.paymentSummaryJson,
         slotId: slotId.present ? slotId.value : this.slotId,
+        vrNo: vrNo.present ? vrNo.value : this.vrNo,
+        isOvernight: isOvernight.present ? isOvernight.value : this.isOvernight,
+        ticketLost: ticketLost.present ? ticketLost.value : this.ticketLost,
+        appliedRateJson: appliedRateJson.present
+            ? appliedRateJson.value
+            : this.appliedRateJson,
+        voidRequestJson: voidRequestJson.present
+            ? voidRequestJson.value
+            : this.voidRequestJson,
+        pendingVoidRequest: pendingVoidRequest ?? this.pendingVoidRequest,
+        pendingVoidReason: pendingVoidReason.present
+            ? pendingVoidReason.value
+            : this.pendingVoidReason,
       );
   Ticket copyWithCompanion(TicketsCompanion data) {
     return Ticket(
@@ -3083,6 +3294,23 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           ? data.paymentSummaryJson.value
           : this.paymentSummaryJson,
       slotId: data.slotId.present ? data.slotId.value : this.slotId,
+      vrNo: data.vrNo.present ? data.vrNo.value : this.vrNo,
+      isOvernight:
+          data.isOvernight.present ? data.isOvernight.value : this.isOvernight,
+      ticketLost:
+          data.ticketLost.present ? data.ticketLost.value : this.ticketLost,
+      appliedRateJson: data.appliedRateJson.present
+          ? data.appliedRateJson.value
+          : this.appliedRateJson,
+      voidRequestJson: data.voidRequestJson.present
+          ? data.voidRequestJson.value
+          : this.voidRequestJson,
+      pendingVoidRequest: data.pendingVoidRequest.present
+          ? data.pendingVoidRequest.value
+          : this.pendingVoidRequest,
+      pendingVoidReason: data.pendingVoidReason.present
+          ? data.pendingVoidReason.value
+          : this.pendingVoidReason,
     );
   }
 
@@ -3112,7 +3340,14 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           ..write('driverOut: $driverOut, ')
           ..write('parkingInfo: $parkingInfo, ')
           ..write('paymentSummaryJson: $paymentSummaryJson, ')
-          ..write('slotId: $slotId')
+          ..write('slotId: $slotId, ')
+          ..write('vrNo: $vrNo, ')
+          ..write('isOvernight: $isOvernight, ')
+          ..write('ticketLost: $ticketLost, ')
+          ..write('appliedRateJson: $appliedRateJson, ')
+          ..write('voidRequestJson: $voidRequestJson, ')
+          ..write('pendingVoidRequest: $pendingVoidRequest, ')
+          ..write('pendingVoidReason: $pendingVoidReason')
           ..write(')'))
         .toString();
   }
@@ -3142,7 +3377,14 @@ class Ticket extends DataClass implements Insertable<Ticket> {
         driverOut,
         parkingInfo,
         paymentSummaryJson,
-        slotId
+        slotId,
+        vrNo,
+        isOvernight,
+        ticketLost,
+        appliedRateJson,
+        voidRequestJson,
+        pendingVoidRequest,
+        pendingVoidReason
       ]);
   @override
   bool operator ==(Object other) =>
@@ -3171,7 +3413,14 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           other.driverOut == this.driverOut &&
           other.parkingInfo == this.parkingInfo &&
           other.paymentSummaryJson == this.paymentSummaryJson &&
-          other.slotId == this.slotId);
+          other.slotId == this.slotId &&
+          other.vrNo == this.vrNo &&
+          other.isOvernight == this.isOvernight &&
+          other.ticketLost == this.ticketLost &&
+          other.appliedRateJson == this.appliedRateJson &&
+          other.voidRequestJson == this.voidRequestJson &&
+          other.pendingVoidRequest == this.pendingVoidRequest &&
+          other.pendingVoidReason == this.pendingVoidReason);
 }
 
 class TicketsCompanion extends UpdateCompanion<Ticket> {
@@ -3199,6 +3448,13 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
   final Value<String?> parkingInfo;
   final Value<String?> paymentSummaryJson;
   final Value<String?> slotId;
+  final Value<String?> vrNo;
+  final Value<bool?> isOvernight;
+  final Value<bool?> ticketLost;
+  final Value<String?> appliedRateJson;
+  final Value<String?> voidRequestJson;
+  final Value<bool> pendingVoidRequest;
+  final Value<String?> pendingVoidReason;
   final Value<int> rowid;
   const TicketsCompanion({
     this.id = const Value.absent(),
@@ -3225,6 +3481,13 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     this.parkingInfo = const Value.absent(),
     this.paymentSummaryJson = const Value.absent(),
     this.slotId = const Value.absent(),
+    this.vrNo = const Value.absent(),
+    this.isOvernight = const Value.absent(),
+    this.ticketLost = const Value.absent(),
+    this.appliedRateJson = const Value.absent(),
+    this.voidRequestJson = const Value.absent(),
+    this.pendingVoidRequest = const Value.absent(),
+    this.pendingVoidReason = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TicketsCompanion.insert({
@@ -3252,6 +3515,13 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     this.parkingInfo = const Value.absent(),
     this.paymentSummaryJson = const Value.absent(),
     this.slotId = const Value.absent(),
+    this.vrNo = const Value.absent(),
+    this.isOvernight = const Value.absent(),
+    this.ticketLost = const Value.absent(),
+    this.appliedRateJson = const Value.absent(),
+    this.voidRequestJson = const Value.absent(),
+    this.pendingVoidRequest = const Value.absent(),
+    this.pendingVoidReason = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         shiftId = Value(shiftId),
@@ -3293,6 +3563,13 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     Expression<String>? parkingInfo,
     Expression<String>? paymentSummaryJson,
     Expression<String>? slotId,
+    Expression<String>? vrNo,
+    Expression<bool>? isOvernight,
+    Expression<bool>? ticketLost,
+    Expression<String>? appliedRateJson,
+    Expression<String>? voidRequestJson,
+    Expression<bool>? pendingVoidRequest,
+    Expression<String>? pendingVoidReason,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3321,6 +3598,14 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       if (paymentSummaryJson != null)
         'payment_summary_json': paymentSummaryJson,
       if (slotId != null) 'slot_id': slotId,
+      if (vrNo != null) 'vr_no': vrNo,
+      if (isOvernight != null) 'is_overnight': isOvernight,
+      if (ticketLost != null) 'ticket_lost': ticketLost,
+      if (appliedRateJson != null) 'applied_rate_json': appliedRateJson,
+      if (voidRequestJson != null) 'void_request_json': voidRequestJson,
+      if (pendingVoidRequest != null)
+        'pending_void_request': pendingVoidRequest,
+      if (pendingVoidReason != null) 'pending_void_reason': pendingVoidReason,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3350,6 +3635,13 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       Value<String?>? parkingInfo,
       Value<String?>? paymentSummaryJson,
       Value<String?>? slotId,
+      Value<String?>? vrNo,
+      Value<bool?>? isOvernight,
+      Value<bool?>? ticketLost,
+      Value<String?>? appliedRateJson,
+      Value<String?>? voidRequestJson,
+      Value<bool>? pendingVoidRequest,
+      Value<String?>? pendingVoidReason,
       Value<int>? rowid}) {
     return TicketsCompanion(
       id: id ?? this.id,
@@ -3376,6 +3668,13 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       parkingInfo: parkingInfo ?? this.parkingInfo,
       paymentSummaryJson: paymentSummaryJson ?? this.paymentSummaryJson,
       slotId: slotId ?? this.slotId,
+      vrNo: vrNo ?? this.vrNo,
+      isOvernight: isOvernight ?? this.isOvernight,
+      ticketLost: ticketLost ?? this.ticketLost,
+      appliedRateJson: appliedRateJson ?? this.appliedRateJson,
+      voidRequestJson: voidRequestJson ?? this.voidRequestJson,
+      pendingVoidRequest: pendingVoidRequest ?? this.pendingVoidRequest,
+      pendingVoidReason: pendingVoidReason ?? this.pendingVoidReason,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3455,6 +3754,27 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     if (slotId.present) {
       map['slot_id'] = Variable<String>(slotId.value);
     }
+    if (vrNo.present) {
+      map['vr_no'] = Variable<String>(vrNo.value);
+    }
+    if (isOvernight.present) {
+      map['is_overnight'] = Variable<bool>(isOvernight.value);
+    }
+    if (ticketLost.present) {
+      map['ticket_lost'] = Variable<bool>(ticketLost.value);
+    }
+    if (appliedRateJson.present) {
+      map['applied_rate_json'] = Variable<String>(appliedRateJson.value);
+    }
+    if (voidRequestJson.present) {
+      map['void_request_json'] = Variable<String>(voidRequestJson.value);
+    }
+    if (pendingVoidRequest.present) {
+      map['pending_void_request'] = Variable<bool>(pendingVoidRequest.value);
+    }
+    if (pendingVoidReason.present) {
+      map['pending_void_reason'] = Variable<String>(pendingVoidReason.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3488,6 +3808,13 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
           ..write('parkingInfo: $parkingInfo, ')
           ..write('paymentSummaryJson: $paymentSummaryJson, ')
           ..write('slotId: $slotId, ')
+          ..write('vrNo: $vrNo, ')
+          ..write('isOvernight: $isOvernight, ')
+          ..write('ticketLost: $ticketLost, ')
+          ..write('appliedRateJson: $appliedRateJson, ')
+          ..write('voidRequestJson: $voidRequestJson, ')
+          ..write('pendingVoidRequest: $pendingVoidRequest, ')
+          ..write('pendingVoidReason: $pendingVoidReason, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5904,6 +6231,13 @@ typedef $$TicketsTableCreateCompanionBuilder = TicketsCompanion Function({
   Value<String?> parkingInfo,
   Value<String?> paymentSummaryJson,
   Value<String?> slotId,
+  Value<String?> vrNo,
+  Value<bool?> isOvernight,
+  Value<bool?> ticketLost,
+  Value<String?> appliedRateJson,
+  Value<String?> voidRequestJson,
+  Value<bool> pendingVoidRequest,
+  Value<String?> pendingVoidReason,
   Value<int> rowid,
 });
 typedef $$TicketsTableUpdateCompanionBuilder = TicketsCompanion Function({
@@ -5931,6 +6265,13 @@ typedef $$TicketsTableUpdateCompanionBuilder = TicketsCompanion Function({
   Value<String?> parkingInfo,
   Value<String?> paymentSummaryJson,
   Value<String?> slotId,
+  Value<String?> vrNo,
+  Value<bool?> isOvernight,
+  Value<bool?> ticketLost,
+  Value<String?> appliedRateJson,
+  Value<String?> voidRequestJson,
+  Value<bool> pendingVoidRequest,
+  Value<String?> pendingVoidReason,
   Value<int> rowid,
 });
 
@@ -5975,6 +6316,13 @@ class $$TicketsTableTableManager extends RootTableManager<
             Value<String?> parkingInfo = const Value.absent(),
             Value<String?> paymentSummaryJson = const Value.absent(),
             Value<String?> slotId = const Value.absent(),
+            Value<String?> vrNo = const Value.absent(),
+            Value<bool?> isOvernight = const Value.absent(),
+            Value<bool?> ticketLost = const Value.absent(),
+            Value<String?> appliedRateJson = const Value.absent(),
+            Value<String?> voidRequestJson = const Value.absent(),
+            Value<bool> pendingVoidRequest = const Value.absent(),
+            Value<String?> pendingVoidReason = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TicketsCompanion(
@@ -6002,6 +6350,13 @@ class $$TicketsTableTableManager extends RootTableManager<
             parkingInfo: parkingInfo,
             paymentSummaryJson: paymentSummaryJson,
             slotId: slotId,
+            vrNo: vrNo,
+            isOvernight: isOvernight,
+            ticketLost: ticketLost,
+            appliedRateJson: appliedRateJson,
+            voidRequestJson: voidRequestJson,
+            pendingVoidRequest: pendingVoidRequest,
+            pendingVoidReason: pendingVoidReason,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -6029,6 +6384,13 @@ class $$TicketsTableTableManager extends RootTableManager<
             Value<String?> parkingInfo = const Value.absent(),
             Value<String?> paymentSummaryJson = const Value.absent(),
             Value<String?> slotId = const Value.absent(),
+            Value<String?> vrNo = const Value.absent(),
+            Value<bool?> isOvernight = const Value.absent(),
+            Value<bool?> ticketLost = const Value.absent(),
+            Value<String?> appliedRateJson = const Value.absent(),
+            Value<String?> voidRequestJson = const Value.absent(),
+            Value<bool> pendingVoidRequest = const Value.absent(),
+            Value<String?> pendingVoidReason = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TicketsCompanion.insert(
@@ -6056,6 +6418,13 @@ class $$TicketsTableTableManager extends RootTableManager<
             parkingInfo: parkingInfo,
             paymentSummaryJson: paymentSummaryJson,
             slotId: slotId,
+            vrNo: vrNo,
+            isOvernight: isOvernight,
+            ticketLost: ticketLost,
+            appliedRateJson: appliedRateJson,
+            voidRequestJson: voidRequestJson,
+            pendingVoidRequest: pendingVoidRequest,
+            pendingVoidReason: pendingVoidReason,
             rowid: rowid,
           ),
         ));
@@ -6176,6 +6545,41 @@ class $$TicketsTableFilterComposer
 
   ColumnFilters<String> get slotId => $state.composableBuilder(
       column: $state.table.slotId,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get vrNo => $state.composableBuilder(
+      column: $state.table.vrNo,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<bool> get isOvernight => $state.composableBuilder(
+      column: $state.table.isOvernight,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<bool> get ticketLost => $state.composableBuilder(
+      column: $state.table.ticketLost,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get appliedRateJson => $state.composableBuilder(
+      column: $state.table.appliedRateJson,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get voidRequestJson => $state.composableBuilder(
+      column: $state.table.voidRequestJson,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<bool> get pendingVoidRequest => $state.composableBuilder(
+      column: $state.table.pendingVoidRequest,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get pendingVoidReason => $state.composableBuilder(
+      column: $state.table.pendingVoidReason,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -6307,6 +6711,41 @@ class $$TicketsTableOrderingComposer
 
   ColumnOrderings<String> get slotId => $state.composableBuilder(
       column: $state.table.slotId,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get vrNo => $state.composableBuilder(
+      column: $state.table.vrNo,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<bool> get isOvernight => $state.composableBuilder(
+      column: $state.table.isOvernight,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<bool> get ticketLost => $state.composableBuilder(
+      column: $state.table.ticketLost,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get appliedRateJson => $state.composableBuilder(
+      column: $state.table.appliedRateJson,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get voidRequestJson => $state.composableBuilder(
+      column: $state.table.voidRequestJson,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<bool> get pendingVoidRequest => $state.composableBuilder(
+      column: $state.table.pendingVoidRequest,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get pendingVoidReason => $state.composableBuilder(
+      column: $state.table.pendingVoidReason,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 

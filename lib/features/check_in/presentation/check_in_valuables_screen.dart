@@ -63,11 +63,14 @@ class _CheckInValuablesScreenState extends State<CheckInValuablesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('PERSONAL BELONGINGS', style: CheckInCompactTokens.pageHeading()),
+          Text(
+            'PERSONAL BELONGINGS',
+            style: CheckInCompactTokens.pageHeadingOf(context),
+          ),
           const SizedBox(height: 4),
           Text(
             'Select any items the customer left in the vehicle (optional).',
-            style: CheckInCompactTokens.bodyHint(),
+            style: CheckInCompactTokens.bodyHintOf(context),
           ),
           const SizedBox(height: CheckInCompactTokens.blockGap),
           Expanded(
@@ -89,11 +92,21 @@ class _CheckInValuablesScreenState extends State<CheckInValuablesScreen> {
                         itemBuilder: (context, i) {
                           final label = _options[i];
                           final on = selected.contains(label);
+                          final tc = AppThemeColors.of(context);
+                          final isDark =
+                              Theme.of(context).brightness == Brightness.dark;
+                          final rowBg = on
+                              ? (isDark
+                                  ? tc.checkboxFill
+                                  : const Color(0xFFFFF5DE))
+                              : tc.cardBg;
                           return Material(
-                            color: on
-                                ? AppColors.accent.withValues(alpha: 0.12)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(8),
+                            color: rowBg,
+                            clipBehavior: Clip.antiAlias,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              side: BorderSide(color: tc.cardBorder),
+                            ),
                             child: CheckboxListTile(
                               value: on,
                               dense: true,
@@ -132,16 +145,11 @@ class _CheckInValuablesScreenState extends State<CheckInValuablesScreen> {
                               },
                               title: Text(
                                 label,
-                                style: CheckInCompactTokens.fieldValue()
-                                    .copyWith(fontWeight: FontWeight.w500),
+                                style: CheckInCompactTokens.fieldValueOf(
+                                  context,
+                                ).copyWith(fontWeight: FontWeight.w500),
                               ),
                               controlAffinity: ListTileControlAffinity.leading,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                side: BorderSide(
-                                  color: Colors.black.withValues(alpha: 0.08),
-                                ),
-                              ),
                             ),
                           );
                         },

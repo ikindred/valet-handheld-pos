@@ -159,7 +159,7 @@ class _ConfirmPasswordDialogState extends State<_ConfirmPasswordDialog> {
               obscureText: true,
               hint: '************',
               autofocus: true,
-              style: AppTextField.defaultValueStyle(),
+              style: AppTextField.defaultValueStyle(context),
               onSubmitted: (_) => _submit(),
             ),
           ),

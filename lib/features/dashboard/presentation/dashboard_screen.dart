@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/branch_config_service.dart';
 import '../../../data/services/rate_fetch_service.dart';
@@ -14,6 +15,9 @@ import '../../../shared/widgets/area_parking_slots_dialog.dart';
 import '../../../shared/widgets/branch_rates_dialog.dart';
 import '../../auth/state/auth_bloc.dart';
 import '../../check_in/state/check_in_cubit.dart';
+import '../../reports/domain/reports_format.dart';
+import '../../reports/domain/reports_models.dart';
+import '../../reports/presentation/widgets/reports_widgets.dart';
 import '../state/dashboard_cubit.dart';
 import 'widgets/dashboard_widgets.dart';
 
@@ -338,7 +342,9 @@ class _ActionRow extends StatelessWidget {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: DashboardStyles.railAccentBg,
+          color: AppThemeColors.isDark(context)
+              ? DashboardStyles.orange.withValues(alpha: 0.18)
+              : DashboardStyles.railAccentBg,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
@@ -432,56 +438,61 @@ class _RecentTransactionsCard extends StatelessWidget {
 
   final DashboardState dashboard;
 
-  static const _dividerColor = Color(0x21000000);
+  static ReportsTicketRow _toReportsRow(DashboardRecentTx tx) {
+    final now = DateTime.now();
+    final timeIn = tx.timeIn ?? now;
+    final timeOut = tx.timeOut;
+    final duration = timeOut != null
+        ? timeOut.difference(timeIn)
+        : now.difference(timeIn);
+    final reportsStatus = tx.status == DashboardRecentStatus.parked
+        ? (duration.inHours >= 8
+            ? ReportsTicketRowStatus.longStay
+            : ReportsTicketRowStatus.parked)
+        : ReportsTicketRowStatus.checkedOut;
 
-  static TransactionStatusKind _mapStatus(DashboardRecentStatus s) =>
-      s == DashboardRecentStatus.parked
-          ? TransactionStatusKind.parked
-          : TransactionStatusKind.checkedOut;
+    return ReportsTicketRow(
+      ticketId: tx.ticketNumber,
+      serverTransactionId: tx.ticketId,
+      plate: tx.plateNumber.isNotEmpty ? tx.plateNumber : tx.plate,
+      vehicle: tx.line1,
+      timeIn: timeIn,
+      timeOut: timeOut,
+      duration: duration,
+      slot: tx.slot,
+      hasPendingVoid: tx.hasPendingVoid,
+      isVoided: tx.isVoided,
+      status: reportsStatus,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final rows = switch (dashboard) {
+    final txRows = switch (dashboard) {
       DashboardReady(:final recent) => recent,
       _ => const <DashboardRecentTx>[],
     };
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
-      decoration: DashboardStyles.cardDecorationOf(context),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('RECENT TRANSACTION', style: DashboardStyles.sectionTitleOf(context)),
-          const SizedBox(height: 8),
-          const Divider(height: 1, color: _dividerColor),
-          if (rows.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child:           Text(
-            dashboard is DashboardLoading
-                ? 'Loading…'
-                : 'No recent transactions for this shift.',
-            style: DashboardStyles.statHintOf(context),
-            textAlign: TextAlign.center,
-          ),
-            )
-          else
-            for (var i = 0; i < rows.length; i++) ...[
-              DashboardTransactionRow(
-                plate: rows[i].plate,
-                line1: rows[i].line1,
-                line2: rows[i].line2,
-                status: _mapStatus(rows[i].status),
-                onTap: () => context.push(
-                  '/dashboard/ticket/${Uri.encodeComponent(rows[i].ticketId)}',
-                ),
-              ),
-              if (i < rows.length - 1)
-                const Divider(height: 1, color: _dividerColor),
-            ],
-        ],
-      ),
+    if (dashboard is DashboardLoading || dashboard is DashboardInitial) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        decoration: DashboardStyles.cardDecorationOf(context),
+        child: const Center(
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
+    final rows = txRows.map(_toReportsRow).toList();
+
+    return ReportsTransactionsTableCard(
+      rowCount: rows.length,
+      rows: rows,
+      onRowTap: (row) {
+        final id = row.detailId.trim();
+        if (id.isEmpty) return;
+        context.push('/dashboard/ticket/${Uri.encodeComponent(id)}');
+      },
     );
   }
 }

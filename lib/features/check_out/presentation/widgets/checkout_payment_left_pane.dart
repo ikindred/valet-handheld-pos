@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../../../../data/local/db/app_database.dart';
 import '../../domain/checkout_pricing.dart';
 import '../../models/checkout_preview_response.dart';
@@ -42,11 +43,9 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
   final TextEditingController driverOutController;
 
   static const _plateBlue = Color(0xFF0068D3);
-  static const _plateBarBg = Color(0xFFA7D6FF);
   static const _orange = Color(0xFFF68D00);
   static const _green = Color(0xFF27AE60);
   static const _red = Color(0xFFEC2231);
-  static const _border = Color(0xFFC0C0BF);
 
   String get _plate {
     final p = preview?.ticket.plate ?? preview?.releaseSummary.plate ?? '';
@@ -66,6 +65,8 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
+    final border = tc.cardBorder;
     final b = breakdown;
     final flatHours = flatBlockHours;
     final flatLabel = 'First $flatHours hrs (flat)';
@@ -77,6 +78,7 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
         _VehicleSummaryCard(
           plate: _plate,
@@ -87,26 +89,27 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
           durationLabel: durationLabel,
         ),
         const SizedBox(height: 10),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.zero,
-            child: Container(
-              width: double.infinity,
-              padding: CheckOutUiTokens.cardPadding,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(CheckOutUiTokens.cardRadius),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('RATE BREAKDOWN', style: CheckOutUiTokens.sectionTitle()),
+        Container(
+          width: double.infinity,
+          padding: CheckOutUiTokens.cardPadding,
+          decoration: BoxDecoration(
+            color: CheckOutUiTokens.cardBgOf(context),
+            borderRadius: BorderRadius.circular(CheckOutUiTokens.cardRadius),
+            border: Border.all(color: border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+                  Text(
+                    'RATE BREAKDOWN',
+                    style: CheckOutUiTokens.sectionTitleOf(context),
+                  ),
                   const SizedBox(height: 8),
                   Material(
                     color: isLostTicket
-                        ? const Color(0xFFFFECEC)
-                        : CheckOutUiTokens.hintFill,
+                        ? CheckOutUiTokens.lostTicketTileBgOf(context)
+                        : CheckOutUiTokens.hintFillOf(context),
                     borderRadius: BorderRadius.circular(8),
                     child: CheckboxListTile(
                       value: isLostTicket,
@@ -119,7 +122,7 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
                       controlAffinity: ListTileControlAffinity.leading,
                       title: Text(
                         'Lost ticket (no stub)',
-                        style: CheckOutUiTokens.body().copyWith(
+                        style: CheckOutUiTokens.bodyOf(context).copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -168,7 +171,7 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
                       Expanded(
                         child: Text(
                           'Total Amount Due',
-                          style: CheckOutUiTokens.fieldLabel(),
+                          style: CheckOutUiTokens.fieldLabelOf(context),
                         ),
                       ),
                       Text(
@@ -177,48 +180,80 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 10),
-                    child: Divider(height: 1, color: CheckOutUiTokens.hairline),
-                  ),
-                  Text('RETURNING VALET', style: CheckOutUiTokens.fieldLabel()),
-                  const SizedBox(height: 4),
-                  TextField(
-                    controller: driverOutController,
-                    textCapitalization: TextCapitalization.words,
-                    style: CheckOutUiTokens.body(),
-                    decoration: InputDecoration(
-                      hintText: 'Name (optional)',
-                      isDense: true,
-                      filled: true,
-                      fillColor: CheckOutUiTokens.hintFill,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: _border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: _border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(
-                          color: Color(0xFF0068D3),
-                          width: 1.5,
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
-          ),
+        const SizedBox(height: 10),
+        _ReturningValetAttendantCard(
+          controller: driverOutController,
         ),
       ],
+    );
+  }
+}
+
+/// Returning valet name captured at payment (Figma left column, below rates).
+class _ReturningValetAttendantCard extends StatelessWidget {
+  const _ReturningValetAttendantCard({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
+    final border = tc.cardBorder;
+    return Container(
+      width: double.infinity,
+      padding: CheckOutUiTokens.cardPadding,
+      decoration: BoxDecoration(
+        color: CheckOutUiTokens.cardBgOf(context),
+        borderRadius: BorderRadius.circular(CheckOutUiTokens.cardRadius),
+        border: Border.all(color: border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'RETURNING VALET ATTENDANT',
+            style: CheckOutUiTokens.sectionTitleOf(context),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: controller,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+            style: CheckOutUiTokens.bodyOf(context),
+            decoration: InputDecoration(
+              hintText: 'Name of valet returning the vehicle',
+              hintStyle: CheckOutUiTokens.hintOf(context),
+              isDense: true,
+              filled: true,
+              fillColor: CheckOutUiTokens.hintFillOf(context),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: Color(0xFFF68D00),
+                  width: 1.5,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -242,11 +277,13 @@ class _VehicleSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: tc.cardBg,
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: tc.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -255,8 +292,13 @@ class _VehicleSummaryCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
-              color: CheckoutPaymentLeftPane._plateBarBg,
+              color: CheckOutUiTokens.plateBarBgOf(context),
               borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: CheckoutPaymentLeftPane._plateBlue.withValues(
+                  alpha: 0.45,
+                ),
+              ),
             ),
             child: Text(
               plate.isEmpty ? '—' : plate,
@@ -267,7 +309,7 @@ class _VehicleSummaryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Text(subtitle, style: CheckOutUiTokens.body()),
+          Text(subtitle, style: CheckOutUiTokens.bodyOf(context)),
           const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -277,8 +319,8 @@ class _VehicleSummaryCard extends StatelessWidget {
                   label: 'CHECK IN',
                   primary: timeInLabel,
                   secondary: dateInLabel,
-                  primaryColor: const Color(0xFF0A1B39),
-                  secondaryColor: const Color(0xFF0A1B39),
+                  primaryColor: tc.textPrimary,
+                  secondaryColor: tc.textPrimary,
                 ),
               ),
               const SizedBox(width: 12),
@@ -319,12 +361,14 @@ class _TimeColumn extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: CheckOutUiTokens.fieldLabel()),
+        Text(label, style: CheckOutUiTokens.fieldLabelOf(context)),
         const SizedBox(height: 2),
         Text(primary, style: CheckOutUiTokens.timeDisplay(color: primaryColor)),
         Text(
           secondary,
-          style: CheckOutUiTokens.helper().copyWith(color: secondaryColor),
+          style: CheckOutUiTokens.helperOf(context).copyWith(
+            color: secondaryColor,
+          ),
         ),
       ],
     );
@@ -349,13 +393,15 @@ class _BreakdownLine extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(child: Text(label, style: CheckOutUiTokens.fieldLabel())),
-            Text(value, style: CheckOutUiTokens.money()),
+            Expanded(
+              child: Text(label, style: CheckOutUiTokens.fieldLabelOf(context)),
+            ),
+            Text(value, style: CheckOutUiTokens.moneyOf(context)),
           ],
         ),
         if (showRule) ...[
           const SizedBox(height: 6),
-          const Divider(height: 1, color: CheckOutUiTokens.hairline),
+          Divider(height: 1, color: CheckOutUiTokens.hairlineOf(context)),
         ],
       ],
     );

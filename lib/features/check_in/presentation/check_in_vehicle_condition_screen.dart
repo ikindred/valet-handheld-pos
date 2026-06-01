@@ -10,9 +10,6 @@ import 'widgets/check_in_step_body.dart';
 import 'widgets/customer_signature_modal.dart';
 import 'widgets/vehicle_condition_diagram.dart';
 
-const _kGrey500 = Color(0xFF6C7688);
-const _kBorder = Color(0xFFC0C0BF);
-
 class CheckInVehicleConditionScreen extends StatelessWidget {
   const CheckInVehicleConditionScreen({super.key});
 
@@ -90,9 +87,7 @@ class _DiagramPanel extends StatelessWidget {
           children: [
             Text(
               'TAP DIAGRAM TO MARK DAMAGE',
-              style: CheckInCompactTokens.sectionTitle().copyWith(
-                color: _kGrey500,
-              ),
+              style: CheckInCompactTokens.sectionTitleOf(context),
             ),
             const SizedBox(height: 4),
             Text.rich(
@@ -100,13 +95,11 @@ class _DiagramPanel extends StatelessWidget {
                 children: [
                   TextSpan(
                     text: 'Selected: ',
-                    style: CheckInCompactTokens.bodyHint().copyWith(
-                      color: const Color(0x936C7688),
-                    ),
+                    style: CheckInCompactTokens.bodyHintOf(context),
                   ),
                   TextSpan(
                     text: state.selectedDamageType.label,
-                    style: CheckInCompactTokens.fieldValue().copyWith(
+                    style: CheckInCompactTokens.fieldValueOf(context).copyWith(
                       color: _selectedTypeAccent(state.selectedDamageType),
                     ),
                   ),
@@ -117,10 +110,10 @@ class _DiagramPanel extends StatelessWidget {
             Expanded(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppThemeColors.of(context).cardBg,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: Colors.black.withValues(alpha: 0.13),
+                    color: AppThemeColors.of(context).cardBorder,
                   ),
                 ),
                 child: ClipRRect(
@@ -155,30 +148,52 @@ Color _selectedTypeAccent(DamageType t) {
   }
 }
 
-/// Selected-state fill / border / label for MARK DAMAGE TYPE buttons (aligned with diagram markers).
-({Color fill, Color border, Color foreground}) _damageTypeButtonSelectedStyle(
-  DamageType t,
-) {
-  switch (t) {
-    case DamageType.crack:
-      return (
+/// Selected-state fill / border / label for MARK DAMAGE TYPE buttons.
+({Color fill, Color border, Color foreground}) _damageTypeButtonStyle(
+  BuildContext context,
+  DamageType t, {
+  required bool selected,
+}) {
+  final tc = AppThemeColors.of(context);
+  if (!selected) {
+    return (fill: tc.cardBg, border: tc.cardBorder, foreground: tc.textPrimary);
+  }
+  if (AppThemeColors.isDark(context)) {
+    return switch (t) {
+      DamageType.crack => (
+          fill: const Color(0xFF1E3A5F),
+          border: const Color(0xFF60A5FA),
+          foreground: const Color(0xFF60A5FA),
+        ),
+      DamageType.scratch => (
+          fill: const Color(0xFF422006),
+          border: const Color(0xFFFBBF24),
+          foreground: const Color(0xFFFBBF24),
+        ),
+      DamageType.dent => (
+          fill: const Color(0xFF3D1F24),
+          border: const Color(0xFFF87171),
+          foreground: const Color(0xFFF87171),
+        ),
+    };
+  }
+  return switch (t) {
+    DamageType.crack => (
         fill: const Color(0xFFECEEFF),
         border: const Color(0xFF0068D3),
         foreground: const Color(0xFF0068D3),
-      );
-    case DamageType.scratch:
-      return (
+      ),
+    DamageType.scratch => (
         fill: const Color(0xFFFFF4EC),
         border: const Color(0xFFF68D00),
         foreground: const Color(0xFFF68D00),
-      );
-    case DamageType.dent:
-      return (
+      ),
+    DamageType.dent => (
         fill: const Color(0xFFFFECEC),
         border: const Color(0xFFEC2231),
         foreground: const Color(0xFFEC2231),
-      );
-  }
+      ),
+  };
 }
 
 class _DamageSidePanel extends StatelessWidget {
@@ -196,9 +211,7 @@ class _DamageSidePanel extends StatelessWidget {
           children: [
             Text(
               'MARK DAMAGE TYPE',
-              style: CheckInCompactTokens.sectionTitle().copyWith(
-                color: _kGrey500,
-              ),
+              style: CheckInCompactTokens.sectionTitleOf(context),
             ),
             const SizedBox(height: CheckInCompactTokens.sectionGap),
             SizedBox(
@@ -245,9 +258,7 @@ class _DamageSidePanel extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'LOGGED DAMAGE (${state.vehicleDamageEntries.length})',
-                    style: CheckInCompactTokens.sectionTitle().copyWith(
-                      color: _kGrey500,
-                    ),
+                    style: CheckInCompactTokens.sectionTitleOf(context),
                   ),
                 ),
                 TextButton(
@@ -255,16 +266,17 @@ class _DamageSidePanel extends StatelessWidget {
                       ? null
                       : () => context.read<CheckInCubit>().clearLoggedDamage(),
                   style: TextButton.styleFrom(
-                    foregroundColor: AppColors.textPrimary,
-                    disabledForegroundColor: AppColors.textSecondary,
+                    foregroundColor: AppThemeColors.of(context).textPrimary,
+                    disabledForegroundColor:
+                        AppThemeColors.of(context).textSecondary,
                     padding: const EdgeInsets.symmetric(horizontal: 6),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   child: Text(
                     'Clear logged damage',
-                    style: CheckInCompactTokens.bodyHint().copyWith(
-                      color: AppColors.textPrimary,
+                    style: CheckInCompactTokens.bodyHintOf(context).copyWith(
+                      color: AppThemeColors.of(context).textPrimary,
                     ),
                   ),
                 ),
@@ -276,7 +288,7 @@ class _DamageSidePanel extends StatelessWidget {
                   ? Center(
                       child: Text(
                         'No damage logged yet.',
-                        style: CheckInCompactTokens.bodyHint(),
+                        style: CheckInCompactTokens.bodyHintOf(context),
                       ),
                     )
                   : ListView.separated(
@@ -312,13 +324,10 @@ class _DamageTypeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = _damageTypeButtonSelectedStyle(type);
-    final fill = selected ? style.fill : Colors.white;
-    final border = selected ? style.border : _kBorder;
-    final fg = selected ? style.foreground : AppColors.textPrimary;
+    final style = _damageTypeButtonStyle(context, type, selected: selected);
 
     return Material(
-      color: fill,
+      color: style.fill,
       borderRadius: BorderRadius.circular(10),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -330,14 +339,14 @@ class _DamageTypeButton extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 6),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: border, width: 1),
+              border: Border.all(color: style.border, width: 1),
             ),
             child: Text(
               type.label,
               textAlign: TextAlign.center,
-              style: CheckInCompactTokens.fieldValue().copyWith(
+              style: CheckInCompactTokens.fieldValueOf(context).copyWith(
                 fontWeight: FontWeight.w500,
-                color: fg,
+                color: style.foreground,
               ),
             ),
           ),
@@ -370,12 +379,13 @@ class _LoggedDamageRow extends StatelessWidget {
         entry.zoneLabel ??
         '${(entry.normalizedX * 100).round()}%, ${(entry.normalizedY * 100).round()}%';
 
+    final tc = AppThemeColors.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: tc.cardBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _kBorder),
+        border: Border.all(color: tc.cardBorder),
       ),
       child: Row(
         children: [
@@ -394,13 +404,15 @@ class _LoggedDamageRow extends StatelessWidget {
               children: [
                 Text(
                   entry.type.label,
-                  style: CheckInCompactTokens.fieldValue().copyWith(
+                  style: CheckInCompactTokens.fieldValueOf(context).copyWith(
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
                   subtitle,
-                  style: CheckInCompactTokens.helperText(),
+                  style: CheckInCompactTokens.helperText().copyWith(
+                    color: tc.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -410,7 +422,7 @@ class _LoggedDamageRow extends StatelessWidget {
             icon: const Icon(Icons.delete_outline, size: 20),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            color: AppColors.textSecondary,
+            color: tc.textSecondary,
             tooltip: 'Remove',
           ),
         ],

@@ -27,6 +27,12 @@ abstract final class TransactionPaymentFields {
   static double? cashTenderedFrom(Map<String, dynamic> json) =>
       optionalMoney(json['cash_tendered'] ?? json['cashTendered']);
 
+  static bool isOvernightFrom(Map<String, dynamic> json) =>
+      json['is_overnight'] == true || json['isOvernight'] == true;
+
+  static bool isTicketLostFrom(Map<String, dynamic> json) =>
+      json['ticket_lost'] == true || json['ticketLost'] == true;
+
   /// Cash tendered and change for receipts and detail screens.
   ///
   /// Change is always `cashTendered - amount` when both are present. API `change`

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/ui/app_text_field.dart';
 
 /// Compact spacing and typography aligned with login / open cash tablet layout.
 abstract final class CheckInCompactTokens {
@@ -41,8 +40,11 @@ abstract final class CheckInCompactTokens {
         fontSize: 10,
         fontWeight: FontWeight.w600,
         height: 1.2,
-        color: AppTextFieldTokens.labelNavy,
+        color: AppColors.textSecondary,
       );
+
+  static TextStyle fieldLabelOf(BuildContext context) => fieldLabel()
+      .copyWith(color: AppThemeColors.of(context).textSecondary);
 
   static TextStyle fieldValue() => GoogleFonts.poppins(
         fontSize: 12,
@@ -56,6 +58,9 @@ abstract final class CheckInCompactTokens {
         fontWeight: FontWeight.w500,
         color: AppColors.textPrimary,
       );
+
+  static TextStyle inlineLabelOf(BuildContext context) => inlineLabel()
+      .copyWith(color: AppThemeColors.of(context).textPrimary);
 
   static TextStyle dateTimeAccent() => GoogleFonts.poppins(
         fontSize: 12,
@@ -112,4 +117,19 @@ abstract final class CheckInCompactTokens {
         color: const Color(0x66F68D00),
         height: 1.15,
       );
+
+  static TextStyle sectionTitleOf(BuildContext context) => sectionTitle()
+      .copyWith(color: AppThemeColors.of(context).textSecondary);
+
+  static TextStyle pageHeadingOf(BuildContext context) => pageHeading()
+      .copyWith(color: AppThemeColors.of(context).textPrimary);
+
+  static TextStyle fieldValueOf(BuildContext context) => fieldValue()
+      .copyWith(color: AppThemeColors.of(context).textPrimary);
+
+  static TextStyle headerStepOf(BuildContext context) => headerStep()
+      .copyWith(color: AppThemeColors.of(context).textSecondary);
+
+  static TextStyle bodyHintOf(BuildContext context) => bodyHint()
+      .copyWith(color: AppThemeColors.of(context).textSecondary);
 }

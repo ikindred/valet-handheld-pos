@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../../../../data/repositories/auth_repository.dart';
 import '../../../../data/services/rate_fetch_service.dart';
 import '../../../../data/services/rate_service.dart';
@@ -36,14 +37,12 @@ class CheckInFlowHeader extends StatelessWidget {
     'PRINT TICKET',
   ];
 
-  static const Color _headerSurface = Color(0xFFFAFAFA);
-
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     final safeStep = stepIndex.clamp(0, totalSteps - 1);
     final title = stepTitles[safeStep];
     final stepLabel = safeStep + 1;
-    final hairline = Colors.black.withValues(alpha: 0.13);
 
     return SizedBox(
       height: CheckInCompactTokens.headerHeight,
@@ -51,8 +50,8 @@ class CheckInFlowHeader extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: _headerSurface,
-          border: Border(bottom: BorderSide(width: 1, color: hairline)),
+          color: tc.cardBg,
+          border: Border(bottom: BorderSide(width: 1, color: tc.cardBorder)),
         ),
         alignment: Alignment.centerLeft,
         child: Row(
@@ -69,7 +68,7 @@ class CheckInFlowHeader extends StatelessWidget {
                     textAlign: TextAlign.left,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: CheckInCompactTokens.headerStep(),
+                    style: CheckInCompactTokens.headerStepOf(context),
                   ),
                   const SizedBox(height: 8),
                   CheckInDotStepper(
@@ -121,15 +120,17 @@ class _TicketPill extends StatelessWidget {
 
   /// SPiD orange; background matches warm cream used with status pills.
   static const Color _orange = Color(0xFFE87722);
-  static const Color _bg = Color(0xFFFFF7EC);
+  static const Color _bgLight = Color(0xFFFFF7EC);
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppThemeColors.of(context).inputFill : _bgLight;
     final display = ticketNumber.trim().isEmpty ? '…' : ticketNumber.trim();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: _bg,
+        color: bg,
         borderRadius: BorderRadius.circular(100),
         border: Border.all(color: _orange),
       ),

@@ -206,6 +206,31 @@ class Tickets extends Table {
   /// Parking slot UUID from area detail (`levels[].slots[].id`).
   TextColumn get slotId => text().named('slot_id').nullable()();
 
+  /// Valet receipt number from check-in or server.
+  TextColumn get vrNo => text().named('vr_no').nullable()();
+
+  /// Whether overnight fee was applied at checkout.
+  BoolColumn get isOvernight => boolean().named('is_overnight').nullable()();
+
+  /// Whether lost ticket surcharge was applied at checkout.
+  BoolColumn get ticketLost => boolean().named('ticket_lost').nullable()();
+
+  /// JSON snapshot of `applied_rate` for offline display.
+  TextColumn get appliedRateJson =>
+      text().named('applied_rate_json').nullable()();
+
+  /// Latest `void_request` from server (for offline display).
+  TextColumn get voidRequestJson =>
+      text().named('void_request_json').nullable()();
+
+  /// Offline void intent — cashier requested void while offline.
+  BoolColumn get pendingVoidRequest =>
+      boolean().named('pending_void_request').withDefault(const Constant(false))();
+
+  /// Reason for the offline void request.
+  TextColumn get pendingVoidReason =>
+      text().named('pending_void_reason').nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -331,7 +356,7 @@ class AppDatabase extends _$AppDatabase {
   final bool _skipDevOfflineSeed;
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -403,6 +428,15 @@ FROM offline_accounts''');
           }
           if (from < 11) {
             await m.addColumn(tickets, tickets.paymentSummaryJson);
+          }
+          if (from < 12) {
+            await m.addColumn(tickets, tickets.vrNo);
+            await m.addColumn(tickets, tickets.isOvernight);
+            await m.addColumn(tickets, tickets.ticketLost);
+            await m.addColumn(tickets, tickets.appliedRateJson);
+            await m.addColumn(tickets, tickets.voidRequestJson);
+            await m.addColumn(tickets, tickets.pendingVoidRequest);
+            await m.addColumn(tickets, tickets.pendingVoidReason);
           }
         },
       );

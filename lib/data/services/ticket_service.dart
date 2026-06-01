@@ -8,6 +8,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/api/transaction_payment_fields.dart';
 import '../../core/api/transaction_payment_summary.dart';
+import '../../core/api/void_request_info.dart';
+import '../../features/check_out/models/checkout_preview_rates.dart';
 import '../../core/pricing/transaction_payment_calculator.dart';
 import '../../core/config/app_config.dart';
 import '../../core/services/device_id_service.dart';
@@ -438,6 +440,12 @@ class TicketService {
       throw StateError('Queued check-in missing slot_id');
     }
 
+    final localRow = localId.isNotEmpty ? await ticketById(localId) : null;
+    final vrFromVehicle = vehicle['vr_no']?.toString().trim();
+    final vrNo = localRow?.vrNo?.trim().isNotEmpty == true
+        ? localRow!.vrNo!.trim()
+        : (vrFromVehicle?.isNotEmpty == true ? vrFromVehicle : null);
+
     final response = await _transactionsApi.submitCheckIn(
       token: token,
       ticketNumber: localId,
@@ -451,18 +459,27 @@ class TicketService {
       customerName: body['customer_name']?.toString(),
       driverIn: body['driver_in']?.toString(),
       notes: body['notes']?.toString(),
+      vrNo: vrNo,
+      voidRequested: localRow?.pendingVoidRequest ?? false,
+      voidReason: localRow?.pendingVoidReason,
     );
 
     if (localId.isNotEmpty) {
       await updateServerTicketId(localId, response.id);
       final queuedSlotId = body['slot_id']?.toString().trim() ?? '';
-      if (queuedSlotId.isNotEmpty) {
-        final row = await ticketById(localId);
-        if (row != null && (row.slotId?.trim().isEmpty ?? true)) {
-          await (_db.update(_db.tickets)..where((t) => t.id.equals(localId)))
-              .write(TicketsCompanion(slotId: Value(queuedSlotId)));
-        }
-      }
+      final companion = TicketsCompanion(
+        syncStatus: const Value('synced'),
+        pendingVoidRequest: const Value(false),
+        pendingVoidReason: const Value(null),
+        slotId: queuedSlotId.isNotEmpty
+            ? Value(queuedSlotId)
+            : const Value.absent(),
+        vrNo: vrNo != null && vrNo.isNotEmpty
+            ? Value(vrNo)
+            : const Value.absent(),
+      );
+      await (_db.update(_db.tickets)..where((t) => t.id.equals(localId)))
+          .write(companion);
     }
     return response;
   }
@@ -674,6 +691,124 @@ LIMIT 1
   }
 
   /// Queues unified check-out for offline finalize (`operation: checkout/finalize`).
+  Future<void> persistVrNo(String ticketId, String vrNo) async {
+    final tid = ticketId.trim();
+    final v = vrNo.trim();
+    if (tid.isEmpty || v.isEmpty) return;
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(tid))).write(
+      TicketsCompanion(vrNo: Value(v)),
+    );
+  }
+
+  /// Persists checkout metadata on the local ticket row (offline display / replay).
+  Future<void> persistCheckoutMetadata({
+    required String ticketId,
+    required bool isOvernight,
+    required bool ticketLost,
+    required Map<String, dynamic> appliedRate,
+  }) async {
+    final tid = ticketId.trim();
+    if (tid.isEmpty) return;
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(tid))).write(
+      TicketsCompanion(
+        isOvernight: Value(isOvernight),
+        ticketLost: Value(ticketLost),
+        appliedRateJson: Value(jsonEncode(appliedRate)),
+      ),
+    );
+  }
+
+  /// Online void request (`POST /tickets/:id/void`).
+  Future<void> requestTicketVoid({
+    required String serverTicketId,
+    String? reason,
+  }) async {
+    if (AppConfig.useStubApi) return;
+    if (!await InternetReachability.hasInternet()) {
+      throw TransactionsApiException(
+        'Device is offline. Connect to request a void.',
+      );
+    }
+    final token = await _activeBearer();
+    if (token == null || token.isEmpty) {
+      throw TransactionsApiException('No active bearer token.');
+    }
+    await _transactionsApi.requestVoid(
+      token: token,
+      ticketId: serverTicketId,
+      reason: reason,
+    );
+    final row = await _ticketByServerId(serverTicketId.trim());
+    if (row != null) {
+      final voidJson = reason != null && reason.trim().isNotEmpty
+          ? jsonEncode(<String, dynamic>{
+              'status': 'pending',
+              'reason': reason.trim(),
+            })
+          : jsonEncode(<String, dynamic>{'status': 'pending'});
+      await (_db.update(_db.tickets)..where((t) => t.id.equals(row.id))).write(
+        TicketsCompanion(
+          voidRequestJson: Value(voidJson),
+          pendingVoidRequest: const Value(false),
+        ),
+      );
+    }
+  }
+
+  /// PATCH `vehicle.plate_number` on the server and update local DB.
+  ///
+  /// Requires an active internet connection and a valid bearer token.
+  /// If the ticket has no [serverTicketId] it has not synced yet; the update
+  /// is applied locally only so it is included in the next sync.
+  Future<void> updatePlateNumber({
+    required String localTicketId,
+    required String newPlate,
+  }) async {
+    final tid = localTicketId.trim();
+    final plate = newPlate.trim().toUpperCase();
+    if (tid.isEmpty) throw TransactionsApiException('Ticket id is empty.');
+
+    final row = await ticketById(tid);
+    if (row == null) throw TransactionsApiException('Ticket not found.');
+
+    final serverId = row.serverTicketId?.trim() ?? '';
+    if (serverId.isNotEmpty) {
+      if (!await InternetReachability.hasInternet()) {
+        throw TransactionsApiException(
+          'Device is offline. Connect to update the plate number.',
+        );
+      }
+      final token = await _activeBearer();
+      if (token == null || token.isEmpty) {
+        throw TransactionsApiException('No active bearer token.');
+      }
+      await _transactionsApi.patchVehiclePlate(
+        token: token,
+        ticketId: serverId,
+        plateNumber: plate,
+      );
+    }
+
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(tid))).write(
+      TicketsCompanion(plateNumber: Value(plate)),
+    );
+  }
+
+  /// Stores offline void intent until check-in sync sends `void_requested`.
+  Future<void> storeOfflineVoidRequest(
+    String localTicketId,
+    String? reason,
+  ) async {
+    final tid = localTicketId.trim();
+    if (tid.isEmpty) return;
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(tid))).write(
+      TicketsCompanion(
+        pendingVoidRequest: const Value(true),
+        pendingVoidReason: Value(reason?.trim()),
+      ),
+    );
+  }
+
   Future<void> enqueueCheckoutFinalize({
     required String ticketId,
     required String? serverTicketId,
@@ -684,6 +819,7 @@ LIMIT 1
     required List<Map<String, dynamic>> conditionCheckout,
     String? driverOut,
     double? cashTendered,
+    Map<String, dynamic>? appliedRate,
   }) async {
     final tid = ticketId.trim();
     if (tid.isEmpty) return;
@@ -700,6 +836,8 @@ LIMIT 1
         'driver_out': driverOut.trim(),
       if (cashTendered != null && cashTendered > 0.009)
         'cash_tendered': cashTendered,
+      if (appliedRate != null && appliedRate.isNotEmpty)
+        'applied_rate': appliedRate,
     });
     await _db
         .into(_db.syncQueue)
@@ -757,6 +895,11 @@ LIMIT 1
         ? cashTenderedRaw.toDouble()
         : double.tryParse('$cashTenderedRaw');
 
+    final appliedRaw = body['applied_rate'];
+    final appliedRate = appliedRaw is Map
+        ? Map<String, dynamic>.from(appliedRaw)
+        : null;
+
     return _transactionsApi.submitCheckOut(
       token: token,
       ticketId: serverId,
@@ -767,6 +910,7 @@ LIMIT 1
       cashTendered: cashTendered,
       driverOut: driverOut,
       conditionCheckout: conditionList,
+      appliedRate: appliedRate,
     );
   }
 
@@ -956,10 +1100,19 @@ WHERE shift_id = ? AND status = 'completed'
       if (payment != null) {
         await _persistPaymentSummary(ticket.id, payment);
       }
+      final extras = _detailExtrasFrom(
+        transactionJson: transactionJson,
+        ticket: ticket,
+      );
       return TicketDetailSnapshot(
         ticket: ticket,
         parking: parking ?? TicketService._parkingFromTicketRow(ticket),
         payment: payment,
+        voidRequest: extras.voidRequest,
+        isOvernight: extras.isOvernight,
+        isTicketLost: extras.isTicketLost,
+        appliedRate: extras.appliedRate,
+        isOnline: true,
       );
     }
 
@@ -1003,10 +1156,120 @@ WHERE shift_id = ? AND status = 'completed'
     if (payment != null) {
       await _persistPaymentSummary(ticket.id, payment);
     }
+    final extras = _detailExtrasFrom(transactionJson: null, ticket: ticket);
     return TicketDetailSnapshot(
       ticket: ticket,
       parking: parking,
       payment: payment,
+      voidRequest: extras.voidRequest,
+      isOvernight: extras.isOvernight,
+      isTicketLost: extras.isTicketLost,
+      appliedRate: extras.appliedRate,
+      isOnline: false,
+    );
+  }
+
+  static ({
+    VoidRequestInfo? voidRequest,
+    bool? isOvernight,
+    bool? isTicketLost,
+    CheckoutPreviewRates? appliedRate,
+  }) _detailExtrasFrom({
+    Map<String, dynamic>? transactionJson,
+    required Ticket ticket,
+  }) {
+    if (transactionJson != null) {
+      final hasOvernight = transactionJson.containsKey('is_overnight') ||
+          transactionJson.containsKey('isOvernight');
+      final hasLost = transactionJson.containsKey('ticket_lost') ||
+          transactionJson.containsKey('ticketLost');
+      return (
+        voidRequest: VoidRequestInfo.tryFromJson(transactionJson['void_request']),
+        isOvernight: hasOvernight
+            ? TransactionPaymentFields.isOvernightFrom(transactionJson)
+            : null,
+        isTicketLost: hasLost
+            ? TransactionPaymentFields.isTicketLostFrom(transactionJson)
+            : null,
+        appliedRate: CheckoutPreviewRates.fromJson(
+          transactionJson['applied_rate'],
+        ),
+      );
+    }
+
+    VoidRequestInfo? voidRequest;
+    final voidRaw = ticket.voidRequestJson?.trim();
+    if (voidRaw != null && voidRaw.isNotEmpty) {
+      try {
+        voidRequest = VoidRequestInfo.tryFromJson(
+          jsonDecode(voidRaw) as Map<String, dynamic>,
+        );
+      } catch (_) {}
+    }
+    if (voidRequest == null && ticket.pendingVoidRequest) {
+      voidRequest = VoidRequestInfo(
+        id: '',
+        status: 'pending',
+        reason: ticket.pendingVoidReason,
+      );
+    }
+
+    CheckoutPreviewRates? appliedRate;
+    final rateRaw = ticket.appliedRateJson?.trim();
+    if (rateRaw != null && rateRaw.isNotEmpty) {
+      try {
+        appliedRate = CheckoutPreviewRates.fromJson(
+          jsonDecode(rateRaw) as Map<String, dynamic>,
+        );
+      } catch (_) {}
+    }
+
+    return (
+      voidRequest: voidRequest,
+      isOvernight: ticket.isOvernight,
+      isTicketLost: ticket.ticketLost,
+      appliedRate: appliedRate,
+    );
+  }
+
+  static TicketsCompanion _serverMetadataCompanion(Map<String, dynamic> json) {
+    final vm = _vehicleMap(json);
+    final vr =
+        json['vr_no']?.toString().trim() ??
+        vm['vr_no']?.toString().trim() ??
+        vm['vrNo']?.toString().trim();
+    final voidReq = VoidRequestInfo.tryFromJson(json['void_request']);
+    final voidJson = voidReq != null ? jsonEncode(json['void_request']) : null;
+    final applied = json['applied_rate'];
+    final appliedJson = applied is Map && applied.isNotEmpty
+        ? jsonEncode(applied)
+        : null;
+    final isOvernight = json.containsKey('is_overnight') ||
+            json.containsKey('isOvernight')
+        ? TransactionPaymentFields.isOvernightFrom(json)
+        : null;
+    final ticketLost = json.containsKey('ticket_lost') ||
+            json.containsKey('ticketLost')
+        ? TransactionPaymentFields.isTicketLostFrom(json)
+        : null;
+
+    return TicketsCompanion(
+      vrNo: vr != null && vr.isNotEmpty ? Value(vr) : const Value.absent(),
+      voidRequestJson: voidJson != null
+          ? Value(voidJson)
+          : const Value.absent(),
+      appliedRateJson: appliedJson != null
+          ? Value(appliedJson)
+          : const Value.absent(),
+      isOvernight: isOvernight != null
+          ? Value(isOvernight)
+          : const Value.absent(),
+      ticketLost: ticketLost != null
+          ? Value(ticketLost)
+          : const Value.absent(),
+      pendingVoidRequest: voidReq?.isPending == true
+          ? const Value(true)
+          : const Value.absent(),
     );
   }
 
@@ -1314,6 +1577,7 @@ WHERE shift_id = ? AND status = 'completed'
     }
 
     final fields = _fieldsFromServerTransactionJson(json);
+    final meta = _serverMetadataCompanion(json);
     final paymentJson = paymentSummary != null
         ? jsonEncode(paymentSummary.toJson())
         : null;
@@ -1345,6 +1609,12 @@ WHERE shift_id = ? AND status = 'completed'
               ? Value(paymentJson)
               : const Value.absent(),
           syncStatus: const Value('synced'),
+          vrNo: meta.vrNo,
+          voidRequestJson: meta.voidRequestJson,
+          appliedRateJson: meta.appliedRateJson,
+          isOvernight: meta.isOvernight,
+          ticketLost: meta.ticketLost,
+          pendingVoidRequest: meta.pendingVoidRequest,
         ),
       );
       final out = await ticketById(existing.id);
@@ -1390,6 +1660,11 @@ WHERE shift_id = ? AND status = 'completed'
             paymentSummaryJson: paymentJson != null
                 ? Value(paymentJson)
                 : const Value.absent(),
+            vrNo: meta.vrNo,
+            voidRequestJson: meta.voidRequestJson,
+            appliedRateJson: meta.appliedRateJson,
+            isOvernight: meta.isOvernight,
+            ticketLost: meta.ticketLost,
           ),
         );
     final out = await ticketById(ticketNum);

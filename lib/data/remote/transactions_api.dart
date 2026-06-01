@@ -230,6 +230,7 @@ class TransactionsApi {
     double? cashTendered,
     String? driverOut,
     List<Map<String, dynamic>>? conditionCheckout,
+    Map<String, dynamic>? appliedRate,
   }) async {
     final id = ticketId.trim();
     if (id.isEmpty) {
@@ -259,6 +260,9 @@ class TransactionsApi {
     final driver = driverOut?.trim();
     if (driver != null && driver.isNotEmpty) {
       body['driver_out'] = driver;
+    }
+    if (appliedRate != null && appliedRate.isNotEmpty) {
+      body['applied_rate'] = appliedRate;
     }
     try {
       final res = await _dio.post<dynamic>(
@@ -290,6 +294,9 @@ class TransactionsApi {
     String? customerName,
     String? driverIn,
     String? notes,
+    String? vrNo,
+    bool voidRequested = false,
+    String? voidReason,
   }) async {
     if (AppConfig.useStubApi) {
       return CheckInResponse(
@@ -320,6 +327,17 @@ class TransactionsApi {
     final note = notes?.trim();
     if (note != null && note.isNotEmpty) {
       fields.add(MapEntry('notes', note));
+    }
+    final vr = vrNo?.trim();
+    if (vr != null && vr.isNotEmpty) {
+      fields.add(MapEntry('vr_no', vr));
+    }
+    if (voidRequested) {
+      fields.add(const MapEntry('void_requested', 'true'));
+      final reason = voidReason?.trim();
+      if (reason != null && reason.isNotEmpty) {
+        fields.add(MapEntry('void_reason', reason));
+      }
     }
 
     final form = FormData.fromMap({
@@ -400,6 +418,101 @@ class TransactionsApi {
       return _unwrapTransaction(Map<String, dynamic>.from(data));
     }
     throw CheckInApiException('Expected JSON object, got ${data.runtimeType}');
+  }
+
+  /// PATCH [AppConfig.transactionPatchUrl] — partial update; only sends `vehicle.plate_number`.
+  Future<void> patchVehiclePlate({
+    required String token,
+    required String ticketId,
+    required String plateNumber,
+  }) async {
+    final tid = ticketId.trim();
+    if (tid.isEmpty) throw TransactionsApiException('Ticket id is empty.');
+    if (AppConfig.useStubApi) return;
+    final body = <String, dynamic>{
+      'vehicle': <String, dynamic>{'plate_number': plateNumber.trim()},
+    };
+    try {
+      final res = await _dio.patch<dynamic>(
+        AppConfig.transactionPatchUrl(tid),
+        data: body,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (_) => true,
+        ),
+      );
+      _throwPlateUpdateIfBad(res, tid);
+    } on DioException catch (e) {
+      throw _fromDio(e, 'PATCH transaction $tid');
+    }
+  }
+
+  /// Specialised 400 handler for plate-update PATCH.
+  ///
+  /// The server may return a list of "property X should not exist" errors when
+  /// its validation runs against the merged stored transaction instead of just
+  /// the incoming patch body. Surface a single, readable message in that case.
+  static void _throwPlateUpdateIfBad(Response<dynamic> res, String tid) {
+    final code = res.statusCode ?? 0;
+    if (code >= 200 && code < 300) return;
+    if (code == 400) {
+      final raw = _messageFromBody(res.data);
+      // Detect the "server merges existing data before validation" pattern:
+      // the response lists known transaction fields as "should not exist".
+      final isMergeValidationBug =
+          raw != null && raw.contains('should not exist');
+      if (isMergeValidationBug) {
+        throw TransactionsApiException(
+          'Plate update is temporarily unavailable — the server rejected the '
+          'request (validation conflict). Please try again or contact support.',
+          statusCode: code,
+        );
+      }
+      throw TransactionsApiException(
+        raw ?? 'Invalid plate number.',
+        statusCode: code,
+      );
+    }
+    final msg = _messageFromBody(res.data) ?? res.statusMessage ?? 'HTTP $code';
+    throw TransactionsApiException(
+      'PATCH transaction $tid: $msg',
+      statusCode: code,
+    );
+  }
+
+  /// POST [AppConfig.ticketVoidUrl] — request ticket void (pending admin approval).
+  Future<void> requestVoid({
+    required String token,
+    required String ticketId,
+    String? reason,
+  }) async {
+    final tid = ticketId.trim();
+    if (tid.isEmpty) {
+      throw TransactionsApiException('Ticket id is empty.');
+    }
+    if (AppConfig.useStubApi) return;
+    final body = <String, dynamic>{};
+    final r = reason?.trim();
+    if (r != null && r.isNotEmpty) {
+      body['reason'] = r;
+    }
+    try {
+      final res = await _dio.post<dynamic>(
+        AppConfig.ticketVoidUrl(tid),
+        data: body,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (_) => true,
+        ),
+      );
+      final code = res.statusCode ?? 0;
+      if (code >= 200 && code < 300) return;
+      final msg =
+          _messageFromBody(res.data) ?? res.statusMessage ?? 'HTTP $code';
+      throw TransactionsApiException(msg, statusCode: code);
+    } on DioException catch (e) {
+      throw _fromDio(e, 'POST ticket void $tid');
+    }
   }
 
   /// POST [AppConfig.ticketLost] — mark ticket lost (live-only; no queue).
@@ -570,6 +683,10 @@ class TransactionsApi {
       case 404:
         throw TicketNotFoundException(msg);
       case 409:
+        final lower = msg.toLowerCase();
+        if (lower.contains('void') || lower.contains('pending')) {
+          throw TicketVoidPendingException(msg);
+        }
         throw TicketAlreadyCheckedOutException(msg);
       default:
         throw CheckoutApiException(msg, statusCode: code);
@@ -609,8 +726,7 @@ class TransactionsApi {
       ticket: CheckoutPreviewTicket(
         ticketNumber: ticketId,
         plate: 'ABC 1234',
-        vehicleMake: 'Toyota',
-        vehicleModel: 'Vios',
+        vehicleMake: 'Toyota Vios',
         vehicleColor: 'White',
         vehicleType: 'Sedan',
         timeIn: DateTime.now()

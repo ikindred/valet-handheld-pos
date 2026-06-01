@@ -56,7 +56,10 @@ class _ReviewTab extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: CheckOutUiTokens.tabLabel(selected: selected)),
+          Text(
+            label,
+            style: CheckOutUiTokens.tabLabelOf(context, selected: selected),
+          ),
           const SizedBox(height: 4),
           AnimatedContainer(
             duration: const Duration(milliseconds: 180),

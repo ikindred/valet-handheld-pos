@@ -151,6 +151,14 @@ class AppConfig {
     return '$baseUrl/api/v1/transactions/$enc';
   }
 
+  /// PATCH `/api/v1/transactions/{id}` — partial update (mobile fields).
+  static String transactionPatchUrl(String transactionId) {
+    final enc = Uri.encodeComponent(transactionId.trim());
+    final t = (_env('API_TRANSACTION_PATCH') ?? '').trim();
+    if (t.isNotEmpty) return baseUrl + t.replaceAll('{id}', enc);
+    return '$baseUrl/api/v1/transactions/$enc';
+  }
+
   /// GET `/api/v1/transactions/{id}/checkout-preview` (no body).
   static String checkoutPreviewUrl(String id) {
     final enc = Uri.encodeComponent(id.trim());
@@ -168,6 +176,7 @@ class AppConfig {
   }
 
   /// POST `/api/v1/transactions/{id}/pay`.
+  @Deprecated('Use checkoutPreviewUrl + checkOutUrl. /pay returns 410 Gone.')
   static String transactionPayUrl(String transactionId) {
     final enc = Uri.encodeComponent(transactionId.trim());
     final t = (_env('API_TRANSACTION_PAY') ?? '').trim();
@@ -198,9 +207,13 @@ class AppConfig {
       (_env('API_TICKET_GET')?.replaceAll('{ticket_number}', ticketNumber) ??
           '/api/v1/tickets/$ticketNumber');
 
-  // ── CONFIG ────────────────────────────────
-  static String get config =>
-      baseUrl + (_env('API_CONFIG') ?? '/api/v1/settings');
+  /// POST `/api/v1/tickets/{id}/void` — request ticket void (pending admin approval).
+  static String ticketVoidUrl(String ticketId) {
+    final enc = Uri.encodeComponent(ticketId.trim());
+    final t = (_env('API_TICKET_VOID') ?? '').trim();
+    if (t.isNotEmpty) return baseUrl + t.replaceAll('{id}', enc);
+    return '$baseUrl/api/v1/tickets/$enc/void';
+  }
 
   /// GET area detail (standard rates + `vehicleTypeRates`).
   static String branchAreaDetailUrl(String branchId, String areaId) {

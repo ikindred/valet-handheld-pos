@@ -1,4 +1,5 @@
 import '../../../core/api/transaction_payment_fields.dart';
+import '../../../core/api/void_request_info.dart';
 import '../../../core/time/philippine_time.dart';
 import 'reports_format.dart';
 import 'reports_models.dart';
@@ -62,6 +63,7 @@ abstract final class ReportsTicketRowMapper {
     final color = _str(json['color']);
     final vehicle = _vehicleLine(vehicleRaw, color);
     final timeInRaw = _str(json['time_in'] ?? json['timeIn']);
+    final timeOutRaw = _str(json['time_out'] ?? json['timeOut']);
     final durationDisplay =
         _str(json['duration_display'] ?? json['durationDisplay']);
     final durationMinutes =
@@ -70,6 +72,9 @@ abstract final class ReportsTicketRowMapper {
     final statusRaw = _str(json['status']).toLowerCase();
     final amount = _double(json['amount']);
     final cashTendered = TransactionPaymentFields.cashTenderedFrom(json);
+    final voidRequest = VoidRequestInfo.tryFromJson(
+      json['void_request'] ?? json['voidRequest'],
+    );
 
     return ReportsTicketRow(
       ticketId: ticketNumber.isEmpty ? '—' : ticketNumber,
@@ -78,12 +83,15 @@ abstract final class ReportsTicketRowMapper {
       vehicle: vehicle.isEmpty ? '—' : vehicle,
       timeIn: _timeInAsToday(timeInRaw),
       timeInDisplay: timeInRaw.isEmpty ? null : timeInRaw,
+      timeOut: timeOutRaw.isEmpty ? null : _timeInAsToday(timeOutRaw),
       duration: Duration(minutes: durationMinutes.clamp(0, 1 << 20)),
       durationDisplay: durationDisplay.isEmpty ? null : durationDisplay,
       slot: slot.isEmpty ? '—' : slot,
       status: _statusFromApi(statusRaw),
       fee: amount,
       cashTendered: cashTendered,
+      hasPendingVoid: voidRequest?.isPending == true,
+      isVoided: voidRequest?.isApproved == true || statusRaw == 'voided',
     );
   }
 
@@ -114,6 +122,7 @@ abstract final class ReportsTicketRowMapper {
       'completed' || 'complete' || 'checked_out' =>
         ReportsTicketRowStatus.checkedOut,
       'lost' => ReportsTicketRowStatus.checkedOut,
+      'voided' => ReportsTicketRowStatus.checkedOut,
       'parked' => ReportsTicketRowStatus.parked,
       'active' => ReportsTicketRowStatus.parked,
       _ => ReportsTicketRowStatus.parked,

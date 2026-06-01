@@ -7,7 +7,6 @@ class OpenTransaction {
     required this.ticketNumber,
     required this.plateNumber,
     required this.vehicleBrand,
-    required this.vehicleModel,
     required this.vehicleColor,
     required this.timeIn,
   });
@@ -16,7 +15,6 @@ class OpenTransaction {
   final String ticketNumber;
   final String plateNumber;
   final String? vehicleBrand;
-  final String? vehicleModel;
   final String? vehicleColor;
   final DateTime timeIn;
 
@@ -27,21 +25,14 @@ class OpenTransaction {
       ticketNumber: t.id,
       plateNumber: t.plateNumber,
       vehicleBrand: t.vehicleBrand,
-      vehicleModel: null,
       vehicleColor: t.vehicleColor,
       timeIn: parsed ?? DateTime.fromMillisecondsSinceEpoch(0),
     );
   }
 
   String get vehicleLabel {
-    final parts = [
-      if (vehicleBrand != null && vehicleBrand!.trim().isNotEmpty)
-        vehicleBrand!.trim(),
-      if (vehicleModel != null && vehicleModel!.trim().isNotEmpty)
-        vehicleModel!.trim(),
-    ];
-    if (parts.isEmpty) return '—';
-    return parts.join(' ');
+    final b = vehicleBrand?.trim() ?? '';
+    return b.isEmpty ? '—' : b;
   }
 
   static String formatDurationSince(DateTime timeIn, DateTime now) {

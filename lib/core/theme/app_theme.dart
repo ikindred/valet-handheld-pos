@@ -37,6 +37,11 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     required this.textSubtitleMuted,
     required this.divider,
     required this.inputFill,
+    required this.hintFill,
+    required this.checkboxFill,
+    required this.chipBg,
+    required this.plateBadgeBg,
+    required this.accentSurface,
   });
 
   final Color scaffoldBg;
@@ -49,6 +54,16 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
   final Color textSubtitleMuted;
   final Color divider;
   final Color inputFill;
+  /// Subtle fill for keypad rows, rate breakdown hints, checkbox rows.
+  final Color hintFill;
+  /// Selected checkbox / toggle row background.
+  final Color checkboxFill;
+  /// Status pills, outlined chips on dark surfaces.
+  final Color chipBg;
+  /// Plate number badge background.
+  final Color plateBadgeBg;
+  /// Ticket / warm accent surfaces (e.g. ticket id pill).
+  final Color accentSurface;
 
   static const light = AppThemeColors(
     scaffoldBg: Color(0xFFF4F5F7),
@@ -61,19 +76,29 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     textSubtitleMuted: Color(0x990A1B39),
     divider: Color(0xFFE2DEDE),
     inputFill: Color(0xFFFFFFFF),
+    hintFill: Color(0xFFF8F9FB),
+    checkboxFill: Color(0xFFF8F9FB),
+    chipBg: Color(0xFFFFFFFF),
+    plateBadgeBg: Color(0xFFECF3FF),
+    accentSurface: Color(0xFFFFF4E5),
   );
 
   static const dark = AppThemeColors(
-    scaffoldBg: Color(0xFF0F172A),
-    cardBg: Color(0xFF1E293B),
-    cardBorder: Color(0x33FFFFFF),
-    railBg: Color(0xFF1A2338),
-    railBorder: Color(0x22FFFFFF),
-    textPrimary: Color(0xFFF1F5F9),
-    textSecondary: Color(0xFF94A3B8),
-    textSubtitleMuted: Color(0x99F1F5F9),
-    divider: Color(0x33FFFFFF),
-    inputFill: Color(0xFF243044),
+    scaffoldBg: Color(0xFF0B1120),
+    cardBg: Color(0xFF1A2332),
+    cardBorder: Color(0xFF334155),
+    railBg: Color(0xFF0F1629),
+    railBorder: Color(0xFF1E293B),
+    textPrimary: Color(0xFFF8FAFC),
+    textSecondary: Color(0xFFCBD5E1),
+    textSubtitleMuted: Color(0xFF94A3B8),
+    divider: Color(0xFF334155),
+    inputFill: Color(0xFF1E293B),
+    hintFill: Color(0xFF152238),
+    checkboxFill: Color(0xFF243044),
+    chipBg: Color(0xFF1E293B),
+    plateBadgeBg: Color(0xFF1E3A5F),
+    accentSurface: Color(0xFF2D2418),
   );
 
   /// Returns the extension from the current theme, falling back to [light].
@@ -92,6 +117,11 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     Color? textSubtitleMuted,
     Color? divider,
     Color? inputFill,
+    Color? hintFill,
+    Color? checkboxFill,
+    Color? chipBg,
+    Color? plateBadgeBg,
+    Color? accentSurface,
   }) {
     return AppThemeColors(
       scaffoldBg: scaffoldBg ?? this.scaffoldBg,
@@ -104,6 +134,11 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
       textSubtitleMuted: textSubtitleMuted ?? this.textSubtitleMuted,
       divider: divider ?? this.divider,
       inputFill: inputFill ?? this.inputFill,
+      hintFill: hintFill ?? this.hintFill,
+      checkboxFill: checkboxFill ?? this.checkboxFill,
+      chipBg: chipBg ?? this.chipBg,
+      plateBadgeBg: plateBadgeBg ?? this.plateBadgeBg,
+      accentSurface: accentSurface ?? this.accentSurface,
     );
   }
 
@@ -122,8 +157,16 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
           Color.lerp(textSubtitleMuted, other.textSubtitleMuted, t)!,
       divider: Color.lerp(divider, other.divider, t)!,
       inputFill: Color.lerp(inputFill, other.inputFill, t)!,
+      hintFill: Color.lerp(hintFill, other.hintFill, t)!,
+      checkboxFill: Color.lerp(checkboxFill, other.checkboxFill, t)!,
+      chipBg: Color.lerp(chipBg, other.chipBg, t)!,
+      plateBadgeBg: Color.lerp(plateBadgeBg, other.plateBadgeBg, t)!,
+      accentSurface: Color.lerp(accentSurface, other.accentSurface, t)!,
     );
   }
+
+  static bool isDark(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
 }
 
 // ── Light theme ──────────────────────────────────────────────────────────────
@@ -233,6 +276,30 @@ ThemeData _buildTheme(Brightness brightness) {
         height: 1.45,
         color: adaptive.textSecondary,
       ),
+    ),
+    dropdownMenuTheme: DropdownMenuThemeData(
+      menuStyle: MenuStyle(
+        backgroundColor: WidgetStatePropertyAll(adaptive.cardBg),
+        surfaceTintColor: WidgetStatePropertyAll(Colors.transparent),
+      ),
+      textStyle: textTheme.bodyMedium?.copyWith(color: adaptive.textPrimary),
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: adaptive.cardBg,
+      surfaceTintColor: Colors.transparent,
+      textStyle: textTheme.bodyMedium?.copyWith(color: adaptive.textPrimary),
+    ),
+    listTileTheme: ListTileThemeData(
+      textColor: adaptive.textPrimary,
+      iconColor: adaptive.textSecondary,
+    ),
+    checkboxTheme: CheckboxThemeData(
+      fillColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return AppColors.accent;
+        }
+        return adaptive.cardBorder;
+      }),
     ),
   );
 }

@@ -6,14 +6,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:signature/signature.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../../state/check_in_cubit.dart';
 
-const _kTitleColor = Color(0xFF0A1B39);
-const _kGrey500 = Color(0xFF6C7688);
-const _kPadBg = Color(0xFFF2F2F2);
-const _kPadBorder = Color(0xFFB8B8B8);
 const _kOrange = Color(0xFFF68D00);
-const _kCancelBorder = Color(0xFFC0C0BF);
 
 /// Figma: [Customer signature modal](https://www.figma.com/design/70RU38Zhijrag1kwt33uMp/Valet-Parking?node-id=32-690&m=dev).
 ///
@@ -40,34 +36,45 @@ class _CustomerSignatureDialog extends StatefulWidget {
 }
 
 class _CustomerSignatureDialogState extends State<_CustomerSignatureDialog> {
-  late final SignatureController _controller;
+  SignatureController? _controller;
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = SignatureController(
+  SignatureController _ensureController(BuildContext context) {
+    if (_controller != null) return _controller!;
+    final created = _newController(context);
+    _controller = created;
+    return created;
+  }
+
+  SignatureController _newController(BuildContext context) {
+    final isDark = AppThemeColors.isDark(context);
+    return SignatureController(
       penStrokeWidth: 2.5,
-      penColor: _kTitleColor,
-      exportBackgroundColor: Colors.white,
+      penColor: isDark ? Colors.white : const Color(0xFF0A1B39),
+      exportBackgroundColor: isDark
+          ? const Color(0xFF1E293B)
+          : Colors.white,
     );
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
   Future<void> _onConfirm(BuildContext context) async {
-    if (_controller.isEmpty) {
+    final controller = _ensureController(context);
+    if (controller.isEmpty) {
       final messenger = ScaffoldMessenger.maybeOf(context);
       messenger?.showSnackBar(
-        const SnackBar(content: Text('Please sign in the box before confirming.')),
+        const SnackBar(
+          content: Text('Please sign in the box before confirming.'),
+        ),
       );
       return;
     }
 
-    final bytes = await _controller.toPngBytes();
+    final bytes = await controller.toPngBytes();
     if (!context.mounted) return;
     if (bytes == null || bytes.isEmpty) {
       final messenger = ScaffoldMessenger.maybeOf(context);
@@ -85,6 +92,8 @@ class _CustomerSignatureDialogState extends State<_CustomerSignatureDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final controller = _ensureController(context);
+    final tc = AppThemeColors.of(context);
     final maxW = math.min(
       455.0,
       MediaQuery.sizeOf(context).width - 48,
@@ -94,9 +103,11 @@ class _CustomerSignatureDialogState extends State<_CustomerSignatureDialog> {
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: Material(
-        color: Colors.white,
+        color: tc.cardBg,
         clipBehavior: Clip.antiAlias,
-        borderRadius: BorderRadius.circular(20),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxW),
           child: Padding(
@@ -108,7 +119,7 @@ class _CustomerSignatureDialogState extends State<_CustomerSignatureDialog> {
                 Text(
                   'CUSTOMER SIGNATURE',
                   style: GoogleFonts.poppins(
-                    color: _kTitleColor,
+                    color: tc.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                   ),
@@ -117,7 +128,7 @@ class _CustomerSignatureDialogState extends State<_CustomerSignatureDialog> {
                 Text(
                   'I acknowledge the above vehicle condition report',
                   style: GoogleFonts.poppins(
-                    color: _kGrey500,
+                    color: tc.textSecondary,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                   ),
@@ -130,14 +141,18 @@ class _CustomerSignatureDialogState extends State<_CustomerSignatureDialog> {
                     return Container(
                       height: h,
                       decoration: BoxDecoration(
-                        color: _kPadBg,
-                        border: Border.all(color: _kPadBorder),
+                        color: tc.inputFill,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: tc.cardBorder),
                       ),
-                      child: Signature(
-                        controller: _controller,
-                        width: w,
-                        height: h,
-                        backgroundColor: _kPadBg,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Signature(
+                          controller: controller,
+                          width: w,
+                          height: h,
+                          backgroundColor: tc.inputFill,
+                        ),
                       ),
                     );
                   },
@@ -147,11 +162,14 @@ class _CustomerSignatureDialogState extends State<_CustomerSignatureDialog> {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () {
-                      setState(() => _controller.clear());
+                      setState(() => controller.clear());
                     },
                     style: TextButton.styleFrom(
-                      foregroundColor: _kGrey500,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      foregroundColor: tc.textSecondary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
@@ -160,7 +178,7 @@ class _CustomerSignatureDialogState extends State<_CustomerSignatureDialog> {
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
-                        color: _kGrey500,
+                        color: tc.textSecondary,
                       ),
                     ),
                   ),
@@ -174,9 +192,9 @@ class _CustomerSignatureDialogState extends State<_CustomerSignatureDialog> {
                         child: OutlinedButton(
                           onPressed: () => Navigator.of(context).pop(),
                           style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: _kTitleColor,
-                            side: const BorderSide(color: _kCancelBorder),
+                            backgroundColor: tc.cardBg,
+                            foregroundColor: tc.textPrimary,
+                            side: BorderSide(color: tc.cardBorder),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -184,7 +202,7 @@ class _CustomerSignatureDialogState extends State<_CustomerSignatureDialog> {
                           child: Text(
                             'Cancel',
                             style: GoogleFonts.poppins(
-                              color: _kTitleColor,
+                              color: tc.textPrimary,
                               fontSize: 15,
                               fontWeight: FontWeight.w500,
                             ),

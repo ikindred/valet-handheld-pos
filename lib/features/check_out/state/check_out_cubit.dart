@@ -62,6 +62,7 @@ class CheckOutState extends Equatable {
     this.receiptSnapshot,
     this.branchName,
     this.mallHours = 'MONDAY – SUNDAY · 10:00AM – 9:00PM',
+    this.checkoutBlockMessage,
   });
 
   final Ticket? ticket;
@@ -93,6 +94,9 @@ class CheckOutState extends Equatable {
   final CheckoutReceiptSnapshot? receiptSnapshot;
   final String? branchName;
   final String mallHours;
+
+  /// Non-dismissable checkout block (e.g. pending void request).
+  final String? checkoutBlockMessage;
 
   List<VehicleDamageEntry> get diagramEntries => [
     ...checkInDamage,
@@ -153,6 +157,8 @@ class CheckOutState extends Equatable {
     bool clearReceipt = false,
     String? branchName,
     String? mallHours,
+    String? checkoutBlockMessage,
+    bool clearCheckoutBlockMessage = false,
   }) {
     return CheckOutState(
       ticket: ticket ?? this.ticket,
@@ -196,6 +202,9 @@ class CheckOutState extends Equatable {
           : (receiptSnapshot ?? this.receiptSnapshot),
       branchName: branchName ?? this.branchName,
       mallHours: mallHours ?? this.mallHours,
+      checkoutBlockMessage: clearCheckoutBlockMessage
+          ? null
+          : (checkoutBlockMessage ?? this.checkoutBlockMessage),
     );
   }
 
@@ -230,6 +239,7 @@ class CheckOutState extends Equatable {
     receiptSnapshot,
     branchName,
     mallHours,
+    checkoutBlockMessage,
   ];
 }
 
@@ -468,6 +478,16 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       serverTicketId: preview.transactionId,
       driverIn: pt.valetIn ?? base.driverIn,
       driverOut: base.driverOut,
+      parkingInfo: base.parkingInfo,
+      paymentSummaryJson: base.paymentSummaryJson,
+      slotId: base.slotId,
+      vrNo: base.vrNo,
+      isOvernight: base.isOvernight,
+      ticketLost: base.ticketLost,
+      appliedRateJson: base.appliedRateJson,
+      voidRequestJson: base.voidRequestJson,
+      pendingVoidRequest: base.pendingVoidRequest,
+      pendingVoidReason: base.pendingVoidReason,
     );
   }
 
@@ -502,6 +522,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       createdAt: DateTime.now().toIso8601String(),
       serverTicketId: preview.transactionId,
       driverIn: pt.valetIn,
+      pendingVoidRequest: false,
     );
   }
 
@@ -517,6 +538,57 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       token: token,
       ticketId: lookupKey,
     );
+  }
+
+  /// Server UUID when synced; otherwise local ticket id (e.g. `TKT-…`).
+  String _previewLookupKeyForTicket(Ticket ticket) {
+    final sid = ticket.serverTicketId?.trim() ?? '';
+    if (sid.isNotEmpty) return sid;
+    return ticket.id;
+  }
+
+  Future<CheckoutPreviewResponse?> _tryCheckoutPreviewLookup(
+    String lookupKey,
+  ) async {
+    try {
+      return await _fetchCheckoutPreview(lookupKey);
+    } on TicketNotFoundException {
+      return null;
+    }
+  }
+
+  /// Resolves an active transaction UUID via reports search when not on Drift.
+  Future<String?> _resolveServerTransactionIdByPlate(String plate) async {
+    final session = await _auth.getActiveSession();
+    final token = session?.authToken;
+    if (token == null || token.isEmpty) return null;
+    final normalized = normalizePlateNumber(plate).toUpperCase();
+    if (normalized.isEmpty) return null;
+    try {
+      final page = await _transactionsApi.fetchReportsTransactions(
+        token: token,
+        search: normalized,
+        status: 'active',
+        limit: 20,
+        page: 1,
+      );
+      for (final row in page.rows) {
+        final rowPlate = normalizePlateNumber(
+          row.plate == '—' ? '' : row.plate,
+        ).toUpperCase();
+        if (rowPlate != normalized) continue;
+        final sid = row.serverTransactionId?.trim() ?? '';
+        if (sid.isNotEmpty) return sid;
+      }
+    } catch (e, st) {
+      ValetLog.error(
+        'CheckOutCubit._resolveServerTransactionIdByPlate',
+        'reports search failed',
+        e,
+        st,
+      );
+    }
+    return null;
   }
 
   void setSelectedDamage(DamageType t) =>
@@ -720,86 +792,132 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       ),
     );
     try {
-      final vt = await _tickets.activeTicketByPlate(plate);
-      if (vt == null) {
-        emit(
-          state.copyWith(
-            scanError:
-                'Ticket not found. Try scanning the QR code or entering the ticket number instead.',
-            isLookupBusy: false,
-            isLoadingPreview: false,
-          ),
-        );
+      final local = await _tickets.activeTicketByPlate(plate);
+
+      if (await InternetReachability.hasInternet()) {
+        try {
+          final lookupKeys = <String>{
+            if (local != null) _previewLookupKeyForTicket(local),
+            plate,
+          };
+          final serverId = await _resolveServerTransactionIdByPlate(plate);
+          if (serverId != null && serverId.isNotEmpty) {
+            lookupKeys.add(serverId);
+          }
+
+          CheckoutPreviewResponse? preview;
+          for (final key in lookupKeys) {
+            ValetLog.info(
+              'CheckOutCubit.lookupByPlate',
+              'GET checkout-preview/$key',
+            );
+            preview = await _tryCheckoutPreviewLookup(key);
+            if (preview != null) break;
+          }
+
+          if (preview != null) {
+            if (isClosed) return;
+            final tn = preview.ticket.ticketNumber;
+            final byTicket = tn.isNotEmpty
+                ? await _tickets.activeTicketByTicketNumber(tn)
+                : null;
+            final base = local ?? byTicket;
+            final ticket = base != null
+                ? _mergeTicketWithPreview(base, preview)
+                : await _minimalTicketFromPreview(preview);
+            if (ticket == null) {
+              emit(
+                state.copyWith(
+                  scanError: 'Sign in and open a shift to check out.',
+                  isLookupBusy: false,
+                  isLoadingPreview: false,
+                ),
+              );
+              return;
+            }
+            _emitPreviewLoaded(preview: preview, ticket: ticket);
+            return;
+          }
+
+          if (local != null &&
+              await _tryDriftCheckoutFallback(
+                ticket: local,
+                previewError: _previewApiFallbackMessage,
+              )) {
+            return;
+          }
+
+          emit(
+            state.copyWith(
+              scanError:
+                  'Ticket not found. Try scanning the QR code or entering the ticket number instead.',
+              isLookupBusy: false,
+              isLoadingPreview: false,
+            ),
+          );
+          return;
+        } on CheckoutAuthException catch (e) {
+          emit(
+            state.copyWith(
+              scanError: e.message,
+              isLookupBusy: false,
+              isLoadingPreview: false,
+            ),
+          );
+          return;
+        } on CheckoutApiException catch (e) {
+          if (local != null &&
+              await _tryDriftCheckoutFallback(
+                ticket: local,
+                previewError: _previewApiFallbackMessage,
+              )) {
+            return;
+          }
+          emit(
+            state.copyWith(
+              scanError: e.message,
+              isLookupBusy: false,
+              isLoadingPreview: false,
+            ),
+          );
+          return;
+        } catch (e, st) {
+          ValetLog.error(
+            'CheckOutCubit.lookupByPlate',
+            'checkout-preview failed',
+            e,
+            st,
+          );
+          if (local != null &&
+              await _tryDriftCheckoutFallback(
+                ticket: local,
+                previewError: _previewApiFallbackMessage,
+              )) {
+            return;
+          }
+          emit(
+            state.copyWith(
+              scanError: 'Could not load preview. Try again.',
+              isLookupBusy: false,
+              isLoadingPreview: false,
+            ),
+          );
+          return;
+        }
+      }
+
+      if (local != null) {
+        _beginDriftCheckout(local, previewError: _offlinePreviewMessage);
         return;
       }
 
-      if (!await InternetReachability.hasInternet()) {
-        _beginDriftCheckout(vt, previewError: _offlinePreviewMessage);
-        return;
-      }
-
-      try {
-        ValetLog.info(
-          'CheckOutCubit.lookupByPlate',
-          'GET checkout-preview/$plate',
-        );
-        final preview = await _fetchCheckoutPreview(plate);
-        if (isClosed) return;
-        _emitPreviewLoaded(
-          preview: preview,
-          ticket: _mergeTicketWithPreview(vt, preview),
-        );
-      } on TicketNotFoundException {
-        emit(
-          state.copyWith(
-            scanError: 'Ticket not found.',
-            isLookupBusy: false,
-            isLoadingPreview: false,
-          ),
-        );
-      } on CheckoutAuthException catch (e) {
-        emit(
-          state.copyWith(
-            scanError: e.message,
-            isLookupBusy: false,
-            isLoadingPreview: false,
-          ),
-        );
-      } on CheckoutApiException catch (e) {
-        if (await _tryDriftCheckoutFallback(
-          ticket: vt,
-          previewError: _previewApiFallbackMessage,
-        )) {
-          return;
-        }
-        emit(
-          state.copyWith(
-            scanError: e.message,
-            isLookupBusy: false,
-            isLoadingPreview: false,
-          ),
-        );
-      } catch (e, st) {
-        ValetLog.error(
-          'CheckOutCubit.lookupByPlate',
-          'checkout-preview failed',
-          e,
-          st,
-        );
-        if (await _tryDriftCheckoutFallback(
-          ticket: vt,
-          previewError: _previewApiFallbackMessage,
-        )) {
-          return;
-        }
-        emit(
-          state.copyWith(
-            scanError: 'Could not load preview. Try again.',
-            isLookupBusy: false,
-            isLoadingPreview: false,
-          ),
-        );
-      }
+      emit(
+        state.copyWith(
+          scanError: 'Ticket not found on this device.',
+          isLookupBusy: false,
+          isLoadingPreview: false,
+        ),
+      );
     } catch (e, st) {
       ValetLog.error('CheckOutCubit.lookupByPlate', 'unexpected', e, st);
       emit(
@@ -983,6 +1101,33 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     return conditionCheckoutPayload(merged);
   }
 
+  Map<String, dynamic> _buildAppliedRate() {
+    final pr = state.preview?.rates;
+    if (pr != null) {
+      return {
+        'flat_rate': pr.flatRate,
+        'flat_rate_hours': pr.flatRateHours > 0
+            ? pr.flatRateHours
+            : state.flatBlockHours,
+        'succeeding_rate': pr.succeedingRate,
+        'overnight_fee': pr.overnightFee,
+        'lost_ticket_fee': pr.lostTicketFee,
+        'overnight_start_time': pr.overnightStart,
+        'overnight_end_time': pr.overnightEnd,
+      };
+    }
+    final r = state.rates;
+    return {
+      'flat_rate': r?.flatRatePesos ?? 0,
+      'flat_rate_hours': state.flatBlockHours,
+      'succeeding_rate': r?.succeedingHourPesos ?? 0,
+      'overnight_fee': r?.overnightFeePesos ?? 0,
+      'lost_ticket_fee': r?.lostTicketFeePesos ?? 0,
+      'overnight_start_time': state.overnightStart,
+      'overnight_end_time': state.overnightEnd,
+    };
+  }
+
   Future<void> _enqueueOfflineCheckoutFinalize({
     required String ticketId,
     required String? serverTicketId,
@@ -993,6 +1138,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     required bool ticketLost,
     required double cashTendered,
   }) async {
+    final appliedRate = _buildAppliedRate();
     await _tickets.enqueueCheckoutFinalize(
       ticketId: ticketId,
       serverTicketId: serverTicketId,
@@ -1003,6 +1149,13 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       driverOut: state.driverOut,
       conditionCheckout: conditionBody,
       cashTendered: cashTendered,
+      appliedRate: appliedRate,
+    );
+    await _tickets.persistCheckoutMetadata(
+      ticketId: ticketId,
+      isOvernight: isOvernight,
+      ticketLost: ticketLost,
+      appliedRate: appliedRate,
     );
   }
 
@@ -1073,6 +1226,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
               emit(state.copyWith(isSubmitting: false));
               return 'Checkout preview is not loaded.';
             }
+            final appliedRate = _buildAppliedRate();
             response = await _transactionsApi.submitCheckOut(
               token: token,
               ticketId: pathId,
@@ -1083,6 +1237,13 @@ class CheckOutCubit extends Cubit<CheckOutState> {
               cashTendered: tendered,
               driverOut: state.driverOut,
               conditionCheckout: conditionBody,
+              appliedRate: appliedRate,
+            );
+            await _tickets.persistCheckoutMetadata(
+              ticketId: t.id,
+              isOvernight: isOvernight,
+              ticketLost: ticketLost,
+              appliedRate: appliedRate,
             );
             invoice = response.invoiceNumber;
             // Amount collected stays what the POS computed and tendered against.
@@ -1242,6 +1403,14 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       return null;
     } on CheckOutValidationException catch (e) {
       emit(state.copyWith(isSubmitting: false));
+      return e.message;
+    } on TicketVoidPendingException catch (e) {
+      emit(
+        state.copyWith(
+          isSubmitting: false,
+          checkoutBlockMessage: e.message,
+        ),
+      );
       return e.message;
     } on TicketAlreadyCheckedOutException catch (e) {
       emit(state.copyWith(isSubmitting: false));

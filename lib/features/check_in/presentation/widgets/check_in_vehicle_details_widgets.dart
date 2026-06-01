@@ -29,6 +29,10 @@ class CheckInPlateNumberField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hintStyle = CheckInCompactTokens.plateHint();
+    final isDark = AppThemeColors.isDark(context);
+    final fill = isDark
+        ? AppThemeColors.of(context).inputFill
+        : _lightOrange;
 
     return Material(
       color: Colors.transparent,
@@ -38,7 +42,7 @@ class CheckInPlateNumberField extends StatelessWidget {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: _lightOrange,
+          color: fill,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: _orange, width: 2),
         ),
@@ -155,13 +159,16 @@ class _VehicleTypeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const orange = Color(0xFFF68D00);
-    const grey = Color(0xFFC0C0BF);
     const creamSelected = Color(0xFFFFEED7);
+    final tc = AppThemeColors.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final bg = selected ? creamSelected : Colors.white;
-    final borderColor = selected ? orange : grey;
+    final bg = selected
+        ? (isDark ? tc.inputFill : creamSelected)
+        : tc.cardBg;
+    final borderColor = selected ? orange : tc.cardBorder;
     final borderWidth = selected ? 2.0 : 1.0;
-    final labelColor = selected ? orange : AppColors.textPrimary;
+    final labelColor = selected ? orange : tc.textPrimary;
 
     return Material(
       color: Colors.transparent,
@@ -184,7 +191,7 @@ class _VehicleTypeCard extends StatelessWidget {
                 style: GoogleFonts.poppins(
                   fontSize: 22,
                   fontWeight: FontWeight.w500,
-                  color: Colors.black,
+                  color: tc.textPrimary,
                 ),
               ),
               const SizedBox(height: 2),
@@ -292,13 +299,16 @@ class _BelongingTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const orange = Color(0xFFF68D00);
-    const grey = Color(0xFFC0C0BF);
     const creamSelected = Color(0xFFFFEED7);
+    final tc = AppThemeColors.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final bg = selected ? creamSelected : Colors.white;
-    final borderColor = selected ? orange : grey;
+    final bg = selected
+        ? (isDark ? tc.inputFill : creamSelected)
+        : tc.cardBg;
+    final borderColor = selected ? orange : tc.cardBorder;
     final borderWidth = selected ? 2.0 : 1.0;
-    final textColor = selected ? orange : AppColors.textPrimary;
+    final textColor = selected ? orange : tc.textPrimary;
 
     return Material(
       color: Colors.transparent,
@@ -348,6 +358,7 @@ class CheckInDropdownField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return CheckInFormField(
       label: label,
       child: AppTextFieldShadow(
@@ -357,9 +368,9 @@ class CheckInDropdownField extends StatelessWidget {
           ),
           padding: CheckInCompactTokens.inputPadding,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: tc.inputFill,
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: AppTextFieldTokens.borderGrey, width: 1),
+            border: Border.all(color: tc.cardBorder, width: 1),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
@@ -367,17 +378,17 @@ class CheckInDropdownField extends StatelessWidget {
               value: value.isEmpty ? null : value,
               hint: Text(
                 'Select',
-                style: CheckInCompactTokens.fieldValue().copyWith(
+                style: CheckInCompactTokens.fieldValueOf(context).copyWith(
                   fontWeight: FontWeight.w500,
-                  color: AppTextFieldTokens.hintGrey,
+                  color: tc.textSubtitleMuted,
                 ),
               ),
-              icon: const Icon(
+              icon: Icon(
                 Icons.keyboard_arrow_down_rounded,
-                color: Color(0xFF0A1B39),
+                color: tc.textSecondary,
                 size: 20,
               ),
-              style: CheckInCompactTokens.fieldValue(),
+              style: CheckInCompactTokens.fieldValueOf(context),
               items: items
                   .map(
                     (s) => DropdownMenuItem<String>(value: s, child: Text(s)),

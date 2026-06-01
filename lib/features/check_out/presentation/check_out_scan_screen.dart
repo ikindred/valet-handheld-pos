@@ -34,6 +34,7 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen>
   var _scannerReady = false;
   var _scanBusy = false;
   var _lastPreviewTurns = -1;
+  Timer? _scanCooldown;
 
   static const _twoColumnMinWidth = 560.0;
   static const _viewportSize = 240.0;
@@ -57,8 +58,9 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen>
 
     final controller = MobileScannerController(
       autoStart: false,
-      detectionSpeed: DetectionSpeed.normal,
+      detectionSpeed: DetectionSpeed.noDuplicates,
       facing: CameraFacing.back,
+      formats: const [BarcodeFormat.qrCode],
     );
     setState(() {
       _scanner = controller;
@@ -105,6 +107,7 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen>
 
   @override
   void dispose() {
+    _scanCooldown?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _ticketCtrl.dispose();
     _plateCtrl.dispose();
@@ -142,7 +145,7 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen>
   }
 
   void _onDetect(BarcodeCapture capture) {
-    if (_scanBusy || _scanner == null) return;
+    if (_scanBusy || _scanCooldown != null || _scanner == null) return;
     final codes = capture.barcodes;
     if (codes.isEmpty) return;
     final raw = codes.first.rawValue;
@@ -157,6 +160,13 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen>
       setState(() {});
       await _afterLookup(cubit.lookupByTicketCode(raw));
       _scanBusy = false;
+      // If lookup failed (still on this screen), apply a 2-second cooldown
+      // before accepting another scan to prevent rapid-fire API calls.
+      if (mounted && context.read<CheckOutCubit>().state.ticket == null) {
+        _scanCooldown = Timer(const Duration(seconds: 2), () {
+          _scanCooldown = null;
+        });
+      }
       if (mounted) setState(() {});
     });
   }
@@ -261,16 +271,15 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen>
         children: [
           Text(
             'ENTER TICKET / PLATE MANUALLY',
-            style: CheckOutUiTokens.sectionTitle().copyWith(
+            style: CheckOutUiTokens.sectionTitleOf(context).copyWith(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             'Use if QR is unavailable or damaged',
-            style: CheckOutUiTokens.hint(),
+            style: CheckOutUiTokens.hintOf(context),
           ),
           const SizedBox(height: CheckInCompactTokens.blockGap),
           CheckInFormField(
@@ -300,18 +309,11 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen>
             height: CheckInCompactTokens.footerButtonHeight,
             child: OutlinedButton(
               onPressed: busy ? null : _onCombinedSearch,
-              style: OutlinedButton.styleFrom(
-                backgroundColor: CheckOutUiTokens.hintFill,
-                foregroundColor: AppColors.textPrimary,
-                side: const BorderSide(color: CheckOutUiTokens.cardBorder),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
+              style: CheckOutUiTokens.searchOutlinedButton(context),
               child: Text(
                 'Search',
                 style: CheckInCompactTokens.footerLabel().copyWith(
-                  color: AppColors.textPrimary,
+                  color: AppThemeColors.of(context).textPrimary,
                 ),
               ),
             ),
@@ -326,6 +328,7 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen>
   }
 
   Widget _cancelOnlyFooter(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return Row(
       children: [
         const Spacer(),
@@ -337,18 +340,11 @@ class _CheckOutScanScreenState extends State<CheckOutScanScreen>
               context.read<CheckOutCubit>().reset();
               context.go('/dashboard');
             },
-            style: OutlinedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: AppColors.textPrimary,
-              side: const BorderSide(color: CheckOutUiTokens.cardBorder),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
+            style: CheckOutUiTokens.footerOutlinedButton(context),
             child: Text(
               'Cancel',
               style: CheckInCompactTokens.footerLabel().copyWith(
-                color: AppColors.textPrimary,
+                color: tc.textPrimary,
               ),
             ),
           ),

@@ -1,4 +1,5 @@
 import '../../core/api/transaction_payment_fields.dart';
+import '../../core/api/void_request_info.dart';
 import '../../features/dashboard/domain/dashboard_recent_format.dart';
 
 /// Default area capacity when API omits `total_slots`.
@@ -9,13 +10,20 @@ class DashboardRecentRow {
   const DashboardRecentRow({
     required this.ticketId,
     required this.plate,
+    required this.plateNumber,
+    required this.ticketNumber,
     required this.line1,
     required this.line2,
     required this.isCheckedOut,
   });
 
   final String ticketId;
+  /// Badge label — plate number if available, else ticket number.
   final String plate;
+  /// Actual plate number (empty string if unknown); shown in blue badge.
+  final String plateNumber;
+  /// Formatted ticket number (e.g. TKT-0123); shown in orange badge.
+  final String ticketNumber;
   final String line1;
   final String line2;
   final bool isCheckedOut;
@@ -148,9 +156,9 @@ class DashboardSummaryRecent {
     this.timeIn,
     this.timeOut,
     this.vehicleBrand,
-    this.vehicleModel,
     this.vehicleColor,
     this.parkingSlot,
+    this.voidRequest,
     this.rawJson,
   });
 
@@ -163,9 +171,15 @@ class DashboardSummaryRecent {
   final String? timeIn;
   final String? timeOut;
   final String? vehicleBrand;
-  final String? vehicleModel;
   final String? vehicleColor;
   final String? parkingSlot;
+
+  /// Parsed from `void_request` object in the API transaction row.
+  final VoidRequestInfo? voidRequest;
+
+  bool get hasPendingVoid => voidRequest?.isPending == true;
+  bool get isVoided =>
+      voidRequest?.isApproved == true || status.toLowerCase() == 'voided';
 
   /// Original API row from `recent_transactions` (full transaction shape).
   final Map<String, dynamic>? rawJson;
@@ -199,16 +213,17 @@ class DashboardSummaryRecent {
 
     final vehicle = _asMap(json['vehicle']);
     String? brand;
-    String? model;
     String? color;
     if (vehicle != null) {
       brand = _str(vehicle['brand']);
-      model = _str(vehicle['model']);
       color = _str(vehicle['color']);
     }
     brand ??= _str(json['vehicle_brand'] ?? json['vehicleBrand']);
-    model ??= _str(json['vehicle_model'] ?? json['vehicleModel']);
     color ??= _str(json['vehicle_color'] ?? json['vehicleColor']);
+
+    // plate_number lives inside the vehicle object; fall back to top-level keys
+    final rawPlate = _str(vehicle?['plate_number']) ??
+        _str(json['plate_number'] ?? json['plateNumber']);
 
     final parking = _asMap(json['parking']);
     var slot = _str(json['parking_slot'] ?? json['parkingSlot'] ?? json['slot']);
@@ -221,19 +236,20 @@ class DashboardSummaryRecent {
       ticketNumber: (json['ticket_number'] ?? json['ticketNumber'] ?? id)
           .toString()
           .trim(),
-      plateNumber:
-          (json['plate_number'] ?? json['plateNumber'] ?? '—').toString().trim(),
+      plateNumber: rawPlate ?? '—',
       status: (json['status'] ?? '').toString().trim(),
       amount: json['amount'] is num
           ? json['amount'] as num
           : num.tryParse('${json['amount']}'),
       cashTendered: TransactionPaymentFields.cashTenderedFrom(json),
-      timeIn: (json['time_in'] ?? json['timeIn'])?.toString(),
-      timeOut: (json['time_out'] ?? json['timeOut'])?.toString(),
+      timeIn: _strOrNull(json['time_in'] ?? json['timeIn']),
+      timeOut: _strOrNull(json['time_out'] ?? json['timeOut']),
       vehicleBrand: brand,
-      vehicleModel: model,
       vehicleColor: color,
       parkingSlot: slot,
+      voidRequest: VoidRequestInfo.tryFromJson(
+        json['void_request'] ?? json['voidRequest'],
+      ),
       rawJson: json,
     );
   }
@@ -249,33 +265,37 @@ class DashboardSummaryRecent {
     return s.isEmpty ? null : s;
   }
 
+  /// Returns a trimmed string only if [value] is a non-empty [String];
+  /// rejects objects/maps that the API sends as `{}` placeholders.
+  static String? _strOrNull(dynamic value) {
+    if (value is! String) return null;
+    final s = value.trim();
+    return s.isEmpty ? null : s;
+  }
+
   DashboardRecentRow toRecentRow() {
-    final plate =
-        plateNumber.isNotEmpty && plateNumber != '—' ? plateNumber : ticketNumber;
+    final actualPlate =
+        plateNumber.isNotEmpty && plateNumber != '—' ? plateNumber : '';
+    final badgePlate = actualPlate.isNotEmpty ? actualPlate : ticketNumber;
     final upper = status.toUpperCase();
     final completed = upper == 'COMPLETED' || upper == 'LOST';
     final line1 = DashboardRecentFormat.vehicleLine(
       brand: vehicleBrand,
-      model: vehicleModel,
       color: vehicleColor,
     );
 
     if (completed) {
+      final inn = DateTime.tryParse(timeIn ?? '') ?? DateTime.now();
       final out = DateTime.tryParse(timeOut ?? '') ?? DateTime.now();
-      final amt = amount?.toDouble();
-      final payment = TransactionPaymentFields.resolve(
-        amount: amt,
-        cashTendered: cashTendered,
-      );
       return DashboardRecentRow(
         ticketId: id,
-        plate: plate,
+        plate: badgePlate,
+        plateNumber: actualPlate,
+        ticketNumber: ticketNumber,
         line1: line1,
         line2: DashboardRecentFormat.checkedOutSubline(
+          inn.toLocal(),
           out.toLocal(),
-          amount,
-          cashTendered: payment.cashTendered,
-          change: payment.change,
         ),
         isCheckedOut: true,
       );
@@ -284,7 +304,9 @@ class DashboardSummaryRecent {
     final inn = DateTime.tryParse(timeIn ?? timeOut ?? '') ?? DateTime.now();
     return DashboardRecentRow(
       ticketId: id,
-      plate: plate,
+      plate: badgePlate,
+      plateNumber: actualPlate,
+      ticketNumber: ticketNumber,
       line1: line1,
       line2: DashboardRecentFormat.parkedSubline(
         inn.toLocal(),

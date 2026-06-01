@@ -20,14 +20,94 @@ abstract final class CheckOutUiTokens {
   static const Color plateBlue = Color(0xFF0068D3);
   static const Color plateBarBg = Color(0xFFA7D6FF);
 
+  static Color cardBorderOf(BuildContext ctx) =>
+      AppThemeColors.of(ctx).cardBorder;
+
+  static Color hintFillOf(BuildContext ctx) => AppThemeColors.of(ctx).hintFill;
+
+  static Color cardBgOf(BuildContext ctx) => AppThemeColors.of(ctx).cardBg;
+
+  static Color hairlineOf(BuildContext ctx) => AppThemeColors.of(ctx).cardBorder;
+
+  static Color plateBarBgOf(BuildContext ctx) {
+    final tc = AppThemeColors.of(ctx);
+    return AppThemeColors.isDark(ctx) ? tc.plateBadgeBg : plateBarBg;
+  }
+
+  static Color chipFillOf(BuildContext ctx) {
+    final tc = AppThemeColors.of(ctx);
+    return AppThemeColors.isDark(ctx) ? tc.accentSurface : const Color(0xFFFFF7EC);
+  }
+
+  static Color issueCardBgOf(BuildContext ctx) {
+    final tc = AppThemeColors.of(ctx);
+    return AppThemeColors.isDark(ctx) ? tc.chipBg : const Color(0xFFF4F5F7);
+  }
+
+  static Color checkoutIssueBgOf(BuildContext ctx) =>
+      AppThemeColors.isDark(ctx)
+          ? const Color(0xFF3D1F24)
+          : const Color(0xFFFFECEC);
+
+  static Color signedChipBgOf(BuildContext ctx) =>
+      AppThemeColors.isDark(ctx)
+          ? const Color(0xFF14532D)
+          : const Color(0xFFF4FBF7);
+
+  static ButtonStyle footerOutlinedButton(BuildContext ctx) {
+    final tc = AppThemeColors.of(ctx);
+    return OutlinedButton.styleFrom(
+      backgroundColor: tc.cardBg,
+      foregroundColor: tc.textPrimary,
+      side: BorderSide(color: tc.cardBorder),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+    );
+  }
+
+  static ButtonStyle searchOutlinedButton(BuildContext ctx) {
+    final tc = AppThemeColors.of(ctx);
+    return OutlinedButton.styleFrom(
+      backgroundColor: tc.hintFill,
+      foregroundColor: tc.textPrimary,
+      side: BorderSide(color: tc.cardBorder),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+    );
+  }
+
   static TextStyle sectionTitle() => CheckInCompactTokens.pageHeading();
+
+  static TextStyle sectionTitleOf(BuildContext ctx) =>
+      sectionTitle().copyWith(color: AppThemeColors.of(ctx).textPrimary);
+
+  static TextStyle fieldLabelOf(BuildContext ctx) =>
+      fieldLabel().copyWith(color: AppThemeColors.of(ctx).textSecondary);
+
+  static TextStyle bodyOf(BuildContext ctx) =>
+      body().copyWith(color: AppThemeColors.of(ctx).textPrimary);
+
+  static TextStyle hintOf(BuildContext ctx) =>
+      hint().copyWith(color: AppThemeColors.of(ctx).textSecondary);
+
+  static TextStyle helperOf(BuildContext ctx) =>
+      helper().copyWith(color: AppThemeColors.of(ctx).textSecondary);
+
+  static TextStyle timeDisplayOf(BuildContext ctx, {Color? color}) =>
+      timeDisplay(color: color ?? AppThemeColors.of(ctx).textPrimary);
 
   static TextStyle fieldLabel() => CheckInCompactTokens.fieldLabel();
 
   static TextStyle body() => CheckInCompactTokens.fieldValue();
 
   /// Amounts with ₱ — Poppins omits U+20B1; bundled Noto Sans renders the sign.
-  static TextStyle money({double? fontSize, FontWeight? fontWeight, Color? color}) {
+  static TextStyle money({
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+  }) {
     final b = body();
     return TextStyle(
       fontFamily: 'Noto Sans',
@@ -37,6 +117,28 @@ abstract final class CheckOutUiTokens {
       color: color ?? b.color,
     );
   }
+
+  static TextStyle moneyOf(
+    BuildContext ctx, {
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+  }) =>
+      money(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color ?? AppThemeColors.of(ctx).textPrimary,
+      );
+
+  static Color lostTicketTileBgOf(BuildContext ctx) =>
+      AppThemeColors.isDark(ctx)
+          ? const Color(0xFF3D1F24)
+          : const Color(0xFFFFECEC);
+
+  static Color changeDueBgOf(BuildContext ctx) =>
+      AppThemeColors.isDark(ctx)
+          ? const Color(0xFF14532D)
+          : const Color(0xFFE2F9F1);
 
   static TextStyle hint() => CheckInCompactTokens.bodyHint();
 
@@ -51,6 +153,13 @@ abstract final class CheckOutUiTokens {
         fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
         color: selected ? DashboardStyles.orange : const Color(0xFFA09E9E),
       );
+
+  static TextStyle tabLabelOf(BuildContext ctx, {required bool selected}) {
+    final tc = AppThemeColors.of(ctx);
+    return tabLabel(selected: selected).copyWith(
+      color: selected ? DashboardStyles.orange : tc.textSecondary,
+    );
+  }
 
   static TextStyle error() => GoogleFonts.poppins(
         fontSize: 11,

@@ -1,7 +1,9 @@
 import 'dart:convert';
 
 import '../../../core/api/transaction_payment_summary.dart';
+import '../../../core/api/void_request_info.dart';
 import '../../../data/local/db/app_database.dart';
+import '../../check_out/models/checkout_preview_rates.dart';
 
 /// Where the vehicle is parked (from `GET /transactions/:id` or local check-in).
 class TicketParkingInfo {
@@ -92,6 +94,11 @@ class TicketDetailSnapshot {
     required this.ticket,
     this.parking,
     this.payment,
+    this.voidRequest,
+    this.isOvernight,
+    this.isTicketLost,
+    this.appliedRate,
+    this.isOnline = true,
   });
 
   final Ticket ticket;
@@ -100,6 +107,17 @@ class TicketDetailSnapshot {
   /// Parsed from transaction JSON — fee breakdown + cash tendered / change.
   final TransactionPaymentSummary? payment;
 
+  final VoidRequestInfo? voidRequest;
+  final bool? isOvernight;
+  final bool? isTicketLost;
+  final CheckoutPreviewRates? appliedRate;
+
+  /// Whether detail was loaded from server (vs pure local Drift).
+  final bool isOnline;
+
   double? get cashTendered => payment?.cashTendered;
   double? get changePesos => payment?.change;
+
+  bool get hasPendingVoid =>
+      voidRequest?.isPending == true || ticket.pendingVoidRequest;
 }

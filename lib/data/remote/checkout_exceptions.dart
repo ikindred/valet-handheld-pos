@@ -28,6 +28,19 @@ class CheckOutValidationException implements Exception {
   String toString() => 'CheckOutValidationException: $message';
 }
 
+/// Ticket has a pending void request (HTTP 409).
+class TicketVoidPendingException implements Exception {
+  TicketVoidPendingException([
+    this.message =
+        'This ticket has a pending void request and cannot be checked out.',
+  ]);
+
+  final String message;
+
+  @override
+  String toString() => 'TicketVoidPendingException: $message';
+}
+
 /// Ticket already checked out (HTTP 409).
 class TicketAlreadyCheckedOutException implements Exception {
   TicketAlreadyCheckedOutException([

@@ -11,9 +11,11 @@ class CheckoutPreviewRates extends Equatable {
     required this.lostTicketFee,
     required this.overnightStart,
     required this.overnightEnd,
+    this.flatRateHours = 0,
   });
 
   final double flatRate;
+  final int flatRateHours;
   final double succeedingRate;
   final double overnightFee;
   final double lostTicketFee;
@@ -37,8 +39,15 @@ class CheckoutPreviewRates extends Equatable {
     final start = overnight.start ?? '';
     final end = overnight.end ?? '';
 
+    final flatHoursRaw =
+        json['flat_rate_hours'] ?? json['flatRateHours'] ?? json['flat_rate_hour'];
+    final flatHours = flatHoursRaw is num
+        ? flatHoursRaw.toInt()
+        : int.tryParse(flatHoursRaw?.toString() ?? '') ?? 0;
+
     return CheckoutPreviewRates(
       flatRate: _dbl(json['flat_rate'] ?? json['flatRate']),
+      flatRateHours: flatHours,
       succeedingRate: _dbl(
         json['succeeding_rate'] ??
             json['succeedingRate'] ??
@@ -62,6 +71,7 @@ class CheckoutPreviewRates extends Equatable {
   @override
   List<Object?> get props => [
         flatRate,
+        flatRateHours,
         succeedingRate,
         overnightFee,
         lostTicketFee,

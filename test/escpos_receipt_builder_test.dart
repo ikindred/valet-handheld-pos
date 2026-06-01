@@ -26,6 +26,7 @@ void main() {
       status: 'active',
       syncStatus: 'pending',
       createdAt: DateTime.now().toIso8601String(),
+      pendingVoidRequest: false,
     );
 
     final bytes = builder.buildCheckInReceipt(

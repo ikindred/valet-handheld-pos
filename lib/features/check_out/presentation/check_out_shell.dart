@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../auth/state/auth_bloc.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../routing/check_out_step.dart';
@@ -40,7 +41,7 @@ class _CheckOutShellState extends State<CheckOutShell> {
     final stepIndex = checkOutStepIndexFromPath(path);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F5F7),
+      backgroundColor: AppThemeColors.of(context).scaffoldBg,
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

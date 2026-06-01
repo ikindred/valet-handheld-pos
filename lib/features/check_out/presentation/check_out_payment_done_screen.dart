@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/formatting/peso_currency.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/time/philippine_time.dart';
 import '../../../core/printing/checkout_receipt_data.dart';
 import '../../../core/printing/print_flow.dart';
@@ -29,12 +30,9 @@ class CheckOutPaymentDoneScreen extends StatefulWidget {
 class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
   bool _printing = false;
 
-  static const _grey500 = Color(0xFF6C7688);
-  static const _navy = Color(0xFF0A1B39);
   static const _plateBlue = Color(0xFF0068D3);
   static const _green = Color(0xFF27AE60);
   static const _orange = Color(0xFFF68D00);
-  static const _successSurface = Color(0xFFE2F9F1);
   static const List<String> _pesoGlyphFallback = ['Noto Sans', 'Roboto'];
 
   static TextStyle _poppins(
@@ -152,9 +150,10 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
               final leftColumn = Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _transactionCompleteCard(),
+                  _transactionCompleteCard(context),
                   const SizedBox(height: 16),
                   _releaseSummaryCard(
+                    context,
                     preview: preview,
                     snapshot: snap,
                     peso2: peso2,
@@ -172,6 +171,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
               );
 
               final receipt = _receiptPreview(
+                context,
                 snapshot: snap,
                 preview: preview,
                 peso2: peso2,
@@ -207,11 +207,11 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
     );
   }
 
-  Widget _transactionCompleteCard() {
+  Widget _transactionCompleteCard(BuildContext context) {
     return Container(
       padding: CheckOutUiTokens.cardPaddingDense,
       decoration: BoxDecoration(
-        color: _successSurface,
+        color: CheckOutUiTokens.changeDueBgOf(context),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _green),
       ),
@@ -239,7 +239,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
                 ),
                 Text(
                   'Vehicle may be released to customer',
-                  style: CheckOutUiTokens.body().copyWith(color: _green),
+                  style: CheckOutUiTokens.bodyOf(context).copyWith(color: _green),
                 ),
               ],
             ),
@@ -265,7 +265,6 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
         shadowColor: Colors.black.withValues(alpha: 0.08),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: Colors.black.withValues(alpha: 0.13)),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -322,7 +321,8 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
     );
   }
 
-  Widget _releaseSummaryCard({
+  Widget _releaseSummaryCard(
+    BuildContext context, {
     required CheckoutPreviewResponse? preview,
     required CheckoutReceiptSnapshot? snapshot,
     required NumberFormat peso2,
@@ -330,6 +330,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
     required double tendered,
     required double change,
   }) {
+    final tc = AppThemeColors.of(context);
     final rs = preview?.releaseSummary;
     final plate = snapshot?.plateNumber.trim().isNotEmpty == true
         ? snapshot!.plateNumber
@@ -346,13 +347,12 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: CheckOutUiTokens.fieldLabel()),
+              Text(label, style: CheckOutUiTokens.fieldLabelOf(context)),
               right,
             ],
           ),
           const SizedBox(height: 8),
-          if (divider)
-            Divider(height: 1, thickness: 1, color: Colors.black.withValues(alpha: 0.13)),
+          if (divider) Divider(height: 1, thickness: 1, color: tc.divider),
         ],
       );
     }
@@ -360,19 +360,23 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
     return Container(
       padding: CheckOutUiTokens.cardPadding,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: tc.cardBg,
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: tc.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('RELEASE SUMMARY', style: CheckOutUiTokens.sectionTitle()),
+          Text(
+            'RELEASE SUMMARY',
+            style: CheckOutUiTokens.sectionTitleOf(context),
+          ),
           const SizedBox(height: 10),
           row(
             'Plate',
             Text(
               plate,
-              style: CheckOutUiTokens.body().copyWith(
+              style: CheckOutUiTokens.bodyOf(context).copyWith(
                 color: _plateBlue,
                 fontWeight: FontWeight.w600,
               ),
@@ -380,9 +384,12 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
           ),
           row(
             'Customer',
-            Text(customer, style: CheckOutUiTokens.body()),
+            Text(customer, style: CheckOutUiTokens.bodyOf(context)),
           ),
-          row('Duration', Text(duration, style: CheckOutUiTokens.body())),
+          row(
+            'Duration',
+            Text(duration, style: CheckOutUiTokens.bodyOf(context)),
+          ),
           row(
             'Amount Paid',
             Text(
@@ -397,7 +404,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
             'Cash Tendered',
             Text(
               peso2.format(tendered),
-              style: CheckOutUiTokens.money(),
+              style: CheckOutUiTokens.moneyOf(context),
             ),
           ),
           row(
@@ -416,7 +423,8 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
     );
   }
 
-  Widget _dottedRule() {
+  Widget _dottedRule(BuildContext context) {
+    final dashColor = AppThemeColors.of(context).cardBorder;
     return LayoutBuilder(
       builder: (context, constraints) {
         const dashWidth = 4.0;
@@ -430,7 +438,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
               Container(
                 width: dashWidth,
                 height: 1,
-                color: Colors.black.withValues(alpha: 0.18),
+                color: dashColor,
               ),
               if (i < count - 1) SizedBox(width: gap),
             ],
@@ -447,7 +455,8 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
     );
   }
 
-  Widget _receiptPreview({
+  Widget _receiptPreview(
+    BuildContext context, {
     required CheckoutReceiptSnapshot? snapshot,
     required CheckoutPreviewResponse? preview,
     required NumberFormat peso2,
@@ -456,6 +465,9 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
     required String thankYou,
     required String mallHours,
   }) {
+    final tc = AppThemeColors.of(context);
+    final labelColor = tc.textSecondary;
+    final valueColor = tc.textPrimary;
     final pt = preview?.ticket;
     final ticketNo = snapshot?.ticketNumber.trim().isNotEmpty == true
         ? snapshot!.ticketNumber
@@ -518,7 +530,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
             Expanded(
               child: Text(
                 label,
-                style: _poppins(10, FontWeight.w500, _grey500),
+                style: _poppins(10, FontWeight.w500, labelColor),
               ),
             ),
             const SizedBox(width: 12),
@@ -526,7 +538,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
               child: Text(
                 value,
                 textAlign: TextAlign.right,
-                style: _poppins(10, FontWeight.w500, _navy),
+                style: _poppins(10, FontWeight.w500, valueColor),
               ),
             ),
           ],
@@ -540,13 +552,13 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: _poppins(10, FontWeight.w500, _grey500)),
+            Text(label, style: _poppins(10, FontWeight.w500, labelColor)),
             Text(
               value,
               style: CheckOutUiTokens.money(
                 fontSize: 10,
                 fontWeight: FontWeight.w500,
-                color: _navy,
+                color: valueColor,
               ),
             ),
           ],
@@ -554,23 +566,30 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
       );
     }
 
-  return Container(
+    final isDark = AppThemeColors.isDark(context);
+    return Container(
       padding: CheckOutUiTokens.cardPadding,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: tc.cardBg,
         borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.10),
-            blurRadius: 14,
-            offset: Offset.zero,
-          ),
-        ],
+        border: Border.all(color: tc.cardBorder),
+        boxShadow: isDark
+            ? const []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.10),
+                  blurRadius: 14,
+                  offset: Offset.zero,
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('TICKET NUMBER', style: CheckOutUiTokens.fieldLabel()),
+          Text(
+            'TICKET NUMBER',
+            style: CheckOutUiTokens.fieldLabelOf(context),
+          ),
           const SizedBox(height: 4),
           Text(
             ticketNo,
@@ -583,7 +602,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
           const SizedBox(height: 6),
           Text(
             plate,
-            style: CheckOutUiTokens.body().copyWith(
+            style: CheckOutUiTokens.bodyOf(context).copyWith(
               color: _plateBlue,
               fontWeight: FontWeight.w700,
             ),
@@ -592,7 +611,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
             const SizedBox(height: 4),
             Text(
               vehicleLine.toUpperCase(),
-              style: _poppins(10, FontWeight.w500, _grey500),
+              style: _poppins(10, FontWeight.w500, labelColor),
             ),
           ],
           const SizedBox(height: 14),
@@ -602,7 +621,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
           smallRow('Parking Slot', slot),
           smallRow('Valet In/Out', valetInOut),
           const SizedBox(height: 4),
-          _dottedRule(),
+          _dottedRule(context),
           const SizedBox(height: 12),
           if (flatAmount > 0.009) feeRow(flatLabel, peso2.format(flatAmount)),
           if (succeedingLabel.isNotEmpty && succeedingAmount > 0.009)
@@ -612,13 +631,13 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
           if (isLostTicket && lostTicketFee > 0.009)
             feeRow('Lost ticket fee', peso2.format(lostTicketFee)),
           const SizedBox(height: 10),
-          _dottedRule(),
+          _dottedRule(context),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('Total', style: _poppins(10, FontWeight.w500, _grey500)),
+              Text('Total', style: _poppins(10, FontWeight.w500, labelColor)),
               Text(
                 peso2.format(total),
                 style: CheckOutUiTokens.money(
@@ -633,7 +652,7 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: _successSurface,
+              color: CheckOutUiTokens.changeDueBgOf(context),
               borderRadius: BorderRadius.circular(100),
               border: Border.all(color: _green),
             ),
@@ -656,20 +675,20 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
           Text(
             'NOTE: THIS IS NOT AN OFFICIAL RECEIPT (OR)',
             textAlign: TextAlign.center,
-            style: _poppins(8, FontWeight.w500, _grey500),
+            style: _poppins(8, FontWeight.w500, labelColor),
           ),
           const SizedBox(height: 10),
           Text(
             thankYou,
             textAlign: TextAlign.center,
-            style: _poppins(8, FontWeight.w500, _grey500),
+            style: _poppins(8, FontWeight.w500, labelColor),
           ),
           if (mallHours.trim().isNotEmpty) ...[
             const SizedBox(height: 5),
             Text(
               mallHours,
               textAlign: TextAlign.center,
-              style: _poppins(8, FontWeight.w500, _grey500),
+              style: _poppins(8, FontWeight.w500, labelColor),
             ),
           ],
         ],

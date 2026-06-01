@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/logging/valet_log.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import 'widgets/check_in_footer_actions.dart';
 import '../domain/vehicle_body_type.dart';
@@ -125,10 +126,9 @@ String _valetTypeLabel(ValetServiceType t) {
 
 String _vehicleLine(CheckInState s) {
   final parts = <String>[
-    if (s.vehicleBrandMake.trim().isNotEmpty) s.vehicleBrandMake.trim(),
-    if (s.vehicleModel.trim().isNotEmpty) s.vehicleModel.trim(),
+    if (s.vehicleBrand.trim().isNotEmpty) s.vehicleBrand.trim(),
     if (s.vehicleColor.trim().isNotEmpty) s.vehicleColor.trim(),
-    if (s.vehicleYear.trim().isNotEmpty) s.vehicleYear.trim(),
+    if (s.vehicleVrNo.trim().isNotEmpty) s.vehicleVrNo.trim(),
   ];
   return parts.isEmpty ? '—' : parts.join(' · ');
 }
@@ -258,26 +258,30 @@ class _ReviewNarrowStack extends StatelessWidget {
 // --- Shared styles ---
 
 class _ReviewTokens {
-  static const hairline = Color(0x21000000);
   static const cardRadius = 10.0;
 
-  static TextStyle sectionTitle() => CheckInCompactTokens.pageHeading();
+  static TextStyle sectionTitle(BuildContext context) =>
+      CheckInCompactTokens.pageHeadingOf(context);
 
-  static TextStyle label() => CheckInCompactTokens.helperText().copyWith(
+  static TextStyle label(BuildContext context) =>
+      CheckInCompactTokens.helperText().copyWith(
         fontWeight: FontWeight.w500,
-        color: DashboardStyles.grey500,
+        color: AppThemeColors.of(context).textSecondary,
       );
 
-  static TextStyle value() => CheckInCompactTokens.fieldValue().copyWith(
+  static TextStyle value(BuildContext context) =>
+      CheckInCompactTokens.fieldValueOf(context).copyWith(
         fontWeight: FontWeight.w500,
       );
 
-  static TextStyle plateValue() => CheckInCompactTokens.fieldValue().copyWith(
+  static TextStyle plateValue(BuildContext context) =>
+      CheckInCompactTokens.fieldValueOf(context).copyWith(
         fontWeight: FontWeight.w700,
         color: DashboardStyles.plateBlue,
       );
 
-  static TextStyle damageCount() => CheckInCompactTokens.bodyHint();
+  static TextStyle damageCount(BuildContext context) =>
+      CheckInCompactTokens.bodyHintOf(context);
 }
 
 class _ReviewCard extends StatelessWidget {
@@ -293,13 +297,14 @@ class _ReviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return Container(
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: tc.cardBg,
         borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.13)),
+        border: Border.all(color: tc.cardBorder),
       ),
       clipBehavior: Clip.antiAlias,
       child: child,
@@ -329,20 +334,23 @@ class _ReviewRow extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(flex: 2, child: Text(label, style: _ReviewTokens.label())),
+            Expanded(
+              flex: 2,
+              child: Text(label, style: _ReviewTokens.label(context)),
+            ),
             Expanded(
               flex: 3,
               child: Text(
                 value,
                 textAlign: TextAlign.right,
-                style: valueStyle ?? _ReviewTokens.value(),
+                style: valueStyle ?? _ReviewTokens.value(context),
               ),
             ),
           ],
         ),
         if (showDivider) ...[
           const SizedBox(height: 6),
-          Container(height: 1, color: _ReviewTokens.hairline),
+          Container(height: 1, color: AppThemeColors.of(context).cardBorder),
         ],
       ],
     );
@@ -364,7 +372,7 @@ class _CustomerValetCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('CUSTOMER & VALET', style: _ReviewTokens.sectionTitle()),
+          Text('CUSTOMER & VALET', style: _ReviewTokens.sectionTitle(context)),
           const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(
             label: 'Name',
@@ -412,18 +420,25 @@ class _DamageChip extends StatelessWidget {
   final VehicleDamageEntry entry;
 
   static const _dentFg = Color(0xFFEC2231);
-  static const _dentBg = Color(0xFFFFECEC);
   static const _scratchFg = Color(0xFFF68D00);
-  static const _scratchBg = Color(0xFFFFF7EC);
   static const _crackFg = Color(0xFF0068D3);
-  static const _crackBg = Color(0xFFECEFFF);
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppThemeColors.isDark(context);
     final (fg, bg) = switch (entry.type) {
-      DamageType.dent => (_dentFg, _dentBg),
-      DamageType.scratch => (_scratchFg, _scratchBg),
-      DamageType.crack => (_crackFg, _crackBg),
+      DamageType.dent => (
+          _dentFg,
+          isDark ? const Color(0xFF3D1F24) : const Color(0xFFFFECEC),
+        ),
+      DamageType.scratch => (
+          _scratchFg,
+          isDark ? const Color(0xFF422006) : const Color(0xFFFFF7EC),
+        ),
+      DamageType.crack => (
+          _crackFg,
+          isDark ? const Color(0xFF1E3A5F) : const Color(0xFFECEFFF),
+        ),
     };
     final zone = entry.zoneLabel?.trim();
     final text = (zone != null && zone.isNotEmpty)
@@ -464,9 +479,9 @@ class _ConditionLogCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('CONDITION LOG', style: _ReviewTokens.sectionTitle()),
+          Text('CONDITION LOG', style: _ReviewTokens.sectionTitle(context)),
           const SizedBox(height: CheckInCompactTokens.sectionGap),
-          Text(countLabel, style: _ReviewTokens.damageCount()),
+          Text(countLabel, style: _ReviewTokens.damageCount(context)),
           if (state.vehicleDamageEntries.isNotEmpty) ...[
             const SizedBox(height: CheckInCompactTokens.sectionGap),
             Wrap(
@@ -479,7 +494,7 @@ class _ConditionLogCard extends StatelessWidget {
             ),
           ] else ...[
             const SizedBox(height: 4),
-            Text('No damage logged.', style: _ReviewTokens.label()),
+            Text('No damage logged.', style: _ReviewTokens.label(context)),
           ],
           const SizedBox(height: CheckInCompactTokens.blockGap),
           Row(
@@ -488,15 +503,15 @@ class _ConditionLogCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Customer signature',
-                  style: _ReviewTokens.label(),
+                  style: _ReviewTokens.label(context),
                 ),
               ),
               Text(
                 state.isCustomerSignatureComplete ? 'Signed ✓' : 'Not signed',
-                style: _ReviewTokens.value().copyWith(
+                style: _ReviewTokens.value(context).copyWith(
                   color: state.isCustomerSignatureComplete
                       ? DashboardStyles.green
-                      : DashboardStyles.grey500,
+                      : AppThemeColors.of(context).textSecondary,
                 ),
               ),
             ],
@@ -523,14 +538,14 @@ class _VehicleCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('VEHICLE', style: _ReviewTokens.sectionTitle()),
+          Text('VEHICLE', style: _ReviewTokens.sectionTitle(context)),
           const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(
             label: 'Plate No.',
             value: plate,
             valueStyle: plate == '—'
-                ? _ReviewTokens.value()
-                : _ReviewTokens.plateValue(),
+                ? _ReviewTokens.value(context)
+                : _ReviewTokens.plateValue(context),
           ),
           const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(label: 'Vehicle', value: _vehicleLine(state)),
@@ -569,7 +584,7 @@ class _TimeCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('TIME', style: _ReviewTokens.sectionTitle()),
+          Text('TIME', style: _ReviewTokens.sectionTitle(context)),
           const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(
             label: 'Time In',

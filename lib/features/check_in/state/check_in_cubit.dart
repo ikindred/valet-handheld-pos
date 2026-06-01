@@ -42,10 +42,9 @@ class CheckInState extends Equatable {
     this.dateTimeIn,
     this.valetServiceType = ValetServiceType.standardValet,
     this.plateNumber = '',
-    this.vehicleModel = '',
-    this.vehicleBrandMake = '',
+    this.vehicleBrand = '',
     this.vehicleColor = '',
-    this.vehicleYear = '',
+    this.vehicleVrNo = '',
     this.vehicleBodyType = VehicleBodyType.sedan,
     this.parkingLevel = '',
     this.parkingSlot = '',
@@ -72,10 +71,9 @@ class CheckInState extends Equatable {
   final ValetServiceType valetServiceType;
 
   final String plateNumber;
-  final String vehicleModel;
-  final String vehicleBrandMake;
+  final String vehicleBrand;
   final String vehicleColor;
-  final String vehicleYear;
+  final String vehicleVrNo;
   final VehicleBodyType vehicleBodyType;
 
   final String parkingLevel;
@@ -125,10 +123,9 @@ class CheckInState extends Equatable {
     DateTime? dateTimeIn,
     ValetServiceType? valetServiceType,
     String? plateNumber,
-    String? vehicleModel,
-    String? vehicleBrandMake,
+    String? vehicleBrand,
     String? vehicleColor,
-    String? vehicleYear,
+    String? vehicleVrNo,
     VehicleBodyType? vehicleBodyType,
     String? parkingLevel,
     String? parkingSlot,
@@ -154,10 +151,9 @@ class CheckInState extends Equatable {
       dateTimeIn: dateTimeIn ?? this.dateTimeIn,
       valetServiceType: valetServiceType ?? this.valetServiceType,
       plateNumber: plateNumber ?? this.plateNumber,
-      vehicleModel: vehicleModel ?? this.vehicleModel,
-      vehicleBrandMake: vehicleBrandMake ?? this.vehicleBrandMake,
+      vehicleBrand: vehicleBrand ?? this.vehicleBrand,
       vehicleColor: vehicleColor ?? this.vehicleColor,
-      vehicleYear: vehicleYear ?? this.vehicleYear,
+      vehicleVrNo: vehicleVrNo ?? this.vehicleVrNo,
       vehicleBodyType: vehicleBodyType ?? this.vehicleBodyType,
       parkingLevel: parkingLevel ?? this.parkingLevel,
       parkingSlot: parkingSlot ?? this.parkingSlot,
@@ -189,10 +185,9 @@ class CheckInState extends Equatable {
       dateTimeIn,
       valetServiceType,
       plateNumber,
-      vehicleModel,
-      vehicleBrandMake,
+      vehicleBrand,
       vehicleColor,
-      vehicleYear,
+      vehicleVrNo,
       vehicleBodyType,
       parkingLevel,
       parkingSlot,
@@ -476,6 +471,7 @@ class CheckInCubit extends Cubit<CheckInState> {
         throw StateError('No bearer token.');
       }
 
+      final vrNo = state.vehicleVrNo.trim();
       final response = await api.submitCheckIn(
         token: token,
         ticketNumber: ticketId,
@@ -489,9 +485,13 @@ class CheckInCubit extends Cubit<CheckInState> {
         customerName: _optionalTrim(state.customerFullName),
         driverIn: data.driverIn,
         notes: _optionalTrim(state.specialInstructions),
+        vrNo: vrNo.isEmpty ? null : vrNo,
       );
 
       await ts.updateServerTicketId(ticketId, response.id);
+      if (vrNo.isNotEmpty) {
+        await ts.persistVrNo(ticketId, vrNo);
+      }
 
       emit(
         state.copyWith(
@@ -582,15 +582,13 @@ class CheckInCubit extends Cubit<CheckInState> {
   }
 
   Map<String, dynamic> _buildVehicleMap() {
-    final yearRaw = state.vehicleYear.trim();
-    final year = yearRaw.isEmpty ? null : int.tryParse(yearRaw);
+    final vrNo = state.vehicleVrNo.trim();
     return <String, dynamic>{
       'plate_number': normalizePlateNumber(state.plateNumber),
-      'brand': state.vehicleBrandMake.trim(),
-      'model': state.vehicleModel.trim(),
+      'brand': state.vehicleBrand.trim(),
       'color': state.vehicleColor.trim(),
       'type': _vehicleTypeApi(state.vehicleBodyType),
-      'year': year,
+      'vr_no': vrNo.isEmpty ? null : vrNo,
     };
   }
 
@@ -648,7 +646,7 @@ class CheckInCubit extends Cubit<CheckInState> {
     final valet = state.assignedValetDriver.trim();
     return CheckInFormData(
       plateNumber: normalizePlateNumber(state.plateNumber),
-      vehicleBrand: '${state.vehicleBrandMake} ${state.vehicleModel}'.trim(),
+      vehicleBrand: state.vehicleBrand.trim(),
       vehicleColor: state.vehicleColor.trim(),
       vehicleType: _vehicleTypeApi(state.vehicleBodyType),
       driverIn: valet.isEmpty ? null : valet,
@@ -703,10 +701,9 @@ class CheckInCubit extends Cubit<CheckInState> {
 
   void updateVehicleStep({
     String? plateNumber,
-    String? vehicleModel,
-    String? vehicleBrandMake,
+    String? vehicleBrand,
     String? vehicleColor,
-    String? vehicleYear,
+    String? vehicleVrNo,
     VehicleBodyType? vehicleBodyType,
     String? parkingLevel,
     String? parkingSlot,
@@ -718,10 +715,9 @@ class CheckInCubit extends Cubit<CheckInState> {
       state.copyWith(
         plateNumber:
             plateNumber != null ? normalizePlateNumber(plateNumber) : null,
-        vehicleModel: vehicleModel,
-        vehicleBrandMake: vehicleBrandMake,
+        vehicleBrand: vehicleBrand,
         vehicleColor: vehicleColor,
-        vehicleYear: vehicleYear,
+        vehicleVrNo: vehicleVrNo,
         vehicleBodyType: vehicleBodyType,
         parkingLevel: parkingLevel,
         parkingSlot: parkingSlot,

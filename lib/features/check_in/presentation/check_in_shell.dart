@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../routing/check_in_step.dart';
 import '../state/check_in_cubit.dart';
@@ -60,9 +61,11 @@ class _CheckInShellState extends State<CheckInShell> {
     final path = GoRouterState.of(context).uri.path;
     final stepIndex = checkInStepIndexFromPath(path);
 
+    final scaffoldBg = AppThemeColors.of(context).scaffoldBg;
+
     if (_awaitingDraft) {
-      return const Scaffold(
-        backgroundColor: Color(0xFFF4F5F7),
+      return Scaffold(
+        backgroundColor: scaffoldBg,
         body: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -81,7 +84,7 @@ class _CheckInShellState extends State<CheckInShell> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F5F7),
+      backgroundColor: scaffoldBg,
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

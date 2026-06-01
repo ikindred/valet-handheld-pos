@@ -12,8 +12,6 @@ import 'widgets/check_out_ui_tokens.dart';
 import 'widgets/checkout_vehicle_review_footer.dart';
 import 'widgets/checkout_vehicle_review_tabs.dart';
 
-const _kBorder = Color(0xFFC0C0BF);
-const _kCardBg = Color(0xFFF4F5F7);
 const _kGreen = Color(0xFF27AE60);
 const _kOrange = Color(0xFFF68D00);
 const _kRed = Color(0xFFEC2231);
@@ -156,10 +154,12 @@ class CheckOutConditionScreen extends StatelessWidget {
             },
           ),
               if (state.isLoadingPreview)
-                const Positioned.fill(
+                Positioned.fill(
                   child: ColoredBox(
-                    color: Color(0x33FFFFFF),
-                    child: Center(child: CircularProgressIndicator()),
+                    color: Theme.of(context)
+                        .scaffoldBackgroundColor
+                        .withValues(alpha: 0.55),
+                    child: const Center(child: CircularProgressIndicator()),
                   ),
                 ),
             ],
@@ -196,7 +196,10 @@ class _ConditionSidebar extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text('AT CHECK-IN', style: CheckOutUiTokens.sectionTitle()),
+              Text(
+                'AT CHECK-IN',
+                style: CheckOutUiTokens.sectionTitleOf(context),
+              ),
               const Spacer(),
               _TimeItemsChip(timeLabel: timeLabel, count: checkInCount),
             ],
@@ -209,7 +212,7 @@ class _ConditionSidebar extends StatelessWidget {
           if (checkInDamage.isEmpty)
             Text(
               'No damage logged at check-in.',
-              style: CheckOutUiTokens.hint(),
+              style: CheckOutUiTokens.hintOf(context),
             )
           else
             for (final e in checkInDamage) ...[
@@ -222,11 +225,14 @@ class _ConditionSidebar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                Text('AT CHECK-OUT', style: CheckOutUiTokens.sectionTitle()),
+                Text(
+                  'AT CHECK-OUT',
+                  style: CheckOutUiTokens.sectionTitleOf(context),
+                ),
                 const SizedBox(width: 6),
                 Text(
                   '${checkoutDamage.length} Items',
-                  style: CheckOutUiTokens.helper(),
+                  style: CheckOutUiTokens.helperOf(context),
                 ),
               ],
             ),
@@ -275,10 +281,10 @@ class _ConditionDiagramPanel extends StatelessWidget {
               Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: CheckOutUiTokens.cardBgOf(context),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: Colors.black.withValues(alpha: 0.13),
+                      color: CheckOutUiTokens.cardBorderOf(context),
                     ),
                   ),
                   child: ClipRRect(
@@ -318,13 +324,13 @@ class _SignedAtCheckInChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFFF4FBF7),
+          color: CheckOutUiTokens.signedChipBgOf(context),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: _kGreen),
         ),
         child: Text(
           'Signed at check-in ✓',
-          style: CheckOutUiTokens.body().copyWith(color: _kGreen),
+          style: CheckOutUiTokens.bodyOf(context).copyWith(color: _kGreen),
         ),
       ),
     );
@@ -342,7 +348,7 @@ class _TimeItemsChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF7EC),
+        color: CheckOutUiTokens.chipFillOf(context),
         borderRadius: BorderRadius.circular(5),
         border: Border.all(color: _kOrange),
       ),
@@ -380,9 +386,9 @@ class _AtCheckInIssueCard extends StatelessWidget {
     return Container(
       padding: CheckOutUiTokens.cardPaddingDense,
       decoration: BoxDecoration(
-        color: _kCardBg,
+        color: CheckOutUiTokens.issueCardBgOf(context),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _kBorder),
+        border: Border.all(color: CheckOutUiTokens.cardBorderOf(context)),
       ),
       child: Row(
         children: [
@@ -399,8 +405,8 @@ class _AtCheckInIssueCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(entry.type.label, style: CheckOutUiTokens.body()),
-                Text(zone, style: CheckOutUiTokens.helper()),
+                Text(entry.type.label, style: CheckOutUiTokens.bodyOf(context)),
+                Text(zone, style: CheckOutUiTokens.helperOf(context)),
               ],
             ),
           ),
@@ -432,7 +438,7 @@ class _AtCheckOutNewIssueCard extends StatelessWidget {
     return Container(
       padding: CheckOutUiTokens.cardPaddingDense,
       decoration: BoxDecoration(
-        color: const Color(0xFFFFECEC),
+        color: CheckOutUiTokens.checkoutIssueBgOf(context),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _kRed),
       ),
@@ -453,8 +459,8 @@ class _AtCheckOutNewIssueCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(entry.type.label, style: CheckOutUiTokens.body()),
-                Text(zone, style: CheckOutUiTokens.helper()),
+                Text(entry.type.label, style: CheckOutUiTokens.bodyOf(context)),
+                Text(zone, style: CheckOutUiTokens.helperOf(context)),
               ],
             ),
           ),
@@ -493,7 +499,7 @@ class _NewDamageAlertBanner extends StatelessWidget {
       width: double.infinity,
       padding: CheckOutUiTokens.cardPaddingDense,
       decoration: BoxDecoration(
-        color: const Color(0xFFFFECEC),
+        color: CheckOutUiTokens.checkoutIssueBgOf(context),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _kRed),
       ),
@@ -520,7 +526,7 @@ class _NewDamageAlertBanner extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: CheckOutUiTokens.body().copyWith(color: _kRed),
+              style: CheckOutUiTokens.bodyOf(context).copyWith(color: _kRed),
             ),
           ),
         ],
@@ -537,7 +543,7 @@ class _AddNewIssueButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFFFFECEC),
+      color: CheckOutUiTokens.checkoutIssueBgOf(context),
       borderRadius: BorderRadius.circular(10),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -550,7 +556,7 @@ class _AddNewIssueButton extends StatelessWidget {
           ),
           child: Text(
             'Add new Issue +',
-            style: CheckOutUiTokens.body().copyWith(
+            style: CheckOutUiTokens.bodyOf(context).copyWith(
               color: _kRed,
               fontWeight: FontWeight.w600,
             ),

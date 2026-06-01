@@ -13,7 +13,7 @@ class CheckInFormField extends StatelessWidget {
   Widget build(BuildContext context) {
     return LabeledAppTextField(
       label: label,
-      labelStyle: CheckInCompactTokens.fieldLabel(),
+      labelStyle: CheckInCompactTokens.fieldLabelOf(context),
       gap: 3,
       child: child,
     );
@@ -52,7 +52,7 @@ class CheckInTextField extends StatelessWidget {
       maxLines: maxLines,
       minHeight: minHeight,
       hint: hint ?? '',
-      style: valueStyle ?? CheckInCompactTokens.fieldValue(),
+      style: valueStyle ?? CheckInCompactTokens.fieldValueOf(context),
     );
   }
 }

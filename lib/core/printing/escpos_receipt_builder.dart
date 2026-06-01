@@ -81,7 +81,7 @@ class EscPosReceiptBuilder {
     bytes.addAll(_labeledRow('Duration', data.durationLabel));
     bytes.addAll(_labeledRow('Parking', data.slotLine));
     bytes.addAll(_labeledRow('Valet in', data.valetInLabel));
-    bytes.addAll(_labeledRow('Valet out', data.valetOutLabel));
+    bytes.addAll(_labeledRow('Returning Valet Attendant', data.valetOutLabel));
 
     bytes.addAll(_hr());
     bytes.addAll(gen.feed(1));

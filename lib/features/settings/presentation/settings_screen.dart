@@ -499,6 +499,45 @@ class _NarrowLayout extends StatelessWidget {
   }
 }
 
+// ── Icon tile tones (light pastels vs dark muted surfaces) ───────────────────
+
+class _SettingsIconTone {
+  _SettingsIconTone._();
+
+  static bool _dark(BuildContext context) => AppThemeColors.isDark(context);
+
+  static (Color bg, Color fg) blue(BuildContext context) => _dark(context)
+      ? (const Color(0xFF1E3A5F), const Color(0xFF60A5FA))
+      : (const Color(0xFFEEF4FF), const Color(0xFF3B82F6));
+
+  static (Color bg, Color fg) green(BuildContext context) => _dark(context)
+      ? (const Color(0xFF14532D), const Color(0xFF4ADE80))
+      : (const Color(0xFFECFDF5), const Color(0xFF27AE60));
+
+  static (Color bg, Color fg) emerald(BuildContext context) => _dark(context)
+      ? (const Color(0xFF064E3B), const Color(0xFF34D399))
+      : (const Color(0xFFECFDF5), const Color(0xFF059669));
+
+  static (Color bg, Color fg) amber(BuildContext context) => _dark(context)
+      ? (const Color(0xFF422006), const Color(0xFFFBBF24))
+      : (const Color(0xFFFFF7ED), const Color(0xFFF59E0B));
+
+  static (Color bg, Color fg) grey(BuildContext context) {
+    final tc = AppThemeColors.of(context);
+    return _dark(context)
+        ? (tc.hintFill, tc.textSecondary)
+        : (const Color(0xFFF3F4F6), const Color(0xFF6B7280));
+  }
+
+  static (Color bg, Color fg) red(BuildContext context) => _dark(context)
+      ? (const Color(0xFF450A0A), const Color(0xFFF87171))
+      : (const Color(0xFFFEF2F2), const Color(0xFFEF4444));
+
+  static (Color bg, Color fg) slate(BuildContext context) => _dark(context)
+      ? (const Color(0xFF334155), Colors.white)
+      : (const Color(0xFF1E293B), Colors.white);
+}
+
 // ── Cards ────────────────────────────────────────────────────────────────────
 
 class _DataSyncCard extends StatelessWidget {
@@ -528,12 +567,16 @@ class _DataSyncCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final wifiTone = _SettingsIconTone.blue(context);
+    final syncTone = _SettingsIconTone.green(context);
+    final historyTone = _SettingsIconTone.amber(context);
+    final autoTone = _SettingsIconTone.emerald(context);
     return _SettingsCard(
       sectionLabel: 'DATA & SYNC',
       children: [
         _SettingsRow(
-          iconBg: const Color(0xFFEEF4FF),
-          iconColor: const Color(0xFF3B82F6),
+          iconBg: wifiTone.$1,
+          iconColor: wifiTone.$2,
           icon: isOfflineMode
               ? Icons.wifi_off_rounded
               : Icons.wifi_rounded,
@@ -546,8 +589,8 @@ class _DataSyncCard extends StatelessWidget {
         ),
         const _RowDivider(),
         _SettingsRow(
-          iconBg: const Color(0xFFECFDF5),
-          iconColor: _green,
+          iconBg: syncTone.$1,
+          iconColor: syncTone.$2,
           icon: Icons.sync_rounded,
           title: 'Sync Offline Data',
           subtitleWidget: pendingCount > 0
@@ -561,8 +604,8 @@ class _DataSyncCard extends StatelessWidget {
         ),
         const _RowDivider(),
         _SettingsRow(
-          iconBg: const Color(0xFFFFF7ED),
-          iconColor: const Color(0xFFF59E0B),
+          iconBg: historyTone.$1,
+          iconColor: historyTone.$2,
           icon: Icons.history_rounded,
           title: 'Last Sync',
           subtitle: lastSyncLabel,
@@ -572,8 +615,8 @@ class _DataSyncCard extends StatelessWidget {
         ),
         const _RowDivider(),
         _SettingsRow(
-          iconBg: const Color(0xFFECFDF5),
-          iconColor: const Color(0xFF059669),
+          iconBg: autoTone.$1,
+          iconColor: autoTone.$2,
           icon: Icons.bolt_rounded,
           title: 'Auto-sync on Connect',
           subtitle: 'Sync automatically when online',
@@ -607,12 +650,14 @@ class _PrinterCard extends StatelessWidget {
         ? '${printer.statusSubtitle.split(' · ').last} · 80mm thermal'
         : printer.statusSubtitle;
 
+    final printerTone = _SettingsIconTone.blue(context);
+    final testTone = _SettingsIconTone.grey(context);
     return _SettingsCard(
       sectionLabel: 'BLUETOOTH PRINTER',
       children: [
         _SettingsRow(
-          iconBg: const Color(0xFFEEF4FF),
-          iconColor: const Color(0xFF3B82F6),
+          iconBg: printerTone.$1,
+          iconColor: printerTone.$2,
           icon: Icons.print_rounded,
           title: printerLabel,
           subtitle: showBluetooth ? connSubtitle : 'Android / iOS only',
@@ -635,8 +680,8 @@ class _PrinterCard extends StatelessWidget {
         ),
         const _RowDivider(),
         _SettingsRow(
-          iconBg: const Color(0xFFF3F4F6),
-          iconColor: const Color(0xFF6B7280),
+          iconBg: testTone.$1,
+          iconColor: testTone.$2,
           icon: Icons.receipt_long_rounded,
           title: 'Test Print',
           subtitle: 'Print a test receipt to verify',
@@ -658,12 +703,13 @@ class _AppearanceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeNotifier = context.watch<ThemeNotifier>();
     final isDark = themeNotifier.isDark;
+    final appearanceTone = _SettingsIconTone.slate(context);
     return _SettingsCard(
       sectionLabel: 'APPEARANCE',
       children: [
         _SettingsRow(
-          iconBg: isDark ? const Color(0xFF334155) : const Color(0xFF1E293B),
-          iconColor: Colors.white,
+          iconBg: appearanceTone.$1,
+          iconColor: appearanceTone.$2,
           icon: isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
           title: 'Dark Mode',
           subtitle: isDark ? 'Dark theme is active' : 'Switch to dark theme',
@@ -691,12 +737,14 @@ class _AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accountTone = _SettingsIconTone.blue(context);
+    final versionTone = _SettingsIconTone.amber(context);
     return _SettingsCard(
       sectionLabel: 'ACCOUNT',
       children: [
         _SettingsRow(
-          iconBg: const Color(0xFFEEF4FF),
-          iconColor: const Color(0xFF3B82F6),
+          iconBg: accountTone.$1,
+          iconColor: accountTone.$2,
           icon: Icons.person_rounded,
           title: fullName,
           subtitle: roleSubtitle,
@@ -704,8 +752,8 @@ class _AccountCard extends StatelessWidget {
         ),
         const _RowDivider(),
         _SettingsRow(
-          iconBg: const Color(0xFFFFF7ED),
-          iconColor: const Color(0xFFF59E0B),
+          iconBg: versionTone.$1,
+          iconColor: versionTone.$2,
           icon: Icons.layers_rounded,
           title: 'App Version',
           subtitle: _kAppVersion,
@@ -721,12 +769,13 @@ class _SessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final logoutTone = _SettingsIconTone.red(context);
     return _SettingsCard(
       sectionLabel: 'SESSION',
       children: [
         _SettingsRow(
-          iconBg: const Color(0xFFFEF2F2),
-          iconColor: const Color(0xFFEF4444),
+          iconBg: logoutTone.$1,
+          iconColor: logoutTone.$2,
           icon: Icons.power_settings_new_rounded,
           title: 'Logout',
           titleColor: const Color(0xFFD92D20),
@@ -866,7 +915,7 @@ class _RowDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Divider(height: 1, color: Color(0x1A000000));
+    return Divider(height: 1, color: AppThemeColors.of(context).divider);
   }
 }
 
@@ -912,14 +961,14 @@ class _OutlinedActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
+    final enabled = onPressed != null;
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.textPrimary,
+        foregroundColor: enabled ? tc.textPrimary : tc.textSubtitleMuted,
         side: BorderSide(
-          color: onPressed != null
-              ? AppColors.textSecondary.withValues(alpha: 0.5)
-              : AppColors.textSecondary.withValues(alpha: 0.2),
+          color: enabled ? tc.cardBorder : tc.divider,
         ),
         minimumSize: const Size(0, 32),
         padding: const EdgeInsets.symmetric(horizontal: 14),

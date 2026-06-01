@@ -258,7 +258,6 @@ class CheckoutPreviewTicket extends Equatable {
     required this.ticketNumber,
     required this.plate,
     required this.vehicleMake,
-    required this.vehicleModel,
     required this.vehicleColor,
     required this.vehicleType,
     required this.timeIn,
@@ -278,7 +277,6 @@ class CheckoutPreviewTicket extends Equatable {
   final String ticketNumber;
   final String plate;
   final String vehicleMake;
-  final String vehicleModel;
   final String vehicleColor;
   final String vehicleType;
   final String timeIn;
@@ -306,12 +304,6 @@ class CheckoutPreviewTicket extends Equatable {
             json['vehicleMake'] ??
             json['brand'] ??
             vMap?['brand'],
-      ),
-      vehicleModel: _str(
-        json['vehicle_model'] ??
-            json['vehicleModel'] ??
-            json['model'] ??
-            vMap?['model'],
       ),
       vehicleColor: _str(
         json['vehicle_color'] ??
@@ -372,7 +364,6 @@ class CheckoutPreviewTicket extends Equatable {
   String get vehicleReceiptLine {
     final parts = <String>[
       vehicleMake.trim(),
-      vehicleModel.trim(),
       vehicleColor.trim(),
       vehicleType.trim(),
     ].where((s) => s.isNotEmpty).toList();
@@ -385,7 +376,6 @@ class CheckoutPreviewTicket extends Equatable {
         ticketNumber,
         plate,
         vehicleMake,
-        vehicleModel,
         vehicleColor,
         vehicleType,
         timeIn,

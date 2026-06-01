@@ -91,5 +91,6 @@ Ticket ticketFromSyncQueuePayload(Map<String, dynamic> p) {
     serverTicketId: _optionalTrimmedStr(p['server_ticket_id']),
     driverIn: _optionalTrimmedStr(p['driver_in']),
     driverOut: _optionalTrimmedStr(p['driver_out']),
+    pendingVoidRequest: false,
   );
 }

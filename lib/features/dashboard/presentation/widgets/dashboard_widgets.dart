@@ -233,7 +233,7 @@ abstract final class DashboardStyles {
     return GoogleFonts.poppins(
       fontSize: 12,
       fontWeight: FontWeight.w400,
-      color: c.textPrimary,
+      color: c.textSecondary,
       height: 1.25,
     ).copyWith(fontFamilyFallback: _pesoFallback);
   }
@@ -364,9 +364,12 @@ class _RailIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tc = AppThemeColors.of(context);
+    final isDark = AppThemeColors.isDark(context);
     final accent = accentSelection && selected;
     final bg = accent
-        ? DashboardStyles.railAccentBg
+        ? (isDark
+              ? DashboardStyles.orange.withValues(alpha: 0.18)
+              : DashboardStyles.railAccentBg)
         : (selected
               ? tc.textPrimary.withValues(alpha: 0.08)
               : Colors.transparent);
@@ -577,7 +580,11 @@ class DashboardActionTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.black.withValues(alpha: 0.13)),
+              border: Border.all(
+                color: primary
+                    ? Colors.white.withValues(alpha: 0.2)
+                    : AppThemeColors.of(context).cardBorder,
+              ),
             ),
             child: Row(
               children: [
@@ -621,6 +628,8 @@ class DashboardTransactionRow extends StatelessWidget {
   const DashboardTransactionRow({
     super.key,
     required this.plate,
+    required this.plateNumber,
+    required this.ticketNumber,
     required this.line1,
     required this.line2,
     required this.status,
@@ -628,13 +637,19 @@ class DashboardTransactionRow extends StatelessWidget {
   });
 
   final String plate;
+  final String plateNumber;
+  /// Formatted ticket number shown in orange badge (e.g. TKT-0123).
+  final String ticketNumber;
   final String line1;
   final String line2;
   final TransactionStatusKind status;
   final VoidCallback? onTap;
 
+  static const _ticketOrange = Color(0xFFF68D00);
+
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     final isParked = status == TransactionStatusKind.parked;
     final line1Style = DashboardStyles.transactionLinePrimaryOf(context);
     final line2Style = DashboardStyles.transactionLineSecondaryOf(context);
@@ -642,11 +657,24 @@ class DashboardTransactionRow extends StatelessWidget {
     final plateBadge = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: DashboardStyles.plateBg,
+        color: tc.plateBadgeBg,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: DashboardStyles.plateBlue),
       ),
       child: Text(plate, style: DashboardStyles.plateBadge()),
+    );
+
+    final ticketBadge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: tc.accentSurface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _ticketOrange),
+      ),
+      child: Text(
+        ticketNumber,
+        style: DashboardStyles.plateBadge().copyWith(color: _ticketOrange),
+      ),
     );
 
     final details = Column(
@@ -672,10 +700,10 @@ class DashboardTransactionRow extends StatelessWidget {
     final statusPill = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: tc.chipBg,
         borderRadius: BorderRadius.circular(100),
         border: Border.all(
-          color: isParked ? DashboardStyles.green : const Color(0xFF6E7584),
+          color: isParked ? DashboardStyles.green : tc.textSecondary,
         ),
       ),
       child: Text(
@@ -694,7 +722,13 @@ class DashboardTransactionRow extends StatelessWidget {
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [plateBadge, const Spacer(), statusPill],
+              children: [
+                plateBadge,
+                const SizedBox(width: 8),
+                ticketBadge,
+                const Spacer(),
+                statusPill,
+              ],
             ),
             const SizedBox(height: 8),
             details,
@@ -706,6 +740,8 @@ class DashboardTransactionRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           plateBadge,
+          const SizedBox(width: 8),
+          ticketBadge,
           const SizedBox(width: 14),
           Expanded(child: details),
           const SizedBox(width: 12),

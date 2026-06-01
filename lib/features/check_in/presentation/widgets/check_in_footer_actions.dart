@@ -58,14 +58,15 @@ class _OutlinedFooterButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return SizedBox(
       height: CheckInCompactTokens.footerButtonHeight,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: AppColors.textPrimary,
-          side: const BorderSide(color: Color(0xFFC0C0BF)),
+          backgroundColor: tc.cardBg,
+          foregroundColor: tc.textPrimary,
+          side: BorderSide(color: tc.cardBorder),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
@@ -73,7 +74,7 @@ class _OutlinedFooterButton extends StatelessWidget {
         child: Text(
           label,
           style: CheckInCompactTokens.footerLabel().copyWith(
-            color: AppColors.textPrimary,
+            color: tc.textPrimary,
           ),
         ),
       ),
@@ -102,7 +103,7 @@ class _PrimaryFooterButton extends StatelessWidget {
         onPressed: busy || !enabled ? null : onPressed,
         style: FilledButton.styleFrom(
           backgroundColor: const Color(0xFFF68D00),
-          disabledBackgroundColor: const Color(0xFFE8E8E8),
+          disabledBackgroundColor: AppThemeColors.of(context).hintFill,
           foregroundColor: Colors.white,
           disabledForegroundColor: const Color(0xFF9E9E9E),
           shape: RoundedRectangleBorder(
@@ -204,6 +205,8 @@ class _CustomerSignatureFooterButton extends StatelessWidget {
     final r = BorderRadius.circular(_radius);
     final shape = RoundedRectangleBorder(borderRadius: r);
 
+    final isDark = AppThemeColors.isDark(context);
+
     if (hasSignature) {
       return SizedBox(
         height: CheckInCompactTokens.footerButtonHeight,
@@ -216,7 +219,9 @@ class _CustomerSignatureFooterButton extends StatelessWidget {
             borderRadius: r,
             child: Ink(
               decoration: BoxDecoration(
-                color: const Color(0xFFF4FBF7),
+                color: isDark
+                    ? const Color(0xFF14532D)
+                    : const Color(0xFFF4FBF7),
                 borderRadius: r,
                 border: Border.all(color: DashboardStyles.green),
               ),
@@ -260,10 +265,8 @@ class _CustomerSignatureFooterButton extends StatelessWidget {
           borderRadius: r,
           child: Ink(
             decoration: BoxDecoration(
-              color: _negativeBg,
+              color: isDark ? const Color(0xFF3D1F24) : _negativeBg,
               borderRadius: r,
-              // Use Border.all, not only top/bottom: partial borders + borderRadius
-              // leave gaps at corner joins in Flutter's border painter.
               border: Border.all(color: _negativeRed, width: 1.5),
             ),
             child: Padding(

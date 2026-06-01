@@ -20,6 +20,8 @@ class CheckoutVehicleReviewFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
+    final primaryEnabled = onPrimary != null && !primaryBusy;
     return Row(
       children: [
         Expanded(
@@ -28,9 +30,9 @@ class CheckoutVehicleReviewFooter extends StatelessWidget {
             child: OutlinedButton(
               onPressed: onBack,
               style: OutlinedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.textPrimary,
-                side: const BorderSide(color: Color(0xFFC0C0BF)),
+                backgroundColor: tc.cardBg,
+                foregroundColor: tc.textPrimary,
+                side: BorderSide(color: tc.cardBorder),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -38,7 +40,7 @@ class CheckoutVehicleReviewFooter extends StatelessWidget {
               child: Text(
                 'Back',
                 style: CheckInCompactTokens.footerLabel().copyWith(
-                  color: AppColors.textPrimary,
+                  color: tc.textPrimary,
                 ),
               ),
             ),
@@ -52,9 +54,10 @@ class CheckoutVehicleReviewFooter extends StatelessWidget {
               onPressed: primaryBusy ? null : onPrimary,
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFF68D00),
-                disabledBackgroundColor: const Color(0xFFE8E8E8),
-                disabledForegroundColor: const Color(0xFF9E9E9E),
+                disabledBackgroundColor: tc.hintFill,
+                disabledForegroundColor: tc.textSecondary,
                 foregroundColor: Colors.white,
+                elevation: primaryEnabled ? 2 : 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -71,7 +74,8 @@ class CheckoutVehicleReviewFooter extends StatelessWidget {
                   : Text(
                       primaryLabel,
                       style: CheckInCompactTokens.footerLabel().copyWith(
-                        color: Colors.white,
+                        color: primaryEnabled ? Colors.white : tc.textSecondary,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
             ),

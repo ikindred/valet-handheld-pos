@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/config/app_config.dart';
@@ -38,20 +40,18 @@ class _CheckInVehicleDetailsScreenState
   bool _areaLevelsLoading = true;
 
   late final TextEditingController _plateCtrl;
-  late final TextEditingController _modelCtrl;
   late final TextEditingController _brandCtrl;
   late final TextEditingController _colorCtrl;
-  late final TextEditingController _yearCtrl;
+  late final TextEditingController _vrNoCtrl;
 
   @override
   void initState() {
     super.initState();
     final s = context.read<CheckInCubit>().state;
     _plateCtrl = TextEditingController(text: s.plateNumber);
-    _modelCtrl = TextEditingController(text: s.vehicleModel);
-    _brandCtrl = TextEditingController(text: s.vehicleBrandMake);
+    _brandCtrl = TextEditingController(text: s.vehicleBrand);
     _colorCtrl = TextEditingController(text: s.vehicleColor);
-    _yearCtrl = TextEditingController(text: s.vehicleYear);
+    _vrNoCtrl = TextEditingController(text: s.vehicleVrNo);
     _loadAreaLevels();
   }
 
@@ -140,10 +140,9 @@ class _CheckInVehicleDetailsScreenState
   @override
   void dispose() {
     _plateCtrl.dispose();
-    _modelCtrl.dispose();
     _brandCtrl.dispose();
     _colorCtrl.dispose();
-    _yearCtrl.dispose();
+    _vrNoCtrl.dispose();
     super.dispose();
   }
 
@@ -165,10 +164,9 @@ class _CheckInVehicleDetailsScreenState
 
     cubit.updateVehicleStep(
       plateNumber: _plateCtrl.text.trim(),
-      vehicleModel: _modelCtrl.text.trim(),
-      vehicleBrandMake: _brandCtrl.text.trim(),
+      vehicleBrand: _brandCtrl.text.trim(),
       vehicleColor: _colorCtrl.text.trim(),
-      vehicleYear: _yearCtrl.text.trim(),
+      vehicleVrNo: _vrNoCtrl.text.trim(),
     );
     final normalizedPlate = cubit.state.plateNumber;
     if (_plateCtrl.text != normalizedPlate) {
@@ -200,24 +198,26 @@ class _CheckInVehicleDetailsScreenState
     );
   }
 
-  Widget _modelYearRow() {
+  Widget _brandVrNoRow() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: CheckInFormField(
-            label: 'MODEL',
-            child: CheckInTextField(controller: _modelCtrl, hint: 'e.g. Camry'),
+            label: 'BRAND / MODEL',
+            child: CheckInTextField(
+              controller: _brandCtrl,
+              hint: 'e.g. Toyota Vios',
+            ),
           ),
         ),
         const SizedBox(width: CheckInCompactTokens.fieldGap),
         Expanded(
           child: CheckInFormField(
-            label: 'YEAR',
+            label: 'VR NO.',
             child: CheckInTextField(
-              controller: _yearCtrl,
-              hint: '2024',
-              keyboardType: TextInputType.number,
+              controller: _vrNoCtrl,
+              hint: 'e.g. VR-12345',
               valueStyle: CheckInCompactTokens.fieldValue(),
             ),
           ),
@@ -226,30 +226,13 @@ class _CheckInVehicleDetailsScreenState
     );
   }
 
-  Widget _brandColorRow() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: CheckInFormField(
-            label: 'BRAND / MAKE',
-            child: CheckInTextField(
-              controller: _brandCtrl,
-              hint: 'e.g. Toyota',
-            ),
-          ),
-        ),
-        const SizedBox(width: CheckInCompactTokens.fieldGap),
-        Expanded(
-          child: CheckInFormField(
-            label: 'COLOR',
-            child: CheckInTextField(
-              controller: _colorCtrl,
-              hint: 'e.g. Silver',
-            ),
-          ),
-        ),
-      ],
+  Widget _colorRow() {
+    return CheckInFormField(
+      label: 'COLOR',
+      child: CheckInTextField(
+        controller: _colorCtrl,
+        hint: 'e.g. Silver',
+      ),
     );
   }
 
@@ -328,9 +311,9 @@ class _CheckInVehicleDetailsScreenState
         const SizedBox(height: CheckInCompactTokens.sectionGap),
         _plateBlock(),
         const SizedBox(height: CheckInCompactTokens.fieldGap),
-        _modelYearRow(),
+        _brandVrNoRow(),
         const SizedBox(height: CheckInCompactTokens.fieldGap),
-        _brandColorRow(),
+        _colorRow(),
         const SizedBox(height: CheckInCompactTokens.blockGap),
         const CheckInSectionTitle(text: 'VEHICLE TYPE'),
         const SizedBox(height: CheckInCompactTokens.sectionGap),
@@ -395,7 +378,7 @@ class _CheckInVehicleDetailsScreenState
                         VerticalDivider(
                           width: CheckInCompactTokens.columnDividerWidth,
                           thickness: 1,
-                          color: Colors.black.withValues(alpha: 0.13),
+                          color: AppThemeColors.of(context).cardBorder,
                         ),
                         Expanded(child: _columnParkingOnly()),
                       ],
