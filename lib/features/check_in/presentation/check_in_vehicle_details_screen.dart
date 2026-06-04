@@ -214,7 +214,7 @@ class _CheckInVehicleDetailsScreenState
         const SizedBox(width: CheckInCompactTokens.fieldGap),
         Expanded(
           child: CheckInFormField(
-            label: 'VR NO.',
+            label: 'VR NO. (OPTIONAL)',
             child: CheckInTextField(
               controller: _vrNoCtrl,
               hint: 'e.g. VR-12345',

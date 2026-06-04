@@ -426,7 +426,13 @@ class TicketService {
       throw StateError('Signature file missing: $path');
     }
 
-    final vehicle = _mapField(body['vehicle']);
+    final vehicleRaw = _mapField(body['vehicle']);
+    final vrFromVehicle =
+        vehicleRaw['vr_no']?.toString().trim() ??
+        vehicleRaw['vrNo']?.toString().trim();
+    final vehicle = Map<String, dynamic>.from(vehicleRaw)
+      ..remove('vr_no')
+      ..remove('vrNo');
     final belongings = _stringListField(body['belongings']);
     final damages = _damageListField(body['damages']);
 
@@ -441,10 +447,12 @@ class TicketService {
     }
 
     final localRow = localId.isNotEmpty ? await ticketById(localId) : null;
-    final vrFromVehicle = vehicle['vr_no']?.toString().trim();
+    final vrFromQueue = body['vr_no']?.toString().trim();
     final vrNo = localRow?.vrNo?.trim().isNotEmpty == true
         ? localRow!.vrNo!.trim()
-        : (vrFromVehicle?.isNotEmpty == true ? vrFromVehicle : null);
+        : (vrFromQueue?.isNotEmpty == true
+            ? vrFromQueue
+            : (vrFromVehicle?.isNotEmpty == true ? vrFromVehicle : null));
 
     final response = await _transactionsApi.submitCheckIn(
       token: token,

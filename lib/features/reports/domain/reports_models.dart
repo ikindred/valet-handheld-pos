@@ -7,6 +7,7 @@ class ReportsTicketRow extends Equatable {
   const ReportsTicketRow({
     required this.ticketId,
     required this.plate,
+    this.vrNo = '—',
     required this.vehicle,
     required this.timeIn,
     required this.duration,
@@ -29,6 +30,10 @@ class ReportsTicketRow extends Equatable {
   final String? serverTransactionId;
 
   final String plate;
+
+  /// Valet receipt number (`vr_no`); `—` when unset.
+  final String vrNo;
+
   final String vehicle;
   final DateTime timeIn;
 
@@ -81,6 +86,7 @@ class ReportsTicketRow extends Equatable {
         ticketId,
         serverTransactionId,
         plate,
+        vrNo,
         vehicle,
         timeIn,
         timeInDisplay,

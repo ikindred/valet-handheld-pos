@@ -19,7 +19,6 @@ abstract final class CheckInDemoDefaults {
       plateNumber: 'ABC 1234',
       vehicleBrand: 'Toyota Vios',
       vehicleColor: 'White',
-      vehicleVrNo: 'VR-12345',
       vehicleBodyType: VehicleBodyType.sedan,
       parkingLevel: 'Level 1',
       parkingSlot: 'Slot #1',

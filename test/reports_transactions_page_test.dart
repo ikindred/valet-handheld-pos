@@ -13,6 +13,7 @@ void main() {
         {
           'id': '3fa85f64-5717-4562-b3fc-2c963f66afa6',
           'ticket_number': 'TKT-0123',
+          'vr_no': 'VR-2026-00142',
           'plate_number': 'ABC1234',
           'vehicle': 'Toyota Vios',
           'color': 'White',
@@ -34,6 +35,7 @@ void main() {
     expect(row.ticketId, 'TKT-0123');
     expect(row.serverTransactionId, '3fa85f64-5717-4562-b3fc-2c963f66afa6');
     expect(row.plate, 'ABC1234');
+    expect(row.vrNo, 'VR-2026-00142');
     expect(row.vehicle, 'Toyota Vios · White');
     expect(row.timeInDisplay, '08:00');
     expect(row.durationDisplay, '1h 20m');

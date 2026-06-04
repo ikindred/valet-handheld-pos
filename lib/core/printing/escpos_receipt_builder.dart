@@ -369,6 +369,13 @@ class EscPosReceiptBuilder {
     }
 
     if (includeQr && qrPayload.isNotEmpty) {
+      out.addAll(
+        _printLines(
+          ReceiptTemplateCopy.claimStubHeading,
+          align: PosAlign.center,
+          bold: true,
+        ),
+      );
       out.addAll(gen.feed(2));
       out.addAll(_escAlign(PosAlign.center));
       out.addAll(gen.qrcode(qrPayload, size: _qrSize, align: PosAlign.center));

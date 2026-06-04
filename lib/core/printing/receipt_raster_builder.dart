@@ -313,6 +313,12 @@ class ReceiptRasterBuilder {
       blocks.addAll([
         const _DashedRuleBlock(),
         const _GapBlock(8),
+        const _TextBlock(
+          ReceiptTemplateCopy.claimStubHeading,
+          center: true,
+          bold: true,
+        ),
+        const _GapBlock(8),
         _QrBlock(ticketNo, sizePx: _checkInQrSizePx),
         const _GapBlock(8),
         const _TextBlock(

@@ -88,6 +88,7 @@ final class DashboardRecentTx extends Equatable {
     this.timeIn,
     this.timeOut,
     this.slot = '—',
+    this.vrNo = '—',
     this.hasPendingVoid = false,
     this.isVoided = false,
   });
@@ -106,6 +107,10 @@ final class DashboardRecentTx extends Equatable {
   final DateTime? timeOut;
   /// Raw slot code (e.g. "LT101"); "—" when unknown.
   final String slot;
+
+  /// Valet receipt number (`vr_no`); "—" when unset.
+  final String vrNo;
+
   /// True when the API reports a pending void request on this ticket.
   final bool hasPendingVoid;
 
@@ -123,6 +128,7 @@ final class DashboardRecentTx extends Equatable {
       status: row.isCheckedOut
           ? DashboardRecentStatus.checkedOut
           : DashboardRecentStatus.parked,
+      vrNo: '—',
     );
   }
 
@@ -140,6 +146,8 @@ final class DashboardRecentTx extends Equatable {
     final timeOut = DateTime.tryParse(r.timeOut ?? '')?.toLocal();
     final rawSlot = r.parkingSlot?.trim() ?? '';
     final slot = rawSlot.isEmpty ? '—' : rawSlot;
+    final vr = r.vrNo?.trim() ?? '';
+    final vrNo = vr.isEmpty ? '—' : vr;
 
     if (completed) {
       final inn = timeIn ?? DateTime.now();
@@ -155,6 +163,7 @@ final class DashboardRecentTx extends Equatable {
         timeIn: inn,
         timeOut: out,
         slot: slot,
+        vrNo: vrNo,
         hasPendingVoid: r.hasPendingVoid,
         isVoided: r.isVoided,
       );
@@ -171,6 +180,7 @@ final class DashboardRecentTx extends Equatable {
       status: DashboardRecentStatus.parked,
       timeIn: inn,
       slot: slot,
+      vrNo: vrNo,
       hasPendingVoid: r.hasPendingVoid,
       isVoided: r.isVoided,
     );
@@ -188,6 +198,7 @@ final class DashboardRecentTx extends Equatable {
         timeIn,
         timeOut,
         slot,
+        vrNo,
         hasPendingVoid,
         isVoided,
       ];
@@ -399,6 +410,8 @@ class DashboardCubit extends Cubit<DashboardState> {
         : rawSlot.toLowerCase().startsWith('slot ')
             ? rawSlot.substring(5).trim()
             : rawSlot;
+    final vrRaw = t.vrNo?.trim() ?? '';
+    final vrNo = vrRaw.isEmpty ? '—' : vrRaw;
     if (t.status == 'completed') {
       final outLocal =
           DateTime.tryParse(t.checkOutAt ?? '')?.toLocal() ?? inLocal;
@@ -413,6 +426,7 @@ class DashboardCubit extends Cubit<DashboardState> {
         timeIn: inLocal,
         timeOut: outLocal,
         slot: slot,
+        vrNo: vrNo,
         hasPendingVoid: t.pendingVoidRequest,
       );
     }
@@ -429,6 +443,7 @@ class DashboardCubit extends Cubit<DashboardState> {
       status: DashboardRecentStatus.parked,
       timeIn: inLocal,
       slot: slot,
+      vrNo: vrNo,
       hasPendingVoid: t.pendingVoidRequest,
     );
   }

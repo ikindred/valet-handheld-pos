@@ -158,6 +158,7 @@ class DashboardSummaryRecent {
     this.vehicleBrand,
     this.vehicleColor,
     this.parkingSlot,
+    this.vrNo,
     this.voidRequest,
     this.rawJson,
   });
@@ -173,6 +174,7 @@ class DashboardSummaryRecent {
   final String? vehicleBrand;
   final String? vehicleColor;
   final String? parkingSlot;
+  final String? vrNo;
 
   /// Parsed from `void_request` object in the API transaction row.
   final VoidRequestInfo? voidRequest;
@@ -231,6 +233,9 @@ class DashboardSummaryRecent {
       slot = _str(parking['slot']);
     }
 
+    final vrNo = _str(json['vr_no'] ?? json['vrNo']) ??
+        (vehicle != null ? _str(vehicle['vr_no'] ?? vehicle['vrNo']) : null);
+
     return DashboardSummaryRecent(
       id: id,
       ticketNumber: (json['ticket_number'] ?? json['ticketNumber'] ?? id)
@@ -247,6 +252,7 @@ class DashboardSummaryRecent {
       vehicleBrand: brand,
       vehicleColor: color,
       parkingSlot: slot,
+      vrNo: vrNo,
       voidRequest: VoidRequestInfo.tryFromJson(
         json['void_request'] ?? json['voidRequest'],
       ),

@@ -577,18 +577,18 @@ class CheckInCubit extends Cubit<CheckInState> {
       customerName: _optionalTrim(state.customerFullName),
       driverIn: _optionalTrim(state.assignedValetDriver),
       notes: _optionalTrim(state.specialInstructions),
+      vrNo: _optionalTrim(state.vehicleVrNo),
     );
     await ts.enqueueCheckInSync(localTicketId: ticketId, payload: payload);
   }
 
+  /// Vehicle JSON for check-in API (`vr_no` is a separate top-level field).
   Map<String, dynamic> _buildVehicleMap() {
-    final vrNo = state.vehicleVrNo.trim();
     return <String, dynamic>{
       'plate_number': normalizePlateNumber(state.plateNumber),
       'brand': state.vehicleBrand.trim(),
       'color': state.vehicleColor.trim(),
       'type': _vehicleTypeApi(state.vehicleBodyType),
-      'vr_no': vrNo.isEmpty ? null : vrNo,
     };
   }
 

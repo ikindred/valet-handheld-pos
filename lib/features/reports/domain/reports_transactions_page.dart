@@ -59,6 +59,7 @@ abstract final class ReportsTicketRowMapper {
     final serverId = _str(json['id']);
     final ticketNumber = _str(json['ticket_number'] ?? json['ticketNumber']);
     final plate = _str(json['plate_number'] ?? json['plateNumber']);
+    final vrNo = _vrNo(json);
     final vehicleRaw = _str(json['vehicle']);
     final color = _str(json['color']);
     final vehicle = _vehicleLine(vehicleRaw, color);
@@ -80,6 +81,7 @@ abstract final class ReportsTicketRowMapper {
       ticketId: ticketNumber.isEmpty ? '—' : ticketNumber,
       serverTransactionId: serverId.isEmpty ? null : serverId,
       plate: plate.isEmpty ? '—' : plate,
+      vrNo: vrNo.isEmpty ? '—' : vrNo,
       vehicle: vehicle.isEmpty ? '—' : vehicle,
       timeIn: _timeInAsToday(timeInRaw),
       timeInDisplay: timeInRaw.isEmpty ? null : timeInRaw,
@@ -127,6 +129,17 @@ abstract final class ReportsTicketRowMapper {
       'active' => ReportsTicketRowStatus.parked,
       _ => ReportsTicketRowStatus.parked,
     };
+  }
+
+  static String _vrNo(Map<String, dynamic> json) {
+    final top = _str(json['vr_no'] ?? json['vrNo']);
+    if (top.isNotEmpty) return top;
+    final vehicle = json['vehicle'];
+    if (vehicle is Map) {
+      final m = Map<String, dynamic>.from(vehicle);
+      return _str(m['vr_no'] ?? m['vrNo']);
+    }
+    return '';
   }
 
   static String _str(dynamic v) {

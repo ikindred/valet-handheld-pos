@@ -41,6 +41,7 @@ abstract final class ReportsRowBuilder {
       serverTransactionId:
           serverId != null && serverId.isNotEmpty ? serverId : null,
       plate: t.plateNumber.trim().isEmpty ? '—' : t.plateNumber.trim(),
+      vrNo: t.vrNo?.trim().isNotEmpty == true ? t.vrNo!.trim() : '—',
       vehicle: DashboardRecentFormat.vehicleLineFromTicket(t),
       timeIn: timeIn,
       timeOut: timeOut,

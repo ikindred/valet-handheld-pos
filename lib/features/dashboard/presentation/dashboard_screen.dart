@@ -455,6 +455,7 @@ class _RecentTransactionsCard extends StatelessWidget {
       ticketId: tx.ticketNumber,
       serverTransactionId: tx.ticketId,
       plate: tx.plateNumber.isNotEmpty ? tx.plateNumber : tx.plate,
+      vrNo: tx.vrNo,
       vehicle: tx.line1,
       timeIn: timeIn,
       timeOut: timeOut,

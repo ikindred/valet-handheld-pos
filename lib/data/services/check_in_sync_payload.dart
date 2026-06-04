@@ -11,6 +11,7 @@ Map<String, dynamic> checkInSyncQueuePayload({
   String? customerName,
   String? driverIn,
   String? notes,
+  String? vrNo,
 }) {
   return <String, dynamic>{
     'local_ticket_id': localTicketId,
@@ -25,5 +26,6 @@ Map<String, dynamic> checkInSyncQueuePayload({
       'customer_name': customerName.trim(),
     if (driverIn != null && driverIn.trim().isNotEmpty) 'driver_in': driverIn.trim(),
     if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+    if (vrNo != null && vrNo.trim().isNotEmpty) 'vr_no': vrNo.trim(),
   };
 }

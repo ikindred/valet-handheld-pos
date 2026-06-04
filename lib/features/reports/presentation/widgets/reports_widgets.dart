@@ -407,6 +407,7 @@ class _ReportsTransactionsTable extends StatelessWidget {
   static const _headers = [
     'Ticket',
     'Plate',
+    'VR No',
     'Vehicle',
     'Time In',
     'Check Out',
@@ -459,7 +460,9 @@ class _HeaderRow extends StatelessWidget {
             Expanded(
               flex: _flexForColumn(i),
               child: Padding(
-                padding: EdgeInsets.only(right: i < 7 ? 8 : 0),
+                padding: EdgeInsets.only(
+                  right: i < _ReportsTransactionsTable._headers.length - 1 ? 8 : 0,
+                ),
                 child: Text(
                   _ReportsTransactionsTable._headers[i],
                   style: ReportsStyles.tableHeaderOf(context),
@@ -512,8 +515,8 @@ class _DataRow extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Text(
-                row.vehicle,
-                maxLines: 2,
+                row.vrNo,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: ReportsStyles.tableCellOf(context),
               ),
@@ -524,7 +527,9 @@ class _DataRow extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Text(
-                row.timeInLabel,
+                row.vehicle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: ReportsStyles.tableCellOf(context),
               ),
             ),
@@ -534,7 +539,7 @@ class _DataRow extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Text(
-                row.timeOutLabel,
+                row.timeInLabel,
                 style: ReportsStyles.tableCellOf(context),
               ),
             ),
@@ -543,18 +548,28 @@ class _DataRow extends StatelessWidget {
             flex: _flexForColumn(5),
             child: Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: _DurationCell(row: row),
+              child: Text(
+                row.timeOutLabel,
+                style: ReportsStyles.tableCellOf(context),
+              ),
             ),
           ),
           Expanded(
             flex: _flexForColumn(6),
             child: Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: Text(row.slot, style: ReportsStyles.tableCellOf(context)),
+              child: _DurationCell(row: row),
             ),
           ),
           Expanded(
             flex: _flexForColumn(7),
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(row.slot, style: ReportsStyles.tableCellOf(context)),
+            ),
+          ),
+          Expanded(
+            flex: _flexForColumn(8),
             child: Align(
               alignment: Alignment.centerLeft,
               child: _StatusPaymentCell(row: row),
@@ -577,14 +592,15 @@ class _DataRow extends StatelessWidget {
 }
 
 int _flexForColumn(int index) => switch (index) {
-      0 => 13, // Ticket
-      1 => 10, // Plate
-      2 => 14, // Vehicle
-      3 => 8,  // Time In
-      4 => 8,  // Check Out
-      5 => 8,  // Duration
-      6 => 7,  // Slot
-      _ => 10, // Status
+      0 => 12, // Ticket
+      1 => 9,  // Plate
+      2 => 9,  // VR No
+      3 => 12, // Vehicle
+      4 => 7,  // Time In
+      5 => 7,  // Check Out
+      6 => 7,  // Duration
+      7 => 6,  // Slot
+      _ => 9,  // Status
     };
 
 class _FixedTable extends StatelessWidget {
@@ -595,7 +611,7 @@ class _FixedTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const colW = <double>[96, 88, 120, 62, 62, 62, 50, 96];
+    const colW = <double>[96, 88, 76, 110, 58, 58, 58, 48, 96];
     return Table(
       defaultVerticalAlignment: TableCellVerticalAlignment.middle,
       columnWidths: {
@@ -622,6 +638,17 @@ class _FixedTable extends StatelessWidget {
                 ),
               ),
               _cell(_maybeTap(r, _PlateBadge(plate: r.plate))),
+              _cell(
+                _maybeTap(
+                  r,
+                  Text(
+                    r.vrNo,
+                    style: ReportsStyles.tableCellOf(context),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
               _cell(
                 _maybeTap(
                   r,

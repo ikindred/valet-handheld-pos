@@ -78,5 +78,7 @@ abstract final class ReceiptTemplateCopy {
   static const defaultMallHours = 'MONDAY - SUNDAY  10:00AM - 9:00PM';
   static const brandName = 'VALET MASTER';
   static const thankYouLine = 'THANK YOU FOR USING VALET MASTER';
+  /// Customer copy (part 2) — shown after the rule line, before the QR code.
+  static const claimStubHeading = 'CLAIM STUB';
   static const scanQrHint = 'Scan at check-out';
 }
