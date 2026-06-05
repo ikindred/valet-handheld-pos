@@ -8,13 +8,11 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/connectivity/internet_reachability.dart';
 import '../../../core/printing/bluetooth_pos_printer.dart';
 import '../../../core/printing/print_flow.dart';
 import '../../../core/printing/printer_connection_notifier.dart';
 import '../../../core/printing/valet_print_service.dart';
 import '../../../core/printing/widgets/printer_pairing_sheet.dart';
-import '../../../core/storage/prefs_keys.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_notifier.dart';
 import '../../../data/repositories/auth_repository.dart';
@@ -43,9 +41,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _fullName = '';
   String _roleBadge = 'Staff';
   String _roleSubtitle = 'Valet Staff';
-  bool _isOnline = false;
   bool _autoSyncEnabled = true;
-  bool _isOfflineMode = false;
   int _pendingCount = 0;
   String _lastSyncLabel = 'Never';
   bool _syncing = false;
@@ -61,7 +57,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _loadUserInfo(),
       _loadSyncInfo(),
       _loadPrefs(),
-      _checkConnectivity(),
     ]);
   }
 
@@ -120,15 +115,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     setState(() {
-      _isOfflineMode = prefs.getBool(PrefsKeys.offlineMode) ?? false;
       _autoSyncEnabled = prefs.getBool(_kAutoSyncKey) ?? true;
     });
-  }
-
-  Future<void> _checkConnectivity() async {
-    final online = await InternetReachability.hasInternet();
-    if (!mounted) return;
-    setState(() => _isOnline = online);
   }
 
   Future<void> _triggerSync() async {
@@ -150,13 +138,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } finally {
       if (mounted) setState(() => _syncing = false);
     }
-  }
-
-  Future<void> _toggleOfflineMode(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(PrefsKeys.offlineMode, value);
-    if (!mounted) return;
-    setState(() => _isOfflineMode = value);
   }
 
   Future<void> _toggleAutoSync(bool value) async {
@@ -250,8 +231,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const SizedBox(height: 16),
                         if (wide)
                           _WideLayout(
-                            isOfflineMode: _isOfflineMode,
-                            isOnline: _isOnline,
                             pendingCount: _pendingCount,
                             lastSyncLabel: _lastSyncLabel,
                             autoSyncEnabled: _autoSyncEnabled,
@@ -260,7 +239,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             fullName: _fullName,
                             roleBadge: _roleBadge,
                             roleSubtitle: _roleSubtitle,
-                            onToggleOfflineMode: _toggleOfflineMode,
                             onSyncNow: _triggerSync,
                             onToggleAutoSync: _toggleAutoSync,
                             onTestPrint: _testPrint,
@@ -268,8 +246,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           )
                         else
                           _NarrowLayout(
-                            isOfflineMode: _isOfflineMode,
-                            isOnline: _isOnline,
                             pendingCount: _pendingCount,
                             lastSyncLabel: _lastSyncLabel,
                             autoSyncEnabled: _autoSyncEnabled,
@@ -278,7 +254,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             fullName: _fullName,
                             roleBadge: _roleBadge,
                             roleSubtitle: _roleSubtitle,
-                            onToggleOfflineMode: _toggleOfflineMode,
                             onSyncNow: _triggerSync,
                             onToggleAutoSync: _toggleAutoSync,
                             onTestPrint: _testPrint,
@@ -344,8 +319,6 @@ class _SettingsHeader extends StatelessWidget {
 
 class _WideLayout extends StatelessWidget {
   const _WideLayout({
-    required this.isOfflineMode,
-    required this.isOnline,
     required this.pendingCount,
     required this.lastSyncLabel,
     required this.autoSyncEnabled,
@@ -354,15 +327,12 @@ class _WideLayout extends StatelessWidget {
     required this.fullName,
     required this.roleBadge,
     required this.roleSubtitle,
-    required this.onToggleOfflineMode,
     required this.onSyncNow,
     required this.onToggleAutoSync,
     required this.onTestPrint,
     required this.onReconnect,
   });
 
-  final bool isOfflineMode;
-  final bool isOnline;
   final int pendingCount;
   final String lastSyncLabel;
   final bool autoSyncEnabled;
@@ -371,7 +341,6 @@ class _WideLayout extends StatelessWidget {
   final String fullName;
   final String roleBadge;
   final String roleSubtitle;
-  final ValueChanged<bool> onToggleOfflineMode;
   final VoidCallback onSyncNow;
   final ValueChanged<bool> onToggleAutoSync;
   final VoidCallback onTestPrint;
@@ -387,13 +356,10 @@ class _WideLayout extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _DataSyncCard(
-                isOfflineMode: isOfflineMode,
-                isOnline: isOnline,
                 pendingCount: pendingCount,
                 lastSyncLabel: lastSyncLabel,
                 autoSyncEnabled: autoSyncEnabled,
                 isSyncing: isSyncing,
-                onToggleOfflineMode: onToggleOfflineMode,
                 onSyncNow: onSyncNow,
                 onToggleAutoSync: onToggleAutoSync,
               ),
@@ -430,8 +396,6 @@ class _WideLayout extends StatelessWidget {
 
 class _NarrowLayout extends StatelessWidget {
   const _NarrowLayout({
-    required this.isOfflineMode,
-    required this.isOnline,
     required this.pendingCount,
     required this.lastSyncLabel,
     required this.autoSyncEnabled,
@@ -440,15 +404,12 @@ class _NarrowLayout extends StatelessWidget {
     required this.fullName,
     required this.roleBadge,
     required this.roleSubtitle,
-    required this.onToggleOfflineMode,
     required this.onSyncNow,
     required this.onToggleAutoSync,
     required this.onTestPrint,
     required this.onReconnect,
   });
 
-  final bool isOfflineMode;
-  final bool isOnline;
   final int pendingCount;
   final String lastSyncLabel;
   final bool autoSyncEnabled;
@@ -457,7 +418,6 @@ class _NarrowLayout extends StatelessWidget {
   final String fullName;
   final String roleBadge;
   final String roleSubtitle;
-  final ValueChanged<bool> onToggleOfflineMode;
   final VoidCallback onSyncNow;
   final ValueChanged<bool> onToggleAutoSync;
   final VoidCallback onTestPrint;
@@ -469,13 +429,10 @@ class _NarrowLayout extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _DataSyncCard(
-          isOfflineMode: isOfflineMode,
-          isOnline: isOnline,
           pendingCount: pendingCount,
           lastSyncLabel: lastSyncLabel,
           autoSyncEnabled: autoSyncEnabled,
           isSyncing: isSyncing,
-          onToggleOfflineMode: onToggleOfflineMode,
           onSyncNow: onSyncNow,
           onToggleAutoSync: onToggleAutoSync,
         ),
@@ -543,24 +500,18 @@ class _SettingsIconTone {
 
 class _DataSyncCard extends StatelessWidget {
   const _DataSyncCard({
-    required this.isOfflineMode,
-    required this.isOnline,
     required this.pendingCount,
     required this.lastSyncLabel,
     required this.autoSyncEnabled,
     required this.isSyncing,
-    required this.onToggleOfflineMode,
     required this.onSyncNow,
     required this.onToggleAutoSync,
   });
 
-  final bool isOfflineMode;
-  final bool isOnline;
   final int pendingCount;
   final String lastSyncLabel;
   final bool autoSyncEnabled;
   final bool isSyncing;
-  final ValueChanged<bool> onToggleOfflineMode;
   final VoidCallback onSyncNow;
   final ValueChanged<bool> onToggleAutoSync;
 
@@ -568,27 +519,12 @@ class _DataSyncCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final wifiTone = _SettingsIconTone.blue(context);
     final syncTone = _SettingsIconTone.green(context);
     final historyTone = _SettingsIconTone.amber(context);
     final autoTone = _SettingsIconTone.emerald(context);
     return _SettingsCard(
       sectionLabel: 'DATA & SYNC',
       children: [
-        _SettingsRow(
-          iconBg: wifiTone.$1,
-          iconColor: wifiTone.$2,
-          icon: isOfflineMode
-              ? Icons.wifi_off_rounded
-              : Icons.wifi_rounded,
-          title: 'Offline Mode',
-          subtitle: 'Continue working without internet',
-          trailing: _GreenFilledButton(
-            label: isOfflineMode ? 'Go Online' : 'Connect',
-            onPressed: () => onToggleOfflineMode(!isOfflineMode),
-          ),
-        ),
-        const _RowDivider(),
         _SettingsRow(
           iconBg: syncTone.$1,
           iconColor: syncTone.$2,
