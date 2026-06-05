@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/ui/app_text_field.dart';
 import 'check_in_compact_tokens.dart';
 
@@ -26,6 +27,8 @@ class CheckInTextField extends StatelessWidget {
     required this.controller,
     this.focusNode,
     this.keyboardType,
+    this.textCapitalization = TextCapitalization.none,
+    this.inputFormatters,
     this.obscureText = false,
     this.maxLines = 1,
     this.hint,
@@ -36,6 +39,8 @@ class CheckInTextField extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode? focusNode;
   final TextInputType? keyboardType;
+  final TextCapitalization textCapitalization;
+  final List<TextInputFormatter>? inputFormatters;
   final bool obscureText;
   final int maxLines;
   final String? hint;
@@ -48,6 +53,8 @@ class CheckInTextField extends StatelessWidget {
       controller: controller,
       focusNode: focusNode,
       keyboardType: keyboardType,
+      textCapitalization: textCapitalization,
+      inputFormatters: inputFormatters,
       obscureText: obscureText,
       maxLines: maxLines,
       minHeight: minHeight,

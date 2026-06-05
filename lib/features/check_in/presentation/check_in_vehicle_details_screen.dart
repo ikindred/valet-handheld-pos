@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -218,6 +219,11 @@ class _CheckInVehicleDetailsScreenState
             child: CheckInTextField(
               controller: _vrNoCtrl,
               hint: 'e.g. VR-12345',
+              keyboardType: TextInputType.text,
+              textCapitalization: TextCapitalization.characters,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-]')),
+              ],
               valueStyle: CheckInCompactTokens.fieldValue(),
             ),
           ),

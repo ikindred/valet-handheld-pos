@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/app_theme.dart';
@@ -167,6 +168,8 @@ class AppTextField extends StatefulWidget {
     required this.controller,
     this.focusNode,
     this.keyboardType,
+    this.textCapitalization = TextCapitalization.none,
+    this.inputFormatters,
     this.obscureText = false,
     this.maxLines = 1,
     this.minHeight = AppTextFieldTokens.minInputHeight,
@@ -182,6 +185,8 @@ class AppTextField extends StatefulWidget {
   final TextEditingController controller;
   final FocusNode? focusNode;
   final TextInputType? keyboardType;
+  final TextCapitalization textCapitalization;
+  final List<TextInputFormatter>? inputFormatters;
   final bool obscureText;
   final int maxLines;
   final double minHeight;
@@ -241,6 +246,8 @@ class _AppTextFieldState extends State<AppTextField> {
         controller: widget.controller,
         focusNode: _focusNode,
         keyboardType: widget.keyboardType,
+        textCapitalization: widget.textCapitalization,
+        inputFormatters: widget.inputFormatters,
         obscureText: widget.obscureText,
         maxLines: widget.maxLines,
         autofocus: widget.autofocus,
