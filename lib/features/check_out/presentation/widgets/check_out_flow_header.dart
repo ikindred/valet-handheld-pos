@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../check_in/presentation/widgets/check_in_compact_tokens.dart';
 import '../../../check_in/presentation/widgets/check_in_flow_header.dart';
-import '../../../dashboard/presentation/widgets/dashboard_widgets.dart';
+import '../../../../shared/widgets/branch_rates_slots_header_actions.dart';
 import '../../state/check_out_cubit.dart';
 
 /// Checkout title bar — compact chrome matching [CheckInFlowHeader].
@@ -77,22 +77,20 @@ class CheckOutFlowHeader extends StatelessWidget {
                 ],
               ),
             ),
-            BlocBuilder<CheckOutCubit, CheckOutState>(
-              buildWhen: (a, b) =>
-                  a.ticket?.id != b.ticket?.id ||
-                  a.receiptTicket != b.receiptTicket ||
-                  a.receiptSnapshot != b.receiptSnapshot,
-              builder: (context, state) {
-                final ticket = state.ticket?.id ?? state.receiptTicket ?? '';
-                if (ticket.isEmpty) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: _TicketPill(ticketNumber: ticket),
-                );
-              },
+            BranchRatesSlotsHeaderActions(
+              leading: BlocBuilder<CheckOutCubit, CheckOutState>(
+                buildWhen: (a, b) =>
+                    a.ticket?.id != b.ticket?.id ||
+                    a.receiptTicket != b.receiptTicket ||
+                    a.receiptSnapshot != b.receiptSnapshot,
+                builder: (context, state) {
+                  final ticket =
+                      state.ticket?.id ?? state.receiptTicket ?? '';
+                  if (ticket.isEmpty) return const SizedBox.shrink();
+                  return _TicketPill(ticketNumber: ticket);
+                },
+              ),
             ),
-            const SizedBox(width: 8),
-            const DashboardStatusPillLive(),
           ],
         ),
       ),

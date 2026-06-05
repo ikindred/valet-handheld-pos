@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:valet_handheld_pos/data/remote/area_detail.dart';
+import 'package:valet_handheld_pos/features/check_in/domain/vehicle_body_type.dart';
 
 void main() {
   test('AreaDetail parses standard and vehicleTypeRates', () {
@@ -61,6 +62,136 @@ void main() {
     });
     expect(detail, isNotNull);
     expect(detail!.flatBlockHours, 8);
+  });
+
+  test('AreaParkingSlot sortAvailableFirst puts available slots on top', () {
+    const slots = [
+      AreaParkingSlot(id: '1', label: 'VAL01', status: 'OCCUPIED'),
+      AreaParkingSlot(id: '3', label: 'VAL03', status: 'AVAILABLE'),
+      AreaParkingSlot(id: '2', label: 'VAL02', status: 'OCCUPIED'),
+      AreaParkingSlot(id: '4', label: 'VAL04', status: 'AVAILABLE'),
+    ];
+    final sorted = AreaParkingSlot.sortAvailableFirst(slots);
+    expect(sorted.map((s) => s.label).toList(), [
+      'VAL03',
+      'VAL04',
+      'VAL01',
+      'VAL02',
+    ]);
+  });
+
+  test('resolveFlatBlockHours inherits standard when vehicle hours null', () {
+    expect(
+      BranchRatesSnapshot.resolveFlatBlockHours(
+        standardHours: 3,
+        vehicleTypeHours: 0,
+      ),
+      3,
+    );
+    expect(
+      BranchRatesSnapshot.resolveFlatBlockHours(
+        standardHours: 3,
+        vehicleTypeHours: 4,
+      ),
+      4,
+    );
+  });
+
+  test('BranchRatesApiPayload uses areaOverrides when area matches', () {
+    const areaId = 'c3d4e5f6-a7b8-9012-cdef-123456789012';
+    final payload = BranchRatesApiPayload.fromResponseData({
+      'overnight_start_time': '01:30',
+      'overnight_end_time': '06:00',
+      'standardRates': {
+        'flatRate': 150,
+        'flatRateHours': 3,
+        'succeedingRate': 30,
+        'overnightFee': 200,
+        'lostTicketFee': 200,
+      },
+      'areaOverrides': [
+        {
+          'id': areaId,
+          'name': 'VIP Parking',
+          'code': 'AREA-VIP',
+          'flatRate': 200,
+          'flatRateHours': 2,
+          'succeedingRate': 40,
+          'overnightFee': 250,
+          'lostTicketFee': 250,
+          'vehicleTypeRates': [
+            {
+              'id': 'd4',
+              'name': 'Luxury',
+              'flatRate': 300,
+              'flatRateHours': 4,
+              'succeedingRate': 50,
+              'overnightFee': 350,
+              'lostTicketFee': 250,
+            },
+          ],
+        },
+      ],
+      'vehicleTypeRates': [
+        {
+          'id': 'e5',
+          'name': 'Sedan / Hatchback',
+          'flatRate': 150,
+          'flatRateHours': 3,
+          'succeedingRate': 30,
+          'status': 'ACTIVE',
+        },
+      ],
+    });
+    expect(payload, isNotNull);
+
+    final vip = payload!.resolveForArea(areaId: areaId);
+    expect(vip.usesAreaOverride, isTrue);
+    expect(vip.standard.flatRate, 200);
+    expect(vip.flatBlockHours, 2);
+    expect(vip.vehicleTypeRates, hasLength(1));
+    expect(vip.vehicleTypeRates.first.name, 'Luxury');
+    expect(
+      BranchRatesSnapshot.bodyTypeHasRates(
+        type: VehicleBodyType.luxury,
+        standard: vip.standard,
+        vehicleTypeRates: vip.vehicleTypeRates,
+        usesAreaOverride: true,
+      ),
+      isTrue,
+    );
+    expect(
+      BranchRatesSnapshot.bodyTypeHasRates(
+        type: VehicleBodyType.sedan,
+        standard: vip.standard,
+        vehicleTypeRates: vip.vehicleTypeRates,
+        usesAreaOverride: true,
+      ),
+      isTrue,
+    );
+
+    final defaultArea = payload.resolveForArea(areaId: 'other-area');
+    expect(defaultArea.usesAreaOverride, isFalse);
+    expect(defaultArea.standard.flatRate, 150);
+    expect(defaultArea.vehicleTypeRates, hasLength(1));
+    expect(
+      BranchRatesSnapshot.bodyTypeHasRates(
+        type: VehicleBodyType.sedan,
+        standard: defaultArea.standard,
+        vehicleTypeRates: defaultArea.vehicleTypeRates,
+        usesAreaOverride: false,
+      ),
+      isTrue,
+    );
+    expect(
+      BranchRatesSnapshot.bodyTypeHasRates(
+        type: VehicleBodyType.evPhev,
+        standard: defaultArea.standard,
+        vehicleTypeRates: defaultArea.vehicleTypeRates,
+        usesAreaOverride: false,
+      ),
+      isFalse,
+    );
   });
 
   test('VehicleTypeRateRow parses per-type flatRateHours', () {

@@ -21,6 +21,7 @@ import '../../../data/repositories/auth_repository.dart';
 import '../../auth/presentation/logout_flow.dart';
 import '../../auth/state/auth_bloc.dart';
 import '../../dashboard/presentation/dashboard_screen.dart';
+import '../../../shared/widgets/branch_rates_slots_header_actions.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../../sync/state/sync_cubit.dart';
 import '../../sync/state/sync_state.dart';
@@ -333,7 +334,7 @@ class _SettingsHeader extends StatelessWidget {
             ],
           ),
         ),
-        const DashboardStatusPillLive(),
+        const BranchRatesSlotsHeaderActions(),
       ],
     );
   }

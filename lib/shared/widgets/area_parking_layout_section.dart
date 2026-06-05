@@ -6,7 +6,16 @@ import '../../data/remote/area_detail.dart';
 import '../../features/dashboard/presentation/widgets/dashboard_widgets.dart';
 import 'parking_slot_status_style.dart';
 
-/// One level: title, free/used counts, and slot chips.
+/// Fixed card size for the parking slots grid (modal + layouts).
+abstract final class ParkingSlotCardMetrics {
+  static const double height = 56;
+  static const double gap = 8;
+  static const double minTileWidth = 76;
+  static const int minColumns = 4;
+  static const int maxColumns = 6;
+}
+
+/// One level: title, availability summary, and uniform slot cards.
 class AreaParkingLevelPanel extends StatelessWidget {
   const AreaParkingLevelPanel({
     super.key,
@@ -19,6 +28,8 @@ class AreaParkingLevelPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final slots = level.slots;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -32,14 +43,38 @@ class AreaParkingLevelPanel extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
         ],
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [for (final slot in level.slots) _SlotChip(slot: slot)],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final cols = _columnCount(constraints.maxWidth);
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: slots.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: cols,
+                mainAxisSpacing: ParkingSlotCardMetrics.gap,
+                crossAxisSpacing: ParkingSlotCardMetrics.gap,
+                mainAxisExtent: ParkingSlotCardMetrics.height,
+              ),
+              itemBuilder: (context, index) =>
+                  ParkingSlotCard(slot: slots[index]),
+            );
+          },
         ),
       ],
+    );
+  }
+
+  static int _columnCount(double maxWidth) {
+    if (maxWidth <= 0) return ParkingSlotCardMetrics.minColumns;
+    final cols = ((maxWidth + ParkingSlotCardMetrics.gap) /
+            (ParkingSlotCardMetrics.minTileWidth + ParkingSlotCardMetrics.gap))
+        .floor();
+    return cols.clamp(
+      ParkingSlotCardMetrics.minColumns,
+      ParkingSlotCardMetrics.maxColumns,
     );
   }
 }
@@ -73,26 +108,79 @@ class AreaParkingLayoutSection extends StatelessWidget {
   }
 }
 
-class _SlotChip extends StatelessWidget {
-  const _SlotChip({required this.slot});
+/// Uniform slot card — label + status, green available / red occupied.
+class ParkingSlotCard extends StatelessWidget {
+  const ParkingSlotCard({super.key, required this.slot});
 
   final AreaParkingSlot slot;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    final statusColor = ParkingSlotStatusStyle.textFor(slot);
+
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: ParkingSlotStatusStyle.backgroundFor(slot),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: ParkingSlotStatusStyle.borderFor(slot)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: ParkingSlotStatusStyle.borderFor(slot),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
-      child: Text(
-        slot.label,
-        style: GoogleFonts.poppins(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: ParkingSlotStatusStyle.textFor(slot),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              slot.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                height: 1.1,
+                color: statusColor,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    ParkingSlotStatusStyle.statusLabel(slot),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                      height: 1.1,
+                      color: statusColor.withValues(alpha: 0.9),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

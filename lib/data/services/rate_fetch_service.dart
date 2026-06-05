@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../core/branch/overnight_window.dart';
 import '../../core/config/app_config.dart';
 import '../../core/logging/valet_log.dart';
 import '../../core/session/standard_parking_rates.dart';
@@ -63,6 +62,48 @@ class RateFetchService {
       return AreaDetail.fromResponseData(res.data);
     } catch (e, st) {
       ValetLog.error('RateFetchService', 'GET area detail failed', e, st);
+      return null;
+    }
+  }
+
+  /// `GET /rates/branches/{branchId}` — `standardRates`, `areaOverrides`, `vehicleTypeRates`.
+  Future<BranchRatesSnapshot?> fetchBranchRatesForArea({
+    required String branchId,
+    required String areaId,
+    String areaCode = '',
+  }) async {
+    if (AppConfig.useStubApi) return null;
+    final token = await _bearer();
+    if (token == null) return null;
+
+    try {
+      final res = await _dio.get<dynamic>(
+        AppConfig.branchRatesUrl(branchId),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      if (res.statusCode != 200) {
+        ValetLog.warning(
+          'RateFetchService',
+          'GET branch rates HTTP ${res.statusCode}',
+        );
+        return null;
+      }
+      final payload = BranchRatesApiPayload.fromResponseData(res.data);
+      if (payload == null) return null;
+      return payload.resolveForArea(
+        areaId: areaId,
+        areaCode: areaCode,
+        defaultFlatBlockHours: CheckoutPricing.defaultFlatBlockHours,
+      );
+    } catch (e, st) {
+      ValetLog.error('RateFetchService', 'GET branch rates failed', e, st);
       return null;
     }
   }
@@ -142,6 +183,7 @@ class RateFetchService {
             id: (row['id'] ?? name).toString(),
             name: name,
             fees: fees,
+            flatRateHours: BranchRatesSnapshot.flatHoursFromMap(row),
           ),
         );
       }
@@ -180,7 +222,9 @@ class RateFetchService {
       );
     }
     for (final row in snapshot.vehicleTypeRates) {
-      final vt = _mapServerVehicleTypeName(row.name) ?? _vehicleTypeKey(row.name);
+      final vt =
+          BranchRatesSnapshot.mapServerVehicleTypeName(row.name) ??
+          _vehicleTypeKey(row.name);
       if (vt == null) continue;
       final rowFlatHours = row.flatRateHours > 0
           ? row.flatRateHours
@@ -198,7 +242,7 @@ class RateFetchService {
     }
   }
 
-  /// Preferred sync: area detail API → local [rates] table.
+  /// Preferred sync: `GET /rates/branches/:id` for area fees; area detail for layout only.
   Future<void> syncRatesForBranchArea({
     required String branchId,
     required String areaId,
@@ -207,12 +251,20 @@ class RateFetchService {
       branchId: branchId,
       areaId: areaId,
     );
-    if (detail == null) {
+    final areaCode = detail?.code ?? '';
+    final snapshot = await fetchBranchRatesForArea(
+      branchId: branchId,
+      areaId: areaId,
+      areaCode: areaCode,
+    );
+    if (snapshot != null && (snapshot.standard.hasAny || snapshot.vehicleTypeRates.isNotEmpty)) {
+      await cacheBranchRatesSnapshot(branchId: branchId, snapshot: snapshot);
+    } else if (detail != null) {
+      await cacheAreaDetailRates(branchId: branchId, detail: detail);
+    } else {
       await syncRatesForBranch(branchId);
-      return;
     }
-    await cacheAreaDetailRates(branchId: branchId, detail: detail);
-    if (detail.levels.isNotEmpty) {
+    if (detail != null && detail.levels.isNotEmpty) {
       await _parkingLayout.saveLevels(
         branchId: branchId,
         areaId: areaId,
@@ -259,7 +311,9 @@ class RateFetchService {
         : StandardParkingRates.offlineDefault.lostTicketFeePesos.toDouble();
 
     for (final row in detail.vehicleTypeRates) {
-      final vt = _mapServerVehicleTypeName(row.name) ?? _vehicleTypeKey(row.name);
+      final vt =
+          BranchRatesSnapshot.mapServerVehicleTypeName(row.name) ??
+          _vehicleTypeKey(row.name);
       if (vt == null) continue;
       var lost = row.fees.lostTicketFee.toDouble();
       if (lost <= 0) lost = lostFallback;
@@ -283,131 +337,27 @@ class RateFetchService {
     return n.replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'_+'), '_');
   }
 
-  /// GET branch `/rates` then vehicle-types; on partial failure keeps whatever succeeded.
+  /// `GET /rates/branches/:branchId` (branch default — no area override).
   Future<void> syncRatesForBranch(String branchId) async {
     final bid = branchId.trim().isEmpty ? '_' : branchId.trim();
     if (bid == '_' || bid.isEmpty) return;
     if (AppConfig.useStubApi) return;
 
-    final token = await _bearer();
-    if (token == null) return;
-
-    final opts = Options(
-      headers: {'Authorization': 'Bearer $token'},
-      validateStatus: (s) => s != null && s < 500,
+    final snapshot = await fetchBranchRatesForArea(
+      branchId: bid,
+      areaId: '',
+      areaCode: '',
     );
-
-    StandardParkingRates? standardRates;
-    var branchStandardFlatHours = CheckoutPricing.defaultFlatBlockHours;
-    try {
-      final res = await _dio.get<dynamic>(
-        AppConfig.branchStandardRatesUrl(bid),
-        options: opts,
-      );
-      if (res.statusCode == 200) {
-        final m = _asStringKeyedMap(res.data);
-        if (m != null) {
-          final parsed = _standardRatesFromMap(m);
-          if (parsed != null &&
-              (parsed.flatRatePesos > 0 || parsed.succeedingHourPesos > 0)) {
-            standardRates = parsed;
-            final overnight = _overnightTimesFromMap(m);
-            final standardFlatHours = BranchRatesSnapshot.flatHoursFromMap(m);
-            final flatHours = standardFlatHours > 0
-                ? standardFlatHours
-                : CheckoutPricing.defaultFlatBlockHours;
-            branchStandardFlatHours = flatHours;
-            await _persistOvernightWindowConfig(
-              branchId: bid,
-              start: overnight.start,
-              end: overnight.end,
-            );
-            await _upsertRateRow(
-              branchId: bid,
-              vehicleType: 'Standard',
-              flatHours: flatHours,
-              flat: parsed.flatRatePesos.toDouble(),
-              succeeding: parsed.succeedingHourPesos.toDouble(),
-              overnight: parsed.overnightFeePesos.toDouble(),
-              lost: parsed.lostTicketFeePesos.toDouble(),
-              overnightCutoff: overnight.start,
-            );
-          }
-        }
-      }
-    } catch (e, st) {
-      ValetLog.error(
-        'RateFetchService',
-        'GET branch standard rates failed',
-        e,
-        st,
-      );
+    if (snapshot != null &&
+        (snapshot.standard.hasAny || snapshot.vehicleTypeRates.isNotEmpty)) {
+      await cacheBranchRatesSnapshot(branchId: bid, snapshot: snapshot);
+      return;
     }
 
-    if (standardRates == null) {
-      final snapshot = await fetchBranchRatesSnapshot(bid);
-      if (snapshot != null && snapshot.standard.hasAny) {
-        await cacheBranchRatesSnapshot(branchId: bid, snapshot: snapshot);
-        return;
-      }
+    final legacy = await fetchBranchRatesSnapshot(bid);
+    if (legacy != null && legacy.standard.hasAny) {
+      await cacheBranchRatesSnapshot(branchId: bid, snapshot: legacy);
     }
-
-    final lostFallback = (standardRates ?? StandardParkingRates.offlineDefault)
-        .lostTicketFeePesos
-        .toDouble();
-
-    try {
-      final res = await _dio.get<dynamic>(
-        AppConfig.branchVehicleTypeRatesUrl(bid),
-        options: opts,
-      );
-      if (res.statusCode != 200) return;
-
-      final list = _asListOfMaps(res.data);
-      for (final row in list) {
-        if (!_isActiveStatus(row['status'])) continue;
-        final name = row['name']?.toString().trim() ?? '';
-        final vt = _mapServerVehicleTypeName(name);
-        if (vt == null) continue;
-
-        final flat = _doubleField(row, const ['flatRate', 'flat_rate']);
-        final succeeding =
-            _doubleField(row, const ['succeedingRate', 'succeeding_rate']);
-        final overnightFee =
-            _doubleField(row, const ['overnightFee', 'overnight_fee']);
-        var lost = _doubleField(row, const ['lostTicketFee', 'lost_ticket_fee']);
-        if (lost <= 0) lost = lostFallback;
-
-        final overnightTimes = _overnightTimesFromMap(row);
-        final rowFlatHours = BranchRatesSnapshot.flatHoursFromMap(row);
-        final flatHours = rowFlatHours > 0
-            ? rowFlatHours
-            : branchStandardFlatHours;
-        await _upsertRateRow(
-          branchId: bid,
-          vehicleType: vt,
-          flatHours: flatHours,
-          flat: flat,
-          succeeding: succeeding,
-          overnight: overnightFee,
-          lost: lost,
-          overnightCutoff: overnightTimes.start,
-        );
-      }
-    } catch (e, st) {
-      ValetLog.error(
-        'RateFetchService',
-        'GET vehicle-type rates failed — Standard fallback only if present',
-        e,
-        st,
-      );
-    }
-  }
-
-  static Map<String, dynamic>? _asStringKeyedMap(dynamic data) {
-    if (data is Map<String, dynamic>) return data;
-    if (data is Map) return Map<String, dynamic>.from(data);
-    return null;
   }
 
   static List<Map<String, dynamic>> _asListOfMaps(dynamic data) {
@@ -428,27 +378,6 @@ class RateFetchService {
     }
     return const [];
   }
-
-  static StandardParkingRates? _standardRatesFromMap(Map<String, dynamic> m) {
-    int pick(String camel, String snake) {
-      final v = m[camel] ?? m[snake];
-      if (v is int) return v;
-      if (v is num) return v.round();
-      return int.tryParse(v?.toString() ?? '') ?? 0;
-    }
-
-    return StandardParkingRates(
-      flatRatePesos: pick('flatRate', 'flat_rate'),
-      succeedingHourPesos: pick('succeedingRate', 'succeeding_rate'),
-      overnightFeePesos: pick('overnightFee', 'overnight_fee'),
-      lostTicketFeePesos: pick('lostTicketFee', 'lost_ticket_fee'),
-    );
-  }
-
-  static ({String? start, String? end}) _overnightTimesFromMap(
-    Map<String, dynamic> m,
-  ) =>
-      OvernightWindow.parseTimesFromJson(m);
 
   Future<void> _persistOvernightWindowConfig({
     required String branchId,
@@ -512,34 +441,9 @@ class RateFetchService {
     }
   }
 
-  static double _doubleField(Map<String, dynamic> m, List<String> keys) {
-    for (final k in keys) {
-      final v = m[k];
-      if (v is num) return v.toDouble();
-      if (v != null) {
-        final d = double.tryParse(v.toString());
-        if (d != null) return d;
-      }
-    }
-    return 0;
-  }
-
   static bool _isActiveStatus(dynamic status) {
     if (status == null) return true;
     return status.toString().toUpperCase() == 'ACTIVE';
-  }
-
-  /// Maps API `name` to local `rates.vehicle_type` (aligned with check-out keys).
-  static String? _mapServerVehicleTypeName(String name) {
-    final n = name.toLowerCase().trim();
-    if (n.isEmpty) return null;
-    if (n.contains('ev') || n.contains('phev')) return 'ev_phev';
-    if (n.contains('luxury')) return 'luxury';
-    if (n.contains('sedan') || n.contains('hatchback')) return 'sedan';
-    if (n.contains('suv') && n.contains('van')) return 'suv';
-    if (n == 'van' || (n.contains('van') && !n.contains('suv'))) return 'van';
-    if (n.contains('suv')) return 'suv';
-    return null;
   }
 
   Future<void> _upsertRateRow({

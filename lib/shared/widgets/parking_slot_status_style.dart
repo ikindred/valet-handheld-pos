@@ -25,4 +25,7 @@ abstract final class ParkingSlotStatusStyle {
 
   static String statusSuffix(AreaParkingSlot slot) =>
       slot.isAvailable ? ' · available' : ' · occupied';
+
+  static String statusLabel(AreaParkingSlot slot) =>
+      slot.isAvailable ? 'Available' : 'Occupied';
 }

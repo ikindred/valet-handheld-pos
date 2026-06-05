@@ -79,9 +79,15 @@ class CheckInPlateNumberField extends StatelessWidget {
   }
 }
 
-/// Vehicle type cards: row 1 (Sedan | SUV | Van), row 2 (Luxury | EV/PHEV), same widths as row 1.
+/// Vehicle type cards: row 1 (Sedan/Crossover | SUV | Van), row 2 (Luxury | EV/PHEV), same widths as row 1.
 class CheckInVehicleBodyTypeGrid extends StatelessWidget {
-  const CheckInVehicleBodyTypeGrid({super.key});
+  const CheckInVehicleBodyTypeGrid({
+    super.key,
+    this.enabledTypes = const {},
+  });
+
+  /// Empty set means all types are selectable (loading / fallback).
+  final Set<VehicleBodyType> enabledTypes;
 
   static const _row1 = [
     VehicleBodyType.sedan,
@@ -105,16 +111,23 @@ class CheckInVehicleBodyTypeGrid extends StatelessWidget {
             final w = constraints.maxWidth;
             final cellW = (w - 2 * gap) / 3;
 
-            Widget card(VehicleBodyType t) => SizedBox(
-              width: cellW,
-              child: _VehicleTypeCard(
-                type: t,
-                selected: state.vehicleBodyType == t,
-                onTap: () => context.read<CheckInCubit>().updateVehicleStep(
-                  vehicleBodyType: t,
+            final allEnabled = enabledTypes.isEmpty;
+            Widget card(VehicleBodyType t) {
+              final enabled = allEnabled || enabledTypes.contains(t);
+              return SizedBox(
+                width: cellW,
+                child: _VehicleTypeCard(
+                  type: t,
+                  selected: state.vehicleBodyType == t,
+                  enabled: enabled,
+                  onTap: enabled
+                      ? () => context.read<CheckInCubit>().updateVehicleStep(
+                            vehicleBodyType: t,
+                          )
+                      : null,
                 ),
-              ),
-            );
+              );
+            }
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,12 +164,14 @@ class _VehicleTypeCard extends StatelessWidget {
   const _VehicleTypeCard({
     required this.type,
     required this.selected,
+    required this.enabled,
     required this.onTap,
   });
 
   final VehicleBodyType type;
   final bool selected;
-  final VoidCallback onTap;
+  final bool enabled;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -165,50 +180,63 @@ class _VehicleTypeCard extends StatelessWidget {
     final tc = AppThemeColors.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final bg = selected
-        ? (isDark ? tc.inputFill : creamSelected)
-        : tc.cardBg;
-    final borderColor = selected ? orange : tc.cardBorder;
-    final borderWidth = selected ? 2.0 : 1.0;
-    final labelColor = selected ? orange : tc.textPrimary;
+    final bg = !enabled
+        ? tc.cardBg.withValues(alpha: isDark ? 0.5 : 0.65)
+        : selected
+            ? (isDark ? tc.inputFill : creamSelected)
+            : tc.cardBg;
+    final borderColor = !enabled
+        ? tc.cardBorder.withValues(alpha: 0.5)
+        : selected
+            ? orange
+            : tc.cardBorder;
+    final borderWidth = selected && enabled ? 2.0 : 1.0;
+    final labelColor = !enabled
+        ? tc.textSubtitleMuted
+        : selected
+            ? orange
+            : tc.textPrimary;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
-        child: Container(
-          height: CheckInCompactTokens.bodyTypeCardHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: borderColor, width: borderWidth),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                type.emoji,
-                style: GoogleFonts.poppins(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w500,
-                  color: tc.textPrimary,
+        child: Opacity(
+          opacity: enabled ? 1 : 0.45,
+          child: Container(
+            height: CheckInCompactTokens.bodyTypeCardHeight,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: borderColor, width: borderWidth),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  type.emoji,
+                  style: GoogleFonts.poppins(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w500,
+                    color: enabled ? tc.textPrimary : tc.textSubtitleMuted,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                type.label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.poppins(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: labelColor,
+                const SizedBox(height: 2),
+                Text(
+                  type.label,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: labelColor,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -407,9 +435,10 @@ class CheckInParkingSlotDropdownField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tc = AppThemeColors.of(context);
+    final sortedSlots = AreaParkingSlot.sortAvailableFirst(slots);
     AreaParkingSlot? selected;
     if (value.trim().isNotEmpty) {
-      for (final s in slots) {
+      for (final s in sortedSlots) {
         if (s.label == value) {
           selected = s;
           break;
@@ -454,7 +483,7 @@ class CheckInParkingSlotDropdownField extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
               items: [
-                for (final slot in slots)
+                for (final slot in sortedSlots)
                   DropdownMenuItem<String>(
                     value: slot.label,
                     enabled: slot.isAvailable,
@@ -473,7 +502,7 @@ class CheckInParkingSlotDropdownField extends StatelessWidget {
                   onChanged(null);
                   return;
                 }
-                for (final slot in slots) {
+                for (final slot in sortedSlots) {
                   if (slot.label == label && slot.isAvailable) {
                     onChanged(slot);
                     return;

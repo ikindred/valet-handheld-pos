@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/time/philippine_time.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../shared/widgets/branch_rates_slots_header_actions.dart';
 import '../../../shared/widgets/offline_data_banner.dart';
 import '../../auth/state/auth_bloc.dart';
 import '../../dashboard/presentation/dashboard_screen.dart';
@@ -248,15 +249,15 @@ class _ReportsHeaderRowState extends State<_ReportsHeaderRow> {
             ],
           ),
         ),
-        if (widget.showSyncSpinner) ...[
-          const SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          const SizedBox(width: 10),
-        ],
-        const DashboardStatusPillLive(),
+        BranchRatesSlotsHeaderActions(
+          trailing: widget.showSyncSpinner
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : null,
+        ),
       ],
     );
   }

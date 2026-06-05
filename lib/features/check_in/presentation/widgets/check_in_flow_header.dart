@@ -3,12 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_theme.dart';
-import '../../../../data/repositories/auth_repository.dart';
-import '../../../../data/services/parking_layout_service.dart';
-import '../../../../data/services/rate_fetch_service.dart';
-import '../../../../data/services/rate_service.dart';
-import '../../../../shared/widgets/branch_rates_dialog.dart';
-import '../../../dashboard/presentation/widgets/dashboard_widgets.dart';
+import '../../../../shared/widgets/branch_rates_slots_header_actions.dart';
 import '../../state/check_in_cubit.dart';
 import 'check_in_compact_tokens.dart';
 
@@ -81,32 +76,14 @@ class CheckInFlowHeader extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            BlocBuilder<CheckInCubit, CheckInState>(
-              buildWhen: (a, b) => a.ticketNumber != b.ticketNumber,
-              builder: (context, state) {
-                return _TicketPill(ticketNumber: state.ticketNumber);
-              },
+            BranchRatesSlotsHeaderActions(
+              leading: BlocBuilder<CheckInCubit, CheckInState>(
+                buildWhen: (a, b) => a.ticketNumber != b.ticketNumber,
+                builder: (context, state) {
+                  return _TicketPill(ticketNumber: state.ticketNumber);
+                },
+              ),
             ),
-            const SizedBox(width: 8),
-            RatesOutlinePill(
-              onPressed: () async {
-                final auth = context.read<AuthRepository>();
-                final site = await auth.branchAndAreaFromDb();
-                final name = branchRatesSubtitle(site);
-                if (!context.mounted) return;
-                await showBranchRatesDialog(
-                  context,
-                  authRepository: auth,
-                  rateFetchService: context.read<RateFetchService>(),
-                  rateService: context.read<RateService>(),
-                  parkingLayoutService: context.read<ParkingLayoutService>(),
-                  branchName: name,
-                );
-              },
-            ),
-            const SizedBox(width: 8),
-            const DashboardStatusPillLive(),
           ],
         ),
       ),

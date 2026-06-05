@@ -9,11 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/branch_config_service.dart';
-import '../../../data/services/parking_layout_service.dart';
-import '../../../data/services/rate_fetch_service.dart';
-import '../../../data/services/rate_service.dart';
-import '../../../shared/widgets/area_parking_slots_dialog.dart';
-import '../../../shared/widgets/branch_rates_dialog.dart';
+import '../../../shared/widgets/branch_rates_slots_header_actions.dart';
 import '../../auth/state/auth_bloc.dart';
 import '../../check_in/state/check_in_cubit.dart';
 import '../../reports/domain/reports_format.dart';
@@ -177,38 +173,6 @@ class _DashboardHeaderRowState extends State<_DashboardHeaderRow> {
   }
 }
 
-Future<void> _openBranchAreaDialog(
-  BuildContext context, {
-  required bool ratesOnly,
-}) async {
-  final auth = context.read<AuthRepository>();
-  final site = await auth.branchAndAreaFromDb();
-  final name = branchRatesSubtitle(site);
-  if (!context.mounted) return;
-  final rateFetch = context.read<RateFetchService>();
-  final rateService = context.read<RateService>();
-  final parkingLayout = context.read<ParkingLayoutService>();
-  if (ratesOnly) {
-    await showBranchRatesDialog(
-      context,
-      authRepository: auth,
-      rateFetchService: rateFetch,
-      rateService: rateService,
-      parkingLayoutService: parkingLayout,
-      branchName: name,
-    );
-  } else {
-    await showAreaParkingSlotsDialog(
-      context,
-      authRepository: auth,
-      rateFetchService: rateFetch,
-      rateService: rateService,
-      parkingLayoutService: parkingLayout,
-      branchName: name,
-    );
-  }
-}
-
 class _HeaderRow extends StatelessWidget {
   const _HeaderRow({
     required this.greeting,
@@ -234,25 +198,7 @@ class _HeaderRow extends StatelessWidget {
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.only(right: 6),
-          child: RatesOutlinePill(
-            onPressed: () => _openBranchAreaDialog(
-              context,
-              ratesOnly: true,
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: ParkingSlotsOutlinePill(
-            onPressed: () => _openBranchAreaDialog(
-              context,
-              ratesOnly: false,
-            ),
-          ),
-        ),
-        const DashboardStatusPillLive(),
+        const BranchRatesSlotsHeaderActions(),
       ],
     );
   }

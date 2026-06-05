@@ -22,6 +22,7 @@ class BranchAreaDialogData {
     this.overnightStart = '',
     this.overnightEnd = '',
     this.fromAreaApi = false,
+    this.usesAreaOverride = false,
   });
 
   final int flatBlockHours;
@@ -33,6 +34,9 @@ class BranchAreaDialogData {
   final String overnightStart;
   final String overnightEnd;
   final bool fromAreaApi;
+
+  /// Fees resolved from `areaOverrides` for this parking area.
+  final bool usesAreaOverride;
 }
 
 class BranchAreaLoadResult {
@@ -77,36 +81,40 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
       areaId: areaUuid,
     );
 
-    var standard = detail?.standard ??
-        const ParkingRateFees(
-          flatRate: 0,
-          succeedingRate: 0,
-          overnightFee: 0,
-          lostTicketFee: 0,
-        );
-    var vehicleTypeRates = detail?.vehicleTypeRates ?? const [];
+    var standard = const ParkingRateFees(
+      flatRate: 0,
+      succeedingRate: 0,
+      overnightFee: 0,
+      lostTicketFee: 0,
+    );
+    var vehicleTypeRates = const <VehicleTypeRateRow>[];
     var flatHours = defaultFlatHours;
     var overnightStart = '';
     var overnightEnd = '';
-    BranchRatesSnapshot? branchRates;
+    var usesAreaOverride = false;
 
-    if (!standard.hasAny || vehicleTypeRates.isEmpty) {
-      branchRates = await rateFetchService.fetchBranchRatesSnapshot(branchUuid);
-      if (branchRates != null) {
-        if (!standard.hasAny && branchRates.standard.hasAny) {
-          standard = branchRates.standard;
-        }
-        if (vehicleTypeRates.isEmpty && branchRates.vehicleTypeRates.isNotEmpty) {
-          vehicleTypeRates = branchRates.vehicleTypeRates;
-        }
-        flatHours = branchRates.flatBlockHours;
+    final branchRates = await rateFetchService.fetchBranchRatesForArea(
+      branchId: branchUuid,
+      areaId: areaUuid,
+      areaCode: detail?.code ?? '',
+    );
+
+    if (branchRates != null) {
+      standard = branchRates.standard;
+      vehicleTypeRates = branchRates.vehicleTypeRates;
+      flatHours = branchRates.flatBlockHours;
+      usesAreaOverride = branchRates.usesAreaOverride;
+      overnightStart = branchRates.overnightTimes.start?.trim() ?? '';
+      overnightEnd = branchRates.overnightTimes.end?.trim() ?? '';
+      if (branchRates.standard.hasAny || branchRates.vehicleTypeRates.isNotEmpty) {
+        await rateFetchService.cacheBranchRatesSnapshot(
+          branchId: branchUuid,
+          snapshot: branchRates,
+        );
       }
     }
 
     if (detail != null) {
-      overnightStart = detail.overnightTimes.start?.trim() ?? '';
-      overnightEnd = detail.overnightTimes.end?.trim() ?? '';
-      if (detail.flatBlockHours > 0) flatHours = detail.flatBlockHours;
       if (detail.levels.isNotEmpty) {
         await parkingLayoutService.saveLevels(
           branchId: branchUuid,
@@ -114,40 +122,6 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
           levels: detail.levels,
         );
       }
-    }
-    if (branchRates != null) {
-      if (overnightStart.isEmpty) {
-        overnightStart = branchRates.overnightTimes.start?.trim() ?? '';
-      }
-      if (overnightEnd.isEmpty) {
-        overnightEnd = branchRates.overnightTimes.end?.trim() ?? '';
-      }
-    }
-
-    if (detail != null && standard.hasAny) {
-      final areaDetail = detail;
-      await rateFetchService.cacheAreaDetailRates(
-        branchId: branchUuid,
-        detail: areaDetail.standard.hasAny
-            ? areaDetail
-            : AreaDetail(
-                id: areaDetail.id,
-                name: areaDetail.name,
-                code: areaDetail.code,
-                standard: standard,
-                vehicleTypeRates: vehicleTypeRates,
-                levels: areaDetail.levels,
-                overnightTimes: branchRates?.overnightTimes ??
-                    areaDetail.overnightTimes,
-                flatBlockHours: branchRates?.flatBlockHours ??
-                    areaDetail.flatBlockHours,
-              ),
-      );
-    } else if (branchRates != null && branchRates.standard.hasAny) {
-      await rateFetchService.cacheBranchRatesSnapshot(
-        branchId: branchUuid,
-        snapshot: branchRates,
-      );
     }
 
     final levels = detail?.levels ?? const <AreaParkingLevel>[];
@@ -165,6 +139,7 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
             overnightStart: overnightStart,
             overnightEnd: overnightEnd,
             fromAreaApi: detail != null,
+            usesAreaOverride: usesAreaOverride,
           ),
         );
       }
@@ -184,6 +159,7 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
           overnightStart: overnightStart,
           overnightEnd: overnightEnd,
           fromAreaApi: detail != null,
+          usesAreaOverride: usesAreaOverride,
         ),
       );
     }

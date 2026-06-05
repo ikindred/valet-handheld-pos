@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import '../../core/branch/overnight_window.dart';
 import '../../core/session/standard_parking_rates.dart';
+import '../../features/check_in/domain/vehicle_body_type.dart';
+import '../../features/check_out/domain/checkout_pricing.dart';
 
 /// Fee row from area detail (`flatRate`, `succeedingRate`, etc.).
 class ParkingRateFees {
@@ -126,6 +128,20 @@ class AreaParkingSlot {
         'status': status,
       };
 
+  /// Available slots first, then occupied; within each group by label.
+  static List<AreaParkingSlot> sortAvailableFirst(
+    Iterable<AreaParkingSlot> slots,
+  ) {
+    final list = slots.toList();
+    list.sort((a, b) {
+      if (a.isAvailable != b.isAvailable) {
+        return a.isAvailable ? -1 : 1;
+      }
+      return a.label.compareTo(b.label);
+    });
+    return list;
+  }
+
   static AreaParkingSlot? fromJson(Map<String, dynamic> json) {
     final label = (json['label'] ?? '').toString().trim();
     if (label.isEmpty) return null;
@@ -232,6 +248,119 @@ class AreaSlotCounts {
   static const empty = AreaSlotCounts(total: 0, available: 0, occupied: 0);
 }
 
+/// Body from `GET /api/v1/rates/branches/:branchId` (`standardRates`, `areaOverrides`, …).
+class BranchRatesApiPayload {
+  const BranchRatesApiPayload({
+    required this.standardRates,
+    required this.areaOverrides,
+    required this.vehicleTypeRates,
+    required this.overnightTimes,
+  });
+
+  final Map<String, dynamic>? standardRates;
+  final List<Map<String, dynamic>> areaOverrides;
+  final List<Map<String, dynamic>> vehicleTypeRates;
+  final ({String? start, String? end}) overnightTimes;
+
+  static BranchRatesApiPayload? fromResponseData(dynamic data) {
+    final root = AreaDetail._asMap(data);
+    if (root == null) return null;
+    final body = AreaDetail._unwrap(body: root);
+
+    final standardRaw = body['standardRates'] ?? body['standard_rates'];
+    Map<String, dynamic>? standard;
+    if (standardRaw is Map<String, dynamic>) {
+      standard = standardRaw;
+    } else if (standardRaw is Map) {
+      standard = Map<String, dynamic>.from(standardRaw);
+    }
+
+    return BranchRatesApiPayload(
+      standardRates: standard,
+      areaOverrides: _parseOverrideList(
+        body['areaOverrides'] ?? body['area_overrides'],
+      ),
+      vehicleTypeRates: _parseOverrideList(
+        body['vehicleTypeRates'] ?? body['vehicle_type_rates'],
+      ),
+      overnightTimes: AreaDetail._parseOvernightTimes(body),
+    );
+  }
+
+  static List<Map<String, dynamic>> _parseOverrideList(dynamic raw) {
+    if (raw is! List) return const [];
+    final out = <Map<String, dynamic>>[];
+    for (final item in raw) {
+      final row = AreaDetail._asMap(item);
+      if (row != null) out.add(row);
+    }
+    return out;
+  }
+
+  Map<String, dynamic>? _matchAreaOverride({
+    required String areaId,
+    required String areaCode,
+  }) {
+    final id = areaId.trim();
+    final code = areaCode.trim().toLowerCase();
+    for (final row in areaOverrides) {
+      final oid = (row['id'] ?? '').toString().trim();
+      if (id.isNotEmpty && oid.isNotEmpty && oid == id) return row;
+      final ocode = (row['code'] ?? '').toString().trim().toLowerCase();
+      if (code.isNotEmpty && ocode.isNotEmpty && ocode == code) return row;
+    }
+    return null;
+  }
+
+  /// Area override fees + vehicle rows when matched; else branch `standardRates` + top-level rows.
+  BranchRatesSnapshot resolveForArea({
+    required String areaId,
+    String areaCode = '',
+    int defaultFlatBlockHours = CheckoutPricing.defaultFlatBlockHours,
+  }) {
+    final override = _matchAreaOverride(areaId: areaId, areaCode: areaCode);
+    if (override != null) {
+      final standard = ParkingRateFees.fromJson(override);
+      final flatHours = BranchRatesSnapshot.flatHoursFromMap(override);
+      final vehicleRows = AreaDetail._parseVehicleTypeRates(override);
+      return BranchRatesSnapshot(
+        standard: standard,
+        vehicleTypeRates: vehicleRows,
+        overnightTimes: overnightTimes,
+        flatBlockHours:
+            flatHours > 0 ? flatHours : defaultFlatBlockHours,
+        usesAreaOverride: true,
+      );
+    }
+
+    final standardMap = standardRates ?? const <String, dynamic>{};
+    final standard = ParkingRateFees.fromJson(standardMap);
+    final flatHours = BranchRatesSnapshot.flatHoursFromMap(standardMap);
+    final vehicleRows = _parseActiveVehicleTypeRateRows(vehicleTypeRates);
+
+    return BranchRatesSnapshot(
+      standard: standard,
+      vehicleTypeRates: vehicleRows,
+      overnightTimes: overnightTimes,
+      flatBlockHours: flatHours > 0 ? flatHours : defaultFlatBlockHours,
+      usesAreaOverride: false,
+    );
+  }
+
+  static List<VehicleTypeRateRow> _parseActiveVehicleTypeRateRows(
+    List<Map<String, dynamic>> rows,
+  ) {
+    final out = <VehicleTypeRateRow>[];
+    for (final row in rows) {
+      final status = row['status']?.toString().toUpperCase();
+      if (status != null && status.isNotEmpty && status != 'ACTIVE') continue;
+      final parsed = VehicleTypeRateRow.fromJson(row);
+      if (parsed != null && parsed.fees.hasAny) out.add(parsed);
+    }
+    return out;
+  }
+}
+
 /// Branch standard rates from `GET /api/v1/branches/{id}` (`rate` object).
 class BranchRatesSnapshot {
   const BranchRatesSnapshot({
@@ -239,12 +368,16 @@ class BranchRatesSnapshot {
     required this.vehicleTypeRates,
     required this.overnightTimes,
     required this.flatBlockHours,
+    this.usesAreaOverride = false,
   });
 
   final ParkingRateFees standard;
   final List<VehicleTypeRateRow> vehicleTypeRates;
   final ({String? start, String? end}) overnightTimes;
   final int flatBlockHours;
+
+  /// True when fees came from `areaOverrides` for the signed-in area.
+  final bool usesAreaOverride;
 
   static BranchRatesSnapshot? fromResponseData(
     dynamic data, {
@@ -275,6 +408,119 @@ class BranchRatesSnapshot {
       overnightTimes: overnight,
       flatBlockHours: flatHours,
     );
+  }
+
+  /// Per-vehicle hours when set; otherwise area/branch [standardHours].
+  static int resolveFlatBlockHours({
+    required int standardHours,
+    int vehicleTypeHours = 0,
+    int fallbackHours = CheckoutPricing.defaultFlatBlockHours,
+  }) {
+    if (vehicleTypeHours > 0) return vehicleTypeHours;
+    if (standardHours > 0) return standardHours;
+    return fallbackHours;
+  }
+
+  /// Whether [type] has billable rates for this branch/area resolution.
+  static bool bodyTypeHasRates({
+    required VehicleBodyType type,
+    required ParkingRateFees standard,
+    required List<VehicleTypeRateRow> vehicleTypeRates,
+    required bool usesAreaOverride,
+  }) {
+    final row = rowForBodyType(type, vehicleTypeRates);
+    if (row != null && row.fees.hasAny) return true;
+    if (vehicleTypeRates.isEmpty && standard.hasAny) return true;
+    if (usesAreaOverride && standard.hasAny) return true;
+    return false;
+  }
+
+  /// Fees for [type]: per-type row, else area/branch standard when allowed.
+  static ParkingRateFees? feesForBodyType({
+    required VehicleBodyType type,
+    required ParkingRateFees standard,
+    required List<VehicleTypeRateRow> vehicleTypeRates,
+    required bool usesAreaOverride,
+  }) {
+    final row = rowForBodyType(type, vehicleTypeRates);
+    if (row != null && row.fees.hasAny) return row.fees;
+    if (vehicleTypeRates.isEmpty && standard.hasAny) return standard;
+    if (usesAreaOverride && standard.hasAny) return standard;
+    return null;
+  }
+
+  static int flatHoursForBodyType({
+    required VehicleBodyType type,
+    required int standardHours,
+    required List<VehicleTypeRateRow> vehicleTypeRates,
+  }) {
+    final row = rowForBodyType(type, vehicleTypeRates);
+    return resolveFlatBlockHours(
+      standardHours: standardHours,
+      vehicleTypeHours: row?.flatRateHours ?? 0,
+    );
+  }
+
+  static Set<VehicleBodyType> ratedBodyTypes({
+    required ParkingRateFees standard,
+    required List<VehicleTypeRateRow> vehicleTypeRates,
+    required bool usesAreaOverride,
+  }) =>
+      {
+        for (final type in VehicleBodyType.values)
+          if (bodyTypeHasRates(
+            type: type,
+            standard: standard,
+            vehicleTypeRates: vehicleTypeRates,
+            usesAreaOverride: usesAreaOverride,
+          ))
+            type,
+      };
+
+  /// Offline: enabled types from Drift `rates.vehicle_type` keys.
+  static Set<VehicleBodyType> ratedBodyTypesFromDriftKeys(Iterable<String> keys) {
+    final keySet = keys.map((k) => k.trim().toLowerCase()).toSet();
+    if (keySet.isEmpty) return {};
+    if (keySet.length == 1 && keySet.contains('standard')) {
+      return VehicleBodyType.values.toSet();
+    }
+    final enabled = <VehicleBodyType>{};
+    for (final type in VehicleBodyType.values) {
+      if (keySet.contains(type.rateKey)) {
+        enabled.add(type);
+      } else if (type == VehicleBodyType.van && keySet.contains('suv')) {
+        enabled.add(type);
+      }
+    }
+    return enabled;
+  }
+
+  static VehicleTypeRateRow? rowForBodyType(
+    VehicleBodyType type,
+    List<VehicleTypeRateRow> rows,
+  ) {
+    final key = type.rateKey;
+    for (final row in rows) {
+      final mapped = mapServerVehicleTypeName(row.name);
+      if (mapped == key) return row;
+      if (type == VehicleBodyType.van && mapped == 'suv') return row;
+      if (type == VehicleBodyType.suv && mapped == 'van') return row;
+    }
+    return null;
+  }
+
+  /// Maps API `name` to local `rates.vehicle_type` / [VehicleBodyType.rateKey].
+  static String? mapServerVehicleTypeName(String name) {
+    final n = name.toLowerCase().trim();
+    if (n.isEmpty) return null;
+    if (n.contains('motor')) return 'motorcycle';
+    if (n.contains('ev') || n.contains('phev')) return 'ev_phev';
+    if (n.contains('luxury')) return 'luxury';
+    if (n.contains('sedan') || n.contains('hatchback')) return 'sedan';
+    if (n.contains('suv') && n.contains('van')) return 'suv';
+    if (n == 'van' || (n.contains('van') && !n.contains('suv'))) return 'van';
+    if (n.contains('suv')) return 'suv';
+    return null;
   }
 
   /// Reads `flatRateHours` / `flat_rate_hours` from an API map; `0` if absent.

@@ -10,6 +10,8 @@ import '../../../data/remote/area_detail.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/parking_layout_service.dart';
 import '../../../data/services/rate_fetch_service.dart';
+import '../../../data/services/rate_service.dart';
+import '../domain/vehicle_body_type.dart';
 import '../state/check_in_cubit.dart';
 import 'widgets/check_in_compact_tokens.dart';
 import 'widgets/check_in_footer_actions.dart';
@@ -41,6 +43,7 @@ class _CheckInVehicleDetailsScreenState
     extends State<CheckInVehicleDetailsScreen> {
   List<AreaParkingLevel> _areaLevels = [];
   bool _areaLevelsLoading = true;
+  Set<VehicleBodyType> _ratedBodyTypes = {};
 
   late final TextEditingController _plateCtrl;
   late final TextEditingController _brandCtrl;
@@ -56,6 +59,52 @@ class _CheckInVehicleDetailsScreenState
     _colorCtrl = TextEditingController(text: s.vehicleColor);
     _vrNoCtrl = TextEditingController(text: s.vehicleVrNo);
     _loadAreaLevels();
+    _loadRatedVehicleTypes();
+  }
+
+  Future<void> _loadRatedVehicleTypes() async {
+    final auth = context.read<AuthRepository>();
+    final rateFetch = context.read<RateFetchService>();
+    final rateService = context.read<RateService>();
+    final branchUuid = await auth.branchUuidForApi();
+    final areaUuid = await auth.areaUuidForApi();
+    if (!mounted) return;
+
+    Set<VehicleBodyType> rated = {};
+    final online =
+        !AppConfig.useStubApi && await InternetReachability.hasInternet();
+    if (online && branchUuid.isNotEmpty && areaUuid.isNotEmpty) {
+      final detail = await rateFetch.fetchAreaDetail(
+        branchId: branchUuid,
+        areaId: areaUuid,
+      );
+      final snapshot = await rateFetch.fetchBranchRatesForArea(
+        branchId: branchUuid,
+        areaId: areaUuid,
+        areaCode: detail?.code ?? '',
+      );
+      if (snapshot != null) {
+        rated = BranchRatesSnapshot.ratedBodyTypes(
+          standard: snapshot.standard,
+          vehicleTypeRates: snapshot.vehicleTypeRates,
+          usesAreaOverride: snapshot.usesAreaOverride,
+        );
+      }
+    }
+    if (rated.isEmpty && branchUuid.isNotEmpty) {
+      final keys = await rateService.getDistinctVehicleTypesForBranch(branchUuid);
+      rated = BranchRatesSnapshot.ratedBodyTypesFromDriftKeys(keys);
+    }
+
+    if (!mounted) return;
+    setState(() => _ratedBodyTypes = rated);
+
+    if (rated.isNotEmpty) {
+      final cubit = context.read<CheckInCubit>();
+      if (!rated.contains(cubit.state.vehicleBodyType)) {
+        cubit.updateVehicleStep(vehicleBodyType: rated.first);
+      }
+    }
   }
 
   Future<void> _loadAreaLevels() async {
@@ -382,7 +431,7 @@ class _CheckInVehicleDetailsScreenState
         const SizedBox(height: CheckInCompactTokens.blockGap),
         const CheckInSectionTitle(text: 'VEHICLE TYPE'),
         const SizedBox(height: CheckInCompactTokens.sectionGap),
-        const CheckInVehicleBodyTypeGrid(),
+        CheckInVehicleBodyTypeGrid(enabledTypes: _ratedBodyTypes),
       ],
     );
   }
