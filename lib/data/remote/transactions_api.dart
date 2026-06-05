@@ -480,8 +480,8 @@ class TransactionsApi {
     );
   }
 
-  /// POST [AppConfig.ticketVoidUrl] — request ticket void (pending admin approval).
-  Future<void> requestVoid({
+  /// POST [AppConfig.ticketVoidUrl] — void active ticket immediately.
+  Future<Map<String, dynamic>> requestVoid({
     required String token,
     required String ticketId,
     String? reason,
@@ -490,7 +490,13 @@ class TransactionsApi {
     if (tid.isEmpty) {
       throw TransactionsApiException('Ticket id is empty.');
     }
-    if (AppConfig.useStubApi) return;
+    if (AppConfig.useStubApi) {
+      return <String, dynamic>{
+        'id': tid,
+        'status': 'VOID',
+        'voidReason': reason ?? 'Voided',
+      };
+    }
     final body = <String, dynamic>{};
     final r = reason?.trim();
     if (r != null && r.isNotEmpty) {
@@ -506,7 +512,9 @@ class TransactionsApi {
         ),
       );
       final code = res.statusCode ?? 0;
-      if (code >= 200 && code < 300) return;
+      if (code >= 200 && code < 300) {
+        return _asJsonMap(res.data);
+      }
       final msg =
           _messageFromBody(res.data) ?? res.statusMessage ?? 'HTTP $code';
       throw TransactionsApiException(msg, statusCode: code);

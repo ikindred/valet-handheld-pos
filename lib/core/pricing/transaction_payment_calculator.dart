@@ -20,6 +20,7 @@ class TransactionPaymentCalculator {
     String? vehicleType,
     DateTime? timeInOverride,
     DateTime? timeOutOverride,
+    int? flatBlockHoursOverride,
   }) async {
     final amount = TransactionPaymentFields.amountFrom(json);
     if (amount == null || amount < 0.009) return null;
@@ -48,12 +49,16 @@ class TransactionPaymentCalculator {
       branchId: branchId,
       vehicleType: vehicleType,
     );
+    final flatBlockHours = flatBlockHoursOverride != null &&
+            flatBlockHoursOverride > 0
+        ? flatBlockHoursOverride
+        : resolved.flatBlockHours;
 
     final breakdown = CheckoutPricing.compute(
       timeIn: timeIn,
       timeOut: timeOut ?? timeIn,
       rates: resolved.rates,
-      flatBlockHours: resolved.flatBlockHours,
+      flatBlockHours: flatBlockHours,
       overnightStart: resolved.overnightStart,
       overnightEnd: resolved.overnightEnd,
     );
@@ -63,7 +68,7 @@ class TransactionPaymentCalculator {
 
     return summaryFromBreakdown(
       breakdown: breakdown,
-      flatBlockHours: resolved.flatBlockHours,
+      flatBlockHours: flatBlockHours,
       succeedingRatePerHour: resolved.rates.succeedingHourPesos.toDouble(),
       totalDue: amount,
       cashTendered: tendered,

@@ -111,10 +111,10 @@ final class DashboardRecentTx extends Equatable {
   /// Valet receipt number (`vr_no`); "—" when unset.
   final String vrNo;
 
-  /// True when the API reports a pending void request on this ticket.
+  /// True when void-at-intake is queued locally (offline sync pending).
   final bool hasPendingVoid;
 
-  /// True when the void request has been approved (transaction is voided).
+  /// True when the transaction is voided.
   final bool isVoided;
 
   factory DashboardRecentTx.fromSummaryRow(DashboardRecentRow row) {
@@ -226,7 +226,10 @@ class DashboardCubit extends Cubit<DashboardState> {
 
   /// Reload dashboard: remote summary when online, else Drift.
   Future<void> refresh() async {
-    emit(const DashboardLoading());
+    final keepVisible = state is DashboardReady;
+    if (!keepVisible) {
+      emit(const DashboardLoading());
+    }
     try {
       final session = await _auth.getActiveSession();
       if (session == null) {
@@ -428,6 +431,7 @@ class DashboardCubit extends Cubit<DashboardState> {
         slot: slot,
         vrNo: vrNo,
         hasPendingVoid: t.pendingVoidRequest,
+        isVoided: t.status == 'void',
       );
     }
     return DashboardRecentTx(
@@ -445,6 +449,7 @@ class DashboardCubit extends Cubit<DashboardState> {
       slot: slot,
       vrNo: vrNo,
       hasPendingVoid: t.pendingVoidRequest,
+      isVoided: t.status == 'void',
     );
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:valet_handheld_pos/core/api/transaction_payment_fields.dart';
+import 'package:valet_handheld_pos/core/api/transaction_payment_summary.dart';
 import 'package:valet_handheld_pos/core/pricing/transaction_payment_calculator.dart';
 import 'package:valet_handheld_pos/features/check_out/domain/checkout_pricing.dart';
 
@@ -50,5 +51,25 @@ void main() {
     expect(summary.succeedingHoursLabel, '5h 2m');
     expect(summary.overnightFee, 500);
     expect(summary.totalDue, 780);
+  });
+
+  test('withFlatBlockHours updates label without changing amounts', () {
+    const stored = TransactionPaymentSummary(
+      totalDue: 320,
+      flatRate: 120,
+      flatRateLabel: 'Flat rate (3h)',
+      flatBlockHours: 3,
+      overnightFee: 200,
+      isOvernight: true,
+      durationMinutes: 3,
+    );
+
+    final aligned = stored.withFlatBlockHours(8);
+
+    expect(aligned.flatBlockHours, 8);
+    expect(aligned.flatRateLabel, 'Flat rate (8h)');
+    expect(aligned.flatRate, 120);
+    expect(aligned.overnightFee, 200);
+    expect(aligned.totalDue, 320);
   });
 }

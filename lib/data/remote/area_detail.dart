@@ -77,11 +77,15 @@ class VehicleTypeRateRow {
     required this.id,
     required this.name,
     required this.fees,
+    this.flatRateHours = 0,
   });
 
   final String id;
   final String name;
   final ParkingRateFees fees;
+
+  /// Per-vehicle flat block hours; `0` means inherit branch/area default.
+  final int flatRateHours;
 
   static VehicleTypeRateRow? fromJson(Map<String, dynamic> json) {
     final name = (json['name'] ?? '').toString().trim();
@@ -90,6 +94,7 @@ class VehicleTypeRateRow {
       id: (json['id'] ?? name).toString(),
       name: name,
       fees: ParkingRateFees.fromJson(json),
+      flatRateHours: BranchRatesSnapshot.flatHoursFromMap(json),
     );
   }
 }
@@ -216,10 +221,10 @@ class BranchRatesSnapshot {
     final ratePayload = ParkingRateFees.ratePayloadFrom(body);
     var flatHours = defaultFlatBlockHours;
     if (ratePayload != null) {
-      final fromApi = _flatHoursFromMap(ratePayload);
+      final fromApi = flatHoursFromMap(ratePayload);
       if (fromApi > 0) flatHours = fromApi;
     } else {
-      final fromApi = _flatHoursFromMap(body);
+      final fromApi = flatHoursFromMap(body);
       if (fromApi > 0) flatHours = fromApi;
     }
 
@@ -233,7 +238,8 @@ class BranchRatesSnapshot {
     );
   }
 
-  static int _flatHoursFromMap(Map<String, dynamic> map) {
+  /// Reads `flatRateHours` / `flat_rate_hours` from an API map; `0` if absent.
+  static int flatHoursFromMap(Map<String, dynamic> map) {
     for (final key in const ['flatRateHours', 'flat_rate_hours']) {
       final raw = map[key];
       if (raw is int && raw > 0) return raw;
@@ -257,6 +263,7 @@ class AreaDetail {
     required this.vehicleTypeRates,
     required this.levels,
     required this.overnightTimes,
+    required this.flatBlockHours,
   });
 
   final String id;
@@ -268,6 +275,9 @@ class AreaDetail {
 
   /// Area-level overnight window (`HH:mm`), applied to all cached rate rows.
   final ({String? start, String? end}) overnightTimes;
+
+  /// Flat-rate block hours from area/branch rate payload.
+  final int flatBlockHours;
 
   AreaSlotCounts get slotCounts {
     if (levels.isEmpty) return AreaSlotCounts.empty;
@@ -297,6 +307,16 @@ class AreaDetail {
       return null;
     }
 
+    final ratePayload = ParkingRateFees.ratePayloadFrom(body);
+    var flatHours = 3;
+    if (ratePayload != null) {
+      final fromApi = BranchRatesSnapshot.flatHoursFromMap(ratePayload);
+      if (fromApi > 0) flatHours = fromApi;
+    } else {
+      final fromApi = BranchRatesSnapshot.flatHoursFromMap(body);
+      if (fromApi > 0) flatHours = fromApi;
+    }
+
     return AreaDetail(
       id: (body['id'] ?? '').toString(),
       name: (body['name'] ?? '').toString().trim(),
@@ -305,6 +325,7 @@ class AreaDetail {
       vehicleTypeRates: vehicleRows,
       levels: levels,
       overnightTimes: _parseOvernightTimes(body),
+      flatBlockHours: flatHours,
     );
   }
 

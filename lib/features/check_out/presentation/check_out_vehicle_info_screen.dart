@@ -141,6 +141,8 @@ class _PreviewVehicleBody extends StatelessWidget {
     final parkingLabel = pt.parkingLocationLine.trim().isEmpty
         ? '—'
         : pt.parkingLocationLine.trim();
+    final vrRaw = row.vrNo?.trim() ?? '';
+    final vrNo = vrRaw.isEmpty ? '—' : vrRaw;
 
     final valetIn = (pt.valetIn ?? '').trim().isEmpty ? '—' : pt.valetIn!.trim();
     final valetOutPrefill = pt.valetOut ?? state.driverOut;
@@ -184,6 +186,7 @@ class _PreviewVehicleBody extends StatelessWidget {
         ),
         vehicleCard: _VehicleCard(
           plate: plateDisplay.isEmpty ? '—' : plateDisplay,
+          vrNo: vrNo,
           makeModel: makeModel.isEmpty ? '—' : makeModel,
           color: colorDisplay,
           type: typeDisplay,
@@ -209,6 +212,8 @@ class _OfflineVehicleBody extends StatelessWidget {
     final belongings = CheckOutVehicleInfoScreen._belongingsFromDrift(
       row.personalBelongings,
     );
+    final vrRaw = row.vrNo?.trim() ?? '';
+    final vrNo = vrRaw.isEmpty ? '—' : vrRaw;
 
     final tabs = CheckoutVehicleReviewTabs(
       vehicleInfoSelected: true,
@@ -242,6 +247,7 @@ class _OfflineVehicleBody extends StatelessWidget {
         ),
         vehicleCard: _VehicleCard(
           plate: row.plateNumber.isEmpty ? '—' : row.plateNumber,
+          vrNo: vrNo,
           makeModel: [
             row.vehicleBrand.trim(),
             row.vehicleColor.trim(),
@@ -408,6 +414,7 @@ class _TimeCard extends StatelessWidget {
 class _VehicleCard extends StatelessWidget {
   const _VehicleCard({
     required this.plate,
+    required this.vrNo,
     required this.makeModel,
     required this.color,
     required this.type,
@@ -415,6 +422,7 @@ class _VehicleCard extends StatelessWidget {
   });
 
   final String plate;
+  final String vrNo;
   final String makeModel;
   final String color;
   final String type;
@@ -445,6 +453,9 @@ class _VehicleCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
+          Text('VR No.', style: CheckOutUiTokens.fieldLabelOf(context)),
+          Text(vrNo, style: CheckOutUiTokens.bodyOf(context)),
+          const SizedBox(height: 6),
           Text('Make / Model', style: CheckOutUiTokens.fieldLabelOf(context)),
           Text(makeModel, style: CheckOutUiTokens.bodyOf(context)),
           const SizedBox(height: 6),

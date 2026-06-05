@@ -1,4 +1,5 @@
 import '../../core/api/transaction_payment_summary.dart';
+import '../../features/check_out/models/checkout_preview_rates.dart';
 import '../../data/local/db/app_database.dart';
 import '../../features/check_out/domain/checkout_pricing.dart';
 import '../../features/check_out/domain/checkout_receipt_snapshot.dart';
@@ -189,6 +190,7 @@ class CheckoutReceiptData {
     String? branchDisplayName,
     String mallHours = 'MONDAY – SUNDAY · 10:00AM – 9:00PM',
     TransactionPaymentSummary? payment,
+    CheckoutPreviewRates? appliedRate,
     double? cashTendered,
     double? changePesos,
   }) {
@@ -203,7 +205,9 @@ class CheckoutReceiptData {
         ? checkOut.millisecondsSinceEpoch ~/ 1000
         : timeInUnix;
 
-    final p = payment;
+    final p = appliedRate != null && appliedRate.flatRateHours > 0
+        ? payment?.withFlatBlockHours(appliedRate.flatRateHours)
+        : payment;
     final durationMinutes = checkOut != null
         ? CheckoutPricing.durationMinutesCeil(checkIn, checkOut)
         : (p?.durationMinutes ?? 0);

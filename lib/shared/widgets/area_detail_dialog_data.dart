@@ -129,6 +129,8 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
                 levels: areaDetail.levels,
                 overnightTimes: branchRates?.overnightTimes ??
                     areaDetail.overnightTimes,
+                flatBlockHours: branchRates?.flatBlockHours ??
+                    areaDetail.flatBlockHours,
               ),
       );
     } else if (branchRates != null && branchRates.standard.hasAny) {

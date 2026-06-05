@@ -1,5 +1,5 @@
 import '../../core/api/transaction_payment_fields.dart';
-import '../../core/api/void_request_info.dart';
+import '../../core/api/void_audit_info.dart';
 import '../../features/dashboard/domain/dashboard_recent_format.dart';
 
 /// Default area capacity when API omits `total_slots`.
@@ -159,7 +159,7 @@ class DashboardSummaryRecent {
     this.vehicleColor,
     this.parkingSlot,
     this.vrNo,
-    this.voidRequest,
+    this.voidAudit,
     this.rawJson,
   });
 
@@ -176,12 +176,13 @@ class DashboardSummaryRecent {
   final String? parkingSlot;
   final String? vrNo;
 
-  /// Parsed from `void_request` object in the API transaction row.
-  final VoidRequestInfo? voidRequest;
+  /// Flat void audit from API (`void_reason`, `voided_by`, `voided_at`).
+  final VoidAuditInfo? voidAudit;
 
-  bool get hasPendingVoid => voidRequest?.isPending == true;
+  bool get hasPendingVoid => false;
+
   bool get isVoided =>
-      voidRequest?.isApproved == true || status.toLowerCase() == 'voided';
+      VoidAuditInfo.isVoidStatus(status) || voidAudit?.isPopulated == true;
 
   /// Original API row from `recent_transactions` (full transaction shape).
   final Map<String, dynamic>? rawJson;
@@ -253,9 +254,7 @@ class DashboardSummaryRecent {
       vehicleColor: color,
       parkingSlot: slot,
       vrNo: vrNo,
-      voidRequest: VoidRequestInfo.tryFromJson(
-        json['void_request'] ?? json['voidRequest'],
-      ),
+      voidAudit: VoidAuditInfo.tryFromJson(json),
       rawJson: json,
     );
   }

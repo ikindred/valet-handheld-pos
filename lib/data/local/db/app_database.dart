@@ -219,15 +219,24 @@ class Tickets extends Table {
   TextColumn get appliedRateJson =>
       text().named('applied_rate_json').nullable()();
 
-  /// Latest `void_request` from server (for offline display).
+  /// Legacy `void_request` JSON — no longer written; use flat void columns.
   TextColumn get voidRequestJson =>
       text().named('void_request_json').nullable()();
 
-  /// Offline void intent — cashier requested void while offline.
+  /// Server void reason (`void_reason`).
+  TextColumn get voidReason => text().named('void_reason').nullable()();
+
+  /// JSON `{ id, username, name }` for `voided_by`.
+  TextColumn get voidedByJson => text().named('voided_by_json').nullable()();
+
+  /// ISO-8601 when void was applied (`voided_at`).
+  TextColumn get voidedAt => text().named('voided_at').nullable()();
+
+  /// Offline void intent — queued until check-in sync sends `void_requested`.
   BoolColumn get pendingVoidRequest =>
       boolean().named('pending_void_request').withDefault(const Constant(false))();
 
-  /// Reason for the offline void request.
+  /// Reason for the offline void-at-intake request.
   TextColumn get pendingVoidReason =>
       text().named('pending_void_reason').nullable()();
 
@@ -356,7 +365,7 @@ class AppDatabase extends _$AppDatabase {
   final bool _skipDevOfflineSeed;
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -437,6 +446,11 @@ FROM offline_accounts''');
             await m.addColumn(tickets, tickets.voidRequestJson);
             await m.addColumn(tickets, tickets.pendingVoidRequest);
             await m.addColumn(tickets, tickets.pendingVoidReason);
+          }
+          if (from < 13) {
+            await m.addColumn(tickets, tickets.voidReason);
+            await m.addColumn(tickets, tickets.voidedByJson);
+            await m.addColumn(tickets, tickets.voidedAt);
           }
         },
       );

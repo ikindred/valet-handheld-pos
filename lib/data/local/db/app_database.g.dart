@@ -2533,6 +2533,24 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
   late final GeneratedColumn<String> voidRequestJson = GeneratedColumn<String>(
       'void_request_json', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _voidReasonMeta =
+      const VerificationMeta('voidReason');
+  @override
+  late final GeneratedColumn<String> voidReason = GeneratedColumn<String>(
+      'void_reason', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _voidedByJsonMeta =
+      const VerificationMeta('voidedByJson');
+  @override
+  late final GeneratedColumn<String> voidedByJson = GeneratedColumn<String>(
+      'voided_by_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _voidedAtMeta =
+      const VerificationMeta('voidedAt');
+  @override
+  late final GeneratedColumn<String> voidedAt = GeneratedColumn<String>(
+      'voided_at', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _pendingVoidRequestMeta =
       const VerificationMeta('pendingVoidRequest');
   @override
@@ -2580,6 +2598,9 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
         ticketLost,
         appliedRateJson,
         voidRequestJson,
+        voidReason,
+        voidedByJson,
+        voidedAt,
         pendingVoidRequest,
         pendingVoidReason
       ];
@@ -2774,6 +2795,22 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
           voidRequestJson.isAcceptableOrUnknown(
               data['void_request_json']!, _voidRequestJsonMeta));
     }
+    if (data.containsKey('void_reason')) {
+      context.handle(
+          _voidReasonMeta,
+          voidReason.isAcceptableOrUnknown(
+              data['void_reason']!, _voidReasonMeta));
+    }
+    if (data.containsKey('voided_by_json')) {
+      context.handle(
+          _voidedByJsonMeta,
+          voidedByJson.isAcceptableOrUnknown(
+              data['voided_by_json']!, _voidedByJsonMeta));
+    }
+    if (data.containsKey('voided_at')) {
+      context.handle(_voidedAtMeta,
+          voidedAt.isAcceptableOrUnknown(data['voided_at']!, _voidedAtMeta));
+    }
     if (data.containsKey('pending_void_request')) {
       context.handle(
           _pendingVoidRequestMeta,
@@ -2853,6 +2890,12 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
           DriftSqlType.string, data['${effectivePrefix}applied_rate_json']),
       voidRequestJson: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}void_request_json']),
+      voidReason: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}void_reason']),
+      voidedByJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}voided_by_json']),
+      voidedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}voided_at']),
       pendingVoidRequest: attachedDatabase.typeMapping.read(
           DriftSqlType.bool, data['${effectivePrefix}pending_void_request'])!,
       pendingVoidReason: attachedDatabase.typeMapping.read(
@@ -2926,13 +2969,22 @@ class Ticket extends DataClass implements Insertable<Ticket> {
   /// JSON snapshot of `applied_rate` for offline display.
   final String? appliedRateJson;
 
-  /// Latest `void_request` from server (for offline display).
+  /// Legacy `void_request` JSON — no longer written; use flat void columns.
   final String? voidRequestJson;
 
-  /// Offline void intent — cashier requested void while offline.
+  /// Server void reason (`void_reason`).
+  final String? voidReason;
+
+  /// JSON `{ id, username, name }` for `voided_by`.
+  final String? voidedByJson;
+
+  /// ISO-8601 when void was applied (`voided_at`).
+  final String? voidedAt;
+
+  /// Offline void intent — queued until check-in sync sends `void_requested`.
   final bool pendingVoidRequest;
 
-  /// Reason for the offline void request.
+  /// Reason for the offline void-at-intake request.
   final String? pendingVoidReason;
   const Ticket(
       {required this.id,
@@ -2964,6 +3016,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       this.ticketLost,
       this.appliedRateJson,
       this.voidRequestJson,
+      this.voidReason,
+      this.voidedByJson,
+      this.voidedAt,
       required this.pendingVoidRequest,
       this.pendingVoidReason});
   @override
@@ -3026,6 +3081,15 @@ class Ticket extends DataClass implements Insertable<Ticket> {
     if (!nullToAbsent || voidRequestJson != null) {
       map['void_request_json'] = Variable<String>(voidRequestJson);
     }
+    if (!nullToAbsent || voidReason != null) {
+      map['void_reason'] = Variable<String>(voidReason);
+    }
+    if (!nullToAbsent || voidedByJson != null) {
+      map['voided_by_json'] = Variable<String>(voidedByJson);
+    }
+    if (!nullToAbsent || voidedAt != null) {
+      map['voided_at'] = Variable<String>(voidedAt);
+    }
     map['pending_void_request'] = Variable<bool>(pendingVoidRequest);
     if (!nullToAbsent || pendingVoidReason != null) {
       map['pending_void_reason'] = Variable<String>(pendingVoidReason);
@@ -3087,6 +3151,15 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       voidRequestJson: voidRequestJson == null && nullToAbsent
           ? const Value.absent()
           : Value(voidRequestJson),
+      voidReason: voidReason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(voidReason),
+      voidedByJson: voidedByJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(voidedByJson),
+      voidedAt: voidedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(voidedAt),
       pendingVoidRequest: Value(pendingVoidRequest),
       pendingVoidReason: pendingVoidReason == null && nullToAbsent
           ? const Value.absent()
@@ -3129,6 +3202,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       ticketLost: serializer.fromJson<bool?>(json['ticketLost']),
       appliedRateJson: serializer.fromJson<String?>(json['appliedRateJson']),
       voidRequestJson: serializer.fromJson<String?>(json['voidRequestJson']),
+      voidReason: serializer.fromJson<String?>(json['voidReason']),
+      voidedByJson: serializer.fromJson<String?>(json['voidedByJson']),
+      voidedAt: serializer.fromJson<String?>(json['voidedAt']),
       pendingVoidRequest: serializer.fromJson<bool>(json['pendingVoidRequest']),
       pendingVoidReason:
           serializer.fromJson<String?>(json['pendingVoidReason']),
@@ -3167,6 +3243,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       'ticketLost': serializer.toJson<bool?>(ticketLost),
       'appliedRateJson': serializer.toJson<String?>(appliedRateJson),
       'voidRequestJson': serializer.toJson<String?>(voidRequestJson),
+      'voidReason': serializer.toJson<String?>(voidReason),
+      'voidedByJson': serializer.toJson<String?>(voidedByJson),
+      'voidedAt': serializer.toJson<String?>(voidedAt),
       'pendingVoidRequest': serializer.toJson<bool>(pendingVoidRequest),
       'pendingVoidReason': serializer.toJson<String?>(pendingVoidReason),
     };
@@ -3202,6 +3281,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           Value<bool?> ticketLost = const Value.absent(),
           Value<String?> appliedRateJson = const Value.absent(),
           Value<String?> voidRequestJson = const Value.absent(),
+          Value<String?> voidReason = const Value.absent(),
+          Value<String?> voidedByJson = const Value.absent(),
+          Value<String?> voidedAt = const Value.absent(),
           bool? pendingVoidRequest,
           Value<String?> pendingVoidReason = const Value.absent()}) =>
       Ticket(
@@ -3242,6 +3324,10 @@ class Ticket extends DataClass implements Insertable<Ticket> {
         voidRequestJson: voidRequestJson.present
             ? voidRequestJson.value
             : this.voidRequestJson,
+        voidReason: voidReason.present ? voidReason.value : this.voidReason,
+        voidedByJson:
+            voidedByJson.present ? voidedByJson.value : this.voidedByJson,
+        voidedAt: voidedAt.present ? voidedAt.value : this.voidedAt,
         pendingVoidRequest: pendingVoidRequest ?? this.pendingVoidRequest,
         pendingVoidReason: pendingVoidReason.present
             ? pendingVoidReason.value
@@ -3305,6 +3391,12 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       voidRequestJson: data.voidRequestJson.present
           ? data.voidRequestJson.value
           : this.voidRequestJson,
+      voidReason:
+          data.voidReason.present ? data.voidReason.value : this.voidReason,
+      voidedByJson: data.voidedByJson.present
+          ? data.voidedByJson.value
+          : this.voidedByJson,
+      voidedAt: data.voidedAt.present ? data.voidedAt.value : this.voidedAt,
       pendingVoidRequest: data.pendingVoidRequest.present
           ? data.pendingVoidRequest.value
           : this.pendingVoidRequest,
@@ -3346,6 +3438,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           ..write('ticketLost: $ticketLost, ')
           ..write('appliedRateJson: $appliedRateJson, ')
           ..write('voidRequestJson: $voidRequestJson, ')
+          ..write('voidReason: $voidReason, ')
+          ..write('voidedByJson: $voidedByJson, ')
+          ..write('voidedAt: $voidedAt, ')
           ..write('pendingVoidRequest: $pendingVoidRequest, ')
           ..write('pendingVoidReason: $pendingVoidReason')
           ..write(')'))
@@ -3383,6 +3478,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
         ticketLost,
         appliedRateJson,
         voidRequestJson,
+        voidReason,
+        voidedByJson,
+        voidedAt,
         pendingVoidRequest,
         pendingVoidReason
       ]);
@@ -3419,6 +3517,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           other.ticketLost == this.ticketLost &&
           other.appliedRateJson == this.appliedRateJson &&
           other.voidRequestJson == this.voidRequestJson &&
+          other.voidReason == this.voidReason &&
+          other.voidedByJson == this.voidedByJson &&
+          other.voidedAt == this.voidedAt &&
           other.pendingVoidRequest == this.pendingVoidRequest &&
           other.pendingVoidReason == this.pendingVoidReason);
 }
@@ -3453,6 +3554,9 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
   final Value<bool?> ticketLost;
   final Value<String?> appliedRateJson;
   final Value<String?> voidRequestJson;
+  final Value<String?> voidReason;
+  final Value<String?> voidedByJson;
+  final Value<String?> voidedAt;
   final Value<bool> pendingVoidRequest;
   final Value<String?> pendingVoidReason;
   final Value<int> rowid;
@@ -3486,6 +3590,9 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     this.ticketLost = const Value.absent(),
     this.appliedRateJson = const Value.absent(),
     this.voidRequestJson = const Value.absent(),
+    this.voidReason = const Value.absent(),
+    this.voidedByJson = const Value.absent(),
+    this.voidedAt = const Value.absent(),
     this.pendingVoidRequest = const Value.absent(),
     this.pendingVoidReason = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -3520,6 +3627,9 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     this.ticketLost = const Value.absent(),
     this.appliedRateJson = const Value.absent(),
     this.voidRequestJson = const Value.absent(),
+    this.voidReason = const Value.absent(),
+    this.voidedByJson = const Value.absent(),
+    this.voidedAt = const Value.absent(),
     this.pendingVoidRequest = const Value.absent(),
     this.pendingVoidReason = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -3568,6 +3678,9 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     Expression<bool>? ticketLost,
     Expression<String>? appliedRateJson,
     Expression<String>? voidRequestJson,
+    Expression<String>? voidReason,
+    Expression<String>? voidedByJson,
+    Expression<String>? voidedAt,
     Expression<bool>? pendingVoidRequest,
     Expression<String>? pendingVoidReason,
     Expression<int>? rowid,
@@ -3603,6 +3716,9 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       if (ticketLost != null) 'ticket_lost': ticketLost,
       if (appliedRateJson != null) 'applied_rate_json': appliedRateJson,
       if (voidRequestJson != null) 'void_request_json': voidRequestJson,
+      if (voidReason != null) 'void_reason': voidReason,
+      if (voidedByJson != null) 'voided_by_json': voidedByJson,
+      if (voidedAt != null) 'voided_at': voidedAt,
       if (pendingVoidRequest != null)
         'pending_void_request': pendingVoidRequest,
       if (pendingVoidReason != null) 'pending_void_reason': pendingVoidReason,
@@ -3640,6 +3756,9 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       Value<bool?>? ticketLost,
       Value<String?>? appliedRateJson,
       Value<String?>? voidRequestJson,
+      Value<String?>? voidReason,
+      Value<String?>? voidedByJson,
+      Value<String?>? voidedAt,
       Value<bool>? pendingVoidRequest,
       Value<String?>? pendingVoidReason,
       Value<int>? rowid}) {
@@ -3673,6 +3792,9 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       ticketLost: ticketLost ?? this.ticketLost,
       appliedRateJson: appliedRateJson ?? this.appliedRateJson,
       voidRequestJson: voidRequestJson ?? this.voidRequestJson,
+      voidReason: voidReason ?? this.voidReason,
+      voidedByJson: voidedByJson ?? this.voidedByJson,
+      voidedAt: voidedAt ?? this.voidedAt,
       pendingVoidRequest: pendingVoidRequest ?? this.pendingVoidRequest,
       pendingVoidReason: pendingVoidReason ?? this.pendingVoidReason,
       rowid: rowid ?? this.rowid,
@@ -3769,6 +3891,15 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     if (voidRequestJson.present) {
       map['void_request_json'] = Variable<String>(voidRequestJson.value);
     }
+    if (voidReason.present) {
+      map['void_reason'] = Variable<String>(voidReason.value);
+    }
+    if (voidedByJson.present) {
+      map['voided_by_json'] = Variable<String>(voidedByJson.value);
+    }
+    if (voidedAt.present) {
+      map['voided_at'] = Variable<String>(voidedAt.value);
+    }
     if (pendingVoidRequest.present) {
       map['pending_void_request'] = Variable<bool>(pendingVoidRequest.value);
     }
@@ -3813,6 +3944,9 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
           ..write('ticketLost: $ticketLost, ')
           ..write('appliedRateJson: $appliedRateJson, ')
           ..write('voidRequestJson: $voidRequestJson, ')
+          ..write('voidReason: $voidReason, ')
+          ..write('voidedByJson: $voidedByJson, ')
+          ..write('voidedAt: $voidedAt, ')
           ..write('pendingVoidRequest: $pendingVoidRequest, ')
           ..write('pendingVoidReason: $pendingVoidReason, ')
           ..write('rowid: $rowid')
@@ -6236,6 +6370,9 @@ typedef $$TicketsTableCreateCompanionBuilder = TicketsCompanion Function({
   Value<bool?> ticketLost,
   Value<String?> appliedRateJson,
   Value<String?> voidRequestJson,
+  Value<String?> voidReason,
+  Value<String?> voidedByJson,
+  Value<String?> voidedAt,
   Value<bool> pendingVoidRequest,
   Value<String?> pendingVoidReason,
   Value<int> rowid,
@@ -6270,6 +6407,9 @@ typedef $$TicketsTableUpdateCompanionBuilder = TicketsCompanion Function({
   Value<bool?> ticketLost,
   Value<String?> appliedRateJson,
   Value<String?> voidRequestJson,
+  Value<String?> voidReason,
+  Value<String?> voidedByJson,
+  Value<String?> voidedAt,
   Value<bool> pendingVoidRequest,
   Value<String?> pendingVoidReason,
   Value<int> rowid,
@@ -6321,6 +6461,9 @@ class $$TicketsTableTableManager extends RootTableManager<
             Value<bool?> ticketLost = const Value.absent(),
             Value<String?> appliedRateJson = const Value.absent(),
             Value<String?> voidRequestJson = const Value.absent(),
+            Value<String?> voidReason = const Value.absent(),
+            Value<String?> voidedByJson = const Value.absent(),
+            Value<String?> voidedAt = const Value.absent(),
             Value<bool> pendingVoidRequest = const Value.absent(),
             Value<String?> pendingVoidReason = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -6355,6 +6498,9 @@ class $$TicketsTableTableManager extends RootTableManager<
             ticketLost: ticketLost,
             appliedRateJson: appliedRateJson,
             voidRequestJson: voidRequestJson,
+            voidReason: voidReason,
+            voidedByJson: voidedByJson,
+            voidedAt: voidedAt,
             pendingVoidRequest: pendingVoidRequest,
             pendingVoidReason: pendingVoidReason,
             rowid: rowid,
@@ -6389,6 +6535,9 @@ class $$TicketsTableTableManager extends RootTableManager<
             Value<bool?> ticketLost = const Value.absent(),
             Value<String?> appliedRateJson = const Value.absent(),
             Value<String?> voidRequestJson = const Value.absent(),
+            Value<String?> voidReason = const Value.absent(),
+            Value<String?> voidedByJson = const Value.absent(),
+            Value<String?> voidedAt = const Value.absent(),
             Value<bool> pendingVoidRequest = const Value.absent(),
             Value<String?> pendingVoidReason = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -6423,6 +6572,9 @@ class $$TicketsTableTableManager extends RootTableManager<
             ticketLost: ticketLost,
             appliedRateJson: appliedRateJson,
             voidRequestJson: voidRequestJson,
+            voidReason: voidReason,
+            voidedByJson: voidedByJson,
+            voidedAt: voidedAt,
             pendingVoidRequest: pendingVoidRequest,
             pendingVoidReason: pendingVoidReason,
             rowid: rowid,
@@ -6570,6 +6722,21 @@ class $$TicketsTableFilterComposer
 
   ColumnFilters<String> get voidRequestJson => $state.composableBuilder(
       column: $state.table.voidRequestJson,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get voidReason => $state.composableBuilder(
+      column: $state.table.voidReason,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get voidedByJson => $state.composableBuilder(
+      column: $state.table.voidedByJson,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get voidedAt => $state.composableBuilder(
+      column: $state.table.voidedAt,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -6736,6 +6903,21 @@ class $$TicketsTableOrderingComposer
 
   ColumnOrderings<String> get voidRequestJson => $state.composableBuilder(
       column: $state.table.voidRequestJson,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get voidReason => $state.composableBuilder(
+      column: $state.table.voidReason,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get voidedByJson => $state.composableBuilder(
+      column: $state.table.voidedByJson,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get voidedAt => $state.composableBuilder(
+      column: $state.table.voidedAt,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 

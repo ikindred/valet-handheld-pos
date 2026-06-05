@@ -15,6 +15,7 @@ import '../../../core/formatting/plate_number.dart';
 import '../../../core/logging/valet_log.dart';
 import '../../../core/session/standard_parking_rates.dart';
 import '../../../data/local/db/app_database.dart';
+import '../../../data/remote/area_detail.dart';
 import '../../../data/remote/checkout_exceptions.dart';
 import '../../../data/remote/transactions_api.dart';
 import '../../../data/repositories/auth_repository.dart';
@@ -423,6 +424,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
   }) {
     final dmg = _damageFromPreview(preview);
     final hasPreviewRates = preview.rates != null;
+    final previewFlatHours = preview.rates?.flatRateHours ?? 0;
     emit(
       state.copyWith(
         preview: preview,
@@ -436,6 +438,9 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         checkInDamage: dmg.checkIn,
         checkoutAddedDamage: dmg.checkout,
         clearBreakdown: true,
+        flatBlockHours: previewFlatHours > 0
+            ? previewFlatHours
+            : state.flatBlockHours,
       ),
     );
     if (hasPreviewRates) {
@@ -485,7 +490,9 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       isOvernight: base.isOvernight,
       ticketLost: base.ticketLost,
       appliedRateJson: base.appliedRateJson,
-      voidRequestJson: base.voidRequestJson,
+      voidReason: base.voidReason,
+      voidedByJson: base.voidedByJson,
+      voidedAt: base.voidedAt,
       pendingVoidRequest: base.pendingVoidRequest,
       pendingVoidReason: base.pendingVoidReason,
     );
@@ -970,6 +977,9 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         cachedStart: state.overnightStart,
         cachedEnd: state.overnightEnd,
       );
+      final flatHours = previewRates.flatRateHours > 0
+          ? previewRates.flatRateHours
+          : state.flatBlockHours;
       final effectivePreview = CheckoutPreviewRates(
         flatRate: previewRates.flatRate,
         succeedingRate: previewRates.succeedingRate,
@@ -982,11 +992,12 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         timeIn: window.timeIn,
         timeOut: window.timeOut,
         rates: effectivePreview,
-        flatBlockHours: state.flatBlockHours,
+        flatBlockHours: flatHours,
       );
       emit(
         state.copyWith(
           breakdown: b,
+          flatBlockHours: flatHours,
           rates: StandardParkingRates(
             flatRatePesos: previewRates.flatRate.round(),
             succeedingHourPesos: previewRates.succeedingRate.round(),
@@ -1056,6 +1067,9 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         cachedStart: state.overnightStart,
         cachedEnd: state.overnightEnd,
       );
+      final flatHours = previewRates.flatRateHours > 0
+          ? previewRates.flatRateHours
+          : state.flatBlockHours;
       return CheckoutPricing.computeFromPreviewRates(
         timeIn: window.timeIn,
         timeOut: checkOut,
@@ -1067,7 +1081,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
           overnightStart: overnight.start,
           overnightEnd: overnight.end,
         ),
-        flatBlockHours: state.flatBlockHours,
+        flatBlockHours: flatHours,
       );
     }
 
@@ -1127,6 +1141,9 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       'overnight_end_time': state.overnightEnd,
     };
   }
+
+  int _flatHoursFromAppliedRate(Map<String, dynamic> applied) =>
+      BranchRatesSnapshot.flatHoursFromMap(applied);
 
   Future<void> _enqueueOfflineCheckoutFinalize({
     required String ticketId,
@@ -1327,9 +1344,14 @@ class CheckOutCubit extends Cubit<CheckOutState> {
 
       final breakdown = _breakdownForFinalize(t, timeOutUnix);
       final ratesRow = _ratesResolvedForReceipt();
+      final appliedRateMap = _buildAppliedRate();
+      final appliedFlatHours = _flatHoursFromAppliedRate(appliedRateMap);
+      final flatBlockHours = appliedFlatHours > 0
+          ? appliedFlatHours
+          : ratesRow.flatBlockHours;
       final resolved = (
         rates: ratesRow.rates,
-        flatBlockHours: ratesRow.flatBlockHours,
+        flatBlockHours: flatBlockHours,
         overnightStart: ratesRow.overnightStart,
         overnightEnd: ratesRow.overnightEnd,
       );

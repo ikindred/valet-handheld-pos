@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import '../../../core/api/transaction_payment_summary.dart';
-import '../../../core/api/void_request_info.dart';
+import '../../../core/api/void_audit_info.dart';
 import '../../../data/local/db/app_database.dart';
 import '../../check_out/models/checkout_preview_rates.dart';
 
@@ -94,7 +94,7 @@ class TicketDetailSnapshot {
     required this.ticket,
     this.parking,
     this.payment,
-    this.voidRequest,
+    this.voidAudit,
     this.isOvernight,
     this.isTicketLost,
     this.appliedRate,
@@ -107,7 +107,7 @@ class TicketDetailSnapshot {
   /// Parsed from transaction JSON — fee breakdown + cash tendered / change.
   final TransactionPaymentSummary? payment;
 
-  final VoidRequestInfo? voidRequest;
+  final VoidAuditInfo? voidAudit;
   final bool? isOvernight;
   final bool? isTicketLost;
   final CheckoutPreviewRates? appliedRate;
@@ -118,6 +118,8 @@ class TicketDetailSnapshot {
   double? get cashTendered => payment?.cashTendered;
   double? get changePesos => payment?.change;
 
-  bool get hasPendingVoid =>
-      voidRequest?.isPending == true || ticket.pendingVoidRequest;
+  bool get hasPendingVoid => ticket.pendingVoidRequest;
+
+  bool get isVoided =>
+      ticket.status == 'void' || voidAudit?.isPopulated == true;
 }

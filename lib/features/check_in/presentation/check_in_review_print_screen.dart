@@ -128,7 +128,6 @@ String _vehicleLine(CheckInState s) {
   final parts = <String>[
     if (s.vehicleBrand.trim().isNotEmpty) s.vehicleBrand.trim(),
     if (s.vehicleColor.trim().isNotEmpty) s.vehicleColor.trim(),
-    if (s.vehicleVrNo.trim().isNotEmpty) s.vehicleVrNo.trim(),
   ];
   return parts.isEmpty ? '—' : parts.join(' · ');
 }
@@ -532,6 +531,9 @@ class _VehicleCard extends StatelessWidget {
     final plate = state.plateNumber.trim().isEmpty
         ? '—'
         : state.plateNumber.trim();
+    final vrNo = state.vehicleVrNo.trim().isEmpty
+        ? '—'
+        : state.vehicleVrNo.trim();
 
     return _ReviewCard(
       borderRadius: _ReviewTokens.cardRadius,
@@ -547,6 +549,8 @@ class _VehicleCard extends StatelessWidget {
                 ? _ReviewTokens.value(context)
                 : _ReviewTokens.plateValue(context),
           ),
+          const SizedBox(height: CheckInCompactTokens.sectionGap),
+          _ReviewRow(label: 'VR No.', value: vrNo),
           const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(label: 'Vehicle', value: _vehicleLine(state)),
           const SizedBox(height: CheckInCompactTokens.sectionGap),

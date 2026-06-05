@@ -1,5 +1,5 @@
 import '../../../core/api/transaction_payment_fields.dart';
-import '../../../core/api/void_request_info.dart';
+import '../../../core/api/void_audit_info.dart';
 import '../../../core/time/philippine_time.dart';
 import 'reports_format.dart';
 import 'reports_models.dart';
@@ -73,9 +73,7 @@ abstract final class ReportsTicketRowMapper {
     final statusRaw = _str(json['status']).toLowerCase();
     final amount = _double(json['amount']);
     final cashTendered = TransactionPaymentFields.cashTenderedFrom(json);
-    final voidRequest = VoidRequestInfo.tryFromJson(
-      json['void_request'] ?? json['voidRequest'],
-    );
+    final voidAudit = VoidAuditInfo.tryFromJson(json);
 
     return ReportsTicketRow(
       ticketId: ticketNumber.isEmpty ? '—' : ticketNumber,
@@ -92,8 +90,9 @@ abstract final class ReportsTicketRowMapper {
       status: _statusFromApi(statusRaw),
       fee: amount,
       cashTendered: cashTendered,
-      hasPendingVoid: voidRequest?.isPending == true,
-      isVoided: voidRequest?.isApproved == true || statusRaw == 'voided',
+      hasPendingVoid: false,
+      isVoided:
+          VoidAuditInfo.isVoidStatus(statusRaw) || voidAudit?.isPopulated == true,
     );
   }
 
@@ -124,7 +123,7 @@ abstract final class ReportsTicketRowMapper {
       'completed' || 'complete' || 'checked_out' =>
         ReportsTicketRowStatus.checkedOut,
       'lost' => ReportsTicketRowStatus.checkedOut,
-      'voided' => ReportsTicketRowStatus.checkedOut,
+      'void' || 'voided' => ReportsTicketRowStatus.checkedOut,
       'parked' => ReportsTicketRowStatus.parked,
       'active' => ReportsTicketRowStatus.parked,
       _ => ReportsTicketRowStatus.parked,

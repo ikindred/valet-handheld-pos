@@ -53,6 +53,27 @@ void main() {
     expect(detail.overnightTimes.end, '06:00');
   });
 
+  test('AreaDetail parses flat_rate_hours from area payload', () {
+    final detail = AreaDetail.fromResponseData({
+      'flatRate': 120,
+      'flat_rate_hours': 8,
+      'succeedingRate': 30,
+    });
+    expect(detail, isNotNull);
+    expect(detail!.flatBlockHours, 8);
+  });
+
+  test('VehicleTypeRateRow parses per-type flatRateHours', () {
+    final row = VehicleTypeRateRow.fromJson({
+      'id': 'vt-1',
+      'name': 'Sedan',
+      'flatRate': 120,
+      'flatRateHours': 8,
+    });
+    expect(row, isNotNull);
+    expect(row!.flatRateHours, 8);
+  });
+
   test('BranchRatesSnapshot parses nested rate from branch detail', () {
     final snapshot = BranchRatesSnapshot.fromResponseData({
       'id': 'branch-uuid',

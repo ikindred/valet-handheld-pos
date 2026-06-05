@@ -433,10 +433,28 @@ class _CheckInVehicleActionTileState extends State<_CheckInVehicleActionTile> {
   }
 }
 
-class _RecentTransactionsCard extends StatelessWidget {
+class _RecentTransactionsCard extends StatefulWidget {
   const _RecentTransactionsCard({required this.dashboard});
 
   final DashboardState dashboard;
+
+  @override
+  State<_RecentTransactionsCard> createState() =>
+      _RecentTransactionsCardState();
+}
+
+class _RecentTransactionsCardState extends State<_RecentTransactionsCard> {
+  bool _refreshing = false;
+
+  Future<void> _handleRefresh() async {
+    if (_refreshing) return;
+    setState(() => _refreshing = true);
+    try {
+      await context.read<DashboardCubit>().refresh();
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
+  }
 
   static ReportsTicketRow _toReportsRow(DashboardRecentTx tx) {
     final now = DateTime.now();
@@ -469,6 +487,7 @@ class _RecentTransactionsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dashboard = widget.dashboard;
     final txRows = switch (dashboard) {
       DashboardReady(:final recent) => recent,
       _ => const <DashboardRecentTx>[],
@@ -489,6 +508,8 @@ class _RecentTransactionsCard extends StatelessWidget {
     return ReportsTransactionsTableCard(
       rowCount: rows.length,
       rows: rows,
+      onRefresh: _handleRefresh,
+      isRefreshing: _refreshing,
       onRowTap: (row) {
         final id = row.detailId.trim();
         if (id.isEmpty) return;

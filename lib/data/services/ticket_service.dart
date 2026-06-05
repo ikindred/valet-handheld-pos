@@ -8,7 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/api/transaction_payment_fields.dart';
 import '../../core/api/transaction_payment_summary.dart';
-import '../../core/api/void_request_info.dart';
+import '../../core/api/void_audit_info.dart';
 import '../../features/check_out/models/checkout_preview_rates.dart';
 import '../../core/pricing/transaction_payment_calculator.dart';
 import '../../core/config/app_config.dart';
@@ -475,10 +475,16 @@ class TicketService {
     if (localId.isNotEmpty) {
       await updateServerTicketId(localId, response.id);
       final queuedSlotId = body['slot_id']?.toString().trim() ?? '';
+      final voidMeta = _voidAuditCompanion(response.rawJson);
+      final voidStatus = _resolveVoidStatus(response.rawJson);
       final companion = TicketsCompanion(
         syncStatus: const Value('synced'),
         pendingVoidRequest: const Value(false),
         pendingVoidReason: const Value(null),
+        status: voidStatus != null ? Value(voidStatus) : const Value.absent(),
+        voidReason: voidMeta.voidReason,
+        voidedByJson: voidMeta.voidedByJson,
+        voidedAt: voidMeta.voidedAt,
         slotId: queuedSlotId.isNotEmpty
             ? Value(queuedSlotId)
             : const Value.absent(),
@@ -741,23 +747,22 @@ LIMIT 1
     if (token == null || token.isEmpty) {
       throw TransactionsApiException('No active bearer token.');
     }
-    await _transactionsApi.requestVoid(
+    final voidBody = await _transactionsApi.requestVoid(
       token: token,
       ticketId: serverTicketId,
       reason: reason,
     );
     final row = await _ticketByServerId(serverTicketId.trim());
     if (row != null) {
-      final voidJson = reason != null && reason.trim().isNotEmpty
-          ? jsonEncode(<String, dynamic>{
-              'status': 'pending',
-              'reason': reason.trim(),
-            })
-          : jsonEncode(<String, dynamic>{'status': 'pending'});
+      final voidMeta = _voidAuditCompanion(voidBody);
       await (_db.update(_db.tickets)..where((t) => t.id.equals(row.id))).write(
         TicketsCompanion(
-          voidRequestJson: Value(voidJson),
+          status: const Value('void'),
           pendingVoidRequest: const Value(false),
+          pendingVoidReason: const Value(null),
+          voidReason: voidMeta.voidReason,
+          voidedByJson: voidMeta.voidedByJson,
+          voidedAt: voidMeta.voidedAt,
         ),
       );
     }
@@ -1101,22 +1106,23 @@ WHERE shift_id = ? AND status = 'completed'
       final parking = map != null
           ? TicketService._parkingFromTransactionJson(map)
           : null;
-      final payment = await _resolvePaymentForTicket(
-        ticket,
-        transactionJson: transactionJson,
-      );
-      if (payment != null) {
-        await _persistPaymentSummary(ticket.id, payment);
-      }
       final extras = _detailExtrasFrom(
         transactionJson: transactionJson,
         ticket: ticket,
       );
+      final payment = await _resolvePaymentForTicket(
+        ticket,
+        transactionJson: transactionJson,
+        appliedRate: extras.appliedRate,
+      );
+      if (payment != null) {
+        await _persistPaymentSummary(ticket.id, payment);
+      }
       return TicketDetailSnapshot(
         ticket: ticket,
         parking: parking ?? TicketService._parkingFromTicketRow(ticket),
         payment: payment,
-        voidRequest: extras.voidRequest,
+        voidAudit: extras.voidAudit,
         isOvernight: extras.isOvernight,
         isTicketLost: extras.isTicketLost,
         appliedRate: extras.appliedRate,
@@ -1160,16 +1166,19 @@ WHERE shift_id = ? AND status = 'completed'
     if (ticket == null) return null;
     var parking = TicketService._parkingFromTicketRow(ticket);
     parking ??= await _parkingFromSyncQueue(ticket.id);
-    var payment = await _resolvePaymentForTicket(ticket);
+    final extras = _detailExtrasFrom(transactionJson: null, ticket: ticket);
+    var payment = await _resolvePaymentForTicket(
+      ticket,
+      appliedRate: extras.appliedRate,
+    );
     if (payment != null) {
       await _persistPaymentSummary(ticket.id, payment);
     }
-    final extras = _detailExtrasFrom(transactionJson: null, ticket: ticket);
     return TicketDetailSnapshot(
       ticket: ticket,
       parking: parking,
       payment: payment,
-      voidRequest: extras.voidRequest,
+      voidAudit: extras.voidAudit,
       isOvernight: extras.isOvernight,
       isTicketLost: extras.isTicketLost,
       appliedRate: extras.appliedRate,
@@ -1178,7 +1187,7 @@ WHERE shift_id = ? AND status = 'completed'
   }
 
   static ({
-    VoidRequestInfo? voidRequest,
+    VoidAuditInfo? voidAudit,
     bool? isOvernight,
     bool? isTicketLost,
     CheckoutPreviewRates? appliedRate,
@@ -1192,7 +1201,7 @@ WHERE shift_id = ? AND status = 'completed'
       final hasLost = transactionJson.containsKey('ticket_lost') ||
           transactionJson.containsKey('ticketLost');
       return (
-        voidRequest: VoidRequestInfo.tryFromJson(transactionJson['void_request']),
+        voidAudit: VoidAuditInfo.tryFromJson(transactionJson),
         isOvernight: hasOvernight
             ? TransactionPaymentFields.isOvernightFrom(transactionJson)
             : null,
@@ -1205,19 +1214,9 @@ WHERE shift_id = ? AND status = 'completed'
       );
     }
 
-    VoidRequestInfo? voidRequest;
-    final voidRaw = ticket.voidRequestJson?.trim();
-    if (voidRaw != null && voidRaw.isNotEmpty) {
-      try {
-        voidRequest = VoidRequestInfo.tryFromJson(
-          jsonDecode(voidRaw) as Map<String, dynamic>,
-        );
-      } catch (_) {}
-    }
-    if (voidRequest == null && ticket.pendingVoidRequest) {
-      voidRequest = VoidRequestInfo(
-        id: '',
-        status: 'pending',
+    VoidAuditInfo? voidAudit = _voidAuditFromTicketRow(ticket);
+    if (voidAudit == null && ticket.pendingVoidRequest) {
+      voidAudit = VoidAuditInfo(
         reason: ticket.pendingVoidReason,
       );
     }
@@ -1233,11 +1232,69 @@ WHERE shift_id = ? AND status = 'completed'
     }
 
     return (
-      voidRequest: voidRequest,
+      voidAudit: voidAudit,
       isOvernight: ticket.isOvernight,
       isTicketLost: ticket.ticketLost,
       appliedRate: appliedRate,
     );
+  }
+
+  static VoidAuditInfo? _voidAuditFromTicketRow(Ticket ticket) {
+    final byRaw = ticket.voidedByJson?.trim();
+    VoidedByUser? voidedBy;
+    if (byRaw != null && byRaw.isNotEmpty) {
+      try {
+        voidedBy = VoidedByUser.tryFromJson(
+          jsonDecode(byRaw) as Map<String, dynamic>,
+        );
+      } catch (_) {}
+    }
+    final reason = ticket.voidReason?.trim();
+    final at = ticket.voidedAt?.trim();
+    if ((reason == null || reason.isEmpty) && voidedBy == null && at == null) {
+      return null;
+    }
+    return VoidAuditInfo(
+      reason: reason?.isNotEmpty == true ? reason : null,
+      voidedBy: voidedBy,
+      voidedAt: at?.isNotEmpty == true ? at : null,
+    );
+  }
+
+  static ({
+    Value<String?> voidReason,
+    Value<String?> voidedByJson,
+    Value<String?> voidedAt,
+  }) _voidAuditCompanion(Map<String, dynamic> json) {
+    final audit = VoidAuditInfo.tryFromJson(json);
+    if (audit == null) {
+      return (
+        voidReason: const Value.absent(),
+        voidedByJson: const Value.absent(),
+        voidedAt: const Value.absent(),
+      );
+    }
+    return (
+      voidReason: audit.reason != null
+          ? Value(audit.reason)
+          : const Value.absent(),
+      voidedByJson: audit.voidedBy != null
+          ? Value(jsonEncode(audit.voidedBy!.toJson()))
+          : const Value.absent(),
+      voidedAt: audit.voidedAt != null
+          ? Value(audit.voidedAt)
+          : const Value.absent(),
+    );
+  }
+
+  static String? _resolveVoidStatus(Map<String, dynamic> json) {
+    if (VoidAuditInfo.isVoidStatus(json['status']?.toString())) {
+      return 'void';
+    }
+    if (VoidAuditInfo.tryFromJson(json)?.isPopulated == true) {
+      return 'void';
+    }
+    return null;
   }
 
   static TicketsCompanion _serverMetadataCompanion(Map<String, dynamic> json) {
@@ -1246,8 +1303,7 @@ WHERE shift_id = ? AND status = 'completed'
         json['vr_no']?.toString().trim() ??
         vm['vr_no']?.toString().trim() ??
         vm['vrNo']?.toString().trim();
-    final voidReq = VoidRequestInfo.tryFromJson(json['void_request']);
-    final voidJson = voidReq != null ? jsonEncode(json['void_request']) : null;
+    final voidMeta = _voidAuditCompanion(json);
     final applied = json['applied_rate'];
     final appliedJson = applied is Map && applied.isNotEmpty
         ? jsonEncode(applied)
@@ -1263,9 +1319,9 @@ WHERE shift_id = ? AND status = 'completed'
 
     return TicketsCompanion(
       vrNo: vr != null && vr.isNotEmpty ? Value(vr) : const Value.absent(),
-      voidRequestJson: voidJson != null
-          ? Value(voidJson)
-          : const Value.absent(),
+      voidReason: voidMeta.voidReason,
+      voidedByJson: voidMeta.voidedByJson,
+      voidedAt: voidMeta.voidedAt,
       appliedRateJson: appliedJson != null
           ? Value(appliedJson)
           : const Value.absent(),
@@ -1274,9 +1330,6 @@ WHERE shift_id = ? AND status = 'completed'
           : const Value.absent(),
       ticketLost: ticketLost != null
           ? Value(ticketLost)
-          : const Value.absent(),
-      pendingVoidRequest: voidReq?.isPending == true
-          ? const Value(true)
           : const Value.absent(),
     );
   }
@@ -1290,7 +1343,9 @@ WHERE shift_id = ? AND status = 'completed'
   Future<TransactionPaymentSummary?> _resolvePaymentForTicket(
     Ticket ticket, {
     Map<String, dynamic>? transactionJson,
+    CheckoutPreviewRates? appliedRate,
   }) async {
+    final appliedFlatHours = appliedRate?.flatRateHours ?? 0;
     final stored = TransactionPaymentSummary.fromStoredJson(
       ticket.paymentSummaryJson,
     );
@@ -1341,7 +1396,7 @@ WHERE shift_id = ? AND status = 'completed'
         isLostTicket: stored.isLostTicket,
         isOvernight: stored.isOvernight,
         durationMinutes: stored.durationMinutes,
-      );
+      ).withFlatBlockHours(appliedFlatHours);
     }
 
     if (cashTendered != null) {
@@ -1350,7 +1405,7 @@ WHERE shift_id = ? AND status = 'completed'
 
     final vehicleType = _vehicleTypeForPayment(ticket, transactionJson);
 
-    return _paymentCalculator.fromTransactionJson(
+    final payment = await _paymentCalculator.fromTransactionJson(
       json: json,
       branchId: ticket.branchId,
       vehicleType: vehicleType,
@@ -1359,7 +1414,10 @@ WHERE shift_id = ? AND status = 'completed'
           ticket.checkOutAt != null && ticket.checkOutAt!.isNotEmpty
           ? PhilippineTime.fromApiIso(ticket.checkOutAt!)
           : null,
+      flatBlockHoursOverride:
+          appliedFlatHours > 0 ? appliedFlatHours : null,
     );
+    return payment?.withFlatBlockHours(appliedFlatHours);
   }
 
   /// Returns true when fee parts (flat + overnight + succeeding + lost) add up
@@ -1618,11 +1676,12 @@ WHERE shift_id = ? AND status = 'completed'
               : const Value.absent(),
           syncStatus: const Value('synced'),
           vrNo: meta.vrNo,
-          voidRequestJson: meta.voidRequestJson,
+          voidReason: meta.voidReason,
+          voidedByJson: meta.voidedByJson,
+          voidedAt: meta.voidedAt,
           appliedRateJson: meta.appliedRateJson,
           isOvernight: meta.isOvernight,
           ticketLost: meta.ticketLost,
-          pendingVoidRequest: meta.pendingVoidRequest,
         ),
       );
       final out = await ticketById(existing.id);
@@ -1669,7 +1728,9 @@ WHERE shift_id = ? AND status = 'completed'
                 ? Value(paymentJson)
                 : const Value.absent(),
             vrNo: meta.vrNo,
-            voidRequestJson: meta.voidRequestJson,
+            voidReason: meta.voidReason,
+            voidedByJson: meta.voidedByJson,
+            voidedAt: meta.voidedAt,
             appliedRateJson: meta.appliedRateJson,
             isOvernight: meta.isOvernight,
             ticketLost: meta.ticketLost,
@@ -1815,6 +1876,7 @@ WHERE shift_id = ? AND status = 'completed'
   static String _normalizeTicketStatus(String raw) {
     final s = raw.trim().toLowerCase();
     if (s == 'lost') return 'lost';
+    if (s == 'void' || s == 'voided') return 'void';
     if (s == 'completed' || s == 'complete') return 'completed';
     if (s == 'draft') return 'draft';
     if (s == 'active' || s == 'parked') return 'active';

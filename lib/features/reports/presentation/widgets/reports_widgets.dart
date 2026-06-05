@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../dashboard/presentation/widgets/dashboard_widgets.dart';
@@ -254,11 +255,15 @@ class ReportsTransactionsTableCard extends StatelessWidget {
     required this.rowCount,
     required this.rows,
     this.onRowTap,
+    this.onRefresh,
+    this.isRefreshing = false,
   });
 
   final int rowCount;
   final List<ReportsTicketRow> rows;
   final void Function(ReportsTicketRow row)? onRowTap;
+  final VoidCallback? onRefresh;
+  final bool isRefreshing;
 
   @override
   Widget build(BuildContext context) {
@@ -270,9 +275,37 @@ class ReportsTransactionsTableCard extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Text(
-              'TRANSACTIONS ($rowCount)'.toUpperCase(),
-              style: ReportsStyles.cardSectionTitleOf(context),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'TRANSACTIONS ($rowCount)'.toUpperCase(),
+                    style: ReportsStyles.cardSectionTitleOf(context),
+                  ),
+                ),
+                if (onRefresh != null)
+                  IconButton(
+                    onPressed: isRefreshing ? null : onRefresh,
+                    tooltip: 'Refresh',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 36,
+                    ),
+                    icon: isRefreshing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(
+                            LucideIcons.refreshCw,
+                            size: 18,
+                            color: DashboardStyles.grey500,
+                          ),
+                  ),
+              ],
             ),
           ),
           if (rows.isEmpty)
@@ -792,7 +825,7 @@ class _VoidPendingBadge extends StatelessWidget {
         border: Border.all(color: const Color(0xFFFCD34D)),
       ),
       child: Text(
-        'Void pending',
+        'Void queued',
         style: GoogleFonts.poppins(
           fontSize: 9,
           fontWeight: FontWeight.w600,

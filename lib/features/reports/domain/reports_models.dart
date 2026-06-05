@@ -53,10 +53,10 @@ class ReportsTicketRow extends Equatable {
   /// API `cash_tendered` when checkout recorded cash payment.
   final double? cashTendered;
 
-  /// True when the transaction has a pending void request.
+  /// True when void-at-intake is queued locally (offline sync pending).
   final bool hasPendingVoid;
 
-  /// True when the void request has been approved (transaction is voided).
+  /// True when the transaction is voided (`status: void`).
   final bool isVoided;
 
   /// Route / detail key: server id when available, else local ticket number.

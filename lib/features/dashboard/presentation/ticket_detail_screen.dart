@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/api/void_audit_info.dart';
 import '../../../core/api/transaction_payment_summary.dart';
 import '../../../core/connectivity/internet_reachability.dart';
 import '../../../core/formatting/peso_currency.dart';
@@ -26,6 +28,7 @@ import '../../check_in/domain/vehicle_damage.dart';
 import '../../check_in/domain/vehicle_damage_zones.dart';
 import '../../check_out/domain/ticket_damage_markers.dart';
 import '../domain/ticket_parking_info.dart';
+import '../state/dashboard_cubit.dart';
 import 'widgets/dashboard_widgets.dart';
 
 const _pesoFallback = ['Noto Sans', 'Roboto'];
@@ -115,6 +118,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     });
   }
 
+  void _refreshDashboardTransactions() {
+    unawaited(context.read<DashboardCubit>().refresh());
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -161,8 +168,15 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       }
       if (!mounted) return;
       _reloadDetail();
+      _refreshDashboardTransactions();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Void request submitted.')),
+        SnackBar(
+          content: Text(
+            isOnline
+                ? 'Ticket voided.'
+                : 'Void queued — will apply when check-in syncs.',
+          ),
+        ),
       );
     } on TransactionsApiException catch (e) {
       if (!mounted) return;
@@ -209,6 +223,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       );
       if (!mounted) return;
       _reloadDetail();
+      _refreshDashboardTransactions();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Plate number updated.')),
       );
@@ -230,6 +245,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   bool _canShowVoidButton(TicketDetailSnapshot detail) {
     final t = detail.ticket;
     if (t.status != 'active') return false;
+    if (detail.isVoided) return false;
     if (detail.hasPendingVoid) return false;
     final isOnline = _isOnline ?? false;
     if (isOnline) return true;
@@ -304,6 +320,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         branchDisplayName: branchLabel,
         mallHours: _defaultMallHours,
         payment: detail.payment,
+        appliedRate: detail.appliedRate,
       );
       if (!mounted) return;
       await printCheckOutFromContext(context, data: data);
@@ -341,6 +358,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         : null;
     final isCompleted = t.status == 'completed';
     final isLost = t.status == 'lost';
+    final isVoided = detail.isVoided || t.status == 'void';
 
     final checkInLabel = _dateFmt.format(checkIn);
     final checkOutLabel = checkOut != null ? _dateFmt.format(checkOut) : '—';
@@ -367,10 +385,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     final statusLabel = switch (t.status) {
       'completed' => 'Completed',
       'lost' => 'Lost',
+      'void' => 'Voided',
       _ => 'Active',
     };
 
-    final statusColor = isCompleted
+    final statusColor = isVoided
+        ? const Color(0xFF6E7584)
+        : isCompleted
         ? const Color(0xFF6E7584)
         : isLost
         ? const Color(0xFFB45309)
@@ -395,7 +416,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         ),
         if (detail.hasPendingVoid) ...[
           const SizedBox(height: 12),
-          _VoidPendingBanner(),
+          const _VoidPendingBanner(),
+        ],
+        if (isVoided && detail.voidAudit != null) ...[
+          const SizedBox(height: 12),
+          _VoidAuditCard(audit: detail.voidAudit!),
         ],
         if (_canShowVoidButton(detail)) ...[
           const SizedBox(height: 12),
@@ -410,7 +435,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(LucideIcons.ban, size: 18),
-            label: Text(_voidLoading ? 'Submitting…' : 'Request void'),
+            label: Text(_voidLoading ? 'Voiding…' : 'Void ticket'),
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFFB45309),
               side: const BorderSide(color: Color(0xFFB45309)),
@@ -593,6 +618,60 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   }
 }
 
+class _VoidAuditCard extends StatelessWidget {
+  const _VoidAuditCard({required this.audit});
+
+  final VoidAuditInfo audit;
+
+  @override
+  Widget build(BuildContext context) {
+    final reason = audit.reason?.trim();
+    final by = audit.voidedBy?.name.trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFD1D5DB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Void details',
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          if (reason != null && reason.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              reason,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+          if (by != null && by.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Voided by $by',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _VoidPendingBanner extends StatelessWidget {
   const _VoidPendingBanner();
 
@@ -612,7 +691,7 @@ class _VoidPendingBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Void requested — awaiting admin approval',
+              'Void queued — will apply when check-in syncs',
               style: GoogleFonts.poppins(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
@@ -1279,7 +1358,7 @@ class _VoidConfirmDialogState extends State<_VoidConfirmDialog> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Request void?',
+                'Void ticket?',
                 style: GoogleFonts.poppins(
                   fontSize: 19,
                   fontWeight: FontWeight.w700,
@@ -1289,7 +1368,7 @@ class _VoidConfirmDialogState extends State<_VoidConfirmDialog> {
               ),
               const SizedBox(height: 6),
               Text(
-                'This ticket will be flagged for admin review. Provide a reason if needed.',
+                'This voids the ticket immediately and releases the parking slot. Provide a reason if needed.',
                 style: GoogleFonts.poppins(
                   fontSize: 13,
                   fontWeight: FontWeight.w400,

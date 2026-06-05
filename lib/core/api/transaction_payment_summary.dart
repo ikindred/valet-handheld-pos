@@ -138,4 +138,31 @@ class TransactionPaymentSummary {
     if (raw is num) return raw.toInt();
     return int.tryParse(raw?.toString() ?? '') ?? fallback;
   }
+
+  /// Rebuilds flat-rate label/hours (e.g. `Flat rate (8h)`) without changing amounts.
+  TransactionPaymentSummary withFlatBlockHours(int hours) {
+    if (hours <= 0) return this;
+    if (flatBlockHours == hours && flatRateLabel == 'Flat rate (${hours}h)') {
+      return this;
+    }
+    return TransactionPaymentSummary(
+      totalDue: totalDue,
+      flatRate: flatRate,
+      flatRateLabel: 'Flat rate (${hours}h)',
+      flatBlockHours: hours,
+      succeedingHoursLabel: succeedingHoursLabel,
+      succeedingLineLabel: succeedingLineLabel,
+      succeedingRatePerHour: succeedingRatePerHour,
+      succeedingTotal: succeedingTotal,
+      overnightFee: overnightFee,
+      overnightStart: overnightStart,
+      overnightEnd: overnightEnd,
+      lostTicketFee: lostTicketFee,
+      cashTendered: cashTendered,
+      change: change,
+      isLostTicket: isLostTicket,
+      isOvernight: isOvernight,
+      durationMinutes: durationMinutes,
+    );
+  }
 }

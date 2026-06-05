@@ -179,10 +179,13 @@ class RateFetchService {
     for (final row in snapshot.vehicleTypeRates) {
       final vt = _mapServerVehicleTypeName(row.name) ?? _vehicleTypeKey(row.name);
       if (vt == null) continue;
+      final rowFlatHours = row.flatRateHours > 0
+          ? row.flatRateHours
+          : snapshot.flatBlockHours;
       await _upsertRateRow(
         branchId: branchId,
         vehicleType: vt,
-        flatHours: snapshot.flatBlockHours,
+        flatHours: rowFlatHours,
         flat: row.fees.flatRate.toDouble(),
         succeeding: row.fees.succeedingRate.toDouble(),
         overnight: row.fees.overnightFee.toDouble(),
@@ -219,7 +222,9 @@ class RateFetchService {
     required String branchId,
     required AreaDetail detail,
   }) async {
-    final flatHours = CheckoutPricing.defaultFlatBlockHours;
+    final flatHours = detail.flatBlockHours > 0
+        ? detail.flatBlockHours
+        : CheckoutPricing.defaultFlatBlockHours;
     final areaOvernight = detail.overnightTimes;
     await _persistOvernightWindowConfig(
       branchId: branchId,
@@ -248,10 +253,11 @@ class RateFetchService {
       if (vt == null) continue;
       var lost = row.fees.lostTicketFee.toDouble();
       if (lost <= 0) lost = lostFallback;
+      final rowFlatHours = row.flatRateHours > 0 ? row.flatRateHours : flatHours;
       await _upsertRateRow(
         branchId: branchId,
         vehicleType: vt,
-        flatHours: flatHours,
+        flatHours: rowFlatHours,
         flat: row.fees.flatRate.toDouble(),
         succeeding: row.fees.succeedingRate.toDouble(),
         overnight: row.fees.overnightFee.toDouble(),
@@ -282,6 +288,7 @@ class RateFetchService {
     );
 
     StandardParkingRates? standardRates;
+    var branchStandardFlatHours = CheckoutPricing.defaultFlatBlockHours;
     try {
       final res = await _dio.get<dynamic>(
         AppConfig.branchStandardRatesUrl(bid),
@@ -295,6 +302,11 @@ class RateFetchService {
               (parsed.flatRatePesos > 0 || parsed.succeedingHourPesos > 0)) {
             standardRates = parsed;
             final overnight = _overnightTimesFromMap(m);
+            final standardFlatHours = BranchRatesSnapshot.flatHoursFromMap(m);
+            final flatHours = standardFlatHours > 0
+                ? standardFlatHours
+                : CheckoutPricing.defaultFlatBlockHours;
+            branchStandardFlatHours = flatHours;
             await _persistOvernightWindowConfig(
               branchId: bid,
               start: overnight.start,
@@ -303,7 +315,7 @@ class RateFetchService {
             await _upsertRateRow(
               branchId: bid,
               vehicleType: 'Standard',
-              flatHours: CheckoutPricing.defaultFlatBlockHours,
+              flatHours: flatHours,
               flat: parsed.flatRatePesos.toDouble(),
               succeeding: parsed.succeedingHourPesos.toDouble(),
               overnight: parsed.overnightFeePesos.toDouble(),
@@ -357,10 +369,14 @@ class RateFetchService {
         if (lost <= 0) lost = lostFallback;
 
         final overnightTimes = _overnightTimesFromMap(row);
+        final rowFlatHours = BranchRatesSnapshot.flatHoursFromMap(row);
+        final flatHours = rowFlatHours > 0
+            ? rowFlatHours
+            : branchStandardFlatHours;
         await _upsertRateRow(
           branchId: bid,
           vehicleType: vt,
-          flatHours: CheckoutPricing.defaultFlatBlockHours,
+          flatHours: flatHours,
           flat: flat,
           succeeding: succeeding,
           overnight: overnightFee,
