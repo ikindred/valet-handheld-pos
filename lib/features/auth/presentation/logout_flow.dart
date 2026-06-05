@@ -33,7 +33,8 @@ Future<void> showLogoutFlow(BuildContext context) async {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Choose how you want to end your session on this device.',
+            'You are signing out of this device. Choose what should happen '
+            'to your open cash shift:',
             style: GoogleFonts.poppins(
               fontSize: 14,
               fontWeight: FontWeight.w400,
@@ -41,22 +42,29 @@ Future<void> showLogoutFlow(BuildContext context) async {
               color: AppColors.textPrimary,
             ),
           ),
+          const SizedBox(height: 14),
+          const _LogoutOptionHint(
+            title: 'Logout only',
+            body:
+                'End this session but keep the shift open on the server. '
+                'Sign in again later to continue where you left off.',
+          ),
           const SizedBox(height: 10),
-          Text(
-            'Close cash and log out, or log out only and leave the shift open '
-            'on the server?',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              height: 1.45,
-              color: AppColors.textSecondary,
-            ),
+          const _LogoutOptionHint(
+            title: 'Close cash + logout',
+            body:
+                'Close your shift, reconcile cash, then sign out. '
+                'Use this when you are finished for the day.',
           ),
         ],
       ),
       actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       actionsAlignment: MainAxisAlignment.end,
       actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
         TextButton(
           onPressed: () =>
               Navigator.of(context).pop(LogoutChoice.logoutOnly),
@@ -98,6 +106,44 @@ Future<void> showLogoutFlow(BuildContext context) async {
   }
 
   context.go('/cash/close');
+}
+
+class _LogoutOptionHint extends StatelessWidget {
+  const _LogoutOptionHint({
+    required this.title,
+    required this.body,
+  });
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            height: 1.35,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          body,
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            fontWeight: FontWeight.w400,
+            height: 1.4,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 Future<String?> _promptPassword(BuildContext context) {
