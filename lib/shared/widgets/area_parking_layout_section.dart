@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/remote/area_detail.dart';
 import '../../features/dashboard/presentation/widgets/dashboard_widgets.dart';
+import 'parking_slot_status_style.dart';
 
 /// One level: title, free/used counts, and slot chips.
 class AreaParkingLevelPanel extends StatelessWidget {
@@ -26,7 +27,7 @@ class AreaParkingLevelPanel extends StatelessWidget {
             children: [
               Expanded(child: Text(level.name, style: _levelTitle())),
               Text(
-                '${level.availableCount} free · ${level.occupiedCount} used',
+                '${level.availableCount} available · ${level.occupiedCount} occupied',
                 style: _levelMeta(),
               ),
             ],
@@ -79,26 +80,19 @@ class _SlotChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final available = slot.isAvailable;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: available
-            ? const Color(0xFFE8F5E9)
-            : const Color(0xFFF3F4F6),
+        color: ParkingSlotStatusStyle.backgroundFor(slot),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: available
-              ? const Color(0xFF43A047).withValues(alpha: 0.45)
-              : Colors.black.withValues(alpha: 0.1),
-        ),
+        border: Border.all(color: ParkingSlotStatusStyle.borderFor(slot)),
       ),
       child: Text(
         slot.label,
         style: GoogleFonts.poppins(
           fontSize: 10,
           fontWeight: FontWeight.w600,
-          color: available ? const Color(0xFF2E7D32) : DashboardStyles.grey500,
+          color: ParkingSlotStatusStyle.textFor(slot),
         ),
       ),
     );

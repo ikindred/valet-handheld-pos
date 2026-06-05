@@ -8,6 +8,7 @@ import '../../core/printing/receipt_print_format.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/remote/area_detail.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../../data/services/parking_layout_service.dart';
 import '../../data/services/rate_fetch_service.dart';
 import '../../data/services/rate_service.dart';
 import '../../features/dashboard/presentation/widgets/dashboard_widgets.dart';
@@ -99,6 +100,7 @@ Future<void> showBranchRatesDialog(
   required AuthRepository authRepository,
   required RateFetchService rateFetchService,
   required RateService rateService,
+  required ParkingLayoutService parkingLayoutService,
   required String branchName,
 }) {
   return showDialog<void>(
@@ -110,6 +112,7 @@ Future<void> showBranchRatesDialog(
           authRepository: authRepository,
           rateFetchService: rateFetchService,
           rateService: rateService,
+          parkingLayoutService: parkingLayoutService,
           allowOfflineFallback: true,
           builder: (context, result, retry) {
             if (result.hasError) {

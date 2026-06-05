@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../data/repositories/auth_repository.dart';
+import '../../../../data/services/parking_layout_service.dart';
 import '../../../../data/services/rate_fetch_service.dart';
 import '../../../../data/services/rate_service.dart';
 import '../../../../shared/widgets/branch_rates_dialog.dart';
@@ -99,6 +100,7 @@ class CheckInFlowHeader extends StatelessWidget {
                   authRepository: auth,
                   rateFetchService: context.read<RateFetchService>(),
                   rateService: context.read<RateService>(),
+                  parkingLayoutService: context.read<ParkingLayoutService>(),
                   branchName: name,
                 );
               },

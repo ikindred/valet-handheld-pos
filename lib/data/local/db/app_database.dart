@@ -311,6 +311,24 @@ class Rates extends Table {
       ];
 }
 
+/// Cached area parking layout (`levels[]` + slot status) for offline check-in.
+class ParkingAreaLayouts extends Table {
+  @override
+  String get tableName => 'parking_area_layouts';
+
+  TextColumn get branchId => text()();
+
+  TextColumn get areaId => text()();
+
+  /// JSON array of [AreaParkingLevel] rows from area detail API.
+  TextColumn get levelsJson => text()();
+
+  TextColumn get updatedAt => text()();
+
+  @override
+  Set<Column> get primaryKey => {branchId, areaId};
+}
+
 /// Server-fetched branch settings (overnight window, mall hours, etc.).
 class BranchConfigs extends Table {
   @override
@@ -348,6 +366,7 @@ class BranchConfigs extends Table {
     Tickets,
     SyncQueue,
     Rates,
+    ParkingAreaLayouts,
     BranchConfigs,
   ],
 )
@@ -365,7 +384,7 @@ class AppDatabase extends _$AppDatabase {
   final bool _skipDevOfflineSeed;
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -451,6 +470,9 @@ FROM offline_accounts''');
             await m.addColumn(tickets, tickets.voidReason);
             await m.addColumn(tickets, tickets.voidedByJson);
             await m.addColumn(tickets, tickets.voidedAt);
+          }
+          if (from < 14) {
+            await m.createTable(parkingAreaLayouts);
           }
         },
       );

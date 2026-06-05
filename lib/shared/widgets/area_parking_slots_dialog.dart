@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/remote/area_detail.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../../data/services/parking_layout_service.dart';
 import '../../data/services/rate_fetch_service.dart';
 import '../../data/services/rate_service.dart';
 import '../../features/dashboard/presentation/widgets/dashboard_widgets.dart';
@@ -20,6 +21,7 @@ Future<void> showAreaParkingSlotsDialog(
   required AuthRepository authRepository,
   required RateFetchService rateFetchService,
   required RateService rateService,
+  required ParkingLayoutService parkingLayoutService,
   required String branchName,
 }) {
   return showDialog<void>(
@@ -32,8 +34,9 @@ Future<void> showAreaParkingSlotsDialog(
           authRepository: authRepository,
           rateFetchService: rateFetchService,
           rateService: rateService,
+          parkingLayoutService: parkingLayoutService,
           purpose: BranchAreaDialogPurpose.parkingSlots,
-          allowOfflineFallback: false,
+          allowOfflineFallback: true,
           builder: (context, result, retry) {
             if (result.hasError) {
               return AreaDialogErrorBody(
@@ -266,7 +269,7 @@ class AreaParkingLevelDropdown extends StatelessWidget {
               DropdownMenuItem<String>(
                 value: level.id,
                 child: Text(
-                  '${level.name} (${level.availableCount} free)',
+                  '${level.name} (${level.availableCount} available)',
                 ),
               ),
           ],

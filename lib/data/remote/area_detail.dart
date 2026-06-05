@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../core/branch/overnight_window.dart';
 import '../../core/session/standard_parking_rates.dart';
 
@@ -116,6 +118,14 @@ class AreaParkingSlot {
     return s == 'AVAILABLE' || s == 'FREE' || s == 'VACANT';
   }
 
+  bool get isOccupied => !isAvailable;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'label': label,
+        'status': status,
+      };
+
   static AreaParkingSlot? fromJson(Map<String, dynamic> json) {
     final label = (json['label'] ?? '').toString().trim();
     if (label.isEmpty) return null;
@@ -150,6 +160,13 @@ class AreaParkingLevel {
 
   int get occupiedCount => totalCount - availableCount;
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'slotPrefix': slotPrefix,
+        'slots': [for (final s in slots) s.toJson()],
+      };
+
   static AreaParkingLevel? fromJson(Map<String, dynamic> json) {
     final name = (json['name'] ?? '').toString().trim();
     if (name.isEmpty) return null;
@@ -170,6 +187,28 @@ class AreaParkingLevel {
       slots: slots,
     );
   }
+
+  /// Parses cached layout JSON from Drift (`parking_area_layouts.levels_json`).
+  static List<AreaParkingLevel> listFromJsonString(String raw) {
+    if (raw.trim().isEmpty) return const [];
+    try {
+      final body = jsonDecode(raw);
+      if (body is! List) return const [];
+      final levels = <AreaParkingLevel>[];
+      for (final item in body) {
+        final row = _asMap(item);
+        if (row == null) continue;
+        final parsed = AreaParkingLevel.fromJson(row);
+        if (parsed != null && parsed.slots.isNotEmpty) levels.add(parsed);
+      }
+      return levels;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static String listToJsonString(List<AreaParkingLevel> levels) =>
+      jsonEncode([for (final l in levels) l.toJson()]);
 
   static Map<String, dynamic>? _asMap(dynamic data) {
     if (data is Map<String, dynamic>) return data;

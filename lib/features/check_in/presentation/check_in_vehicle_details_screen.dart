@@ -5,8 +5,10 @@ import '../../../core/theme/app_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/connectivity/internet_reachability.dart';
 import '../../../data/remote/area_detail.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/parking_layout_service.dart';
 import '../../../data/services/rate_fetch_service.dart';
 import '../state/check_in_cubit.dart';
 import 'widgets/check_in_compact_tokens.dart';
@@ -59,6 +61,7 @@ class _CheckInVehicleDetailsScreenState
   Future<void> _loadAreaLevels() async {
     final auth = context.read<AuthRepository>();
     final rateFetch = context.read<RateFetchService>();
+    final parkingLayout = context.read<ParkingLayoutService>();
     final branchUuid = await auth.branchUuidForApi();
     final areaUuid = await auth.areaUuidForApi();
     if (!mounted) return;
@@ -69,13 +72,34 @@ class _CheckInVehicleDetailsScreenState
       });
       return;
     }
-    final detail = await rateFetch.fetchAreaDetail(
-      branchId: branchUuid,
-      areaId: areaUuid,
-    );
+
+    var levels = <AreaParkingLevel>[];
+    final online =
+        !AppConfig.useStubApi && await InternetReachability.hasInternet();
+    if (online) {
+      final detail = await rateFetch.fetchAreaDetail(
+        branchId: branchUuid,
+        areaId: areaUuid,
+      );
+      if (detail != null && detail.levels.isNotEmpty) {
+        levels = detail.levels;
+        await parkingLayout.saveLevels(
+          branchId: branchUuid,
+          areaId: areaUuid,
+          levels: levels,
+        );
+      }
+    }
+    if (levels.isEmpty) {
+      levels = await parkingLayout.loadLevels(
+        branchId: branchUuid,
+        areaId: areaUuid,
+      );
+    }
+
     if (!mounted) return;
     setState(() {
-      _areaLevels = detail?.levels ?? [];
+      _areaLevels = levels;
       _areaLevelsLoading = false;
     });
     if (AppConfig.checkInPrefillEnabled && mounted) {
@@ -111,13 +135,9 @@ class _CheckInVehicleDetailsScreenState
     return null;
   }
 
-  AreaParkingSlot? _slotForLabel(String levelName, String slotLabel) {
+  List<AreaParkingSlot> _slotsForLevel(String levelName) {
     final level = _levelForName(levelName);
-    if (level == null) return null;
-    for (final s in level.availableSlots) {
-      if (s.label == slotLabel) return s;
-    }
-    return null;
+    return level?.slots ?? const [];
   }
 
   List<String> get _levelItems {
@@ -129,11 +149,7 @@ class _CheckInVehicleDetailsScreenState
 
   List<String> _slotItemsForLevel(String levelName) {
     if (_areaLevels.isNotEmpty) {
-      final match = _areaLevels.where((l) => l.name == levelName);
-      if (match.isNotEmpty) {
-        return match.first.availableSlots.map((s) => s.label).toList();
-      }
-      return const [];
+      return _slotsForLevel(levelName).map((s) => s.label).toList();
     }
     return CheckInVehicleDetailsScreen._fallbackSlots;
   }
@@ -266,43 +282,86 @@ class _CheckInVehicleDetailsScreenState
         final slotValue =
             slot.isEmpty || !slotItems.contains(slot) ? null : slot;
 
+        final useAreaLayout = _areaLevels.isNotEmpty;
+        final levelSlots = levelValue == null
+            ? const <AreaParkingSlot>[]
+            : _slotsForLevel(levelValue);
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            CheckInDropdownField(
-              label: 'LEVEL',
-              value: levelValue ?? '',
-              items: levelItems,
-              onChanged: (v) {
-                final cubit = context.read<CheckInCubit>();
-                final nextLevel = v ?? '';
-                final slotsForLevel = nextLevel.isEmpty
-                    ? const <String>[]
-                    : _slotItemsForLevel(nextLevel);
-                final keepSlot = slotsForLevel.contains(state.parkingSlot);
-                cubit.updateVehicleStep(
-                  parkingLevel: nextLevel,
-                  parkingSlot: keepSlot ? state.parkingSlot : '',
-                  parkingSlotId: keepSlot ? state.parkingSlotId : '',
-                );
-              },
-            ),
+            if (useAreaLayout)
+              CheckInParkingLevelDropdownField(
+                label: 'LEVEL',
+                levels: _areaLevels,
+                value: levelValue ?? '',
+                onChanged: (v) {
+                  final cubit = context.read<CheckInCubit>();
+                  final nextLevel = v ?? '';
+                  final slotsForLevel = nextLevel.isEmpty
+                      ? const <AreaParkingSlot>[]
+                      : _slotsForLevel(nextLevel);
+                  final keepSlot = slotsForLevel.any(
+                    (s) =>
+                        s.label == state.parkingSlot &&
+                        s.isAvailable,
+                  );
+                  cubit.updateVehicleStep(
+                    parkingLevel: nextLevel,
+                    parkingSlot: keepSlot ? state.parkingSlot : '',
+                    parkingSlotId: keepSlot ? state.parkingSlotId : '',
+                  );
+                },
+              )
+            else
+              CheckInDropdownField(
+                label: 'LEVEL',
+                value: levelValue ?? '',
+                items: levelItems,
+                onChanged: (v) {
+                  final cubit = context.read<CheckInCubit>();
+                  final nextLevel = v ?? '';
+                  final slotsForLevel = nextLevel.isEmpty
+                      ? const <String>[]
+                      : _slotItemsForLevel(nextLevel);
+                  final keepSlot = slotsForLevel.contains(state.parkingSlot);
+                  cubit.updateVehicleStep(
+                    parkingLevel: nextLevel,
+                    parkingSlot: keepSlot ? state.parkingSlot : '',
+                    parkingSlotId: keepSlot ? state.parkingSlotId : '',
+                  );
+                },
+              ),
             const SizedBox(height: CheckInCompactTokens.fieldGap),
-            CheckInDropdownField(
-              label: 'SLOT',
-              value: slotValue ?? '',
-              items: slotItems,
-              onChanged: levelValue == null || slotItems.isEmpty
-                  ? (_) {}
-                  : (v) {
-                      final label = v ?? '';
-                      final picked = _slotForLabel(levelValue, label);
-                      context.read<CheckInCubit>().updateVehicleStep(
-                            parkingSlot: label,
-                            parkingSlotId: picked?.id ?? '',
-                          );
-                    },
-            ),
+            if (useAreaLayout)
+              CheckInParkingSlotDropdownField(
+                label: 'SLOT',
+                slots: levelSlots,
+                value: slotValue ?? '',
+                onChanged: levelValue == null || levelSlots.isEmpty
+                    ? (_) {}
+                    : (picked) {
+                        context.read<CheckInCubit>().updateVehicleStep(
+                              parkingSlot: picked?.label ?? '',
+                              parkingSlotId: picked?.id ?? '',
+                            );
+                      },
+              )
+            else
+              CheckInDropdownField(
+                label: 'SLOT',
+                value: slotValue ?? '',
+                items: slotItems,
+                onChanged: levelValue == null || slotItems.isEmpty
+                    ? (_) {}
+                    : (v) {
+                        final label = v ?? '';
+                        context.read<CheckInCubit>().updateVehicleStep(
+                              parkingSlot: label,
+                              parkingSlotId: '',
+                            );
+                      },
+              ),
           ],
         );
       },

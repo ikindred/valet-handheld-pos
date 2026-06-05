@@ -23,6 +23,7 @@ import '../../core/connectivity/internet_reachability.dart';
 import '../../core/logging/valet_log.dart';
 import '../local/db/app_database.dart';
 import '../remote/dashboard_api.dart';
+import 'parking_layout_service.dart';
 import '../remote/transactions_api.dart';
 import 'rate_fetch_service.dart';
 import 'rate_service.dart';
@@ -95,6 +96,7 @@ class TicketService {
     this._dashboardApi,
     RateService rates,
     this._rateFetch,
+    this._parkingLayout,
   ) : _paymentCalculator = TransactionPaymentCalculator(rates);
 
   final AppDatabase _db;
@@ -102,6 +104,7 @@ class TicketService {
   final TransactionsApi _transactionsApi;
   final DashboardApi _dashboardApi;
   final RateFetchService _rateFetch;
+  final ParkingLayoutService _parkingLayout;
   final TransactionPaymentCalculator _paymentCalculator;
 
   static const _uuid = Uuid();
@@ -368,6 +371,16 @@ class TicketService {
         slotId: slotUuid.isNotEmpty ? Value(slotUuid) : const Value.absent(),
       ),
     );
+
+    if (slotUuid.isNotEmpty) {
+      final layoutBranchId = _validUuidOrNull(bid) ?? await _deviceBranchId;
+      if (layoutBranchId != null) {
+        await _parkingLayout.markSlotOccupiedForTicket(
+          branchId: layoutBranchId,
+          slotId: slotUuid,
+        );
+      }
+    }
 
     return (_db.select(
       _db.tickets,
@@ -682,6 +695,7 @@ LIMIT 1
       'TicketService.completeTicketCheckout',
       'ticketId=$ticketId fee=$totalFee (local)',
     );
+    final ticketBefore = await ticketById(ticketId);
     final paymentJson = paymentSummary != null
         ? jsonEncode(paymentSummary.toJson())
         : null;
@@ -702,6 +716,17 @@ LIMIT 1
         ),
       );
     });
+    final slotId = ticketBefore?.slotId?.trim() ?? '';
+    if (slotId.isNotEmpty && ticketBefore != null) {
+      final layoutBranchId =
+          _validUuidOrNull(ticketBefore.branchId) ?? await _deviceBranchId;
+      if (layoutBranchId != null) {
+        await _parkingLayout.markSlotAvailableForTicket(
+          branchId: layoutBranchId,
+          slotId: slotId,
+        );
+      }
+    }
   }
 
   /// Queues unified check-out for offline finalize (`operation: checkout/finalize`).

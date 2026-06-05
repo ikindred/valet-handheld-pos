@@ -1,6 +1,7 @@
 import '../../core/connectivity/internet_reachability.dart';
 import '../../data/remote/area_detail.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../../data/services/parking_layout_service.dart';
 import '../../data/services/rate_fetch_service.dart';
 import '../../data/services/rate_service.dart';
 import '../../features/check_out/domain/checkout_pricing.dart';
@@ -53,6 +54,7 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
   required AuthRepository authRepository,
   required RateFetchService rateFetchService,
   required RateService rateService,
+  required ParkingLayoutService parkingLayoutService,
   BranchAreaDialogPurpose purpose = BranchAreaDialogPurpose.rates,
   bool allowOfflineFallback = true,
 }) async {
@@ -104,6 +106,14 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
     if (detail != null) {
       overnightStart = detail.overnightTimes.start?.trim() ?? '';
       overnightEnd = detail.overnightTimes.end?.trim() ?? '';
+      if (detail.flatBlockHours > 0) flatHours = detail.flatBlockHours;
+      if (detail.levels.isNotEmpty) {
+        await parkingLayoutService.saveLevels(
+          branchId: branchUuid,
+          areaId: areaUuid,
+          levels: detail.levels,
+        );
+      }
     }
     if (branchRates != null) {
       if (overnightStart.isEmpty) {
@@ -190,6 +200,35 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
     );
   }
 
+  final cachedLevels = await parkingLayoutService.loadLevels(
+    branchId: branchUuid,
+    areaId: areaUuid,
+  );
+
+  if (purpose == BranchAreaDialogPurpose.parkingSlots) {
+    if (cachedLevels.isNotEmpty) {
+      return BranchAreaLoadResult(
+        offlineCache: true,
+        data: BranchAreaDialogData(
+          flatBlockHours: defaultFlatHours,
+          standard: const ParkingRateFees(
+            flatRate: 0,
+            succeedingRate: 0,
+            overnightFee: 0,
+            lostTicketFee: 0,
+          ),
+          vehicleTypeRates: const [],
+          levels: cachedLevels,
+          fromAreaApi: false,
+        ),
+      );
+    }
+    return const BranchAreaLoadResult(
+      errorMessage:
+          'No internet and no cached parking layout. Sign in online once to download slots.',
+    );
+  }
+
   final resolved = await rateService.checkoutRatesResolved(
     branchId: branchUuid,
     vehicleType: 'Standard',
@@ -211,7 +250,7 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
         lostTicketFee: r.lostTicketFeePesos,
       ),
       vehicleTypeRates: const [],
-      levels: const [],
+      levels: cachedLevels,
       overnightStart: resolved.overnightStart,
       overnightEnd: resolved.overnightEnd,
       fromAreaApi: false,

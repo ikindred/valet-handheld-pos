@@ -9,13 +9,16 @@ import '../../core/session/standard_parking_rates.dart';
 import '../../features/check_out/domain/checkout_pricing.dart';
 import '../local/db/app_database.dart';
 import '../remote/area_detail.dart';
+import 'parking_layout_service.dart';
 
 /// Pulls branch standard + per-vehicle-type rates from the API into Drift [rates].
 class RateFetchService {
-  RateFetchService(this._db, this._dio);
+  RateFetchService(this._db, this._dio, [ParkingLayoutService? parkingLayout])
+      : _parkingLayout = parkingLayout ?? ParkingLayoutService(_db);
 
   final AppDatabase _db;
   final Dio _dio;
+  final ParkingLayoutService _parkingLayout;
 
   static const _uuid = Uuid();
 
@@ -209,6 +212,13 @@ class RateFetchService {
       return;
     }
     await cacheAreaDetailRates(branchId: branchId, detail: detail);
+    if (detail.levels.isNotEmpty) {
+      await _parkingLayout.saveLevels(
+        branchId: branchId,
+        areaId: areaId,
+        levels: detail.levels,
+      );
+    }
   }
 
   /// Writes standard + vehicle-type fees from area detail into Drift [rates].

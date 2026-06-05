@@ -14,6 +14,7 @@ import '../../core/printing/bluetooth_valet_print_service.dart';
 import '../../core/printing/printer_connection_notifier.dart';
 import '../../core/printing/valet_print_service.dart';
 import '../../data/services/branch_config_service.dart';
+import '../../data/services/parking_layout_service.dart';
 import '../../data/services/rate_fetch_service.dart';
 import '../../data/services/rate_service.dart';
 import '../../data/services/shift_service.dart';
@@ -48,9 +49,15 @@ class AppProviders extends StatelessWidget {
         Provider<RateService>(
           create: (c) => RateService(c.read<AppDatabase>()),
         ),
+        Provider<ParkingLayoutService>(
+          create: (c) => ParkingLayoutService(c.read<AppDatabase>()),
+        ),
         Provider<RateFetchService>(
-          create: (c) =>
-              RateFetchService(c.read<AppDatabase>(), c.read<Dio>()),
+          create: (c) => RateFetchService(
+            c.read<AppDatabase>(),
+            c.read<Dio>(),
+            c.read<ParkingLayoutService>(),
+          ),
         ),
         Provider<TicketService>(
           create: (c) => TicketService(
@@ -60,6 +67,7 @@ class AppProviders extends StatelessWidget {
             c.read<DashboardApi>(),
             c.read<RateService>(),
             c.read<RateFetchService>(),
+            c.read<ParkingLayoutService>(),
           ),
         ),
         Provider<ShiftService>(

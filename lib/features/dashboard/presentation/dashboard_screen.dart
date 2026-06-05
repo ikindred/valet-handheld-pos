@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/branch_config_service.dart';
+import '../../../data/services/parking_layout_service.dart';
 import '../../../data/services/rate_fetch_service.dart';
 import '../../../data/services/rate_service.dart';
 import '../../../shared/widgets/area_parking_slots_dialog.dart';
@@ -186,12 +187,14 @@ Future<void> _openBranchAreaDialog(
   if (!context.mounted) return;
   final rateFetch = context.read<RateFetchService>();
   final rateService = context.read<RateService>();
+  final parkingLayout = context.read<ParkingLayoutService>();
   if (ratesOnly) {
     await showBranchRatesDialog(
       context,
       authRepository: auth,
       rateFetchService: rateFetch,
       rateService: rateService,
+      parkingLayoutService: parkingLayout,
       branchName: name,
     );
   } else {
@@ -200,6 +203,7 @@ Future<void> _openBranchAreaDialog(
       authRepository: auth,
       rateFetchService: rateFetch,
       rateService: rateService,
+      parkingLayoutService: parkingLayout,
       branchName: name,
     );
   }

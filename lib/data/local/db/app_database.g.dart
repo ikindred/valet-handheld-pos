@@ -4993,6 +4993,285 @@ class RatesCompanion extends UpdateCompanion<Rate> {
   }
 }
 
+class $ParkingAreaLayoutsTable extends ParkingAreaLayouts
+    with TableInfo<$ParkingAreaLayoutsTable, ParkingAreaLayout> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ParkingAreaLayoutsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _branchIdMeta =
+      const VerificationMeta('branchId');
+  @override
+  late final GeneratedColumn<String> branchId = GeneratedColumn<String>(
+      'branch_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _areaIdMeta = const VerificationMeta('areaId');
+  @override
+  late final GeneratedColumn<String> areaId = GeneratedColumn<String>(
+      'area_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _levelsJsonMeta =
+      const VerificationMeta('levelsJson');
+  @override
+  late final GeneratedColumn<String> levelsJson = GeneratedColumn<String>(
+      'levels_json', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<String> updatedAt = GeneratedColumn<String>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [branchId, areaId, levelsJson, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'parking_area_layouts';
+  @override
+  VerificationContext validateIntegrity(Insertable<ParkingAreaLayout> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('branch_id')) {
+      context.handle(_branchIdMeta,
+          branchId.isAcceptableOrUnknown(data['branch_id']!, _branchIdMeta));
+    } else if (isInserting) {
+      context.missing(_branchIdMeta);
+    }
+    if (data.containsKey('area_id')) {
+      context.handle(_areaIdMeta,
+          areaId.isAcceptableOrUnknown(data['area_id']!, _areaIdMeta));
+    } else if (isInserting) {
+      context.missing(_areaIdMeta);
+    }
+    if (data.containsKey('levels_json')) {
+      context.handle(
+          _levelsJsonMeta,
+          levelsJson.isAcceptableOrUnknown(
+              data['levels_json']!, _levelsJsonMeta));
+    } else if (isInserting) {
+      context.missing(_levelsJsonMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {branchId, areaId};
+  @override
+  ParkingAreaLayout map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ParkingAreaLayout(
+      branchId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}branch_id'])!,
+      areaId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}area_id'])!,
+      levelsJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}levels_json'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $ParkingAreaLayoutsTable createAlias(String alias) {
+    return $ParkingAreaLayoutsTable(attachedDatabase, alias);
+  }
+}
+
+class ParkingAreaLayout extends DataClass
+    implements Insertable<ParkingAreaLayout> {
+  final String branchId;
+  final String areaId;
+
+  /// JSON array of [AreaParkingLevel] rows from area detail API.
+  final String levelsJson;
+  final String updatedAt;
+  const ParkingAreaLayout(
+      {required this.branchId,
+      required this.areaId,
+      required this.levelsJson,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['branch_id'] = Variable<String>(branchId);
+    map['area_id'] = Variable<String>(areaId);
+    map['levels_json'] = Variable<String>(levelsJson);
+    map['updated_at'] = Variable<String>(updatedAt);
+    return map;
+  }
+
+  ParkingAreaLayoutsCompanion toCompanion(bool nullToAbsent) {
+    return ParkingAreaLayoutsCompanion(
+      branchId: Value(branchId),
+      areaId: Value(areaId),
+      levelsJson: Value(levelsJson),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory ParkingAreaLayout.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ParkingAreaLayout(
+      branchId: serializer.fromJson<String>(json['branchId']),
+      areaId: serializer.fromJson<String>(json['areaId']),
+      levelsJson: serializer.fromJson<String>(json['levelsJson']),
+      updatedAt: serializer.fromJson<String>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'branchId': serializer.toJson<String>(branchId),
+      'areaId': serializer.toJson<String>(areaId),
+      'levelsJson': serializer.toJson<String>(levelsJson),
+      'updatedAt': serializer.toJson<String>(updatedAt),
+    };
+  }
+
+  ParkingAreaLayout copyWith(
+          {String? branchId,
+          String? areaId,
+          String? levelsJson,
+          String? updatedAt}) =>
+      ParkingAreaLayout(
+        branchId: branchId ?? this.branchId,
+        areaId: areaId ?? this.areaId,
+        levelsJson: levelsJson ?? this.levelsJson,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  ParkingAreaLayout copyWithCompanion(ParkingAreaLayoutsCompanion data) {
+    return ParkingAreaLayout(
+      branchId: data.branchId.present ? data.branchId.value : this.branchId,
+      areaId: data.areaId.present ? data.areaId.value : this.areaId,
+      levelsJson:
+          data.levelsJson.present ? data.levelsJson.value : this.levelsJson,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ParkingAreaLayout(')
+          ..write('branchId: $branchId, ')
+          ..write('areaId: $areaId, ')
+          ..write('levelsJson: $levelsJson, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(branchId, areaId, levelsJson, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ParkingAreaLayout &&
+          other.branchId == this.branchId &&
+          other.areaId == this.areaId &&
+          other.levelsJson == this.levelsJson &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ParkingAreaLayoutsCompanion extends UpdateCompanion<ParkingAreaLayout> {
+  final Value<String> branchId;
+  final Value<String> areaId;
+  final Value<String> levelsJson;
+  final Value<String> updatedAt;
+  final Value<int> rowid;
+  const ParkingAreaLayoutsCompanion({
+    this.branchId = const Value.absent(),
+    this.areaId = const Value.absent(),
+    this.levelsJson = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ParkingAreaLayoutsCompanion.insert({
+    required String branchId,
+    required String areaId,
+    required String levelsJson,
+    required String updatedAt,
+    this.rowid = const Value.absent(),
+  })  : branchId = Value(branchId),
+        areaId = Value(areaId),
+        levelsJson = Value(levelsJson),
+        updatedAt = Value(updatedAt);
+  static Insertable<ParkingAreaLayout> custom({
+    Expression<String>? branchId,
+    Expression<String>? areaId,
+    Expression<String>? levelsJson,
+    Expression<String>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (branchId != null) 'branch_id': branchId,
+      if (areaId != null) 'area_id': areaId,
+      if (levelsJson != null) 'levels_json': levelsJson,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ParkingAreaLayoutsCompanion copyWith(
+      {Value<String>? branchId,
+      Value<String>? areaId,
+      Value<String>? levelsJson,
+      Value<String>? updatedAt,
+      Value<int>? rowid}) {
+    return ParkingAreaLayoutsCompanion(
+      branchId: branchId ?? this.branchId,
+      areaId: areaId ?? this.areaId,
+      levelsJson: levelsJson ?? this.levelsJson,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (branchId.present) {
+      map['branch_id'] = Variable<String>(branchId.value);
+    }
+    if (areaId.present) {
+      map['area_id'] = Variable<String>(areaId.value);
+    }
+    if (levelsJson.present) {
+      map['levels_json'] = Variable<String>(levelsJson.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<String>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ParkingAreaLayoutsCompanion(')
+          ..write('branchId: $branchId, ')
+          ..write('areaId: $areaId, ')
+          ..write('levelsJson: $levelsJson, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $BranchConfigsTable extends BranchConfigs
     with TableInfo<$BranchConfigsTable, BranchConfig> {
   @override
@@ -5364,6 +5643,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $TicketsTable tickets = $TicketsTable(this);
   late final $SyncQueueTable syncQueue = $SyncQueueTable(this);
   late final $RatesTable rates = $RatesTable(this);
+  late final $ParkingAreaLayoutsTable parkingAreaLayouts =
+      $ParkingAreaLayoutsTable(this);
   late final $BranchConfigsTable branchConfigs = $BranchConfigsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -5378,6 +5659,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         tickets,
         syncQueue,
         rates,
+        parkingAreaLayouts,
         branchConfigs
       ];
 }
@@ -7340,6 +7622,119 @@ class $$RatesTableOrderingComposer
           ColumnOrderings(column, joinBuilders: joinBuilders));
 }
 
+typedef $$ParkingAreaLayoutsTableCreateCompanionBuilder
+    = ParkingAreaLayoutsCompanion Function({
+  required String branchId,
+  required String areaId,
+  required String levelsJson,
+  required String updatedAt,
+  Value<int> rowid,
+});
+typedef $$ParkingAreaLayoutsTableUpdateCompanionBuilder
+    = ParkingAreaLayoutsCompanion Function({
+  Value<String> branchId,
+  Value<String> areaId,
+  Value<String> levelsJson,
+  Value<String> updatedAt,
+  Value<int> rowid,
+});
+
+class $$ParkingAreaLayoutsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ParkingAreaLayoutsTable,
+    ParkingAreaLayout,
+    $$ParkingAreaLayoutsTableFilterComposer,
+    $$ParkingAreaLayoutsTableOrderingComposer,
+    $$ParkingAreaLayoutsTableCreateCompanionBuilder,
+    $$ParkingAreaLayoutsTableUpdateCompanionBuilder> {
+  $$ParkingAreaLayoutsTableTableManager(
+      _$AppDatabase db, $ParkingAreaLayoutsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          filteringComposer:
+              $$ParkingAreaLayoutsTableFilterComposer(ComposerState(db, table)),
+          orderingComposer: $$ParkingAreaLayoutsTableOrderingComposer(
+              ComposerState(db, table)),
+          updateCompanionCallback: ({
+            Value<String> branchId = const Value.absent(),
+            Value<String> areaId = const Value.absent(),
+            Value<String> levelsJson = const Value.absent(),
+            Value<String> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ParkingAreaLayoutsCompanion(
+            branchId: branchId,
+            areaId: areaId,
+            levelsJson: levelsJson,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String branchId,
+            required String areaId,
+            required String levelsJson,
+            required String updatedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ParkingAreaLayoutsCompanion.insert(
+            branchId: branchId,
+            areaId: areaId,
+            levelsJson: levelsJson,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+        ));
+}
+
+class $$ParkingAreaLayoutsTableFilterComposer
+    extends FilterComposer<_$AppDatabase, $ParkingAreaLayoutsTable> {
+  $$ParkingAreaLayoutsTableFilterComposer(super.$state);
+  ColumnFilters<String> get branchId => $state.composableBuilder(
+      column: $state.table.branchId,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get areaId => $state.composableBuilder(
+      column: $state.table.areaId,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get levelsJson => $state.composableBuilder(
+      column: $state.table.levelsJson,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get updatedAt => $state.composableBuilder(
+      column: $state.table.updatedAt,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+}
+
+class $$ParkingAreaLayoutsTableOrderingComposer
+    extends OrderingComposer<_$AppDatabase, $ParkingAreaLayoutsTable> {
+  $$ParkingAreaLayoutsTableOrderingComposer(super.$state);
+  ColumnOrderings<String> get branchId => $state.composableBuilder(
+      column: $state.table.branchId,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get areaId => $state.composableBuilder(
+      column: $state.table.areaId,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get levelsJson => $state.composableBuilder(
+      column: $state.table.levelsJson,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get updatedAt => $state.composableBuilder(
+      column: $state.table.updatedAt,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+}
+
 typedef $$BranchConfigsTableCreateCompanionBuilder = BranchConfigsCompanion
     Function({
   required String id,
@@ -7503,6 +7898,8 @@ class $AppDatabaseManager {
       $$SyncQueueTableTableManager(_db, _db.syncQueue);
   $$RatesTableTableManager get rates =>
       $$RatesTableTableManager(_db, _db.rates);
+  $$ParkingAreaLayoutsTableTableManager get parkingAreaLayouts =>
+      $$ParkingAreaLayoutsTableTableManager(_db, _db.parkingAreaLayouts);
   $$BranchConfigsTableTableManager get branchConfigs =>
       $$BranchConfigsTableTableManager(_db, _db.branchConfigs);
 }

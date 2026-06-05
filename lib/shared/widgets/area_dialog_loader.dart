@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/repositories/auth_repository.dart';
+import '../../data/services/parking_layout_service.dart';
 import '../../data/services/rate_fetch_service.dart';
 import '../../data/services/rate_service.dart';
 import 'area_detail_dialog_data.dart';
@@ -13,6 +14,7 @@ class AreaDialogLoader extends StatefulWidget {
     required this.authRepository,
     required this.rateFetchService,
     required this.rateService,
+    required this.parkingLayoutService,
     required this.allowOfflineFallback,
     this.purpose = BranchAreaDialogPurpose.rates,
     required this.builder,
@@ -21,6 +23,7 @@ class AreaDialogLoader extends StatefulWidget {
   final AuthRepository authRepository;
   final RateFetchService rateFetchService;
   final RateService rateService;
+  final ParkingLayoutService parkingLayoutService;
   final bool allowOfflineFallback;
   final BranchAreaDialogPurpose purpose;
   final Widget Function(
@@ -46,6 +49,7 @@ class _AreaDialogLoaderState extends State<AreaDialogLoader> {
         authRepository: widget.authRepository,
         rateFetchService: widget.rateFetchService,
         rateService: widget.rateService,
+        parkingLayoutService: widget.parkingLayoutService,
         purpose: widget.purpose,
         allowOfflineFallback: widget.allowOfflineFallback,
       );

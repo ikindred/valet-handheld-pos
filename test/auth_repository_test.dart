@@ -8,6 +8,7 @@ import 'package:valet_handheld_pos/core/storage/prefs_keys.dart';
 import 'package:valet_handheld_pos/data/local/db/app_database.dart';
 import 'package:valet_handheld_pos/data/remote/auth_api.dart';
 import 'package:valet_handheld_pos/data/repositories/auth_repository.dart';
+import 'package:valet_handheld_pos/data/services/parking_layout_service.dart';
 import 'package:valet_handheld_pos/data/services/rate_fetch_service.dart';
 import 'package:valet_handheld_pos/data/services/rate_service.dart';
 import 'package:valet_handheld_pos/data/remote/dashboard_api.dart';
@@ -38,13 +39,15 @@ void main() {
       final api = AuthApi(Dio());
       final refresh = RouterRefreshNotifier();
       final dio = Dio();
+      final parkingLayout = ParkingLayoutService(db);
       final tickets = TicketService(
         db,
         dio,
         TransactionsApi(dio),
         DashboardApi(dio),
         RateService(db),
-        RateFetchService(db, dio),
+        RateFetchService(db, dio, parkingLayout),
+        parkingLayout,
       );
       shifts = ShiftService(
         db,
@@ -53,7 +56,7 @@ void main() {
         onShiftMutated: refresh.notifyAuthChanged,
       );
       final rates = RateService(db);
-      final rateFetch = RateFetchService(db, dio);
+      final rateFetch = RateFetchService(db, dio, parkingLayout);
       repo = AuthRepository(db, api, refresh, shifts, rates, rateFetch);
     });
 

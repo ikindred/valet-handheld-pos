@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/app_text_field.dart';
+import '../../../../data/remote/area_detail.dart';
+import '../../../../shared/widgets/parking_slot_status_style.dart';
 import '../../domain/vehicle_body_type.dart';
 import '../../state/check_in_cubit.dart';
 import 'check_in_compact_tokens.dart';
@@ -333,6 +335,151 @@ class _BelongingTile extends StatelessWidget {
               fontSize: 13,
               fontWeight: FontWeight.w500,
               color: textColor,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Level picker with free-slot count (matches parking slots modal).
+class CheckInParkingLevelDropdownField extends StatelessWidget {
+  const CheckInParkingLevelDropdownField({
+    super.key,
+    required this.label,
+    required this.levels,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final List<AreaParkingLevel> levels;
+  final String value;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return CheckInDropdownField(
+      label: label,
+      value: value,
+      items: [
+        for (final level in levels)
+          levels.length > 1
+              ? '${level.name} (${level.availableCount} available)'
+              : level.name,
+      ],
+      onChanged: (picked) {
+        if (picked == null) {
+          onChanged(null);
+          return;
+        }
+        for (final level in levels) {
+          final itemLabel = levels.length > 1
+              ? '${level.name} (${level.availableCount} available)'
+              : level.name;
+          if (itemLabel == picked) {
+            onChanged(level.name);
+            return;
+          }
+        }
+        onChanged(picked);
+      },
+    );
+  }
+}
+
+/// Slot picker — green free / red occupied; only free slots are selectable.
+class CheckInParkingSlotDropdownField extends StatelessWidget {
+  const CheckInParkingSlotDropdownField({
+    super.key,
+    required this.label,
+    required this.slots,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final List<AreaParkingSlot> slots;
+  final String value;
+  final ValueChanged<AreaParkingSlot?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
+    AreaParkingSlot? selected;
+    if (value.trim().isNotEmpty) {
+      for (final s in slots) {
+        if (s.label == value) {
+          selected = s;
+          break;
+        }
+      }
+    }
+    final selectedColor = selected == null
+        ? tc.textPrimary
+        : ParkingSlotStatusStyle.textFor(selected);
+
+    return CheckInFormField(
+      label: label,
+      child: AppTextFieldShadow(
+        child: Container(
+          constraints: const BoxConstraints(
+            minHeight: CheckInCompactTokens.inputMinHeight,
+          ),
+          padding: CheckInCompactTokens.inputPadding,
+          decoration: BoxDecoration(
+            color: tc.inputFill,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: tc.cardBorder, width: 1),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              isExpanded: true,
+              value: value.isEmpty ? null : value,
+              hint: Text(
+                'Select',
+                style: CheckInCompactTokens.fieldValueOf(context).copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: tc.textSubtitleMuted,
+                ),
+              ),
+              icon: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: tc.textSecondary,
+                size: 20,
+              ),
+              style: CheckInCompactTokens.fieldValueOf(context).copyWith(
+                color: selectedColor,
+                fontWeight: FontWeight.w600,
+              ),
+              items: [
+                for (final slot in slots)
+                  DropdownMenuItem<String>(
+                    value: slot.label,
+                    enabled: slot.isAvailable,
+                    child: Text(
+                      '${slot.label}${ParkingSlotStatusStyle.statusSuffix(slot)}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: ParkingSlotStatusStyle.textFor(slot),
+                      ),
+                    ),
+                  ),
+              ],
+              onChanged: (label) {
+                if (label == null) {
+                  onChanged(null);
+                  return;
+                }
+                for (final slot in slots) {
+                  if (slot.label == label && slot.isAvailable) {
+                    onChanged(slot);
+                    return;
+                  }
+                }
+              },
             ),
           ),
         ),
