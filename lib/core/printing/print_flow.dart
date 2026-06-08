@@ -8,6 +8,7 @@ import '../../data/repositories/auth_repository.dart';
 import 'bluetooth_pos_printer.dart';
 import 'check_in_receipt_data.dart';
 import 'checkout_receipt_data.dart';
+import 'close_cash_receipt_data.dart';
 import 'printer_connection_notifier.dart';
 import 'valet_print_service.dart';
 import 'widgets/printer_pairing_sheet.dart';
@@ -98,6 +99,18 @@ Future<bool> printCheckOutFromContext(
     context,
     printJob: () =>
         context.read<ValetPrintService>().printCheckOut(data),
+  );
+}
+
+/// Prints end-of-shift close cash receipt.
+Future<bool> printCloseCashFromContext(
+  BuildContext context, {
+  required CloseCashReceiptData data,
+}) {
+  return runBluetoothPrint(
+    context,
+    printJob: () =>
+        context.read<ValetPrintService>().printCloseCash(data),
   );
 }
 

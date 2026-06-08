@@ -14,6 +14,7 @@ import '../../core/printing/bluetooth_valet_print_service.dart';
 import '../../core/printing/printer_connection_notifier.dart';
 import '../../core/printing/valet_print_service.dart';
 import '../../data/services/branch_config_service.dart';
+import '../../data/services/close_cash_purge_service.dart';
 import '../../data/services/parking_layout_service.dart';
 import '../../data/services/rate_fetch_service.dart';
 import '../../data/services/rate_service.dart';
@@ -78,6 +79,9 @@ class AppProviders extends StatelessWidget {
             onShiftMutated: () => c.read<RouterRefreshNotifier>().notifyAuthChanged(),
           ),
         ),
+        Provider<CloseCashPurgeService>(
+          create: (c) => CloseCashPurgeService(c.read<AppDatabase>()),
+        ),
         Provider<BluetoothPosPrinter>(
           create: (_) => BluetoothPosPrinter(),
         ),
@@ -99,6 +103,7 @@ class AppProviders extends StatelessWidget {
             c.read<ShiftService>(),
             c.read<RateService>(),
             c.read<RateFetchService>(),
+            c.read<TransactionsApi>(),
           ),
         ),
         Provider<DeviceConflictService>(

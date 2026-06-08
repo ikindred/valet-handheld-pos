@@ -1380,6 +1380,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         driverOut: driverOut,
         status: state.isLostTicket ? 'lost' : 'completed',
         paymentSummary: paymentSummary,
+        syncedToServer: response != null,
       );
 
       final preview = state.preview;

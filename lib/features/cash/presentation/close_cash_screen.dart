@@ -6,18 +6,21 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/connectivity/internet_reachability.dart';
+import '../../../core/printing/print_flow.dart';
 import '../../../core/formatting/peso_currency.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../data/remote/dashboard_api.dart';
+import '../../../core/storage/offline_mode_prefs.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/close_cash_purge_service.dart';
 import '../../../data/services/shift_service.dart';
-import '../../../core/ui/app_text_field.dart';
 import '../../auth/state/auth_bloc.dart';
 import '../../sync/state/sync_cubit.dart';
+import '../../sync/state/sync_state.dart';
 import '../cubits/close_cash_cubit.dart';
 import '../cubits/close_cash_state.dart';
-import 'widgets/cash_figma_text_styles.dart';
 import 'widgets/cash_widgets.dart';
-import '../widgets/open_transactions_warning_modal.dart';
+import 'widgets/close_cash_shift_stats_card.dart';
 
 class CloseCashScreen extends StatefulWidget {
   const CloseCashScreen({super.key});
@@ -27,16 +30,16 @@ class CloseCashScreen extends StatefulWidget {
 }
 
 class _CloseCashScreenState extends State<CloseCashScreen> {
-  final _notesCtrl = TextEditingController();
   String _amountText = '0';
   String _headerSubtitle = '';
   bool _online = true;
+  bool _offlineMode = false;
+  int _pendingSyncCount = 0;
+  int _failedSyncCount = 0;
   bool _amountSyncedFromCubit = false;
 
   static const _orange = Color(0xFFE8831A);
   static const _pageBg = Color(0xFFF5F5F5);
-  static const _varianceRed = Color(0xFFD32F2F);
-  static const _varianceGreen = Color(0xFF2E7D32);
 
   @override
   void initState() {
@@ -46,29 +49,83 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
 
   Future<void> _loadHeader() async {
     final repo = context.read<AuthRepository>();
+    final syncCubit = context.read<SyncCubit>();
+    final prefs = await SharedPreferences.getInstance();
     final dateLine = DateFormat('EEEE, MMMM d, y').format(DateTime.now());
-    final siteSub = await repo.dateAndSiteLine(
-      await SharedPreferences.getInstance(),
-      dateLine,
-    );
+    final siteSub = await repo.dateAndSiteLine(prefs, dateLine);
     final hasInternet = await InternetReachability.hasInternet();
+    final offlineMode = OfflineModePrefs.read(prefs);
+    final session = await repo.getActiveSession();
+    await syncCubit.flush();
+    final pending = await syncCubit.pendingCount();
+    final failed = await syncCubit.failedCount();
     if (!mounted) return;
     setState(() {
       _headerSubtitle = siteSub;
       _online = hasInternet;
+      _offlineMode = offlineMode || (session?.isOfflineSession ?? false);
+      _pendingSyncCount = pending;
+      _failedSyncCount = failed;
     });
   }
 
-  @override
-  void dispose() {
-    _notesCtrl.dispose();
-    super.dispose();
+  Future<void> _refreshSyncCounts() async {
+    final syncCubit = context.read<SyncCubit>();
+    final pending = await syncCubit.pendingCount();
+    final failed = await syncCubit.failedCount();
+    if (!mounted) return;
+    setState(() {
+      _pendingSyncCount = pending;
+      _failedSyncCount = failed;
+    });
+  }
+
+  bool get _closeBlocked =>
+      !_online ||
+      _offlineMode ||
+      _pendingSyncCount > 0 ||
+      _failedSyncCount > 0;
+
+  String? get _closeBlockedMessage {
+    if (_offlineMode) {
+      return 'Close cash requires an online connection. '
+          'Connect to the internet and sync all transactions.';
+    }
+    if (!_online) {
+      return 'Connect to the internet and sync all transactions before closing cash.';
+    }
+    if (_pendingSyncCount > 0) {
+      return 'Sync $_pendingSyncCount pending transaction'
+          '${_pendingSyncCount == 1 ? '' : 's'} before closing cash.';
+    }
+    if (_failedSyncCount > 0) {
+      return 'Resolve $_failedSyncCount failed sync item'
+          '${_failedSyncCount == 1 ? '' : 's'} before closing cash.';
+    }
+    return null;
   }
 
   String _formatDecimalInput(double v) => v.toStringAsFixed(2);
 
+  /// Cubit sync uses fixed decimals ("0.00"); keypad logic expects bare "0".
+  void _normalizeZeroLikeAmount() {
+    if (_amountText == '0.00' || _amountText == '0.0') {
+      _amountText = '0';
+    }
+  }
+
+  bool get _isZeroLikeAmount {
+    if (_amountText == '0' || _amountText == '0.') return true;
+    final parsed = double.tryParse(_amountText.replaceAll(',', ''));
+    return parsed == 0 && !_amountText.contains(RegExp(r'\.[1-9]'));
+  }
+
+  double get _parsedAmount =>
+      double.tryParse(_amountText.replaceAll(',', '')) ?? 0;
+
   void _onKey(CloseCashCubit cubit, String key) {
     setState(() {
+      _normalizeZeroLikeAmount();
       if (key == '⌫') {
         if (_amountText.isNotEmpty) {
           _amountText = _amountText.substring(0, _amountText.length - 1);
@@ -83,21 +140,14 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
         }
         return;
       }
-      if (key == '00') {
-        if (_amountText == '0') return;
-        _amountText = '$_amountText$key';
-        _trimDecimalPlaces();
-        return;
-      }
-      if (_amountText == '0' && key != '.') {
+      if (_isZeroLikeAmount && key != '.') {
         _amountText = key;
       } else {
         _amountText = '$_amountText$key';
       }
       _trimDecimalPlaces();
     });
-    final parsed = double.tryParse(_amountText.replaceAll(',', '')) ?? 0;
-    cubit.updateActualCash(parsed);
+    cubit.updateActualCash(_parsedAmount);
   }
 
   void _normalizeLeadingZero() {
@@ -122,8 +172,8 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
   CloseCashLoaded? _resolveLoaded(CloseCashState state, CloseCashCubit cubit) {
     if (state is CloseCashLoaded) return state;
     if (state is CloseCashConfirming) return cubit.lastLoaded;
-    if (state is CloseCashHasOpenTransactions) return cubit.lastLoaded;
     if (state is CloseCashError) return cubit.lastLoaded;
+    if (state is CloseCashBlocked) return cubit.lastLoaded;
     return null;
   }
 
@@ -138,15 +188,22 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
       return const Scaffold(body: Center(child: Text('Invalid user')));
     }
 
-    return BlocProvider(
-      key: ValueKey<int>(uid),
-      create: (_) =>
-          CloseCashCubit(
-            context.read<AuthRepository>(),
-            context.read<ShiftService>(),
-            context.read<SyncCubit>(),
-          )..loadShift(uid),
-      child: BlocConsumer<CloseCashCubit, CloseCashState>(
+    return BlocListener<SyncCubit, SyncState>(
+      listener: (context, state) {
+        if (state is SyncComplete) {
+          _refreshSyncCounts();
+        }
+      },
+      child: BlocProvider(
+        key: ValueKey<int>(uid),
+        create: (_) => CloseCashCubit(
+          context.read<AuthRepository>(),
+          context.read<ShiftService>(),
+          context.read<SyncCubit>(),
+          context.read<DashboardApi>(),
+          context.read<CloseCashPurgeService>(),
+        )..loadShift(uid),
+        child: BlocConsumer<CloseCashCubit, CloseCashState>(
         listener: (context, state) async {
           if (state is CloseCashLoading) {
             _amountSyncedFromCubit = false;
@@ -155,11 +212,18 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
             if (!_amountSyncedFromCubit) {
               _amountSyncedFromCubit = true;
               setState(() {
-                _amountText = _formatDecimalInput(state.actualCash);
+                _amountText = state.actualCash == 0
+                    ? '0'
+                    : _formatDecimalInput(state.actualCash);
               });
             }
           }
           if (state is CloseCashSuccess) {
+            await printCloseCashFromContext(
+              context,
+              data: state.receipt,
+            );
+            if (!context.mounted) return;
             final authBloc = context.read<AuthBloc>();
             if (authBloc.state is! AuthUnauthenticated) {
               authBloc.add(const AuthLoggedOut());
@@ -174,19 +238,11 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
             );
             context.read<CloseCashCubit>().restoreLoadedAfterError();
           }
-          if (state is CloseCashHasOpenTransactions) {
-            OpenTransactionsWarningModal.show(
-              context,
-              openTransactions: state.openTransactions,
-              onCancel: () {
-                Navigator.of(context).pop();
-                context.read<CloseCashCubit>().dismissOpenTransactionsWarning();
-              },
-              onConfirm: () {
-                Navigator.of(context).pop();
-                context.read<CloseCashCubit>().confirmCloseWithOpenTransactions(uid);
-              },
+          if (state is CloseCashBlocked) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message)),
             );
+            context.read<CloseCashCubit>().dismissBlockedWarning();
           }
         },
         builder: (context, state) {
@@ -203,24 +259,16 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
             return Scaffold(
               body: Center(
                 child: Text(
-                  state is CloseCashError
-                      ? state.message
-                      : 'No data',
+                  state is CloseCashError ? state.message : 'No data',
                 ),
               ),
             );
           }
 
-          final opening = loaded.openingFloat;
-          final totalSales = loaded.totalSales;
-          final expected = loaded.expectedCash;
-          final actual = loaded.actualCash;
-          final variance = loaded.variance;
-          final remit = loaded.salesToRemit;
-
           final headerSub = _headerSubtitle.isEmpty
               ? DateFormat('EEEE, MMMM d, y').format(DateTime.now())
               : _headerSubtitle;
+          final confirming = state is CloseCashConfirming;
 
           return Scaffold(
             backgroundColor: _pageBg,
@@ -238,165 +286,123 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
                           subtitle: headerSub,
                           online: _online,
                         ),
-                        const SizedBox(height: 22),
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: SingleChildScrollView(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'OVERVIEW',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .labelLarge
-                                              ?.copyWith(
-                                                color: AppColors.textSecondary,
-                                                letterSpacing: 1.2,
-                                              ),
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: _StatCard(
-                                                title: 'TRANSACTIONS',
-                                                big: '${loaded.transactionsCount}',
-                                                sub: 'This shift',
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: _StatCard(
-                                                title: 'TOTAL SALES',
-                                                big:
-                                                    '${PesoCurrency.symbol} ${totalSales.toStringAsFixed(2)}',
-                                                sub: 'Cash collected',
-                                                accent: _StatAccent.success,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: _StatCard(
-                                                title: 'OPENING BALANCE',
-                                                big:
-                                                    '${PesoCurrency.symbol} ${opening.toStringAsFixed(2)}',
-                                                sub: 'Start shift',
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: _StatCard(
-                                                title: 'EXPECTED CASH',
-                                                big:
-                                                    '${PesoCurrency.symbol} ${expected.toStringAsFixed(2)}',
-                                                sub: 'Opening + sales',
-                                                accent: _StatAccent.warning,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 28),
-                                        Container(
-                                          height: 1,
-                                          color: Colors.black.withValues(
-                                            alpha: 0.08,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 20),
-                                        Text(
-                                          'ACTUAL CASH COUNT',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .labelLarge
-                                              ?.copyWith(
-                                                color: AppColors.textSecondary,
-                                                letterSpacing: 1.2,
-                                              ),
-                                        ),
-                                        const SizedBox(height: 10),
-                                        CashAmountBox(
-                                          text: _displayPeso(actual),
-                                          color: _orange,
-                                        ),
-                                        const SizedBox(height: 12),
-                                        _CloseCashKeypad(
-                                          onKey: (k) =>
-                                              _onKey(cubit, k),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 18),
-                                SizedBox(
-                                  width: 380,
-                                  child: Column(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final sideBySide = constraints.maxWidth >= 640;
+                                final statsPane = CloseCashShiftStatsCard(
+                                  stats: loaded.stats,
+                                  activeCheckInCount:
+                                      loaded.openTransactions.length,
+                                  accentColor: _orange,
+                                );
+                                final cashPane = _CloseCashCountPane(
+                                  amountText: _displayPeso(_parsedAmount),
+                                  accentColor: _orange,
+                                  onKey: (k) => _onKey(cubit, k),
+                                );
+
+                                if (sideBySide) {
+                                  return Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      const SizedBox(height: 16),
-                                      _CashReconciliationCard(
-                                        opening: opening,
-                                        totalSales: totalSales,
-                                        expected: expected,
-                                        actual: actual,
-                                        variance: variance,
-                                        orange: _orange,
-                                        varianceRed: _varianceRed,
-                                        varianceGreen: _varianceGreen,
+                                      Expanded(
+                                        flex: 5,
+                                        child: SingleChildScrollView(
+                                          child: statsPane,
+                                        ),
                                       ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 18),
-                                SizedBox(
-                                  width: 360,
-                                  child: Column(
-                                    children: [
-                                      _RemittanceCard(
-                                        amount: remit,
-                                        accent: _orange,
+                                      const VerticalDivider(
+                                        width: 28,
+                                        thickness: 1,
+                                        color: Color(0x21000000),
                                       ),
-                                      const SizedBox(height: 16),
-                                      _ClosingNotesCard(
-                                        controller: _notesCtrl,
-                                        onChanged: (s) =>
-                                            cubit.updateClosingNotes(s),
-                                      ),
-                                      const Spacer(),
-                                      SizedBox(
-                                        width: double.infinity,
-                                        height: 54,
-                                        child: FilledButton(
-                                          style: FilledButton.styleFrom(
-                                            backgroundColor: _orange,
-                                            foregroundColor: Colors.white,
-                                          ),
-                                          onPressed: state
-                                                  is CloseCashConfirming
-                                              ? null
-                                              : () => cubit
-                                                  .attemptCloseShift(uid),
-                                          child: const Text(
-                                            'Close Cash & End Shift',
-                                          ),
+                                      Expanded(
+                                        flex: 5,
+                                        child: SingleChildScrollView(
+                                          child: cashPane,
                                         ),
                                       ),
                                     ],
+                                  );
+                                }
+
+                                return SingleChildScrollView(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      statsPane,
+                                      const SizedBox(height: 16),
+                                      cashPane,
+                                    ],
                                   ),
-                                ),
-                              ],
+                                );
+                              },
                             ),
                           ),
+                        ),
+                        if (_closeBlockedMessage != null)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                            child: Text(
+                              _closeBlockedMessage!,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.error,
+                                    height: 1.4,
+                                  ),
+                            ),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                          child: Row(
+                                children: [
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 54,
+                                      child: OutlinedButton(
+                                        onPressed: confirming
+                                            ? null
+                                            : () => context.go('/dashboard'),
+                                        child: const Text('Cancel'),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    flex: 2,
+                                    child: SizedBox(
+                                      height: 54,
+                                      child: FilledButton(
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: _orange,
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        onPressed: confirming || _closeBlocked
+                                            ? null
+                                            : () =>
+                                                cubit.attemptCloseShift(uid),
+                                        child: confirming
+                                            ? const SizedBox(
+                                                width: 22,
+                                                height: 22,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: Colors.white,
+                                                ),
+                                              )
+                                            : const Text(
+                                                'Close Cash & End Shift',
+                                              ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                         ),
                       ],
                     ),
@@ -406,401 +412,48 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-enum _StatAccent { none, success, warning }
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.title,
-    required this.big,
-    required this.sub,
-    this.accent = _StatAccent.none,
-  });
-
-  final String title;
-  final String big;
-  final String sub;
-  final _StatAccent accent;
-
-  @override
-  Widget build(BuildContext context) {
-    Color bigColor = const Color(0xFF3C3434);
-    if (accent == _StatAccent.success) bigColor = AppColors.success;
-    if (accent == _StatAccent.warning) bigColor = const Color(0xFFE8831A);
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.13)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D000000),
-            blurRadius: 1,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                  letterSpacing: 0.6,
-                ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            big,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: bigColor,
-                ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            sub,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CashReconciliationCard extends StatelessWidget {
-  const _CashReconciliationCard({
-    required this.opening,
-    required this.totalSales,
-    required this.expected,
-    required this.actual,
-    required this.variance,
-    required this.orange,
-    required this.varianceRed,
-    required this.varianceGreen,
-  });
-
-  final double opening;
-  final double totalSales;
-  final double expected;
-  final double actual;
-  final double variance;
-  final Color orange;
-  final Color varianceRed;
-  final Color varianceGreen;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget row(
-      String left,
-      String right, {
-      Color? color,
-      FontWeight fw = FontWeight.w600,
-    }) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 9),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              left,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-            ),
-            Text(
-              right,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: color ?? const Color(0xFF3C3434),
-                    fontWeight: fw,
-                  ),
-            ),
-          ],
         ),
-      );
-    }
-
-    final balanced = variance.abs() < 0.005;
-    final over = variance > 0.005;
-    final bannerColor = balanced ? varianceGreen : (over ? orange : varianceRed);
-    String bannerText;
-    if (balanced) {
-      bannerText = 'Cash balanced — no variance';
-    } else if (over) {
-      bannerText =
-          'Over by ${PesoCurrency.symbol}${variance.abs().toStringAsFixed(2)}';
-    } else {
-      bannerText =
-          'Short by ${PesoCurrency.symbol}${variance.abs().toStringAsFixed(2)}';
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'CASH RECONCILIATION',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  letterSpacing: 0.8,
-                  color: const Color(0xFF3C3434),
-                ),
-          ),
-          const SizedBox(height: 10),
-          row('Opening Balance',
-              '${PesoCurrency.symbol} ${opening.toStringAsFixed(2)}'),
-          const Divider(height: 1),
-          row(
-            'Total Sales',
-            '+ ${PesoCurrency.symbol} ${totalSales.toStringAsFixed(2)}',
-            color: varianceGreen,
-          ),
-          const Divider(height: 1),
-          row(
-            'Expected Total',
-            '${PesoCurrency.symbol} ${expected.toStringAsFixed(2)}',
-            fw: FontWeight.w700,
-          ),
-          const Divider(height: 1),
-          row('Actual Cash on Hand',
-              '${PesoCurrency.symbol} ${actual.toStringAsFixed(2)}'),
-          const Divider(height: 1),
-          row(
-            'Variance',
-            '${PesoCurrency.symbol} ${variance.toStringAsFixed(2)}',
-            color: balanced ? varianceGreen : (over ? orange : varianceRed),
-            fw: FontWeight.w700,
-          ),
-          const SizedBox(height: 14),
-          Container(
-            height: 40,
-            decoration: BoxDecoration(
-              color: balanced
-                  ? const Color(0xFFF4FBF7)
-                  : (over
-                      ? const Color(0xFFFFF7EC)
-                      : const Color(0xFFFFEBEE)),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: bannerColor),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              bannerText,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: bannerColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-          ),
-        ],
       ),
     );
   }
 }
 
-class _RemittanceCard extends StatelessWidget {
-  const _RemittanceCard({required this.amount, required this.accent});
-
-  final double amount;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D000000),
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.payments_outlined, size: 20, color: accent.withValues(alpha: 0.9)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'SALES TO REMIT TO SUPERVISOR',
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                        letterSpacing: 0.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF7EC),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: accent.withValues(alpha: 0.35)),
-            ),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.center,
-              child: Text(
-                '${PesoCurrency.symbol} ${amount.toStringAsFixed(2)}',
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      color: accent,
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ClosingNotesCard extends StatelessWidget {
-  const _ClosingNotesCard({
-    required this.controller,
-    required this.onChanged,
+class _CloseCashCountPane extends StatelessWidget {
+  const _CloseCashCountPane({
+    required this.amountText,
+    required this.accentColor,
+    required this.onKey,
   });
 
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
+  final String amountText;
+  final Color accentColor;
+  final void Function(String key) onKey;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'CLOSING NOTES',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-          ),
-          const SizedBox(height: 8),
-          AppTextField(
-            controller: controller,
-            maxLines: 4,
-            minHeight: 88,
-            hint: 'Any incidents, discrepancies, or notes for the next shift…',
-            style: CashFigmaStyles.notesInput(),
-            onChanged: onChanged,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Numpad with decimal and backspace.
-class _CloseCashKeypad extends StatelessWidget {
-  const _CloseCashKeypad({required this.onKey});
-
-  final void Function(String) onKey;
-
-  @override
-  Widget build(BuildContext context) {
-    const keys = [
-      ['1', '2', '3'],
-      ['4', '5', '6'],
-      ['7', '8', '9'],
-      ['.', '00', '⌫'],
-      ['0'],
-    ];
-
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var r = 0; r < keys.length; r++) ...[
-          Row(
-            children: [
-              for (final k in keys[r])
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: _CloseKeyButton(label: k, onTap: () => onKey(k)),
-                  ),
-                ),
-              if (keys[r].length == 1) ...[
-                Spacer(),
-                Spacer(),
-              ],
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _CloseKeyButton extends StatelessWidget {
-  const _CloseKeyButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isAccent = label == '00';
-    final isDelete = label == '⌫';
-
-    Color bg = const Color(0xFFF8F9FB);
-    Color border = const Color(0xFFC0C0BF);
-    Color fg = const Color(0xFF3C3434);
-
-    if (isAccent) {
-      bg = const Color(0xFFFFF5DE);
-      border = const Color(0xFFE8831A);
-      fg = const Color(0xFFE8831A);
-    }
-    if (isDelete) {
-      bg = Colors.white;
-      border = const Color(0xFFC0C0BF);
-      fg = const Color(0xFFD64045);
-    }
-
-    return SizedBox(
-      height: 48,
-      child: OutlinedButton(
-        onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          backgroundColor: bg,
-          foregroundColor: fg,
-          side: BorderSide(color: border),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+        Text(
+          'ACTUAL CASH COUNT',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: AppColors.textSecondary,
+                letterSpacing: 1.2,
+              ),
         ),
-        child: isDelete
-            ? Icon(Icons.backspace_outlined, color: fg, size: 22)
-            : Text(label, style: CashFigmaStyles.keypadDigit(color: fg)),
-      ),
+        const SizedBox(height: 6),
+        Text(
+          'Enter the total cash sales you are turning in for this shift.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+        ),
+        const SizedBox(height: 14),
+        CashAmountBox(text: amountText, color: accentColor),
+        const SizedBox(height: 10),
+        CashKeypad(onKey: onKey),
+      ],
     );
   }
 }

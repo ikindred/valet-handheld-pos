@@ -18,9 +18,15 @@ import '../../core/routing/router_refresh_notifier.dart';
 import '../../core/session/cashier_shift_schedule.dart';
 import '../../core/session/standard_parking_rates.dart';
 import '../../core/time/unix_timestamp.dart';
+import '../../data/remote/dashboard_summary.dart';
+import '../../features/cash/models/close_cash_shift_stats.dart';
+import '../../features/cash/models/open_transaction.dart';
+import '../../features/check_in/domain/vehicle_body_type.dart';
+import '../../features/reports/domain/reports_format.dart';
 import '../local/db/app_database.dart';
 import '../remote/api_error_message.dart';
 import '../remote/auth_api.dart';
+import '../remote/transactions_api.dart';
 import '../services/rate_fetch_service.dart';
 import '../services/rate_service.dart';
 import '../services/shift_service.dart';
@@ -54,6 +60,7 @@ class AuthRepository {
     this._shifts,
     this._rates,
     this._rateFetch,
+    this._txApi,
   );
 
   final AppDatabase _db;
@@ -62,6 +69,7 @@ class AuthRepository {
   final ShiftService _shifts;
   final RateService _rates;
   final RateFetchService _rateFetch;
+  final TransactionsApi _txApi;
 
   static const _uuid = Uuid();
 
@@ -391,9 +399,8 @@ class AuthRepository {
             ),
           );
 
-      await _syncShiftFromFlag(
+      await applyServerOpenCashFlag(
         localUserId: accountId,
-        sessionId: sid,
         isOpenCash: res.isOpenCash,
       );
     });
@@ -528,9 +535,8 @@ class AuthRepository {
         ),
       );
       if (!AppConfig.useStubApi) {
-        await _syncShiftFromFlag(
+        await applyServerOpenCashFlag(
           localUserId: session.userId,
-          sessionId: session.id,
           isOpenCash: res.isOpenCash,
         );
       }
@@ -673,6 +679,54 @@ class AuthRepository {
     return shift.id;
   }
 
+  /// Pre-open-cash check: returns all currently-parked tickets that the
+  /// incoming cashier will need to acknowledge before a shift is created.
+  ///
+  /// Sources (merged, deduplicated by server UUID):
+  /// 1. Local Drift DB — all `active` tickets (regardless of shift).
+  /// 2. Remote `GET /reports/transactions?status=active` — best-effort; ignored
+  ///    on network errors so the flow still works offline.
+  Future<List<OpenTransaction>> queryInheritedTransactionsPreCheck() async {
+    // 1. Local active tickets.
+    final localTickets = await (_db.select(_db.tickets)
+          ..where((t) => t.status.equals('active') & t.checkOutAt.isNull())
+          ..orderBy([(t) => OrderingTerm.asc(t.checkInAt)]))
+        .get();
+
+    final localServerIds = localTickets
+        .map((t) => t.serverTicketId)
+        .whereType<String>()
+        .toSet();
+
+    final localResult =
+        localTickets.map(OpenTransaction.fromTicket).toList();
+
+    // 2. Remote active tickets (best-effort).
+    final remoteExtra = <OpenTransaction>[];
+    try {
+      final session = await getActiveSession();
+      final token = session?.authToken?.trim();
+      if (token != null && token.isNotEmpty) {
+        final page = await _txApi.fetchReportsTransactions(
+          token: token,
+          status: 'active',
+          limit: 200,
+        );
+        for (final row in page.rows) {
+          if (row.status != ReportsTicketRowStatus.parked &&
+              row.status != ReportsTicketRowStatus.longStay) continue;
+          final sid = row.serverTransactionId?.trim() ?? '';
+          if (sid.isNotEmpty && localServerIds.contains(sid)) continue;
+          remoteExtra.add(OpenTransaction.fromReportsRow(row));
+        }
+      }
+    } catch (_) {
+      // Network unavailable or API error — local results are sufficient.
+    }
+
+    return [...localResult, ...remoteExtra];
+  }
+
   /// Active tickets on this shift (close-cash warning).
   Future<List<Ticket>> queryOpenTicketsForShiftClose(String shiftId) {
     return (_db.select(_db.tickets)
@@ -683,12 +737,14 @@ class AuthRepository {
         .get();
   }
 
-  /// Active tickets from other shifts to optionally adopt into [newShiftId].
+  /// Active check-ins from other shifts to optionally adopt into [newShiftId].
   Future<List<Ticket>> queryInheritedOpenTickets(String newShiftId) {
     return (_db.select(_db.tickets)
           ..where(
             (t) =>
-                t.status.equals('active') & t.shiftId.equals(newShiftId).not(),
+                t.status.equals('active') &
+                t.shiftId.equals(newShiftId).not() &
+                t.checkOutAt.isNull(),
           )
           ..orderBy([(t) => OrderingTerm.asc(t.checkInAt)]))
         .get();
@@ -720,20 +776,294 @@ WHERE shift_id = ? AND status = 'completed'
     return (row.data['c'] as num?)?.toInt() ?? 0;
   }
 
-  /// Reassigns inherited active tickets to [newShiftId] and enqueues outbound sync.
+  /// Close-cash stats for [shift]: counts activity since shift open (not only
+  /// `shift_id` match — checkouts stay on the ticket's original shift row).
+  /// When online, pass [remoteCheckoutCount] / [remoteVehiclesIn] from
+  /// `GET /dashboard/summary` so totals match the dashboard.
+  Future<CloseCashShiftStats> loadCloseCashStatsForShift(
+    Shift shift, {
+    int? remoteCheckoutCount,
+    int? remoteVehiclesIn,
+    Map<String, int>? remoteByVehicleType,
+    List<DashboardSummaryRecent>? recentCheckouts,
+  }) async {
+    final since = shift.openedAt;
+    final userId = shift.userId;
+
+    final checkInCount = await _countCheckInsSinceOpen(since, userId);
+    var checkoutCount = await _countCompletedSinceOpen(
+      since,
+      userId,
+      shiftId: shift.id,
+    );
+    var vehiclesIn = await _countActiveOnShift(shift.id);
+    final totalSales = await _sumCompletedSalesSinceOpen(
+      since,
+      userId,
+      shiftId: shift.id,
+    );
+    var byVehicleType = await _completedByVehicleTypeSinceOpen(
+      since,
+      userId,
+      shiftId: shift.id,
+    );
+
+    if (remoteCheckoutCount != null &&
+        remoteCheckoutCount > checkoutCount) {
+      checkoutCount = remoteCheckoutCount;
+    }
+    if (remoteVehiclesIn != null) {
+      vehiclesIn = remoteVehiclesIn;
+    }
+
+    final localTypeTotal =
+        byVehicleType.values.fold<int>(0, (sum, n) => sum + n);
+    final remoteTypeTotal = remoteByVehicleType?.values.fold<int>(
+          0,
+          (sum, n) => sum + n,
+        ) ??
+        0;
+    if (remoteByVehicleType != null &&
+        remoteTypeTotal > 0 &&
+        (localTypeTotal == 0 || remoteTypeTotal > localTypeTotal)) {
+      byVehicleType = remoteByVehicleType;
+    }
+
+    final mergedTypeTotal =
+        byVehicleType.values.fold<int>(0, (sum, n) => sum + n);
+    if (mergedTypeTotal == 0 &&
+        checkoutCount > 0 &&
+        recentCheckouts != null &&
+        recentCheckouts.isNotEmpty) {
+      final fromRecent =
+          await _vehicleTypeCountsFromRecentCheckouts(recentCheckouts);
+      if (fromRecent.isNotEmpty) {
+        byVehicleType = fromRecent;
+      }
+    }
+
+    return CloseCashShiftStats.fromAggregates(
+      checkInCount: checkInCount,
+      checkoutCount: checkoutCount,
+      vehiclesIn: vehiclesIn,
+      totalSales: totalSales,
+      openingFloat: shift.openingFloat,
+      byVehicleType: byVehicleType,
+    );
+  }
+
+  Future<int> _countCheckInsSinceOpen(String sinceIso, String userId) async {
+    final row = await _db.customSelect(
+      '''
+SELECT COUNT(*) AS c FROM tickets
+WHERE user_id = ? AND check_in_at >= ? AND status != 'draft'
+''',
+      variables: [Variable<String>(userId), Variable<String>(sinceIso)],
+      readsFrom: {_db.tickets},
+    ).getSingle();
+    return (row.data['c'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<int> _countCompletedSinceOpen(
+    String sinceIso,
+    String userId, {
+    required String shiftId,
+  }) async {
+    final row = await _db.customSelect(
+      '''
+SELECT COUNT(*) AS c FROM tickets
+WHERE user_id = ?
+  AND status IN ('completed', 'lost')
+  AND (
+    shift_id = ?
+    OR (check_out_at IS NOT NULL AND check_out_at >= ?)
+  )
+''',
+      variables: [
+        Variable<String>(userId),
+        Variable<String>(shiftId),
+        Variable<String>(sinceIso),
+      ],
+      readsFrom: {_db.tickets},
+    ).getSingle();
+    return (row.data['c'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<int> _countActiveOnShift(String shiftId) async {
+    final row = await _db.customSelect(
+      '''
+SELECT COUNT(*) AS c FROM tickets
+WHERE shift_id = ? AND status = 'active'
+''',
+      variables: [Variable<String>(shiftId)],
+      readsFrom: {_db.tickets},
+    ).getSingle();
+    return (row.data['c'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<double> _sumCompletedSalesSinceOpen(
+    String sinceIso,
+    String userId, {
+    required String shiftId,
+  }) async {
+    final row = await _db.customSelect(
+      '''
+SELECT COALESCE(SUM(fee), 0) AS s FROM tickets
+WHERE user_id = ?
+  AND status IN ('completed', 'lost')
+  AND (
+    shift_id = ?
+    OR (check_out_at IS NOT NULL AND check_out_at >= ?)
+  )
+''',
+      variables: [
+        Variable<String>(userId),
+        Variable<String>(shiftId),
+        Variable<String>(sinceIso),
+      ],
+      readsFrom: {_db.tickets},
+    ).getSingle();
+    return (row.data['s'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  Future<Map<String, int>> _completedByVehicleTypeSinceOpen(
+    String sinceIso,
+    String userId, {
+    required String shiftId,
+  }) async {
+    final rows = await _db.customSelect(
+      '''
+SELECT vehicle_type AS vt, COUNT(*) AS c FROM tickets
+WHERE user_id = ?
+  AND status IN ('completed', 'lost')
+  AND (
+    shift_id = ?
+    OR (check_out_at IS NOT NULL AND check_out_at >= ?)
+  )
+GROUP BY vehicle_type
+''',
+      variables: [
+        Variable<String>(userId),
+        Variable<String>(shiftId),
+        Variable<String>(sinceIso),
+      ],
+      readsFrom: {_db.tickets},
+    ).get();
+    final counts = <String, int>{};
+    for (final row in rows) {
+      final raw = (row.data['vt'] as String?)?.trim() ?? '';
+      final key = normalizeVehicleTypeRateKey(raw);
+      if (key == null) continue;
+      final n = (row.data['c'] as num?)?.toInt() ?? 0;
+      counts[key] = (counts[key] ?? 0) + n;
+    }
+    return counts;
+  }
+
+  Future<Map<String, int>> _vehicleTypeCountsFromRecentCheckouts(
+    List<DashboardSummaryRecent> recent,
+  ) async {
+    final counts = <String, int>{};
+    for (final row in recent) {
+      if (!row.isCheckedOutStatus) continue;
+
+      var key = row.vehicleTypeRateKey;
+      if (key == null) {
+        final ticket = await _findLocalTicketForSummaryRow(row);
+        key = normalizeVehicleTypeRateKey(ticket?.vehicleType);
+      }
+      if (key == null) continue;
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  Future<Ticket?> _findLocalTicketForSummaryRow(
+    DashboardSummaryRecent row,
+  ) async {
+    final serverId = row.id.trim();
+    if (serverId.isNotEmpty) {
+      final byServer = await (_db.select(_db.tickets)
+            ..where((t) => t.serverTicketId.equals(serverId))
+            ..limit(1))
+          .getSingleOrNull();
+      if (byServer != null) return byServer;
+
+      final byLocalId = await (_db.select(_db.tickets)
+            ..where((t) => t.id.equals(serverId))
+            ..limit(1))
+          .getSingleOrNull();
+      if (byLocalId != null) return byLocalId;
+    }
+
+    final ticketNo = row.ticketNumber.trim();
+    if (ticketNo.isNotEmpty) {
+      return (_db.select(_db.tickets)
+            ..where((t) => t.id.equals(ticketNo))
+            ..limit(1))
+          .getSingleOrNull();
+    }
+    return null;
+  }
+
+  /// Check-ins on [shiftId] (excludes drafts).
+  Future<int> countCheckInsForShift(String shiftId) async {
+    final row = await _db.customSelect(
+      '''
+SELECT COUNT(*) AS c FROM tickets
+WHERE shift_id = ? AND status != 'draft'
+''',
+      variables: [Variable<String>(shiftId)],
+      readsFrom: {_db.tickets},
+    ).getSingle();
+    return (row.data['c'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<Shift?> getShiftById(String shiftId) {
+    return (_db.select(_db.shifts)..where((s) => s.id.equals(shiftId)))
+        .getSingleOrNull();
+  }
+
+  /// Completed checkouts grouped by `vehicle_type` for close-cash summary.
+  Future<Map<String, int>> countCompletedByVehicleTypeForShift(
+    String shiftId,
+  ) async {
+    final rows = await _db.customSelect(
+      '''
+SELECT vehicle_type AS vt, COUNT(*) AS c FROM tickets
+WHERE shift_id = ? AND status = 'completed'
+GROUP BY vehicle_type
+''',
+      variables: [Variable<String>(shiftId)],
+      readsFrom: {_db.tickets},
+    ).get();
+    final counts = <String, int>{};
+    for (final row in rows) {
+      final key = (row.data['vt'] as String?)?.trim() ?? '';
+      counts[key] = (row.data['c'] as num?)?.toInt() ?? 0;
+    }
+    return counts;
+  }
+
+  /// Reassigns inherited active tickets to [newShiftId].
+  ///
+  /// Already-synced tickets (on the server) only move locally; unsynced rows are
+  /// queued for outbound sync.
   Future<void> adoptInheritedTicketsForShift(String newShiftId) async {
     final rows = await queryInheritedOpenTickets(newShiftId);
     if (rows.isEmpty) return;
     final now = DateTime.now().toIso8601String();
     await _db.transaction(() async {
       for (final row in rows) {
+        final alreadySynced = row.syncStatus == 'synced';
         await (_db.update(_db.tickets)..where((t) => t.id.equals(row.id)))
             .write(
           TicketsCompanion(
             shiftId: Value(newShiftId),
-            syncStatus: const Value('pending'),
+            syncStatus: Value(alreadySynced ? 'synced' : 'pending'),
           ),
         );
+        if (alreadySynced) continue;
         final updated = await (_db.select(_db.tickets)
               ..where((t) => t.id.equals(row.id)))
             .getSingle();
@@ -773,17 +1103,9 @@ WHERE shift_id = ? AND status = 'completed'
   }
 
   /// Close cash + logout: [ShiftService] has already closed the shift row; flush queue then end session.
-  ///
-  /// [closingFloat], [closingNotes], and sales fields are accepted for UI parity but not persisted here.
   Future<void> confirmCloseCash({
     required int localUserId,
     required double closingFloat,
-    String? closingNotes,
-    required double totalSales,
-    required double expectedCash,
-    required double variance,
-    required double remittance,
-    required int transactionsCount,
   }) async {
     final session = await getActiveSession();
     if (session == null || session.userId != localUserId) return;
@@ -811,9 +1133,14 @@ WHERE shift_id = ? AND status = 'completed'
     );
   }
 
-  Future<void> _syncShiftFromFlag({
+  /// Reconciles local [shifts] with server `is_open_cash` from login / validate-token.
+  ///
+  /// Called on every online login and token revalidate. After local storage was
+  /// cleared (or close-cash purge removed shift rows), `is_open_cash: true`
+  /// recreates an open local shift so [shiftRouteForLocalUser] can resume the
+  /// server session; `false` ensures the cashier is sent to Open Cash.
+  Future<void> applyServerOpenCashFlag({
     required int localUserId,
-    required int sessionId,
     required bool isOpenCash,
   }) async {
     if (isOpenCash) {
@@ -827,6 +1154,7 @@ WHERE shift_id = ? AND status = 'completed'
           userId: uid,
           branchId: bid,
           openingFloat: 0,
+          resumeServerSession: true,
         );
       } on StateError catch (_) {
         // Race: shift opened concurrently.

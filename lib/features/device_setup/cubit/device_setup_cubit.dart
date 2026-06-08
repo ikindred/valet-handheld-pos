@@ -246,6 +246,7 @@ class DeviceSetupCubit extends Cubit<DeviceSetupState> {
     final osVersion = deviceInfo['system_version']?.toString() ??
         deviceInfo['sdk_int']?.toString() ??
         '';
+    final serialNumber = await getHardwareSerialNumber();
 
     final bearer = AppConfig.deviceClaimBearerToken;
     final body = <String, dynamic>{
@@ -253,6 +254,7 @@ class DeviceSetupCubit extends Cubit<DeviceSetupState> {
       'android_id_hash': androidIdHash,
       'device_model': deviceModel,
       'os_version': osVersion,
+      'serial_number': serialNumber,
     };
     final slotId = serverDeviceId.trim();
     if (slotId.isNotEmpty) {

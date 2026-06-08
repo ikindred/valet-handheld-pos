@@ -2,6 +2,7 @@ import '../logging/valet_log.dart';
 import 'bluetooth_pos_printer.dart';
 import 'check_in_receipt_data.dart';
 import 'checkout_receipt_data.dart';
+import 'close_cash_receipt_data.dart';
 import 'escpos_receipt_builder.dart';
 import 'receipt_brand_logo.dart';
 import 'printer_config.dart';
@@ -56,6 +57,20 @@ class BluetoothValetPrintService implements ValetPrintService {
         );
   }
 
+  Future<List<int>> _buildCloseCashBytes(CloseCashReceiptData data) async {
+    final profile = await _printer.loadProfile();
+    final width = await _printer.paperWidth;
+    final logo = await ReceiptBrandLogo.loadForReceipt(
+      maxWidthPx: width == PrinterPaperWidth.mm58 ? 160 : 220,
+    );
+    if (width == PrinterPaperWidth.mm58) {
+      return ReceiptRasterBuilder(paperSize: width.paperSize)
+          .buildCloseCashEscPosBytes(data, profile, logo: logo);
+    }
+    return EscPosReceiptBuilder(profile, paperSize: width.paperSize)
+        .buildCloseCashReceipt(data, logo: logo);
+  }
+
   Future<List<int>> _buildCheckoutBytes(CheckoutReceiptData data) async {
     final profile = await _printer.loadProfile();
     final width = await _printer.paperWidth;
@@ -68,6 +83,16 @@ class BluetoothValetPrintService implements ValetPrintService {
     }
     return EscPosReceiptBuilder(profile, paperSize: width.paperSize)
         .buildCheckoutReceipt(data, logo: logo);
+  }
+
+  @override
+  Future<void> printCloseCash(CloseCashReceiptData data) async {
+    final bytes = await _buildCloseCashBytes(data);
+    await _printer.printBytes(bytes);
+    ValetLog.info(
+      'BluetoothValetPrintService',
+      'printed close cash ${data.cashierName}',
+    );
   }
 
   @override

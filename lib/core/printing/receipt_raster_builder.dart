@@ -9,6 +9,7 @@ import 'package:qr/qr.dart';
 import '../time/philippine_time.dart';
 import 'check_in_receipt_data.dart';
 import 'checkout_receipt_data.dart';
+import 'close_cash_receipt_data.dart';
 import 'esc_pos_text_sanitize.dart';
 import 'receipt_print_format.dart';
 
@@ -64,6 +65,87 @@ class ReceiptRasterBuilder {
       ),
       ...gen.feed(3),
     ];
+  }
+
+  List<int> buildCloseCashEscPosBytes(
+    CloseCashReceiptData data,
+    CapabilityProfile profile, {
+    img.Image? logo,
+  }) {
+    final gen = Generator(paperSize, profile);
+    return [
+      ...gen.reset(),
+      ...gen.image(buildCloseCashImage(data, logo: logo), align: PosAlign.center),
+      ...gen.feed(3),
+      ...gen.cut(),
+    ];
+  }
+
+  img.Image buildCloseCashImage(
+    CloseCashReceiptData data, {
+    img.Image? logo,
+  }) {
+    return _render(_closeCashBlocks(data, logo: logo));
+  }
+
+  List<_Block> _closeCashBlocks(
+    CloseCashReceiptData data, {
+    img.Image? logo,
+  }) {
+    final blocks = <_Block>[
+      ..._brandHeader(data.headerBranchLine, logo: logo),
+      const _RuleBlock(),
+      const _TextBlock('CLOSE CASH RECEIPT', center: true, bold: true),
+      const _RuleBlock(),
+      const _GapBlock(6),
+    ];
+    if (data.branchName.isNotEmpty) {
+      blocks.add(_TwoColumnFieldBlock('Branch', data.branchName));
+    }
+    if (data.areaName.isNotEmpty) {
+      blocks.add(_TwoColumnFieldBlock('Area', data.areaName));
+    }
+    blocks.addAll([
+      _TwoColumnFieldBlock('Cashier', data.cashierName),
+      _TwoColumnFieldBlock('Opened at', data.openedAtLabel),
+      _TwoColumnFieldBlock('Closed at', data.closedAtLabel),
+      const _GapBlock(4),
+      const _RuleBlock(),
+      const _GapBlock(4),
+      const _TextBlock('ACTIVE CHECK-INS', bold: true),
+      const _GapBlock(2),
+      _TwoColumnFieldBlock('Active check-ins', '${data.activeCheckInCount}'),
+      const _GapBlock(4),
+      const _TextBlock('SHIFT CHECKOUTS', bold: true),
+      const _GapBlock(2),
+      _TwoColumnFieldBlock('Total checkouts', '${data.checkoutCount}'),
+      const _GapBlock(4),
+      const _TextBlock('BY VEHICLE TYPE', bold: true),
+      const _GapBlock(2),
+    ]);
+    for (final row in data.vehicleTypeStats) {
+      blocks.add(_TwoColumnFieldBlock(row.label, '${row.count}'));
+    }
+    blocks.addAll([
+      const _GapBlock(4),
+      const _RuleBlock(),
+      const _GapBlock(4),
+      _TwoColumnFieldBlock(
+        'Actual cash turned in',
+        data.actualCashLabel,
+        boldValue: true,
+      ),
+      const _GapBlock(6),
+      const _RuleBlock(),
+      const _GapBlock(4),
+      _TextBlock(
+        ReceiptPrintFormat.printedAtLabel(),
+        center: true,
+        small: true,
+      ),
+      const _GapBlock(4),
+    ]);
+    return blocks;
   }
 
   List<int> buildCheckoutEscPosBytes(

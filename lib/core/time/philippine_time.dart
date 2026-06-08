@@ -88,4 +88,18 @@ class PhilippineTime {
   static DateTime fromUnixSeconds(int seconds) => fromUtc(
         DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true),
       );
+
+  /// Normalize API / Drift check-in strings to Manila wall storage (no `Z`).
+  static String normalizeCheckInStorage(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return iso8601Now();
+    return formatIso(fromApiIso(s));
+  }
+
+  /// Elapsed time since [checkInRaw]; clamped at zero when clock is behind.
+  static Duration elapsedSinceCheckIn(String checkInRaw, [DateTime? clock]) {
+    final checkIn = fromApiIso(checkInRaw);
+    final elapsed = (clock ?? now()).difference(checkIn);
+    return elapsed.isNegative ? Duration.zero : elapsed;
+  }
 }

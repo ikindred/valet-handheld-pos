@@ -9,12 +9,23 @@ import '../../core/config/app_config.dart';
 import '../../core/logging/valet_log.dart';
 import '../local/db/app_database.dart';
 import '../remote/api_error_message.dart';
+import 'cash_session_close_payload.dart';
+import 'cash_session_http.dart';
 import 'cash_session_start_payload.dart';
 import 'ticket_service.dart';
 
 /// Thrown when online `POST /cash-sessions/start` fails after local shift row exists.
 class CashSessionStartException implements Exception {
   CashSessionStartException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+/// Thrown when online `POST /cash-sessions/close-cash` fails during close cash.
+class CashSessionCloseException implements Exception {
+  CashSessionCloseException(this.message);
   final String message;
 
   @override
@@ -57,12 +68,17 @@ class ShiftService {
   }
 
   /// Creates a shift row + outbound queue; best-effort POST. Throws if one is already open.
+  ///
+  /// When [resumeServerSession] is true (login after cache clear with server
+  /// `is_open_cash`), the local row mirrors an existing server session — no
+  /// `sync_queue` row and no POST `/cash-sessions/start`.
   Future<Shift> createShift({
     required String userId,
     required String branchId,
     required double openingFloat,
     String? notes,
     bool awaitRemoteStart = false,
+    bool resumeServerSession = false,
   }) async {
     final existing = await getActiveShift(userId);
     if (existing != null) {
@@ -82,10 +98,11 @@ class ShiftService {
               openedAt: nowUtc,
               openingFloat: openingFloat,
               status: 'open',
-              syncStatus: 'pending',
+              syncStatus: resumeServerSession ? 'synced' : 'pending',
               createdAt: nowUtc,
             ),
           );
+      if (resumeServerSession) return;
       final inserted =
           await (_db.select(_db.shifts)..where((s) => s.id.equals(id)))
               .getSingle();
@@ -107,6 +124,9 @@ class ShiftService {
     });
 
     onShiftMutated?.call();
+    if (resumeServerSession) {
+      return (_db.select(_db.shifts)..where((s) => s.id.equals(id))).getSingle();
+    }
     final remote = _postShiftCreate(
       shiftId: id,
       openingBalance: openingFloat,
@@ -129,8 +149,9 @@ class ShiftService {
   Future<Shift> closeShift({
     required String shiftId,
     required double closingCash,
+    bool awaitRemoteClose = false,
   }) async {
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now().toUtc().toIso8601String();
     await _db.transaction(() async {
       await (_db.update(_db.shifts)..where((s) => s.id.equals(shiftId))).write(
             ShiftsCompanion(
@@ -157,7 +178,17 @@ class ShiftService {
           );
     });
     onShiftMutated?.call();
-    unawaited(_patchShift(shiftId));
+    final remote = _postShiftClose(
+      shiftId: shiftId,
+      actualCash: closingCash,
+      timestampUtcIso: now,
+      throwOnFailure: awaitRemoteClose,
+    );
+    if (awaitRemoteClose) {
+      await remote;
+    } else {
+      unawaited(remote);
+    }
     return (_db.select(_db.shifts)..where((s) => s.id.equals(shiftId)))
         .getSingle();
   }
@@ -165,12 +196,17 @@ class ShiftService {
   /// Closes the active shift for [localUserId], if any (no-op when none).
   Future<void> closeActiveShiftForLocalUser(
     int localUserId,
-    double closingCash,
-  ) async {
+    double closingCash, {
+    bool awaitRemoteClose = false,
+  }) async {
     final uid = await shiftUserIdForLocalAccount(localUserId);
     final open = await getActiveShift(uid);
     if (open == null) return;
-    await closeShift(shiftId: open.id, closingCash: closingCash);
+    await closeShift(
+      shiftId: open.id,
+      closingCash: closingCash,
+      awaitRemoteClose: awaitRemoteClose,
+    );
   }
 
   static Map<String, dynamic> shiftRowToJson(Shift s) => <String, dynamic>{
@@ -220,13 +256,14 @@ class ShiftService {
         ),
       );
       if (res.statusCode == 201) {
-        final openedAt = _openedAtFromStartResponse(res.data);
-        await (_db.update(_db.shifts)..where((s) => s.id.equals(shiftId))).write(
-          ShiftsCompanion(
-            syncStatus: const Value('synced'),
-            openedAt: openedAt != null ? Value(openedAt) : const Value.absent(),
-          ),
+        await _markShiftCreateSynced(
+          shiftId,
+          openedAt: _openedAtFromStartResponse(res.data),
         );
+        return;
+      }
+      if (isCashSessionAlreadyOpenResponse(res.statusCode, res.data)) {
+        await _markShiftCreateSynced(shiftId);
         return;
       }
       final msg = messageFromResponseData(res.data) ??
@@ -258,6 +295,26 @@ class ShiftService {
     }
   }
 
+  Future<void> _markShiftCreateSynced(
+    String shiftId, {
+    String? openedAt,
+  }) async {
+    await (_db.update(_db.shifts)..where((s) => s.id.equals(shiftId))).write(
+      ShiftsCompanion(
+        syncStatus: const Value('synced'),
+        openedAt: openedAt != null ? Value(openedAt) : const Value.absent(),
+      ),
+    );
+    await (_db.update(_db.syncQueue)
+          ..where(
+            (q) =>
+                q.queueTableName.equals('shifts') &
+                q.operation.equals('create') &
+                q.recordId.equals(shiftId),
+          ))
+        .write(const SyncQueueCompanion(syncStatus: Value('synced')));
+  }
+
   static String? _openedAtFromStartResponse(dynamic data) {
     if (data is! Map) return null;
     final map = Map<String, dynamic>.from(data);
@@ -267,37 +324,73 @@ class ShiftService {
     return s.isEmpty ? null : s;
   }
 
-  Future<void> _patchShift(String shiftId) async {
+  Future<void> _postShiftClose({
+    required String shiftId,
+    required double actualCash,
+    required String timestampUtcIso,
+    String? notes,
+    bool throwOnFailure = false,
+  }) async {
     if (AppConfig.useStubApi) return;
     final token = await _activeBearer();
-    if (token == null) return;
+    if (token == null) {
+      if (throwOnFailure) {
+        throw CashSessionCloseException(
+          'Session expired. Sign in again and retry close cash.',
+        );
+      }
+      return;
+    }
     try {
-      final row =
-          await (_db.select(_db.shifts)..where((s) => s.id.equals(shiftId)))
-              .getSingle();
       final res = await _dio.post<dynamic>(
         AppConfig.cashSessionsClose,
-        data: <String, dynamic>{
-          'shift_id': shiftId,
-          'actual_cash': row.closingCash ?? 0,
-          'notes': null,
-        },
+        data: buildCashSessionCloseBody(
+          actualCash: actualCash,
+          timestampUtcIso: timestampUtcIso,
+          notes: notes,
+        ),
         options: Options(
           headers: {'Authorization': 'Bearer $token'},
           validateStatus: (c) => c != null && c < 500,
         ),
       );
-      if (res.statusCode == 200) {
+      final code = res.statusCode ?? 0;
+      if (code == 200 || code == 201) {
         await (_db.update(_db.shifts)..where((s) => s.id.equals(shiftId)))
             .write(const ShiftsCompanion(syncStatus: Value('synced')));
+        return;
+      }
+      final msg = messageFromResponseData(res.data) ??
+          'Could not close cash session (HTTP $code).';
+      if (throwOnFailure) throw CashSessionCloseException(msg);
+      ValetLog.warning('ShiftService', 'POST cash-sessions/close-cash: $msg');
+    } on CashSessionCloseException {
+      rethrow;
+    } on DioException catch (e, st) {
+      ValetLog.error(
+        'ShiftService',
+        'POST cash-sessions/close-cash failed',
+        e,
+        st,
+      );
+      if (throwOnFailure) {
+        throw CashSessionCloseException(
+          parseApiErrorUserMessage(e) ??
+              'Could not close cash. Check your connection and try again.',
+        );
       }
     } catch (e, st) {
       ValetLog.error(
         'ShiftService',
-        'POST cash-sessions/close failed (queued)',
+        'POST cash-sessions/close-cash failed (queued)',
         e,
         st,
       );
+      if (throwOnFailure) {
+        throw CashSessionCloseException(
+          'Could not close cash. Check your connection and try again.',
+        );
+      }
     }
   }
 }

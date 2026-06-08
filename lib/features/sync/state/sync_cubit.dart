@@ -8,6 +8,8 @@ import '../../../core/config/app_config.dart';
 import '../../../core/logging/valet_log.dart';
 import '../../../data/local/db/app_database.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/cash_session_close_payload.dart';
+import '../../../data/services/cash_session_http.dart';
 import '../../../data/services/cash_session_start_payload.dart';
 import '../../../data/services/ticket_service.dart';
 import '../../../data/services/ticket_sync_payload.dart';
@@ -61,10 +63,80 @@ class SyncCubit extends Cubit<SyncState> {
     await flush();
   }
 
+  /// Marks queue rows `synced` when their shift/ticket entity is already synced
+  /// (e.g. direct HTTP path updated the entity but left the queue row pending).
+  Future<void> _reconcileOrphanQueueEntries() async {
+    await _db.customStatement(
+      '''
+UPDATE sync_queue
+SET sync_status = 'synced'
+WHERE sync_status IN ('pending', 'failed')
+  AND (
+    (table_name = 'tickets' AND record_id IN (
+      SELECT id FROM tickets WHERE sync_status = 'synced'
+    ))
+    OR (table_name = 'shifts' AND record_id IN (
+      SELECT id FROM shifts WHERE sync_status = 'synced'
+    ))
+  )
+''',
+    );
+    await _reconcileResumedShiftCreates();
+    await _reconcileServerBackedTickets();
+  }
+
+  /// Tickets already on the server (`server_ticket_id` set) should not block
+  /// close cash — e.g. online checkout left `sync_status = pending` locally.
+  Future<void> _reconcileServerBackedTickets() async {
+    await _db.customStatement(
+      '''
+UPDATE tickets
+SET sync_status = 'synced'
+WHERE sync_status = 'pending'
+  AND server_ticket_id IS NOT NULL
+  AND TRIM(server_ticket_id) != ''
+''',
+    );
+  }
+
+  /// Clears stale shift-create queue rows after cache clear + login resume
+  /// (`applyServerOpenCashFlag` used opening_float = 0 before [resumeServerSession]).
+  Future<void> _reconcileResumedShiftCreates() async {
+    await _db.customStatement(
+      '''
+UPDATE shifts
+SET sync_status = 'synced'
+WHERE status = 'open'
+  AND opening_float = 0
+  AND sync_status = 'pending'
+  AND id IN (
+    SELECT record_id FROM sync_queue
+    WHERE table_name = 'shifts'
+      AND operation = 'create'
+      AND sync_status IN ('pending', 'failed')
+  )
+''',
+    );
+    await _db.customStatement(
+      '''
+UPDATE sync_queue
+SET sync_status = 'synced'
+WHERE table_name = 'shifts'
+  AND operation = 'create'
+  AND sync_status IN ('pending', 'failed')
+  AND record_id IN (
+    SELECT id FROM shifts
+    WHERE status = 'open' AND opening_float = 0 AND sync_status = 'synced'
+  )
+''',
+    );
+  }
+
   Future<void> flush() async {
     emit(const SyncInProgress());
     var syncedThisRun = 0;
     try {
+      await _reconcileOrphanQueueEntries();
       final pending = await (_db.select(_db.syncQueue)
             ..where((q) => q.syncStatus.equals('pending'))
             ..orderBy([(q) => OrderingTerm.asc(q.createdAt)]))
@@ -236,6 +308,15 @@ class SyncCubit extends Cubit<SyncState> {
                   continue;
                 }
                 if (code >= 400 && code < 500) {
+                  if (row.queueTableName == 'shifts' &&
+                      row.operation == 'create' &&
+                      isCashSessionAlreadyOpenResponse(code, response.data)) {
+                    await _markQueueSynced(row);
+                    await _markEntitySynced(row);
+                    syncedThisRun++;
+                    allOk = false;
+                    break;
+                  }
                   ValetLog.error(
                     'SyncCubit.flush',
                     'client error $code ${h.method} ${h.url} body=${h.body}',
@@ -257,13 +338,21 @@ class SyncCubit extends Cubit<SyncState> {
             } on DioException catch (e, st) {
               final status = e.response?.statusCode;
               if (status != null && status >= 400 && status < 500) {
-                ValetLog.error(
-                  'SyncCubit.flush',
-                  'client error $status $method $url body=$body',
-                  e,
-                  st,
-                );
-                await _markQueueFailed(row);
+                if (row.queueTableName == 'shifts' &&
+                    row.operation == 'create' &&
+                    isCashSessionAlreadyOpenResponse(status, e.response?.data)) {
+                  await _markQueueSynced(row);
+                  await _markEntitySynced(row);
+                  syncedThisRun++;
+                } else {
+                  ValetLog.error(
+                    'SyncCubit.flush',
+                    'client error $status $method $url body=$body',
+                    e,
+                    st,
+                  );
+                  await _markQueueFailed(row);
+                }
               } else {
                 ValetLog.error(
                   'SyncCubit.flush',
@@ -333,11 +422,12 @@ class SyncCubit extends Cubit<SyncState> {
         _SyncHop(
           'POST',
           AppConfig.cashSessionsClose,
-          <String, dynamic>{
-            'shift_id': row.recordId,
-            'actual_cash': cash,
-            'notes': null,
-          },
+          buildCashSessionCloseBody(
+            actualCash: cash,
+            timestampUtcIso: cashSessionStartTimestamp(
+              openedAtIso: body['closed_at']?.toString(),
+            ),
+          ),
         ),
       ];
     }

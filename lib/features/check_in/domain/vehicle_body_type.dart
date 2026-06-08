@@ -13,6 +13,22 @@ extension VehicleBodyTypeRateKey on VehicleBodyType {
       };
 }
 
+/// Maps stored/API vehicle type strings to [VehicleBodyType.rateKey].
+String? normalizeVehicleTypeRateKey(String? raw) {
+  final key = raw?.trim().toLowerCase() ?? '';
+  if (key.isEmpty) return null;
+  for (final type in VehicleBodyType.values) {
+    if (type.rateKey == key) return type.rateKey;
+    if (type.label.toLowerCase() == key) return type.rateKey;
+  }
+  return switch (key) {
+    'sedan/crossover' || 'crossover' || 'sedan crossover' => 'sedan',
+    'ev' || 'phev' || 'ev/phev' => 'ev_phev',
+    'motor' || 'moto' => 'motorcycle',
+    _ => key,
+  };
+}
+
 extension VehicleBodyTypeX on VehicleBodyType {
   String get label => switch (this) {
     VehicleBodyType.sedan => 'Sedan/Crossover',

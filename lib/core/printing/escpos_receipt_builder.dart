@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../time/philippine_time.dart';
 import 'check_in_receipt_data.dart';
 import 'checkout_receipt_data.dart';
+import 'close_cash_receipt_data.dart';
 import 'esc_pos_text_sanitize.dart';
 import 'receipt_print_format.dart';
 
@@ -116,6 +117,69 @@ class EscPosReceiptBuilder {
     bytes.addAll(gen.cut());
     return bytes;
   }
+
+  /// End-of-shift close cash receipt (single tear-off).
+  List<int> buildCloseCashReceipt(CloseCashReceiptData data, {img.Image? logo}) {
+    final gen = _generator();
+    final bytes = <int>[];
+
+    bytes.addAll(gen.reset());
+    bytes.addAll(_printerInit());
+    bytes.addAll(_brandHeader(gen, data.headerBranchLine, logo: logo));
+    bytes.addAll(_closeCashSectionTitle());
+
+    if (data.branchName.isNotEmpty) {
+      bytes.addAll(_labeledRow('Branch', data.branchName));
+    }
+    if (data.areaName.isNotEmpty) {
+      bytes.addAll(_labeledRow('Area', data.areaName));
+    }
+    bytes.addAll(_labeledRow('Cashier', data.cashierName));
+    bytes.addAll(_labeledRow('Opened at', data.openedAtLabel));
+    bytes.addAll(_labeledRow('Closed at', data.closedAtLabel));
+
+    bytes.addAll(_hr());
+    bytes.addAll(gen.feed(1));
+    bytes.addAll(_printLines('ACTIVE CHECK-INS', bold: true));
+    bytes.addAll(
+      _labeledRow('Active check-ins', '${data.activeCheckInCount}'),
+    );
+
+    bytes.addAll(gen.feed(1));
+    bytes.addAll(_printLines('SHIFT CHECKOUTS', bold: true));
+    bytes.addAll(_labeledRow('Total checkouts', '${data.checkoutCount}'));
+
+    bytes.addAll(gen.feed(1));
+    bytes.addAll(_printLines('BY VEHICLE TYPE', bold: true));
+    for (final row in data.vehicleTypeStats) {
+      bytes.addAll(_labeledRow(row.label, '${row.count}'));
+    }
+
+    bytes.addAll(gen.feed(1));
+    bytes.addAll(_hr());
+    bytes.addAll(gen.feed(1));
+    bytes.addAll(
+      _moneyRow('Actual cash turned in', data.actualCashLabel, bold: true),
+    );
+    bytes.addAll(gen.feed(1));
+    bytes.addAll(_closeCashFooter());
+    bytes.addAll(gen.feed(3));
+    bytes.addAll(gen.cut());
+    return bytes;
+  }
+
+  List<int> _closeCashSectionTitle() => [
+    ..._printLines('CLOSE CASH RECEIPT', align: PosAlign.center, bold: true),
+    ..._hr(),
+  ];
+
+  List<int> _closeCashFooter() => [
+    ..._hr(),
+    ..._printLines(
+      ReceiptPrintFormat.printedAtLabel(),
+      align: PosAlign.center,
+    ),
+  ];
 
   List<int> _moneyRow(String label, String amount, {bool bold = false}) =>
       _labeledRow(label, amount, bold: bold);

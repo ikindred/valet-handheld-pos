@@ -113,11 +113,6 @@ void main() {
       await repo.confirmCloseCash(
         localUserId: session.userId,
         closingFloat: 100,
-        totalSales: 0,
-        expectedCash: 100,
-        variance: 0,
-        remittance: 100,
-        transactionsCount: 0,
       );
 
       expect(await shifts.getActiveShift(uid), isNull);
@@ -134,6 +129,83 @@ void main() {
         () => repo.loginOffline(email: 'x@test.com', password: 'p'),
         throwsA(isA<StateError>()),
       );
+    });
+
+    group('is_open_cash (applyServerOpenCashFlag)', () {
+      Future<int> seedLocalUser() async {
+        await repo.loginOnline(email: 'cash@test.com', password: 'secret');
+        final session = await repo.getActiveSession();
+        expect(session, isNotNull);
+        return session!.userId;
+      }
+
+      test('stub login (is_open_cash false) routes to open cash', () async {
+        final localUserId = await seedLocalUser();
+        final route = await repo.shiftRouteForLocalUser(localUserId);
+        expect(route, '/cash/open');
+      });
+
+      test('is_open_cash true with empty local shifts creates open shift', () async {
+        final localUserId = await seedLocalUser();
+        await (db.delete(db.shifts)).go();
+
+        await repo.applyServerOpenCashFlag(
+          localUserId: localUserId,
+          isOpenCash: true,
+        );
+
+        final route = await repo.shiftRouteForLocalUser(localUserId);
+        expect(route, '/dashboard');
+        final uid = await shifts.shiftUserIdForLocalAccount(localUserId);
+        expect(await shifts.getActiveShift(uid), isNotNull);
+      });
+
+      test('is_open_cash false clears local open shift after logout-only resume',
+          () async {
+        final localUserId = await seedLocalUser();
+        await repo.recordOpenCash(
+          localUserId: localUserId,
+          sessionId: (await repo.getActiveSession())!.id,
+          openingFloat: 200,
+        );
+        expect(
+          await repo.shiftRouteForLocalUser(localUserId),
+          '/dashboard',
+        );
+
+        await repo.applyServerOpenCashFlag(
+          localUserId: localUserId,
+          isOpenCash: false,
+        );
+
+        expect(
+          await repo.shiftRouteForLocalUser(localUserId),
+          '/cash/open',
+        );
+      });
+
+      test('is_open_cash true does not duplicate existing local open shift', () async {
+        final localUserId = await seedLocalUser();
+        await repo.recordOpenCash(
+          localUserId: localUserId,
+          sessionId: (await repo.getActiveSession())!.id,
+          openingFloat: 150,
+        );
+        final uid = await shifts.shiftUserIdForLocalAccount(localUserId);
+        final before = await shifts.getActiveShift(uid);
+
+        await repo.applyServerOpenCashFlag(
+          localUserId: localUserId,
+          isOpenCash: true,
+        );
+
+        final after = await shifts.getActiveShift(uid);
+        expect(after?.id, before?.id);
+        final allOpen = await (db.select(db.shifts)
+              ..where((s) => s.status.equals('open')))
+            .get();
+        expect(allOpen, hasLength(1));
+      });
     });
   });
 }

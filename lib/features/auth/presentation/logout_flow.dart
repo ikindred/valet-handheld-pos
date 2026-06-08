@@ -9,6 +9,52 @@ import '../../../core/services/device_id_service.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../state/auth_bloc.dart';
 
+/// Simple "Are you sure?" used when there is no open cash session.
+Future<void> _logoutWithSimpleConfirm(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      scrollable: false,
+      title: Text(
+        'Logout',
+        style: GoogleFonts.poppins(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      content: Text(
+        'You have no open cash session. Are you sure you want to logout?',
+        style: GoogleFonts.poppins(
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          height: 1.45,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      actionsAlignment: MainAxisAlignment.end,
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Logout'),
+        ),
+      ],
+    ),
+  );
+  if (!context.mounted || confirmed != true) return;
+  final deviceId = await DeviceIdService.getOrCreate();
+  if (!context.mounted) return;
+  await context.read<AuthRepository>().logoutOnly(deviceId: deviceId);
+  if (!context.mounted) return;
+  context.read<AuthBloc>().add(const AuthLoggedOut());
+  context.go('/login');
+}
+
 enum LogoutChoice {
   logoutOnly,
   closeCashAndLogout,
@@ -16,6 +62,15 @@ enum LogoutChoice {
 
 /// Shared logout UX from Dashboard, Open Cash, and Settings.
 Future<void> showLogoutFlow(BuildContext context) async {
+  final authState = context.read<AuthBloc>().state;
+  final hasCashOpen = authState is AuthAuthenticated &&
+      authState.cashSessionStatus == CashSessionStatus.open;
+
+  if (!hasCashOpen) {
+    await _logoutWithSimpleConfirm(context);
+    return;
+  }
+
   final choice = await showDialog<LogoutChoice>(
     context: context,
     builder: (context) => AlertDialog(

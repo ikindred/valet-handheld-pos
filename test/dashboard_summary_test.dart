@@ -75,6 +75,44 @@ void main() {
     expect(row.line2, isNot(contains('TKT-0123')));
   });
 
+  test('checkoutCountsByVehicleRateKey groups completed recent rows', () {
+    final summary = DashboardSummary.fromResponseData({
+      'checked_out_total': 3,
+      'recent_transactions': [
+        {
+          'id': '1',
+          'ticket_number': 'TKT-1',
+          'status': 'COMPLETED',
+          'vehicle': {'type': 'sedan'},
+        },
+        {
+          'id': '2',
+          'ticket_number': 'TKT-2',
+          'status': 'COMPLETED',
+          'vehicle': {'type': 'suv'},
+        },
+        {
+          'id': '3',
+          'ticket_number': 'TKT-3',
+          'status': 'COMPLETED',
+          'vehicle_type': 'suv',
+        },
+        {
+          'id': '4',
+          'ticket_number': 'TKT-4',
+          'status': 'ACTIVE',
+          'vehicle': {'type': 'van'},
+        },
+      ],
+    });
+
+    expect(summary, isNotNull);
+    expect(summary!.checkoutCountsByVehicleRateKey(), {
+      'sedan': 1,
+      'suv': 2,
+    });
+  });
+
   test('remaining_count falls back to total_slots minus active_slots', () {
     final summary = DashboardSummary.fromResponseData({
       'total_vehicles_in': 2,

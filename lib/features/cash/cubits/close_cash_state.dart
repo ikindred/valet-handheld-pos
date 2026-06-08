@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../data/local/db/app_database.dart';
+import '../../../core/printing/close_cash_receipt_data.dart';
+import '../models/close_cash_shift_stats.dart';
 import '../models/open_transaction.dart';
 
 sealed class CloseCashState extends Equatable {
@@ -21,70 +23,27 @@ class CloseCashLoading extends CloseCashState {
 class CloseCashLoaded extends CloseCashState {
   const CloseCashLoaded({
     required this.shift,
-    required this.openingFloat,
-    required this.totalSales,
-    required this.expectedCash,
     required this.actualCash,
-    required this.variance,
-    required this.salesToRemit,
-    required this.transactionsCount,
     required this.openTransactions,
-    required this.closingNotes,
+    required this.stats,
   });
 
   final Shift shift;
-  final double openingFloat;
-  final double totalSales;
-  final double expectedCash;
   final double actualCash;
-  final double variance;
-  final double salesToRemit;
-  final int transactionsCount;
   final List<OpenTransaction> openTransactions;
-  final String closingNotes;
+  final CloseCashShiftStats stats;
 
-  CloseCashLoaded copyWith({
-    double? actualCash,
-    String? closingNotes,
-  }) {
-    final nextActual = actualCash ?? this.actualCash;
-    final nextExpected = expectedCash;
+  CloseCashLoaded copyWith({double? actualCash}) {
     return CloseCashLoaded(
       shift: shift,
-      openingFloat: openingFloat,
-      totalSales: totalSales,
-      expectedCash: nextExpected,
-      actualCash: nextActual,
-      variance: nextActual - nextExpected,
-      salesToRemit: salesToRemit,
-      transactionsCount: transactionsCount,
+      actualCash: actualCash ?? this.actualCash,
       openTransactions: openTransactions,
-      closingNotes: closingNotes ?? this.closingNotes,
+      stats: stats,
     );
   }
 
   @override
-  List<Object?> get props => [
-        shift,
-        openingFloat,
-        totalSales,
-        expectedCash,
-        actualCash,
-        variance,
-        salesToRemit,
-        transactionsCount,
-        openTransactions,
-        closingNotes,
-      ];
-}
-
-class CloseCashHasOpenTransactions extends CloseCashState {
-  const CloseCashHasOpenTransactions({required this.openTransactions});
-
-  final List<OpenTransaction> openTransactions;
-
-  @override
-  List<Object?> get props => [openTransactions];
+  List<Object?> get props => [shift, actualCash, openTransactions, stats];
 }
 
 class CloseCashConfirming extends CloseCashState {
@@ -92,7 +51,21 @@ class CloseCashConfirming extends CloseCashState {
 }
 
 class CloseCashSuccess extends CloseCashState {
-  const CloseCashSuccess();
+  const CloseCashSuccess({required this.receipt});
+
+  final CloseCashReceiptData receipt;
+
+  @override
+  List<Object?> get props => [receipt];
+}
+
+class CloseCashBlocked extends CloseCashState {
+  const CloseCashBlocked(this.message);
+
+  final String message;
+
+  @override
+  List<Object?> get props => [message];
 }
 
 class CloseCashError extends CloseCashState {

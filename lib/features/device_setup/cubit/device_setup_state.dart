@@ -49,6 +49,8 @@ class DeviceModel extends Equatable {
         'id',
       ]),
       deviceLabel: _str(json, const [
+        'display_name',
+        'displayName',
         'device_label',
         'deviceLabel',
         'label',
@@ -84,6 +86,8 @@ class DeviceModel extends Equatable {
     return DeviceModel(
       serverDeviceId: serverDeviceId,
       deviceLabel: _str(json, const [
+        'display_name',
+        'displayName',
         'device_label',
         'deviceLabel',
         'label',

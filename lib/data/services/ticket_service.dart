@@ -690,6 +690,7 @@ LIMIT 1
     String? driverOut,
     String status = 'completed',
     TransactionPaymentSummary? paymentSummary,
+    bool syncedToServer = false,
   }) async {
     ValetLog.info(
       'TicketService.completeTicketCheckout',
@@ -708,7 +709,7 @@ LIMIT 1
           fee: Value(totalFee),
           status: Value(status),
           damageMarkers: Value(damageMarkersJson),
-          syncStatus: const Value('pending'),
+          syncStatus: Value(syncedToServer ? 'synced' : 'pending'),
           driverOut: Value(_normalizedDriverName(driverOut)),
           paymentSummaryJson: paymentJson != null
               ? Value(paymentJson)
@@ -1689,7 +1690,13 @@ WHERE shift_id = ? AND status = 'completed'
           damageMarkers: Value(fields.damageMarkers),
           personalBelongings: Value(fields.personalBelongings),
           signaturePng: Value(fields.signaturePng),
-          checkInAt: Value(fields.checkInAt),
+          // Keep the device-recorded check-in wall time; server UTC can drift
+          // from a slow handset clock and produce negative "parked for" values.
+          checkInAt: existing.checkInAt.trim().isNotEmpty
+              ? const Value.absent()
+              : Value(
+                  PhilippineTime.normalizeCheckInStorage(fields.checkInAt),
+                ),
           checkOutAt: Value(fields.checkOutAt),
           fee: Value(fields.fee),
           status: Value(fields.status),
@@ -1739,7 +1746,7 @@ WHERE shift_id = ? AND status = 'completed'
             damageMarkers: fields.damageMarkers,
             personalBelongings: fields.personalBelongings,
             signaturePng: Value(fields.signaturePng),
-            checkInAt: fields.checkInAt,
+            checkInAt: PhilippineTime.normalizeCheckInStorage(fields.checkInAt),
             checkOutAt: Value(fields.checkOutAt),
             fee: Value(fields.fee),
             status: fields.status,
@@ -1831,7 +1838,10 @@ WHERE shift_id = ? AND status = 'completed'
         json['checkInAt'] ??
         json['created_at'] ??
         json['createdAt'];
-    return _parseIsoTime(raw) ?? DateTime.now().toIso8601String();
+    if (raw == null) return PhilippineTime.iso8601Now();
+    final s = raw.toString().trim();
+    if (s.isEmpty) return PhilippineTime.iso8601Now();
+    return PhilippineTime.normalizeCheckInStorage(s);
   }
 
   static String? _parseCheckOutTime(Map<String, dynamic> json) {

@@ -1,5 +1,6 @@
 import '../../core/api/transaction_payment_fields.dart';
 import '../../core/api/void_audit_info.dart';
+import '../../features/check_in/domain/vehicle_body_type.dart';
 import '../../features/dashboard/domain/dashboard_recent_format.dart';
 
 /// Default area capacity when API omits `total_slots`.
@@ -48,6 +49,18 @@ class DashboardSummary {
   final int remainingCount;
   final int totalSlots;
   final List<DashboardSummaryRecent> recent;
+
+  /// Checked-out rows in `recent_transactions` grouped by vehicle type rate key.
+  Map<String, int> checkoutCountsByVehicleRateKey() {
+    final counts = <String, int>{};
+    for (final row in recent) {
+      if (!row.isCheckedOutStatus) continue;
+      final key = row.vehicleTypeRateKey;
+      if (key == null) continue;
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
+  }
 
   static DashboardSummary? fromResponseData(dynamic data) {
     final root = _asMap(data);
@@ -183,6 +196,41 @@ class DashboardSummaryRecent {
 
   bool get isVoided =>
       VoidAuditInfo.isVoidStatus(status) || voidAudit?.isPopulated == true;
+
+  bool get isCheckedOutStatus {
+    final upper = status.toUpperCase();
+    return upper == 'COMPLETED' || upper == 'LOST';
+  }
+
+  /// Normalized key for close-cash vehicle type cards (`sedan`, `suv`, …).
+  String? get vehicleTypeRateKey {
+    final raw = _rawVehicleType();
+    if (raw == null) return null;
+    return normalizeVehicleTypeRateKey(raw);
+  }
+
+  String? _rawVehicleType() {
+    final json = rawJson;
+    if (json == null) return null;
+    final vehicle = _asMap(json['vehicle']);
+    if (vehicle != null) {
+      for (final key in const [
+        'type',
+        'vehicle_type',
+        'vehicleType',
+        'body_type',
+        'bodyType',
+      ]) {
+        final raw = _str(vehicle[key]);
+        if (raw != null) return raw;
+      }
+    }
+    for (final key in const ['vehicle_type', 'vehicleType', 'body_type']) {
+      final raw = _str(json[key]);
+      if (raw != null) return raw;
+    }
+    return null;
+  }
 
   /// Original API row from `recent_transactions` (full transaction shape).
   final Map<String, dynamic>? rawJson;

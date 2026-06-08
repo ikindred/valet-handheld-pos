@@ -30,6 +30,10 @@ class OpenCashHasInheritedTransactions extends OpenCashState {
   List<Object?> get props => [inheritedTransactions];
 }
 
+class OpenCashCancelled extends OpenCashState {
+  const OpenCashCancelled();
+}
+
 class OpenCashError extends OpenCashState {
   const OpenCashError(this.message);
 

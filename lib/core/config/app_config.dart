@@ -103,12 +103,13 @@ class AppConfig {
           _env('API_SHIFTS_REST') ??
           '/api/v1/cash-sessions/start');
 
-  /// POST `/api/v1/cash-sessions/close`.
+  /// POST `/api/v1/cash-sessions/close-cash` (alias: legacy `/close`).
   static String get cashSessionsClose =>
       baseUrl +
-      (_env('API_CASH_SESSIONS_CLOSE') ?? '/api/v1/cash-sessions/close');
+      (_env('API_CASH_SESSIONS_CLOSE') ??
+          '/api/v1/cash-sessions/close-cash');
 
-  /// POST close cash session. [shiftId] is only used when `API_SHIFT_BY_ID` template contains `{id}`.
+  /// Legacy per-id shift URL (unused for close-cash; session resolved from Bearer token).
   static String shiftById(String shiftId) {
     final enc = Uri.encodeComponent(shiftId);
     final t = (_env('API_SHIFT_BY_ID') ?? '').trim();

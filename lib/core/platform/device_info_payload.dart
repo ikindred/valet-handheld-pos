@@ -2,6 +2,25 @@ import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
 
+/// Best-effort hardware serial for POST `/devices/claim` (`serial_number`).
+///
+/// On Android this uses [AndroidDeviceInfo.serialNumber] when exposed by the OS.
+Future<String> getHardwareSerialNumber() async {
+  try {
+    final plugin = DeviceInfoPlugin();
+    if (Platform.isAndroid) {
+      final a = await plugin.androidInfo;
+      final serial = a.serialNumber.trim();
+      if (serial.isNotEmpty && serial.toLowerCase() != 'unknown') {
+        return serial;
+      }
+    }
+  } catch (_) {
+    // Unavailable on this device / OS policy.
+  }
+  return '';
+}
+
 /// Lightweight device payload for POST /devices/register.
 Future<Map<String, dynamic>> buildDeviceInfoPayload() async {
   try {

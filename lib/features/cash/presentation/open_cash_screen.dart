@@ -33,16 +33,25 @@ class OpenCashScreen extends StatelessWidget {
       child: BlocConsumer<OpenCashCubit, OpenCashState>(
         listener: (context, state) async {
           if (state is OpenCashHasInheritedTransactions) {
-            context.read<AuthBloc>().add(
-                  const AuthCashSessionUpdated(CashSessionStatus.open),
-                );
-            InheritedTransactionsModal.show(
+            // Shift has NOT been opened yet — do not update AuthBloc here.
+            await InheritedTransactionsModal.show(
               context,
               inheritedTransactions: state.inheritedTransactions,
-              onAcknowledge: () async {
-                Navigator.of(context).pop();
-                await context.read<OpenCashCubit>().adoptInheritedTickets();
+              onAcknowledge: () {
+                context.read<OpenCashCubit>().adoptInheritedTickets();
               },
+              onCancel: () {
+                context.read<OpenCashCubit>().cancelPendingShift();
+              },
+            );
+          }
+          if (state is OpenCashCancelled) {
+            // No shift was created — AuthBloc is still closed, nothing to reset.
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Cancelled. Adjust your opening float and try again.'),
+              ),
             );
           }
           if (state is OpenCashReady) {
@@ -90,8 +99,8 @@ class _OpenCashView extends StatefulWidget {
 class _OpenCashViewState extends State<_OpenCashView> {
   final _notesCtrl = TextEditingController();
 
-  /// Whole peso digits only (no decimal point). "0" means zero pesos.
-  String _digits = '0';
+  /// Decimal amount text (e.g. "150.50"). "0" means zero pesos.
+  String _amountText = '0';
 
   String? _staffName;
   String _branchName = '';
@@ -138,45 +147,64 @@ class _OpenCashViewState extends State<_OpenCashView> {
     super.dispose();
   }
 
-  static const int _maxDigitChars = 12;
+  void _normalizeZeroLikeAmount() {
+    if (_amountText == '0.00' || _amountText == '0.0') {
+      _amountText = '0';
+    }
+  }
+
+  bool get _isZeroLikeAmount {
+    if (_amountText == '0' || _amountText == '0.') return true;
+    final parsed = double.tryParse(_amountText.replaceAll(',', ''));
+    return parsed == 0 && !_amountText.contains(RegExp(r'\.[1-9]'));
+  }
+
+  double get _parsedAmount =>
+      double.tryParse(_amountText.replaceAll(',', '')) ?? 0;
+
+  void _normalizeLeadingZero() {
+    if (_amountText.startsWith('0') &&
+        _amountText.length > 1 &&
+        _amountText[1] != '.') {
+      _amountText = _amountText.replaceFirst(RegExp(r'^0+'), '');
+      if (_amountText.isEmpty) _amountText = '0';
+    }
+  }
+
+  void _trimDecimalPlaces() {
+    final i = _amountText.indexOf('.');
+    if (i >= 0 && _amountText.length - i - 1 > 2) {
+      _amountText = _amountText.substring(0, i + 3);
+    }
+  }
 
   void _tapKey(String key) {
     setState(() {
+      _normalizeZeroLikeAmount();
       if (key == '⌫') {
-        if (_digits.length <= 1) {
-          _digits = '0';
-        } else {
-          _digits = _digits.substring(0, _digits.length - 1);
+        if (_amountText.isNotEmpty) {
+          _amountText = _amountText.substring(0, _amountText.length - 1);
+        }
+        if (_amountText.isEmpty || _amountText == '.') _amountText = '0';
+        _normalizeLeadingZero();
+        return;
+      }
+      if (key == '.') {
+        if (!_amountText.contains('.')) {
+          _amountText = _amountText == '0' ? '0.' : '$_amountText.';
         }
         return;
       }
-      if (key == '00') {
-        if (_digits == '0') return;
-        _appendDigits('00');
-        return;
-      }
-      if (key == '0') {
-        if (_digits == '0') return;
-        _appendDigits('0');
-        return;
-      }
-      if (_digits == '0') {
-        _digits = key;
+      if (_isZeroLikeAmount && key != '.') {
+        _amountText = key;
       } else {
-        _appendDigits(key);
+        _amountText = '$_amountText$key';
       }
+      _trimDecimalPlaces();
     });
   }
 
-  void _appendDigits(String chunk) {
-    if (_digits.length + chunk.length > _maxDigitChars) return;
-    _digits += chunk;
-  }
-
-  String get _displayAmount {
-    final n = int.tryParse(_digits) ?? 0;
-    return _pesoFmt.format(n);
-  }
+  String get _displayAmount => _pesoFmt.format(_parsedAmount);
 
   String get _shiftTodayLabel {
     final schedule = _shiftSchedule;
@@ -201,12 +229,11 @@ class _OpenCashViewState extends State<_OpenCashView> {
     final session = await repo.getActiveSession();
     if (session == null) return;
     final now = DateTime.now();
-    final pesos = int.tryParse(_digits) ?? 0;
     final notes = _notesCtrl.text.trim();
     await cubit.openShift(
       localUserId: localUserId,
       sessionId: session.id,
-      openingFloat: pesos.toDouble(),
+      openingFloat: _parsedAmount,
       branch: _branchName,
       area: _areaName,
       shiftDate: _shiftDate.format(now),

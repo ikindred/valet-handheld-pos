@@ -10,15 +10,21 @@ class InheritedTransactionsModal extends StatelessWidget {
     super.key,
     required this.inheritedTransactions,
     required this.onAcknowledge,
+    this.onCancel,
   });
 
   final List<OpenTransaction> inheritedTransactions;
   final VoidCallback onAcknowledge;
 
+  /// When provided, a "Cancel" button is shown. The callback is responsible for
+  /// voiding the shift and resetting state; the dialog is closed automatically.
+  final VoidCallback? onCancel;
+
   static Future<void> show(
     BuildContext context, {
     required List<OpenTransaction> inheritedTransactions,
     required VoidCallback onAcknowledge,
+    VoidCallback? onCancel,
   }) {
     return showDialog<void>(
       context: context,
@@ -26,6 +32,7 @@ class InheritedTransactionsModal extends StatelessWidget {
       builder: (ctx) => InheritedTransactionsModal(
         inheritedTransactions: inheritedTransactions,
         onAcknowledge: onAcknowledge,
+        onCancel: onCancel,
       ),
     );
   }
@@ -41,7 +48,11 @@ class InheritedTransactionsModal extends StatelessWidget {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 600, maxHeight: maxDialogH),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).width * 0.92,
+          minWidth: 520,
+          maxHeight: maxDialogH,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -83,6 +94,7 @@ class InheritedTransactionsModal extends StatelessWidget {
               Expanded(
                 child: OpenTransactionsDataTable(
                   transactions: inheritedTransactions,
+                  durationColumnLabel: 'Parked For',
                 ),
               ),
               const SizedBox(height: 12),
@@ -94,16 +106,31 @@ class InheritedTransactionsModal extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _orange,
-                    foregroundColor: Colors.white,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (onCancel != null) ...[
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        onCancel!();
+                      },
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _orange,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      onAcknowledge();
+                    },
+                    child: const Text('Acknowledge & Continue'),
                   ),
-                  onPressed: onAcknowledge,
-                  child: const Text('Acknowledge & Continue'),
-                ),
+                ],
               ),
             ],
           ),

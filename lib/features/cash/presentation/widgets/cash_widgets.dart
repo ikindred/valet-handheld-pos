@@ -137,30 +137,42 @@ class CashKeypad extends StatelessWidget {
 
   final void Function(String) onKey;
 
+  static const _gap = 6.0;
+  static const _digitRowHeight = 40.0;
+  static const _actionRowHeight = 40.0;
+
   @override
   Widget build(BuildContext context) {
-    final keys = const [
-      ['1', '2', '3'],
-      ['4', '5', '6'],
-      ['7', '8', '9'],
-      ['00', '0', '⌫'],
-    ];
+    Widget digitRow(String a, String b, String c, {double height = _digitRowHeight}) {
+      return SizedBox(
+        height: height,
+        child: Row(
+          children: [
+            Expanded(
+              child: _KeyButton(label: a, height: height, onTap: () => onKey(a)),
+            ),
+            const SizedBox(width: _gap),
+            Expanded(
+              child: _KeyButton(label: b, height: height, onTap: () => onKey(b)),
+            ),
+            const SizedBox(width: _gap),
+            Expanded(
+              child: _KeyButton(label: c, height: height, onTap: () => onKey(c)),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Column(
       children: [
-        for (final row in keys) ...[
-          Row(
-            children: [
-              for (final k in row)
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: _KeyButton(label: k, onTap: () => onKey(k)),
-                  ),
-                ),
-            ],
-          ),
-        ],
+        digitRow('1', '2', '3'),
+        const SizedBox(height: _gap),
+        digitRow('4', '5', '6'),
+        const SizedBox(height: _gap),
+        digitRow('7', '8', '9'),
+        const SizedBox(height: _gap),
+        digitRow('.', '0', '⌫', height: _actionRowHeight),
       ],
     );
   }
@@ -229,25 +241,24 @@ class _OnlinePill extends StatelessWidget {
 }
 
 class _KeyButton extends StatelessWidget {
-  const _KeyButton({required this.label, required this.onTap});
+  const _KeyButton({
+    required this.label,
+    required this.onTap,
+    this.height = 38,
+  });
 
   final String label;
   final VoidCallback onTap;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
-    final isAccent = label == '00';
     final isDelete = label == '⌫';
 
     Color bg = const Color(0xFFF8F9FB);
     Color border = const Color(0xFFC0C0BF);
     Color fg = const Color(0xFF0A1B39);
 
-    if (isAccent) {
-      bg = const Color(0xFFFFF5DE);
-      border = const Color(0xFFF68D00);
-      fg = const Color(0xFFF68D00);
-    }
     if (isDelete) {
       bg = Colors.white;
       border = const Color(0xFFC0C0BF);
@@ -255,7 +266,7 @@ class _KeyButton extends StatelessWidget {
     }
 
     return SizedBox(
-      height: 38,
+      height: height,
       child: OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
