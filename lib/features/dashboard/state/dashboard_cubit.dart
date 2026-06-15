@@ -248,10 +248,13 @@ class DashboardCubit extends Cubit<DashboardState> {
               session.userId,
             );
             final areaSlots = await _slotCountsFromArea();
+            final serverUserId =
+                await _auth.serverUserIdForLocalAccount(session.userId);
             emit(_readyFromSummary(
               summary,
               checkInsLastHour,
               areaSlots: areaSlots,
+              serverUserId: serverUserId,
             ));
             return;
           }
@@ -275,12 +278,21 @@ class DashboardCubit extends Cubit<DashboardState> {
     DashboardSummary summary,
     int checkInsLastHour, {
     AreaSlotCounts? areaSlots,
+    String? serverUserId,
   }) {
     var remaining = summary.remainingCount;
     var total = summary.totalSlots;
     if (areaSlots != null && areaSlots.total > 0) {
       total = areaSlots.total;
     }
+    final filteredRecent = summary.recent
+        .where(
+          (r) =>
+              r.cashierId == null ||
+              serverUserId == null ||
+              r.cashierId == serverUserId,
+        )
+        .toList();
     return DashboardReady(
       vehiclesIn: summary.totalVehiclesIn,
       checkedOut: summary.checkedOutTotal,
@@ -288,7 +300,7 @@ class DashboardCubit extends Cubit<DashboardState> {
       remainingSlots: remaining,
       totalSlots: total,
       recent: _sortRecentParkedFirst(
-        summary.recent
+        filteredRecent
             .map((r) => DashboardRecentTx.fromSummaryRecent(r))
             .toList(),
       ),

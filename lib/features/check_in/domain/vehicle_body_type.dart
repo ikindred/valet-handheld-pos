@@ -29,6 +29,17 @@ String? normalizeVehicleTypeRateKey(String? raw) {
   };
 }
 
+/// UI label for a stored/API vehicle type key (e.g. `ev_phev` → `EV/PHEV`).
+String vehicleTypeDisplayLabel(String? raw) {
+  final trimmed = raw?.trim() ?? '';
+  if (trimmed.isEmpty) return '';
+  final normalized = normalizeVehicleTypeRateKey(trimmed) ?? trimmed;
+  for (final type in VehicleBodyType.values) {
+    if (type.rateKey == normalized) return type.label;
+  }
+  return trimmed;
+}
+
 extension VehicleBodyTypeX on VehicleBodyType {
   String get label => switch (this) {
     VehicleBodyType.sedan => 'Sedan/Crossover',

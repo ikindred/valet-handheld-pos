@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import '../../check_in/domain/vehicle_body_type.dart';
 import 'checkout_preview_rates.dart';
 
 /// GET `/transactions/{id}/checkout-preview` payload.
@@ -362,10 +363,11 @@ class CheckoutPreviewTicket extends Equatable {
   }
 
   String get vehicleReceiptLine {
+    final typeLabel = vehicleTypeDisplayLabel(vehicleType);
     final parts = <String>[
       vehicleMake.trim(),
       vehicleColor.trim(),
-      vehicleType.trim(),
+      typeLabel,
     ].where((s) => s.isNotEmpty).toList();
     if (parts.isEmpty) return '—';
     return parts.join(' · ').toUpperCase();

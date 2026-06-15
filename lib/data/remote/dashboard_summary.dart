@@ -164,6 +164,7 @@ class DashboardSummaryRecent {
     required this.ticketNumber,
     required this.plateNumber,
     required this.status,
+    this.cashierId,
     this.amount,
     this.cashTendered,
     this.timeIn,
@@ -180,6 +181,9 @@ class DashboardSummaryRecent {
   final String ticketNumber;
   final String plateNumber;
   final String status;
+
+  /// Server user UUID (`user.id` from login) who owns this transaction.
+  final String? cashierId;
   final num? amount;
   final double? cashTendered;
   final String? timeIn;
@@ -285,6 +289,7 @@ class DashboardSummaryRecent {
     final vrNo = _str(json['vr_no'] ?? json['vrNo']) ??
         (vehicle != null ? _str(vehicle['vr_no'] ?? vehicle['vrNo']) : null);
 
+    final cashierIdRaw = _str(json['cashier_id'] ?? json['user_id']);
     return DashboardSummaryRecent(
       id: id,
       ticketNumber: (json['ticket_number'] ?? json['ticketNumber'] ?? id)
@@ -292,6 +297,7 @@ class DashboardSummaryRecent {
           .trim(),
       plateNumber: rawPlate ?? '—',
       status: (json['status'] ?? '').toString().trim(),
+      cashierId: cashierIdRaw,
       amount: json['amount'] is num
           ? json['amount'] as num
           : num.tryParse('${json['amount']}'),

@@ -85,9 +85,7 @@ class _CheckInVehicleDetailsScreenState
       );
       if (snapshot != null) {
         rated = BranchRatesSnapshot.ratedBodyTypes(
-          standard: snapshot.standard,
           vehicleTypeRates: snapshot.vehicleTypeRates,
-          usesAreaOverride: snapshot.usesAreaOverride,
         );
       }
     }

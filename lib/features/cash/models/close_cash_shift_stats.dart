@@ -29,12 +29,8 @@ class CloseCashShiftStats {
   final List<CloseCashVehicleTypeStat> vehicleTypes;
 
   static String vehicleTypeLabel(String rawKey) {
-    final normalized = normalizeVehicleTypeRateKey(rawKey) ?? rawKey.trim();
-    if (normalized.isEmpty) return 'Unspecified';
-    for (final type in VehicleBodyType.values) {
-      if (type.rateKey == normalized) return type.label;
-    }
-    return rawKey.trim();
+    final label = vehicleTypeDisplayLabel(rawKey);
+    return label.isEmpty ? 'Unspecified' : label;
   }
 
   factory CloseCashShiftStats.fromAggregates({

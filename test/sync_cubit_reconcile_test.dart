@@ -46,6 +46,7 @@ void main() {
       shifts,
       rateService,
       rateFetch,
+      DashboardApi(dio),
     );
     syncCubit = SyncCubit(
       database: db,

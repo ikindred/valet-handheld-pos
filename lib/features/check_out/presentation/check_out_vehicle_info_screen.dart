@@ -8,6 +8,7 @@ import '../../../core/time/philippine_time.dart';
 import '../../check_in/presentation/widgets/check_in_compact_tokens.dart';
 import '../../check_in/presentation/widgets/check_in_vehicle_details_widgets.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
+import '../../check_in/domain/vehicle_body_type.dart';
 import '../domain/checkout_pricing.dart';
 import '../domain/checkout_preview_format.dart';
 import '../domain/checkout_receipt_snapshot.dart';
@@ -137,7 +138,9 @@ class _PreviewVehicleBody extends StatelessWidget {
     final plateDisplay = pt.plate.isNotEmpty ? pt.plate : rs.plate;
     final makeModel = pt.vehicleMake.trim().isEmpty ? '—' : pt.vehicleMake.trim();
     final colorDisplay = pt.vehicleColor.trim().isEmpty ? '—' : pt.vehicleColor.trim();
-    final typeDisplay = pt.vehicleType.trim().isEmpty ? '—' : pt.vehicleType.trim();
+    final typeDisplay = pt.vehicleType.trim().isEmpty
+        ? '—'
+        : vehicleTypeDisplayLabel(pt.vehicleType);
     final parkingLabel = pt.parkingLocationLine.trim().isEmpty
         ? '—'
         : pt.parkingLocationLine.trim();
@@ -253,7 +256,9 @@ class _OfflineVehicleBody extends StatelessWidget {
             row.vehicleColor.trim(),
           ].where((s) => s.isNotEmpty).join(' '),
           color: row.vehicleColor.isEmpty ? '—' : row.vehicleColor,
-          type: row.vehicleType.isEmpty ? '—' : row.vehicleType,
+          type: row.vehicleType.isEmpty
+              ? '—'
+              : vehicleTypeDisplayLabel(row.vehicleType),
           slot: '—',
         ),
         staffCard: _StaffCard(

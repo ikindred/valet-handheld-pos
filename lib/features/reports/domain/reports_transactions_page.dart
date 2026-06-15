@@ -74,6 +74,7 @@ abstract final class ReportsTicketRowMapper {
     final amount = _double(json['amount']);
     final cashTendered = TransactionPaymentFields.cashTenderedFrom(json);
     final voidAudit = VoidAuditInfo.tryFromJson(json);
+    final cashierIdRaw = _str(json['cashier_id'] ?? json['user_id']);
 
     return ReportsTicketRow(
       ticketId: ticketNumber.isEmpty ? '—' : ticketNumber,
@@ -93,6 +94,7 @@ abstract final class ReportsTicketRowMapper {
       hasPendingVoid: false,
       isVoided:
           VoidAuditInfo.isVoidStatus(statusRaw) || voidAudit?.isPopulated == true,
+      cashierId: cashierIdRaw.isEmpty ? null : cashierIdRaw,
     );
   }
 

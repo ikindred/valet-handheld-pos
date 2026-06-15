@@ -106,7 +106,7 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
       usesAreaOverride = branchRates.usesAreaOverride;
       overnightStart = branchRates.overnightTimes.start?.trim() ?? '';
       overnightEnd = branchRates.overnightTimes.end?.trim() ?? '';
-      if (branchRates.standard.hasAny || branchRates.vehicleTypeRates.isNotEmpty) {
+      if (branchRates.vehicleTypeRates.isNotEmpty) {
         await rateFetchService.cacheBranchRatesSnapshot(
           branchId: branchUuid,
           snapshot: branchRates,
@@ -125,7 +125,8 @@ Future<BranchAreaLoadResult> refreshBranchAreaDialogData({
     }
 
     final levels = detail?.levels ?? const <AreaParkingLevel>[];
-    final hasRates = standard.hasAny || vehicleTypeRates.isNotEmpty;
+    final hasRates = vehicleTypeRates.isNotEmpty &&
+        vehicleTypeRates.any((r) => r.fees.hasAny);
     final hasSlots = levels.isNotEmpty;
 
     if (purpose == BranchAreaDialogPurpose.parkingSlots) {

@@ -26,6 +26,7 @@ import '../../check_in/domain/vehicle_damage_zones.dart';
 import '../domain/checkout_condition_payload.dart';
 import '../domain/checkout_preview_format.dart';
 import '../domain/checkout_pricing.dart';
+import '../domain/checkout_rate_resolution.dart';
 import '../domain/checkout_receipt_snapshot.dart';
 import '../domain/ticket_damage_markers.dart';
 import '../models/check_out_response.dart';
@@ -444,7 +445,15 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       ),
     );
     if (hasPreviewRates) {
-      _recomputeBreakdown();
+      if (CheckoutRateResolution.previewParkingRatesEmpty(preview.rates!)) {
+        unawaited(
+          hydrateRatesFromDrift().then((_) {
+            if (!isClosed) _recomputeBreakdown();
+          }),
+        );
+      } else {
+        _recomputeBreakdown();
+      }
     } else {
       unawaited(hydrateRatesFromDrift());
     }
@@ -953,8 +962,17 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     return code.trim();
   }
 
+  CheckoutPreviewRates _effectivePreviewRates(CheckoutPreviewRates preview) =>
+      CheckoutRateResolution.effectiveRates(
+        preview: preview,
+        drift: state.rates,
+        driftFlatHours: state.flatBlockHours,
+        driftOvernightStart: state.overnightStart,
+        driftOvernightEnd: state.overnightEnd,
+      );
+
   /// Fee lines: checkout-preview `rates` when online preview includes them;
-  /// otherwise Drift (`rates` + `branch_config`). Times always from ticket check-in → now.
+  /// when preview parking fees are zero, full Drift row from rates sync.
   void _recomputeBreakdown() {
     final t = state.ticket;
     if (t == null) {
@@ -971,20 +989,21 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     final previewRates = state.preview?.rates;
 
     if (previewRates != null) {
+      final effective = _effectivePreviewRates(previewRates);
       final overnight = CheckoutPricing.mergeOvernightTimes(
-        previewStart: previewRates.overnightStart,
-        previewEnd: previewRates.overnightEnd,
+        previewStart: effective.overnightStart,
+        previewEnd: effective.overnightEnd,
         cachedStart: state.overnightStart,
         cachedEnd: state.overnightEnd,
       );
-      final flatHours = previewRates.flatRateHours > 0
-          ? previewRates.flatRateHours
+      final flatHours = effective.flatRateHours > 0
+          ? effective.flatRateHours
           : state.flatBlockHours;
       final effectivePreview = CheckoutPreviewRates(
-        flatRate: previewRates.flatRate,
-        succeedingRate: previewRates.succeedingRate,
-        overnightFee: previewRates.overnightFee,
-        lostTicketFee: previewRates.lostTicketFee,
+        flatRate: effective.flatRate,
+        succeedingRate: effective.succeedingRate,
+        overnightFee: effective.overnightFee,
+        lostTicketFee: effective.lostTicketFee,
         overnightStart: overnight.start,
         overnightEnd: overnight.end,
       );
@@ -999,10 +1018,10 @@ class CheckOutCubit extends Cubit<CheckOutState> {
           breakdown: b,
           flatBlockHours: flatHours,
           rates: StandardParkingRates(
-            flatRatePesos: previewRates.flatRate.round(),
-            succeedingHourPesos: previewRates.succeedingRate.round(),
-            overnightFeePesos: previewRates.overnightFee.round(),
-            lostTicketFeePesos: previewRates.lostTicketFee.round(),
+            flatRatePesos: effective.flatRate.round(),
+            succeedingHourPesos: effective.succeedingRate.round(),
+            overnightFeePesos: effective.overnightFee.round(),
+            lostTicketFeePesos: effective.lostTicketFee.round(),
           ),
           overnightStart: overnight.start,
           overnightEnd: overnight.end,
@@ -1058,26 +1077,27 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     final checkOut = PhilippineTime.fromUnixSeconds(timeOutUnix);
     final previewRates = state.preview?.rates;
     if (previewRates != null) {
+      final effective = _effectivePreviewRates(previewRates);
       final window = CheckoutPricing.pricingWindow(
         checkInRaw: ticket.checkInAt,
       );
       final overnight = CheckoutPricing.mergeOvernightTimes(
-        previewStart: previewRates.overnightStart,
-        previewEnd: previewRates.overnightEnd,
+        previewStart: effective.overnightStart,
+        previewEnd: effective.overnightEnd,
         cachedStart: state.overnightStart,
         cachedEnd: state.overnightEnd,
       );
-      final flatHours = previewRates.flatRateHours > 0
-          ? previewRates.flatRateHours
+      final flatHours = effective.flatRateHours > 0
+          ? effective.flatRateHours
           : state.flatBlockHours;
       return CheckoutPricing.computeFromPreviewRates(
         timeIn: window.timeIn,
         timeOut: checkOut,
         rates: CheckoutPreviewRates(
-          flatRate: previewRates.flatRate,
-          succeedingRate: previewRates.succeedingRate,
-          overnightFee: previewRates.overnightFee,
-          lostTicketFee: previewRates.lostTicketFee,
+          flatRate: effective.flatRate,
+          succeedingRate: effective.succeedingRate,
+          overnightFee: effective.overnightFee,
+          lostTicketFee: effective.lostTicketFee,
           overnightStart: overnight.start,
           overnightEnd: overnight.end,
         ),
@@ -1118,16 +1138,17 @@ class CheckOutCubit extends Cubit<CheckOutState> {
   Map<String, dynamic> _buildAppliedRate() {
     final pr = state.preview?.rates;
     if (pr != null) {
+      final effective = _effectivePreviewRates(pr);
       return {
-        'flat_rate': pr.flatRate,
-        'flat_rate_hours': pr.flatRateHours > 0
-            ? pr.flatRateHours
+        'flat_rate': effective.flatRate,
+        'flat_rate_hours': effective.flatRateHours > 0
+            ? effective.flatRateHours
             : state.flatBlockHours,
-        'succeeding_rate': pr.succeedingRate,
-        'overnight_fee': pr.overnightFee,
-        'lost_ticket_fee': pr.lostTicketFee,
-        'overnight_start_time': pr.overnightStart,
-        'overnight_end_time': pr.overnightEnd,
+        'succeeding_rate': effective.succeedingRate,
+        'overnight_fee': effective.overnightFee,
+        'lost_ticket_fee': effective.lostTicketFee,
+        'overnight_start_time': effective.overnightStart,
+        'overnight_end_time': effective.overnightEnd,
       };
     }
     final r = state.rates;

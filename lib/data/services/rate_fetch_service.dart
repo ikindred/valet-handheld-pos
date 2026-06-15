@@ -66,7 +66,7 @@ class RateFetchService {
     }
   }
 
-  /// `GET /rates/branches/{branchId}` — `standardRates`, `areaOverrides`, `vehicleTypeRates`.
+  /// `GET /rates/branches/{branchId}` — `vehicleTypeRates`, `areaOverrides`, overnight window.
   Future<BranchRatesSnapshot?> fetchBranchRatesForArea({
     required String branchId,
     required String areaId,
@@ -174,18 +174,9 @@ class RateFetchService {
       final rows = <VehicleTypeRateRow>[];
       for (final row in _asListOfMaps(res.data)) {
         if (!_isActiveStatus(row['status'])) continue;
-        final name = row['name']?.toString().trim() ?? '';
-        if (name.isEmpty) continue;
-        final fees = ParkingRateFees.fromJson(row);
-        if (!fees.hasAny) continue;
-        rows.add(
-          VehicleTypeRateRow(
-            id: (row['id'] ?? name).toString(),
-            name: name,
-            fees: fees,
-            flatRateHours: BranchRatesSnapshot.flatHoursFromMap(row),
-          ),
-        );
+        final parsed = VehicleTypeRateRow.fromJson(row);
+        if (parsed == null || !parsed.fees.hasAny) continue;
+        rows.add(parsed);
       }
       return rows;
     } catch (e, st) {
@@ -209,22 +200,8 @@ class RateFetchService {
       start: snapshot.overnightTimes.start,
       end: snapshot.overnightTimes.end,
     );
-    if (snapshot.standard.hasAny) {
-      await _upsertRateRow(
-        branchId: branchId,
-        vehicleType: 'Standard',
-        flatHours: snapshot.flatBlockHours,
-        flat: snapshot.standard.flatRate.toDouble(),
-        succeeding: snapshot.standard.succeedingRate.toDouble(),
-        overnight: snapshot.standard.overnightFee.toDouble(),
-        lost: snapshot.standard.lostTicketFee.toDouble(),
-        overnightCutoff: snapshot.overnightTimes.start,
-      );
-    }
     for (final row in snapshot.vehicleTypeRates) {
-      final vt =
-          BranchRatesSnapshot.mapServerVehicleTypeName(row.name) ??
-          _vehicleTypeKey(row.name);
+      final vt = row.rateKey;
       if (vt == null) continue;
       final rowFlatHours = row.flatRateHours > 0
           ? row.flatRateHours
@@ -257,7 +234,7 @@ class RateFetchService {
       areaId: areaId,
       areaCode: areaCode,
     );
-    if (snapshot != null && (snapshot.standard.hasAny || snapshot.vehicleTypeRates.isNotEmpty)) {
+    if (snapshot != null && snapshot.vehicleTypeRates.isNotEmpty) {
       await cacheBranchRatesSnapshot(branchId: branchId, snapshot: snapshot);
     } else if (detail != null) {
       await cacheAreaDetailRates(branchId: branchId, detail: detail);
@@ -293,27 +270,13 @@ class RateFetchService {
       start: areaOvernight.start,
       end: areaOvernight.end,
     );
-    if (detail.standard.hasAny) {
-      await _upsertRateRow(
-        branchId: branchId,
-        vehicleType: 'Standard',
-        flatHours: flatHours,
-        flat: detail.standard.flatRate.toDouble(),
-        succeeding: detail.standard.succeedingRate.toDouble(),
-        overnight: detail.standard.overnightFee.toDouble(),
-        lost: detail.standard.lostTicketFee.toDouble(),
-        overnightCutoff: areaOvernight.start,
-      );
-    }
 
     final lostFallback = detail.standard.lostTicketFee > 0
         ? detail.standard.lostTicketFee.toDouble()
         : StandardParkingRates.offlineDefault.lostTicketFeePesos.toDouble();
 
     for (final row in detail.vehicleTypeRates) {
-      final vt =
-          BranchRatesSnapshot.mapServerVehicleTypeName(row.name) ??
-          _vehicleTypeKey(row.name);
+      final vt = row.rateKey;
       if (vt == null) continue;
       var lost = row.fees.lostTicketFee.toDouble();
       if (lost <= 0) lost = lostFallback;
@@ -331,12 +294,6 @@ class RateFetchService {
     }
   }
 
-  static String? _vehicleTypeKey(String displayName) {
-    final n = displayName.trim().toLowerCase();
-    if (n.isEmpty) return null;
-    return n.replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'_+'), '_');
-  }
-
   /// `GET /rates/branches/:branchId` (branch default — no area override).
   Future<void> syncRatesForBranch(String branchId) async {
     final bid = branchId.trim().isEmpty ? '_' : branchId.trim();
@@ -348,14 +305,14 @@ class RateFetchService {
       areaId: '',
       areaCode: '',
     );
-    if (snapshot != null &&
-        (snapshot.standard.hasAny || snapshot.vehicleTypeRates.isNotEmpty)) {
+    if (snapshot != null && snapshot.vehicleTypeRates.isNotEmpty) {
       await cacheBranchRatesSnapshot(branchId: bid, snapshot: snapshot);
       return;
     }
 
     final legacy = await fetchBranchRatesSnapshot(bid);
-    if (legacy != null && legacy.standard.hasAny) {
+    if (legacy != null &&
+        (legacy.vehicleTypeRates.isNotEmpty || legacy.standard.hasAny)) {
       await cacheBranchRatesSnapshot(branchId: bid, snapshot: legacy);
     }
   }

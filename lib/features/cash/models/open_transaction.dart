@@ -1,5 +1,6 @@
 import '../../../core/time/philippine_time.dart';
 import '../../../data/local/db/app_database.dart';
+import '../../../data/remote/dashboard_summary.dart';
 import '../../dashboard/domain/dashboard_recent_format.dart';
 import '../../dashboard/domain/ticket_parking_info.dart';
 import '../../reports/domain/reports_format.dart';
@@ -73,6 +74,25 @@ class OpenTransaction {
       checkInAtRaw: row.timeIn.toIso8601String(),
       timeIn: row.timeIn,
       slot: row.slot,
+    );
+  }
+
+  /// Builds an [OpenTransaction] from a dashboard summary recent row.
+  factory OpenTransaction.fromDashboardSummaryRecent(
+    DashboardSummaryRecent r,
+  ) {
+    return OpenTransaction(
+      ticketId: r.id,
+      ticketNumber: r.ticketNumber,
+      plateNumber: r.plateNumber == '—' ? '' : r.plateNumber,
+      vehicleBrand: r.vehicleBrand,
+      vehicleColor: r.vehicleColor,
+      vehicleType: '',
+      checkInAtRaw: r.timeIn ?? '',
+      timeIn: r.timeIn != null
+          ? (DateTime.tryParse(r.timeIn!)?.toLocal() ?? DateTime.now())
+          : DateTime.now(),
+      slot: r.parkingSlot ?? '—',
     );
   }
 

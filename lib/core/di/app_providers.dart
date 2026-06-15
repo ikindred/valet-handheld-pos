@@ -103,7 +103,7 @@ class AppProviders extends StatelessWidget {
             c.read<ShiftService>(),
             c.read<RateService>(),
             c.read<RateFetchService>(),
-            c.read<TransactionsApi>(),
+            c.read<DashboardApi>(),
           ),
         ),
         Provider<DeviceConflictService>(

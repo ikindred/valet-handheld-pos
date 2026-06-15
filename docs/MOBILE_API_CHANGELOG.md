@@ -236,7 +236,7 @@ The cashier app **does not** call `GET /settings`. Load overnight window from br
 |--------|------|--------|
 | `GET` | `/branches` | `overnight_start_time`, `overnight_end_time` per branch |
 | `GET` | `/branches/:id` | Same |
-| `GET` | `/rates/branches/:branchId` | Top-level + `standardRates` |
+| `GET` | `/rates/branches/:branchId` | Top-level overnight keys + `vehicleTypeRates[]` (no `standardRates`) |
 | `GET` | `/rates/branches/:branchId/vehicle-types` | Duplicated on each row |
 | `GET` | `/transactions/:id/checkout-preview` | `rates.overnight_start_time`, `rates.overnight_end_time` |
 
@@ -247,7 +247,9 @@ Do **not** expect `overnightStartTime` / `overnightEndTime` on branch/rates read
 
 ### 5.2 Rates sync route
 
-`GET /rates/branches/:branchId` — overnight keys only at **root**; `standardRates` no longer embeds overnight window keys.
+`GET /rates/branches/:branchId` returns `{ branch, areaOverrides, vehicleTypeRates, overnight_start_time, overnight_end_time }`. Sync pricing from **`vehicleTypeRates[]`** keyed by `vehicle_type`. Legacy branch `standardRates` is **removed** (2026-06-09).
+
+When checkout-preview returns `flat_rate: 0` and `succeeding_rate: 0`, the app falls back to the **Drift cache** from the last rates sync (full row: flat, succeeding, overnight, lost ticket, hours, overnight window). If both preview and cache are zero, checkout proceeds at ₱0 — admin must configure branch vehicle-type rates.
 
 ---
 
@@ -319,6 +321,8 @@ Legacy `POST /tickets/:id/check-out` and `/lost` exist for admin; mobile should 
 
 Use after pulling a new API build:
 
+- [ ] Rates: sync from `vehicleTypeRates[]` / `vehicle_type` slug; no `standardRates` on branch rates endpoint
+- [ ] Checkout: when preview parking fees are zero, use Drift rates cache; verify `applied_rate` sent on check-out
 - [ ] Void: drop `void_request`; add flat void fields; remove pending/approve UI
 - [ ] Check-out: always send `applied_rate` from preview/cache
 - [ ] Overnight: read snake_case keys from branch/rates; drop settings sync
@@ -333,6 +337,8 @@ Use after pulling a new API build:
 
 | Date | Summary |
 |------|---------|
+| 2026-06-09 | Branch rates: `standardRates` removed from `GET /rates/branches/:branchId`; pricing is `VehicleTypeRate` rows keyed by `vehicle_type`; `PUT`/`DELETE /branches/:id/rates` removed |
+| 2026-06-09 | Checkout preview may return zero parking fees when branch VT row missing; app falls back to Drift rates cache |
 | 2026-06-01 | Void: immediate + flat fields; `void_request` removed; approve/reject routes removed |
 | 2026-06-01 | Check-out: required `applied_rate` on request and response |
 | 2026-06-01 | Overnight: per-branch; snake_case; removed from settings |

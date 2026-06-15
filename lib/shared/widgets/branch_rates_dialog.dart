@@ -188,16 +188,12 @@ class _RatesOnlyDialogContentState extends State<_RatesOnlyDialogContent> {
   bool _typeHasRates(VehicleBodyType type) =>
       BranchRatesSnapshot.bodyTypeHasRates(
         type: type,
-        standard: widget.standard,
         vehicleTypeRates: widget.vehicleTypeRates,
-        usesAreaOverride: widget.usesAreaOverride,
       );
 
   ParkingRateFees? get _effectiveFees => BranchRatesSnapshot.feesForBodyType(
         type: _selectedType,
-        standard: widget.standard,
         vehicleTypeRates: widget.vehicleTypeRates,
-        usesAreaOverride: widget.usesAreaOverride,
       );
 
   int get _effectiveFlatHours => BranchRatesSnapshot.flatHoursForBodyType(
@@ -209,7 +205,6 @@ class _RatesOnlyDialogContentState extends State<_RatesOnlyDialogContent> {
   bool get _selectedHasRates => _typeHasRates(_selectedType);
 
   bool get _hasRates =>
-      widget.standard.hasAny ||
       widget.vehicleTypeRates.any((r) => r.fees.hasAny);
 
   @override

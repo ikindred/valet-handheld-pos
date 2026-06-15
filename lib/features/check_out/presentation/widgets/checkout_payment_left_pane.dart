@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../data/local/db/app_database.dart';
+import '../../../check_in/domain/vehicle_body_type.dart';
 import '../../domain/checkout_pricing.dart';
 import '../../models/checkout_preview_response.dart';
 import 'check_out_ui_tokens.dart';
@@ -58,7 +59,7 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
     final parts = <String>[
       row.vehicleBrand.trim(),
       row.vehicleColor.trim(),
-      row.vehicleType.trim(),
+      vehicleTypeDisplayLabel(row.vehicleType),
     ].where((s) => s.isNotEmpty).toList();
     return parts.isEmpty ? '—' : parts.join(' · ');
   }

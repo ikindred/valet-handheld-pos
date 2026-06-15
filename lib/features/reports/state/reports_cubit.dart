@@ -286,9 +286,20 @@ class ReportsCubit extends Cubit<ReportsState> {
           page: query.page,
         );
 
+        final serverUserId =
+            await _auth.serverUserIdForLocalAccount(session.userId);
+        final filteredRows = page.rows
+            .where(
+              (r) =>
+                  r.cashierId == null ||
+                  serverUserId == null ||
+                  r.cashierId == serverUserId,
+            )
+            .toList();
+
         final merged = append && prev is ReportsLoaded
-            ? [...prev.rows, ...page.rows]
-            : page.rows;
+            ? [...prev.rows, ...filteredRows]
+            : filteredRows;
 
         emit(
           ReportsLoaded(

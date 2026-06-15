@@ -81,6 +81,7 @@ class VehicleTypeRateRow {
     required this.id,
     required this.name,
     required this.fees,
+    this.vehicleType,
     this.flatRateHours = 0,
   });
 
@@ -88,15 +89,31 @@ class VehicleTypeRateRow {
   final String name;
   final ParkingRateFees fees;
 
+  /// API slug (`sedan`, `ev_phev`, …) when present.
+  final String? vehicleType;
+
   /// Per-vehicle flat block hours; `0` means inherit branch/area default.
   final int flatRateHours;
 
+  /// Normalized Drift / [VehicleBodyType.rateKey] slug for this row.
+  String? get rateKey {
+    final fromSlug = normalizeVehicleTypeRateKey(vehicleType);
+    if (fromSlug != null) return fromSlug;
+    return BranchRatesSnapshot.mapServerVehicleTypeName(name);
+  }
+
   static VehicleTypeRateRow? fromJson(Map<String, dynamic> json) {
-    final name = (json['name'] ?? '').toString().trim();
+    final vtRaw =
+        (json['vehicle_type'] ?? json['vehicleType'] ?? '').toString().trim();
+    var name = (json['name'] ?? '').toString().trim();
+    if (name.isEmpty && vtRaw.isNotEmpty) {
+      name = vehicleTypeDisplayLabel(vtRaw);
+    }
     if (name.isEmpty) return null;
     return VehicleTypeRateRow(
-      id: (json['id'] ?? name).toString(),
+      id: (json['id'] ?? (vtRaw.isEmpty ? name : vtRaw)).toString(),
       name: name,
+      vehicleType: vtRaw.isEmpty ? null : vtRaw,
       fees: ParkingRateFees.fromJson(json),
       flatRateHours: BranchRatesSnapshot.flatHoursFromMap(json),
     );
@@ -248,16 +265,14 @@ class AreaSlotCounts {
   static const empty = AreaSlotCounts(total: 0, available: 0, occupied: 0);
 }
 
-/// Body from `GET /api/v1/rates/branches/:branchId` (`standardRates`, `areaOverrides`, …).
+/// Body from `GET /api/v1/rates/branches/:branchId` (`vehicleTypeRates`, `areaOverrides`, …).
 class BranchRatesApiPayload {
   const BranchRatesApiPayload({
-    required this.standardRates,
     required this.areaOverrides,
     required this.vehicleTypeRates,
     required this.overnightTimes,
   });
 
-  final Map<String, dynamic>? standardRates;
   final List<Map<String, dynamic>> areaOverrides;
   final List<Map<String, dynamic>> vehicleTypeRates;
   final ({String? start, String? end}) overnightTimes;
@@ -267,16 +282,7 @@ class BranchRatesApiPayload {
     if (root == null) return null;
     final body = AreaDetail._unwrap(body: root);
 
-    final standardRaw = body['standardRates'] ?? body['standard_rates'];
-    Map<String, dynamic>? standard;
-    if (standardRaw is Map<String, dynamic>) {
-      standard = standardRaw;
-    } else if (standardRaw is Map) {
-      standard = Map<String, dynamic>.from(standardRaw);
-    }
-
     return BranchRatesApiPayload(
-      standardRates: standard,
       areaOverrides: _parseOverrideList(
         body['areaOverrides'] ?? body['area_overrides'],
       ),
@@ -312,7 +318,7 @@ class BranchRatesApiPayload {
     return null;
   }
 
-  /// Area override fees + vehicle rows when matched; else branch `standardRates` + top-level rows.
+  /// Area VT rows when matched; else branch-level `vehicleTypeRates` (no legacy standard row).
   BranchRatesSnapshot resolveForArea({
     required String areaId,
     String areaCode = '',
@@ -320,11 +326,15 @@ class BranchRatesApiPayload {
   }) {
     final override = _matchAreaOverride(areaId: areaId, areaCode: areaCode);
     if (override != null) {
-      final standard = ParkingRateFees.fromJson(override);
       final flatHours = BranchRatesSnapshot.flatHoursFromMap(override);
       final vehicleRows = AreaDetail._parseVehicleTypeRates(override);
       return BranchRatesSnapshot(
-        standard: standard,
+        standard: const ParkingRateFees(
+          flatRate: 0,
+          succeedingRate: 0,
+          overnightFee: 0,
+          lostTicketFee: 0,
+        ),
         vehicleTypeRates: vehicleRows,
         overnightTimes: overnightTimes,
         flatBlockHours:
@@ -333,16 +343,22 @@ class BranchRatesApiPayload {
       );
     }
 
-    final standardMap = standardRates ?? const <String, dynamic>{};
-    final standard = ParkingRateFees.fromJson(standardMap);
-    final flatHours = BranchRatesSnapshot.flatHoursFromMap(standardMap);
     final vehicleRows = _parseActiveVehicleTypeRateRows(vehicleTypeRates);
+    final flatHours = BranchRatesSnapshot.defaultFlatHoursFromVehicleRows(
+      vehicleRows,
+      fallbackHours: defaultFlatBlockHours,
+    );
 
     return BranchRatesSnapshot(
-      standard: standard,
+      standard: const ParkingRateFees(
+        flatRate: 0,
+        succeedingRate: 0,
+        overnightFee: 0,
+        lostTicketFee: 0,
+      ),
       vehicleTypeRates: vehicleRows,
       overnightTimes: overnightTimes,
-      flatBlockHours: flatHours > 0 ? flatHours : defaultFlatBlockHours,
+      flatBlockHours: flatHours,
       usesAreaOverride: false,
     );
   }
@@ -421,32 +437,35 @@ class BranchRatesSnapshot {
     return fallbackHours;
   }
 
-  /// Whether [type] has billable rates for this branch/area resolution.
+  /// Whether [type] has billable rates (ACTIVE vehicle-type row only).
   static bool bodyTypeHasRates({
     required VehicleBodyType type,
-    required ParkingRateFees standard,
     required List<VehicleTypeRateRow> vehicleTypeRates,
-    required bool usesAreaOverride,
   }) {
     final row = rowForBodyType(type, vehicleTypeRates);
-    if (row != null && row.fees.hasAny) return true;
-    if (vehicleTypeRates.isEmpty && standard.hasAny) return true;
-    if (usesAreaOverride && standard.hasAny) return true;
-    return false;
+    return row != null && row.fees.hasAny;
   }
 
-  /// Fees for [type]: per-type row, else area/branch standard when allowed.
+  /// Fees for [type] from matching vehicle-type row, else null.
   static ParkingRateFees? feesForBodyType({
     required VehicleBodyType type,
-    required ParkingRateFees standard,
     required List<VehicleTypeRateRow> vehicleTypeRates,
-    required bool usesAreaOverride,
   }) {
     final row = rowForBodyType(type, vehicleTypeRates);
     if (row != null && row.fees.hasAny) return row.fees;
-    if (vehicleTypeRates.isEmpty && standard.hasAny) return standard;
-    if (usesAreaOverride && standard.hasAny) return standard;
     return null;
+  }
+
+  static int defaultFlatHoursFromVehicleRows(
+    List<VehicleTypeRateRow> rows, {
+    int fallbackHours = CheckoutPricing.defaultFlatBlockHours,
+  }) {
+    final sedan = rowForBodyType(VehicleBodyType.sedan, rows);
+    if (sedan != null && sedan.flatRateHours > 0) return sedan.flatRateHours;
+    for (final row in rows) {
+      if (row.flatRateHours > 0) return row.flatRateHours;
+    }
+    return fallbackHours;
   }
 
   static int flatHoursForBodyType({
@@ -462,18 +481,11 @@ class BranchRatesSnapshot {
   }
 
   static Set<VehicleBodyType> ratedBodyTypes({
-    required ParkingRateFees standard,
     required List<VehicleTypeRateRow> vehicleTypeRates,
-    required bool usesAreaOverride,
   }) =>
       {
         for (final type in VehicleBodyType.values)
-          if (bodyTypeHasRates(
-            type: type,
-            standard: standard,
-            vehicleTypeRates: vehicleTypeRates,
-            usesAreaOverride: usesAreaOverride,
-          ))
+          if (bodyTypeHasRates(type: type, vehicleTypeRates: vehicleTypeRates))
             type,
       };
 
@@ -501,10 +513,10 @@ class BranchRatesSnapshot {
   ) {
     final key = type.rateKey;
     for (final row in rows) {
-      final mapped = mapServerVehicleTypeName(row.name);
-      if (mapped == key) return row;
-      if (type == VehicleBodyType.van && mapped == 'suv') return row;
-      if (type == VehicleBodyType.suv && mapped == 'van') return row;
+      final slug = row.rateKey;
+      if (slug == key) return row;
+      if (type == VehicleBodyType.van && slug == 'suv') return row;
+      if (type == VehicleBodyType.suv && slug == 'van') return row;
     }
     return null;
   }

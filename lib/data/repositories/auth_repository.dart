@@ -22,11 +22,10 @@ import '../../data/remote/dashboard_summary.dart';
 import '../../features/cash/models/close_cash_shift_stats.dart';
 import '../../features/cash/models/open_transaction.dart';
 import '../../features/check_in/domain/vehicle_body_type.dart';
-import '../../features/reports/domain/reports_format.dart';
 import '../local/db/app_database.dart';
 import '../remote/api_error_message.dart';
 import '../remote/auth_api.dart';
-import '../remote/transactions_api.dart';
+import '../remote/dashboard_api.dart';
 import '../services/rate_fetch_service.dart';
 import '../services/rate_service.dart';
 import '../services/shift_service.dart';
@@ -60,7 +59,7 @@ class AuthRepository {
     this._shifts,
     this._rates,
     this._rateFetch,
-    this._txApi,
+    this._dashboardApi,
   );
 
   final AppDatabase _db;
@@ -69,7 +68,7 @@ class AuthRepository {
   final ShiftService _shifts;
   final RateService _rates;
   final RateFetchService _rateFetch;
-  final TransactionsApi _txApi;
+  final DashboardApi _dashboardApi;
 
   static const _uuid = Uuid();
 
@@ -99,6 +98,12 @@ class AuthRepository {
           ..where((a) => a.id.equals(localId))
           ..limit(1))
         .getSingleOrNull();
+  }
+
+  /// Server user UUID for a local offline account (login `user.id`).
+  Future<String?> serverUserIdForLocalAccount(int localUserId) async {
+    final account = await offlineAccountById(localUserId);
+    return account?.serverUserId;
   }
 
   Future<OfflineAccount?> offlineAccountByServerId(String serverUserId) {
@@ -701,23 +706,20 @@ class AuthRepository {
     final localResult =
         localTickets.map(OpenTransaction.fromTicket).toList();
 
-    // 2. Remote active tickets (best-effort).
+    // 2. Remote active tickets (best-effort) via dashboard/summary recent list.
     final remoteExtra = <OpenTransaction>[];
     try {
       final session = await getActiveSession();
       final token = session?.authToken?.trim();
       if (token != null && token.isNotEmpty) {
-        final page = await _txApi.fetchReportsTransactions(
-          token: token,
-          status: 'active',
-          limit: 200,
-        );
-        for (final row in page.rows) {
-          if (row.status != ReportsTicketRowStatus.parked &&
-              row.status != ReportsTicketRowStatus.longStay) continue;
-          final sid = row.serverTransactionId?.trim() ?? '';
-          if (sid.isNotEmpty && localServerIds.contains(sid)) continue;
-          remoteExtra.add(OpenTransaction.fromReportsRow(row));
+        final summary = await _dashboardApi.fetchSummary(bearerToken: token);
+        if (summary != null) {
+          for (final row in summary.recent) {
+            if (row.isCheckedOutStatus) continue;
+            final sid = row.id.trim();
+            if (sid.isNotEmpty && localServerIds.contains(sid)) continue;
+            remoteExtra.add(OpenTransaction.fromDashboardSummaryRecent(row));
+          }
         }
       }
     } catch (_) {

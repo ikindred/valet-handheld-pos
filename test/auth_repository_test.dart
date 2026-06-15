@@ -57,7 +57,15 @@ void main() {
       );
       final rates = RateService(db);
       final rateFetch = RateFetchService(db, dio, parkingLayout);
-      repo = AuthRepository(db, api, refresh, shifts, rates, rateFetch);
+      repo = AuthRepository(
+        db,
+        api,
+        refresh,
+        shifts,
+        rates,
+        rateFetch,
+        DashboardApi(dio),
+      );
     });
 
     tearDown(() async {

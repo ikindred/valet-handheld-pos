@@ -102,13 +102,6 @@ void main() {
     final payload = BranchRatesApiPayload.fromResponseData({
       'overnight_start_time': '01:30',
       'overnight_end_time': '06:00',
-      'standardRates': {
-        'flatRate': 150,
-        'flatRateHours': 3,
-        'succeedingRate': 30,
-        'overnightFee': 200,
-        'lostTicketFee': 200,
-      },
       'areaOverrides': [
         {
           'id': areaId,
@@ -122,6 +115,7 @@ void main() {
           'vehicleTypeRates': [
             {
               'id': 'd4',
+              'vehicle_type': 'luxury',
               'name': 'Luxury',
               'flatRate': 300,
               'flatRateHours': 4,
@@ -135,6 +129,7 @@ void main() {
       'vehicleTypeRates': [
         {
           'id': 'e5',
+          'vehicle_type': 'sedan',
           'name': 'Sedan / Hatchback',
           'flatRate': 150,
           'flatRateHours': 3,
@@ -147,51 +142,97 @@ void main() {
 
     final vip = payload!.resolveForArea(areaId: areaId);
     expect(vip.usesAreaOverride, isTrue);
-    expect(vip.standard.flatRate, 200);
+    expect(vip.standard.flatRate, 0);
     expect(vip.flatBlockHours, 2);
     expect(vip.vehicleTypeRates, hasLength(1));
-    expect(vip.vehicleTypeRates.first.name, 'Luxury');
+    expect(vip.vehicleTypeRates.first.rateKey, 'luxury');
     expect(
       BranchRatesSnapshot.bodyTypeHasRates(
         type: VehicleBodyType.luxury,
-        standard: vip.standard,
         vehicleTypeRates: vip.vehicleTypeRates,
-        usesAreaOverride: true,
       ),
       isTrue,
     );
     expect(
       BranchRatesSnapshot.bodyTypeHasRates(
         type: VehicleBodyType.sedan,
-        standard: vip.standard,
         vehicleTypeRates: vip.vehicleTypeRates,
-        usesAreaOverride: true,
       ),
-      isTrue,
+      isFalse,
     );
 
     final defaultArea = payload.resolveForArea(areaId: 'other-area');
     expect(defaultArea.usesAreaOverride, isFalse);
-    expect(defaultArea.standard.flatRate, 150);
+    expect(defaultArea.standard.flatRate, 0);
     expect(defaultArea.vehicleTypeRates, hasLength(1));
+    expect(defaultArea.vehicleTypeRates.first.rateKey, 'sedan');
     expect(
       BranchRatesSnapshot.bodyTypeHasRates(
         type: VehicleBodyType.sedan,
-        standard: defaultArea.standard,
         vehicleTypeRates: defaultArea.vehicleTypeRates,
-        usesAreaOverride: false,
       ),
       isTrue,
     );
     expect(
       BranchRatesSnapshot.bodyTypeHasRates(
         type: VehicleBodyType.evPhev,
-        standard: defaultArea.standard,
         vehicleTypeRates: defaultArea.vehicleTypeRates,
-        usesAreaOverride: false,
       ),
       isFalse,
     );
+  });
+
+  test('BranchRatesApiPayload resolves VT-only payload without standardRates', () {
+    final payload = BranchRatesApiPayload.fromResponseData({
+      'overnight_start_time': '01:30',
+      'overnight_end_time': '06:00',
+      'vehicleTypeRates': [
+        {
+          'id': 'vt-sedan',
+          'vehicle_type': 'sedan',
+          'name': 'Sedan / Hatchback',
+          'flatRate': 150,
+          'flatRateHours': 3,
+          'succeedingRate': 30,
+          'overnightFee': 100,
+          'lostTicketFee': 200,
+          'status': 'ACTIVE',
+        },
+        {
+          'id': 'vt-suv',
+          'vehicle_type': 'suv',
+          'name': 'SUV',
+          'flatRate': 180,
+          'flatRateHours': 3,
+          'succeedingRate': 35,
+          'status': 'ACTIVE',
+        },
+      ],
+    });
+    expect(payload, isNotNull);
+
+    final snapshot = payload!.resolveForArea(areaId: '');
+    expect(snapshot.vehicleTypeRates, hasLength(2));
+    expect(snapshot.flatBlockHours, 3);
+    expect(
+      BranchRatesSnapshot.rowForBodyType(
+        VehicleBodyType.suv,
+        snapshot.vehicleTypeRates,
+      )?.fees.flatRate,
+      180,
+    );
+  });
+
+  test('VehicleTypeRateRow parses vehicle_type slug when name is omitted', () {
+    final row = VehicleTypeRateRow.fromJson({
+      'id': 'vt-ev',
+      'vehicle_type': 'ev_phev',
+      'flatRate': 160,
+      'succeedingRate': 35,
+    });
+    expect(row, isNotNull);
+    expect(row!.rateKey, 'ev_phev');
+    expect(row.name, isNotEmpty);
   });
 
   test('VehicleTypeRateRow parses per-type flatRateHours', () {

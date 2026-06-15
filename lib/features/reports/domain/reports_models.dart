@@ -21,6 +21,7 @@ class ReportsTicketRow extends Equatable {
     this.cashTendered,
     this.hasPendingVoid = false,
     this.isVoided = false,
+    this.cashierId,
   });
 
   /// Display ticket number (e.g. `TKT-0123`).
@@ -58,6 +59,9 @@ class ReportsTicketRow extends Equatable {
 
   /// True when the transaction is voided (`status: void`).
   final bool isVoided;
+
+  /// Server user UUID (`user.id` from login) who owns this transaction.
+  final String? cashierId;
 
   /// Route / detail key: server id when available, else local ticket number.
   String get detailId {
@@ -99,6 +103,7 @@ class ReportsTicketRow extends Equatable {
         cashTendered,
         hasPendingVoid,
         isVoided,
+        cashierId,
       ];
 }
 

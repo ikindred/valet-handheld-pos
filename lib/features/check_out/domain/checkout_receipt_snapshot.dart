@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 import '../../../core/time/philippine_time.dart';
 import '../../../core/printing/receipt_print_format.dart';
 import '../../../data/local/db/app_database.dart';
+import '../../check_in/domain/vehicle_body_type.dart';
 import 'checkout_pricing.dart';
 
 /// Immutable receipt data captured at checkout finalize (ticket row is cleared from state after).
@@ -70,10 +71,11 @@ class CheckoutReceiptSnapshot extends Equatable {
   }
 
   static String vehicleReceiptLineFromTicket(Ticket t) {
+    final typeLabel = vehicleTypeDisplayLabel(t.vehicleType);
     final parts = <String>[
       t.vehicleBrand.trim(),
       t.vehicleColor.trim(),
-      t.vehicleType.trim(),
+      typeLabel,
     ].where((s) => s.isNotEmpty).toList();
     return parts.isEmpty ? '—' : parts.join(' · ').toUpperCase();
   }
