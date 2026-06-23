@@ -10,12 +10,13 @@ class CashLeftRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return Container(
       width: 72,
       decoration: BoxDecoration(
-        color: const Color(0xFFFAFAFA),
+        color: tc.railBg,
         border: Border(
-          right: BorderSide(color: Colors.black.withValues(alpha: 0.13)),
+          right: BorderSide(color: tc.railBorder),
         ),
       ),
       child: SafeArea(
@@ -32,7 +33,7 @@ class CashLeftRail extends StatelessWidget {
                 onPressed: () => showLogoutFlow(context),
                 icon: Icon(
                   Icons.logout_rounded,
-                  color: AppColors.textSecondary,
+                  color: tc.textSecondary,
                 ),
               ),
             ],
@@ -58,17 +59,18 @@ class CashPageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return SizedBox(
       height: 68,
       width: double.infinity,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: const Color(0xFFFAFAFA),
+          color: tc.railBg,
           border: Border(
             bottom: BorderSide(
               width: 1,
-              color: Colors.black.withValues(alpha: 0.13),
+              color: tc.cardBorder,
             ),
           ),
         ),
@@ -81,11 +83,18 @@ class CashPageHeader extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(title.toUpperCase(), style: CashFigmaStyles.pageTitle()),
+                  Text(
+                    title.toUpperCase(),
+                    style: CashFigmaStyles.pageTitle().copyWith(
+                      color: tc.textPrimary,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     subtitle.toUpperCase(),
-                    style: CashFigmaStyles.pageSubtitle(),
+                    style: CashFigmaStyles.pageSubtitle().copyWith(
+                      color: tc.textSubtitleMuted,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -109,13 +118,14 @@ class CashAmountBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     final accent = color ?? const Color(0xFFF68D00);
     return Container(
       height: 50,
       alignment: Alignment.centerRight,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF7EC),
+        color: tc.accentSurface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: accent),
       ),
@@ -183,13 +193,14 @@ class _LogoMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return Container(
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: tc.cardBg,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.13)),
+        border: Border.all(color: tc.cardBorder),
       ),
       clipBehavior: Clip.antiAlias,
       child: Padding(
@@ -211,8 +222,12 @@ class _OnlinePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
+    final isDark = AppThemeColors.isDark(context);
     final color = online ? const Color(0xFF27AE60) : AppColors.warning;
-    final bg = online ? const Color(0xFFF4FBF7) : const Color(0xFFFFF7EC);
+    final bg = online
+        ? (isDark ? const Color(0xFF1A3D2E) : const Color(0xFFF4FBF7))
+        : (isDark ? tc.accentSurface : const Color(0xFFFFF7EC));
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -253,16 +268,17 @@ class _KeyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     final isDelete = label == '⌫';
 
-    Color bg = const Color(0xFFF8F9FB);
-    Color border = const Color(0xFFC0C0BF);
-    Color fg = const Color(0xFF0A1B39);
+    Color bg = tc.hintFill;
+    Color border = tc.cardBorder;
+    Color fg = tc.textPrimary;
 
     if (isDelete) {
-      bg = Colors.white;
-      border = const Color(0xFFC0C0BF);
-      fg = const Color(0xFFD64045);
+      bg = tc.inputFill;
+      border = tc.cardBorder;
+      fg = AppColors.error;
     }
 
     return SizedBox(

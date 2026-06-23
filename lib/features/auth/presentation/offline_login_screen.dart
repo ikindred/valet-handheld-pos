@@ -6,6 +6,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/storage/offline_mode_prefs.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_background.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../../../data/repositories/auth_repository.dart';
@@ -126,7 +127,9 @@ class _OfflineLoginScreenState extends State<OfflineLoginScreen> {
   @override
   Widget build(BuildContext context) {
     const titleOrange = Color(0xFFF68D00);
-    const hintGrey = Color(0xFF9DA4B0);
+    final tc = AppThemeColors.of(context);
+    final isDark = AppThemeColors.isDark(context);
+    final iconMuted = tc.textSubtitleMuted;
 
     return Scaffold(
       body: AppBackground(
@@ -135,19 +138,21 @@ class _OfflineLoginScreenState extends State<OfflineLoginScreen> {
             constraints: const BoxConstraints(maxWidth: 520),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: tc.cardBg,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: Colors.black.withValues(alpha: 0.13),
+                  color: tc.cardBorder,
                   width: 2,
                 ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x19000000),
-                    blurRadius: 19.3,
-                    offset: Offset(0, 0),
-                  ),
-                ],
+                boxShadow: isDark
+                    ? const []
+                    : const [
+                        BoxShadow(
+                          color: Color(0x19000000),
+                          blurRadius: 19.3,
+                          offset: Offset(0, 0),
+                        ),
+                      ],
               ),
               padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 50),
               child: Column(
@@ -161,7 +166,7 @@ class _OfflineLoginScreenState extends State<OfflineLoginScreen> {
                   const SizedBox(height: 8),
                   Text(
                     'Enter your password to continue without an internet connection.',
-                    style: _poppins(13, FontWeight.w400, const Color(0xFF6B7280)),
+                    style: _poppins(13, FontWeight.w400, tc.textSecondary),
                   ),
                   const SizedBox(height: 28),
                   if (_email != null)
@@ -171,7 +176,11 @@ class _OfflineLoginScreenState extends State<OfflineLoginScreen> {
                         minHeight: 40,
                         child: Text(
                           _email!,
-                          style: _poppins(14, FontWeight.w500, Colors.black87),
+                          style: _poppins(
+                            14,
+                            FontWeight.w500,
+                            tc.textPrimary,
+                          ),
                         ),
                       ),
                     ),
@@ -183,12 +192,12 @@ class _OfflineLoginScreenState extends State<OfflineLoginScreen> {
                       focusNode: _passwordFocus,
                       obscureText: _obscure,
                       hint: '************',
-                      prefixIcon: const Padding(
-                        padding: EdgeInsets.only(left: 4),
+                      prefixIcon: Padding(
+                        padding: const EdgeInsets.only(left: 4),
                         child: Icon(
                           LucideIcons.lock,
                           size: 14,
-                          color: hintGrey,
+                          color: iconMuted,
                         ),
                       ),
                       suffixIcon: IconButton(
@@ -201,7 +210,7 @@ class _OfflineLoginScreenState extends State<OfflineLoginScreen> {
                         icon: Icon(
                           _obscure ? LucideIcons.eyeOff : LucideIcons.eye,
                           size: 14,
-                          color: hintGrey,
+                          color: iconMuted,
                         ),
                       ),
                     ),
@@ -210,7 +219,13 @@ class _OfflineLoginScreenState extends State<OfflineLoginScreen> {
                     const SizedBox(height: 12),
                     Text(
                       _error!,
-                      style: _poppins(12, FontWeight.w500, Colors.red.shade700),
+                      style: _poppins(
+                        12,
+                        FontWeight.w500,
+                        isDark
+                            ? const Color(0xFFFCA5A5)
+                            : Colors.red.shade700,
+                      ),
                     ),
                   ],
                   if (_siteReady == false) ...[
@@ -221,7 +236,7 @@ class _OfflineLoginScreenState extends State<OfflineLoginScreen> {
                       style: _poppins(
                         11,
                         FontWeight.w500,
-                        const Color(0xFF6B7280),
+                        tc.textSecondary,
                       ),
                     ),
                   ],

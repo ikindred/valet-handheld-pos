@@ -22,7 +22,10 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
     required this.timeOutLabel,
     required this.durationLabel,
     required this.flatBlockHours,
+    required this.driverInLabel,
     required this.driverOutController,
+    required this.driverOutEnabled,
+    this.valetTypeLabel,
     required this.isLostTicket,
     required this.lostTicketFee,
     required this.onLostTicketChanged,
@@ -41,7 +44,10 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
   final String timeOutLabel;
   final String durationLabel;
   final int flatBlockHours;
+  final String? driverInLabel;
   final TextEditingController driverOutController;
+  final bool driverOutEnabled;
+  final String? valetTypeLabel;
 
   static const _plateBlue = Color(0xFF0068D3);
   static const _orange = Color(0xFFF68D00);
@@ -84,6 +90,7 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
         _VehicleSummaryCard(
           plate: _plate,
           subtitle: _subtitle,
+          valetTypeLabel: valetTypeLabel,
           timeInLabel: timeInLabel,
           dateInLabel: dateInLabel,
           timeOutLabel: timeOutLabel,
@@ -185,24 +192,33 @@ class CheckoutPaymentLeftPane extends StatelessWidget {
               ),
             ),
         const SizedBox(height: 10),
-        _ReturningValetAttendantCard(
-          controller: driverOutController,
+        _ValetStaffCard(
+          driverInLabel: driverInLabel,
+          driverOutController: driverOutController,
+          driverOutEnabled: driverOutEnabled,
         ),
       ],
     );
   }
 }
 
-/// Returning valet name captured at payment (Figma left column, below rates).
-class _ReturningValetAttendantCard extends StatelessWidget {
-  const _ReturningValetAttendantCard({required this.controller});
+/// Valet staff captured at payment (driver in from ticket, driver out editable).
+class _ValetStaffCard extends StatelessWidget {
+  const _ValetStaffCard({
+    required this.driverInLabel,
+    required this.driverOutController,
+    required this.driverOutEnabled,
+  });
 
-  final TextEditingController controller;
+  final String? driverInLabel;
+  final TextEditingController driverOutController;
+  final bool driverOutEnabled;
 
   @override
   Widget build(BuildContext context) {
     final tc = AppThemeColors.of(context);
     final border = tc.cardBorder;
+    final driverIn = driverInLabel?.trim();
     return Container(
       width: double.infinity,
       padding: CheckOutUiTokens.cardPadding,
@@ -216,18 +232,45 @@ class _ReturningValetAttendantCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'RETURNING VALET ATTENDANT',
+            'VALET STAFF',
             style: CheckOutUiTokens.sectionTitleOf(context),
           ),
           const SizedBox(height: 8),
+          Text(
+            'DRIVER IN',
+            style: CheckOutUiTokens.fieldLabelOf(context),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: CheckOutUiTokens.hintFillOf(context),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: border),
+            ),
+            child: Text(
+              driverIn != null && driverIn.isNotEmpty ? driverIn : '—',
+              style: CheckOutUiTokens.bodyOf(context),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'DRIVER OUT (OPTIONAL)',
+            style: CheckOutUiTokens.fieldLabelOf(context),
+          ),
+          const SizedBox(height: 4),
           TextField(
-            controller: controller,
+            controller: driverOutController,
+            enabled: driverOutEnabled,
             textCapitalization: TextCapitalization.words,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => FocusManager.instance.primaryFocus?.unfocus(),
             style: CheckOutUiTokens.bodyOf(context),
             decoration: InputDecoration(
-              hintText: 'Name of valet returning the vehicle',
+              hintText: driverOutEnabled
+                  ? 'Name of valet returning the vehicle'
+                  : 'Not applicable for self-park',
               hintStyle: CheckOutUiTokens.hintOf(context),
               isDense: true,
               filled: true,
@@ -267,6 +310,7 @@ class _VehicleSummaryCard extends StatelessWidget {
     required this.dateInLabel,
     required this.timeOutLabel,
     required this.durationLabel,
+    this.valetTypeLabel,
   });
 
   final String plate;
@@ -275,6 +319,7 @@ class _VehicleSummaryCard extends StatelessWidget {
   final String dateInLabel;
   final String timeOutLabel;
   final String durationLabel;
+  final String? valetTypeLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -311,6 +356,13 @@ class _VehicleSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(subtitle, style: CheckOutUiTokens.bodyOf(context)),
+          if (valetTypeLabel != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Service: $valetTypeLabel',
+              style: CheckOutUiTokens.fieldLabelOf(context),
+            ),
+          ],
           const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -38,8 +38,7 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
   int _failedSyncCount = 0;
   bool _amountSyncedFromCubit = false;
 
-  static const _orange = Color(0xFFE8831A);
-  static const _pageBg = Color(0xFFF5F5F5);
+  static const _orange = Color(0xFFF68D00);
 
   @override
   void initState() {
@@ -269,9 +268,10 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
               ? DateFormat('EEEE, MMMM d, y').format(DateTime.now())
               : _headerSubtitle;
           final confirming = state is CloseCashConfirming;
+          final tc = AppThemeColors.of(context);
 
           return Scaffold(
-            backgroundColor: _pageBg,
+            backgroundColor: tc.scaffoldBg,
             body: Row(
               children: [
                 const CashLeftRail(),
@@ -294,9 +294,8 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
                                 final sideBySide = constraints.maxWidth >= 640;
                                 final statsPane = CloseCashShiftStatsCard(
                                   stats: loaded.stats,
-                                  activeCheckInCount:
-                                      loaded.openTransactions.length,
                                   accentColor: _orange,
+                                  hideVehicleTypes: loaded.shift.isExpressCashier,
                                 );
                                 final cashPane = _CloseCashCountPane(
                                   amountText: _displayPeso(_parsedAmount),
@@ -318,7 +317,6 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
                                       const VerticalDivider(
                                         width: 28,
                                         thickness: 1,
-                                        color: Color(0x21000000),
                                       ),
                                       Expanded(
                                         flex: 5,
@@ -366,7 +364,11 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
                                       child: OutlinedButton(
                                         onPressed: confirming
                                             ? null
-                                            : () => context.go('/dashboard'),
+                                            : () => context.go(
+                                                  auth.isExpressCashier
+                                                      ? '/express-cashier'
+                                                      : '/dashboard',
+                                                ),
                                         child: const Text('Cancel'),
                                       ),
                                     ),
@@ -431,13 +433,14 @@ class _CloseCashCountPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           'ACTUAL CASH COUNT',
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: AppColors.textSecondary,
+                color: tc.textSecondary,
                 letterSpacing: 1.2,
               ),
         ),
@@ -445,7 +448,7 @@ class _CloseCashCountPane extends StatelessWidget {
         Text(
           'Enter the total cash sales you are turning in for this shift.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
+                color: tc.textSecondary,
                 height: 1.4,
               ),
         ),

@@ -6,7 +6,10 @@ import 'package:drift/drift.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/formatting/vr_number.dart';
+import '../../core/formatting/valet_type_format.dart';
 import '../../core/api/transaction_payment_fields.dart';
+import '../remote/check_in_exceptions.dart';
 import '../../core/api/transaction_payment_summary.dart';
 import '../../core/api/void_audit_info.dart';
 import '../../features/check_out/models/checkout_preview_rates.dart';
@@ -46,18 +49,38 @@ String? _encodeCheckoutMetaDriverOut({
   String? valetType,
   String? parkingLevel,
   String? parkingSlot,
+  String? driverOutName,
 }) {
   final map = <String, dynamic>{};
   final name = customerName?.trim();
   final valet = valetType?.trim();
   final level = parkingLevel?.trim();
   final slot = parkingSlot?.trim();
+  final driverOut = driverOutName?.trim();
   if (name != null && name.isNotEmpty) map['customer_name'] = name;
   if (valet != null && valet.isNotEmpty) map['valet_type'] = valet;
   if (level != null && level.isNotEmpty) map['parking_level'] = level;
   if (slot != null && slot.isNotEmpty) map['parking_slot'] = slot;
+  if (driverOut != null && driverOut.isNotEmpty) map['driver_out'] = driverOut;
   if (map.isEmpty) return null;
   return jsonEncode(map);
+}
+
+/// Plain driver-out name from [Tickets.driverOut] (meta JSON or post-checkout scalar).
+String? driverOutNameFromColumn(String? raw) {
+  final t = raw?.trim() ?? '';
+  if (t.isEmpty) return null;
+  if (t.startsWith('{')) {
+    try {
+      final body = jsonDecode(t);
+      if (body is Map) {
+        final name = body['driver_out']?.toString().trim();
+        return name != null && name.isNotEmpty ? name : null;
+      }
+    } catch (_) {}
+    return null;
+  }
+  return t;
 }
 
 CheckoutTicketDisplay? _checkoutDisplayFromDriverOutMeta(String? raw) {
@@ -78,9 +101,7 @@ CheckoutTicketDisplay? _checkoutDisplayFromDriverOutMeta(String? raw) {
     return CheckoutTicketDisplay(
       customerName: (name == null || name.isEmpty) ? null : name,
       parkingLine: parkingParts.isEmpty ? null : parkingParts.join(' · '),
-      valetTypeLabel: valetRaw.isEmpty
-          ? null
-          : TicketService._prettyValetType(valetRaw),
+      valetTypeLabel: valetRaw.isEmpty ? null : ValetTypeFormat.label(valetRaw),
     );
   } catch (_) {
     return null;
@@ -322,7 +343,9 @@ class TicketService {
     required String cellphoneNumber,
     required String damageMarkersJson,
     required String personalBelongingsJson,
+    required String vrNo,
     String? driverIn,
+    String? driverOut,
     String? customerName,
     String? valetType,
     String? parkingLevel,
@@ -337,6 +360,11 @@ class TicketService {
     if (existing.shiftId != shiftId || existing.userId != userId) {
       throw StateError('Ticket shift/user mismatch');
     }
+    final vr = normalizeVrNumber(vrNo);
+    if (vr.isEmpty) {
+      throw StateError('VR number is required');
+    }
+    await ensureVrNoAvailable(vr, excludeTicketId: tid);
     final bid = branchId.trim().isEmpty ? '_' : branchId.trim();
     final now = PhilippineTime.iso8601Now();
     final metaDriverOut = _encodeCheckoutMetaDriverOut(
@@ -344,6 +372,7 @@ class TicketService {
       valetType: valetType,
       parkingLevel: parkingLevel,
       parkingSlot: parkingSlot,
+      driverOutName: driverOut,
     );
     final parkingJson = TicketService._encodeParkingInfoColumn(
       level: parkingLevel,
@@ -369,6 +398,7 @@ class TicketService {
         parkingInfo: Value(parkingJson),
         driverOut: Value(metaDriverOut),
         slotId: slotUuid.isNotEmpty ? Value(slotUuid) : const Value.absent(),
+        vrNo: Value(vr),
       ),
     );
 
@@ -385,6 +415,90 @@ class TicketService {
     return (_db.select(
       _db.tickets,
     )..where((t) => t.id.equals(tid))).getSingle();
+  }
+
+  /// Inserts an express cashier ticket — completed at intake, no check-out.
+  Future<Ticket> persistExpressCheckInLocally({
+    required String ticketId,
+    required String shiftId,
+    required String userId,
+    required String branchId,
+    required String plateNumber,
+    required double amount,
+    required String vrNo,
+    String? driverIn,
+    String? driverOut,
+  }) async {
+    final tid = ticketId.trim();
+    if (tid.isEmpty) {
+      throw StateError('Ticket id is required');
+    }
+    final existing = await ticketById(tid);
+    if (existing != null) {
+      throw StateError('Ticket number already exists');
+    }
+    final bid = branchId.trim().isEmpty ? '_' : branchId.trim();
+    final now = PhilippineTime.iso8601Now();
+    final vr = normalizeVrNumber(vrNo);
+    if (vr.isEmpty) {
+      throw StateError('VR number is required');
+    }
+    await ensureVrNoAvailable(vr);
+
+    await _db.into(_db.tickets).insert(
+          TicketsCompanion.insert(
+            id: tid,
+            shiftId: shiftId,
+            userId: userId,
+            branchId: bid,
+            plateNumber: plateNumber,
+            vehicleBrand: '',
+            vehicleColor: '',
+            vehicleType: '',
+            cellphoneNumber: '',
+            damageMarkers: '[]',
+            personalBelongings: '[]',
+            checkInAt: now,
+            checkOutAt: Value(now),
+            fee: Value(amount),
+            status: 'completed',
+            syncStatus: 'pending',
+            createdAt: now,
+            isExpressCashier: const Value(true),
+            vrNo: Value(vr),
+            driverIn: Value(_normalizedDriverName(driverIn)),
+            driverOut: Value(_normalizedDriverName(driverOut)),
+          ),
+        );
+
+    return (_db.select(_db.tickets)..where((t) => t.id.equals(tid)))
+        .getSingle();
+  }
+
+  /// Removes a failed express save that never reached the server (validation).
+  Future<void> deleteExpressPendingTicket(String ticketId) async {
+    final tid = ticketId.trim();
+    if (tid.isEmpty) return;
+    final row = await ticketById(tid);
+    if (row == null ||
+        !row.isExpressCashier ||
+        row.syncStatus != 'pending') {
+      return;
+    }
+    await (_db.delete(_db.tickets)..where((t) => t.id.equals(tid))).go();
+  }
+
+  /// Express cashier tickets on [shiftId], newest first.
+  Future<List<Ticket>> expressTicketsForShift(String shiftId) {
+    final sid = shiftId.trim();
+    return (_db.select(_db.tickets)
+          ..where(
+            (t) =>
+                t.shiftId.equals(sid) &
+                t.isExpressCashier.equals(true),
+          )
+          ..orderBy([(t) => OrderingTerm.desc(t.checkInAt)]))
+        .get();
   }
 
   Future<void> updateServerTicketId(
@@ -430,6 +544,10 @@ class TicketService {
     Map<String, dynamic> body,
     String token,
   ) async {
+    if (body['is_express_cashier'] == true) {
+      return syncQueuedExpressCheckIn(body, token);
+    }
+
     final path = body['signature_path']?.toString().trim() ?? '';
     if (path.isEmpty) {
       throw StateError('Queued check-in missing signature_path');
@@ -464,8 +582,11 @@ class TicketService {
     final vrNo = localRow?.vrNo?.trim().isNotEmpty == true
         ? localRow!.vrNo!.trim()
         : (vrFromQueue?.isNotEmpty == true
-            ? vrFromQueue
-            : (vrFromVehicle?.isNotEmpty == true ? vrFromVehicle : null));
+            ? vrFromQueue!
+            : (vrFromVehicle?.isNotEmpty == true ? vrFromVehicle! : ''));
+    if (vrNo.isEmpty) {
+      throw StateError('Queued check-in missing vr_no');
+    }
 
     final response = await _transactionsApi.submitCheckIn(
       token: token,
@@ -479,6 +600,7 @@ class TicketService {
       damages: damages,
       customerName: body['customer_name']?.toString(),
       driverIn: body['driver_in']?.toString(),
+      driverOut: body['driver_out']?.toString(),
       notes: body['notes']?.toString(),
       vrNo: vrNo,
       voidRequested: localRow?.pendingVoidRequest ?? false,
@@ -501,13 +623,68 @@ class TicketService {
         slotId: queuedSlotId.isNotEmpty
             ? Value(queuedSlotId)
             : const Value.absent(),
-        vrNo: vrNo != null && vrNo.isNotEmpty
-            ? Value(vrNo)
-            : const Value.absent(),
+        vrNo: Value(vrNo),
       );
       await (_db.update(_db.tickets)..where((t) => t.id.equals(localId)))
           .write(companion);
     }
+    return response;
+  }
+
+  /// Processes a queued express cashier check-in row.
+  Future<CheckInResponse> syncQueuedExpressCheckIn(
+    Map<String, dynamic> body,
+    String token,
+  ) async {
+    final localId =
+        body['local_ticket_id']?.toString().trim() ??
+        body['ticket_number']?.toString().trim() ??
+        '';
+    if (localId.isEmpty) {
+      throw StateError('Queued express check-in missing local_ticket_id');
+    }
+
+    final plate = body['plate_number']?.toString().trim() ?? '';
+    if (plate.isEmpty) {
+      throw StateError('Queued express check-in missing plate_number');
+    }
+
+    final amountRaw = body['amount'];
+    final amount = amountRaw is num
+        ? amountRaw.toDouble()
+        : double.tryParse(amountRaw?.toString() ?? '') ?? 0;
+    if (amount <= 0) {
+      throw StateError('Queued express check-in missing amount');
+    }
+
+    final ticketNumber =
+        body['ticket_number']?.toString().trim().isNotEmpty == true
+            ? body['ticket_number'].toString().trim()
+            : localId;
+
+    final localRow = await ticketById(localId);
+    final vrFromQueue = body['vr_no']?.toString().trim() ?? '';
+    final vrNo = localRow?.vrNo?.trim().isNotEmpty == true
+        ? localRow!.vrNo!.trim()
+        : vrFromQueue;
+    if (vrNo.isEmpty) {
+      throw StateError('Queued express check-in missing vr_no');
+    }
+
+    final response = await _transactionsApi.submitExpressCheckIn(
+      token: token,
+      ticketNumber: ticketNumber,
+      plateNumber: plate,
+      amount: amount,
+      vrNo: vrNo,
+      driverIn: body['driver_in']?.toString(),
+      driverOut: body['driver_out']?.toString(),
+    );
+
+    await updateServerTicketId(localId, response.id);
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(localId))).write(
+      const TicketsCompanion(syncStatus: Value('synced')),
+    );
     return response;
   }
 
@@ -628,22 +805,11 @@ class TicketService {
       return CheckoutTicketDisplay(
         customerName: (name == null || name.isEmpty) ? null : name,
         parkingLine: parkingParts.isEmpty ? null : parkingParts.join(' · '),
-        valetTypeLabel: valetRaw.isEmpty ? null : _prettyValetType(valetRaw),
+        valetTypeLabel: valetRaw.isEmpty ? null : ValetTypeFormat.label(valetRaw),
       );
     } catch (_) {
       return null;
     }
-  }
-
-  static String _prettyValetType(String raw) {
-    return raw
-        .split(RegExp(r'[_\s]+'))
-        .where((s) => s.isNotEmpty)
-        .map(
-          (w) =>
-              '${w[0].toUpperCase()}${w.length > 1 ? w.substring(1).toLowerCase() : ''}',
-        )
-        .join(' ');
   }
 
   /// Open row by id (exact ticket code, e.g. `TKT-0001`).
@@ -654,6 +820,60 @@ class TicketService {
           ..where((r) => r.id.equals(t) & r.status.equals('active'))
           ..limit(1))
         .getSingleOrNull();
+  }
+
+  /// Ticket with [vrNo] (case-insensitive), excluding [excludeTicketId].
+  Future<Ticket?> ticketByVrNo(
+    String vrNo, {
+    String? excludeTicketId,
+  }) async {
+    final normalized = normalizeVrNumber(vrNo);
+    if (normalized.isEmpty) return null;
+    final exclude = excludeTicketId?.trim() ?? '';
+    final row = await _db
+        .customSelect(
+          exclude.isEmpty
+              ? '''
+SELECT id FROM tickets
+WHERE status != 'draft'
+  AND vr_no IS NOT NULL
+  AND TRIM(vr_no) != ''
+  AND UPPER(TRIM(vr_no)) = ?
+ORDER BY check_in_at DESC
+LIMIT 1
+'''
+              : '''
+SELECT id FROM tickets
+WHERE status != 'draft'
+  AND vr_no IS NOT NULL
+  AND TRIM(vr_no) != ''
+  AND UPPER(TRIM(vr_no)) = ?
+  AND id != ?
+ORDER BY check_in_at DESC
+LIMIT 1
+''',
+          variables: exclude.isEmpty
+              ? <Variable<Object>>[Variable.withString(normalized)]
+              : <Variable<Object>>[
+                  Variable.withString(normalized),
+                  Variable.withString(exclude),
+                ],
+          readsFrom: {_db.tickets},
+        )
+        .getSingleOrNull();
+    if (row == null) return null;
+    return ticketById(row.read<String>('id'));
+  }
+
+  /// Ensures [vrNo] is not already stored on another local ticket.
+  Future<void> ensureVrNoAvailable(
+    String vrNo, {
+    String? excludeTicketId,
+  }) async {
+    final existing = await ticketByVrNo(vrNo, excludeTicketId: excludeTicketId);
+    if (existing != null) {
+      throw VrNumberAlreadyUsedException();
+    }
   }
 
   /// Most recent open ticket for [plate] (spaces ignored, case-insensitive).
@@ -733,7 +953,7 @@ LIMIT 1
   /// Queues unified check-out for offline finalize (`operation: checkout/finalize`).
   Future<void> persistVrNo(String ticketId, String vrNo) async {
     final tid = ticketId.trim();
-    final v = vrNo.trim();
+    final v = normalizeVrNumber(vrNo);
     if (tid.isEmpty || v.isEmpty) return;
     await (_db.update(_db.tickets)..where((t) => t.id.equals(tid))).write(
       TicketsCompanion(vrNo: Value(v)),
@@ -939,6 +1159,14 @@ LIMIT 1
         ? Map<String, dynamic>.from(appliedRaw)
         : null;
 
+    if (driverOut != null && driverOut.trim().isNotEmpty) {
+      await _transactionsApi.patchTransactionDrivers(
+        token: token,
+        ticketId: serverId,
+        driverOut: driverOut,
+      );
+    }
+
     return _transactionsApi.submitCheckOut(
       token: token,
       ticketId: serverId,
@@ -947,7 +1175,6 @@ LIMIT 1
       isOvernight: isOvernight,
       ticketLost: ticketLost,
       cashTendered: cashTendered,
-      driverOut: driverOut,
       conditionCheckout: conditionList,
       appliedRate: appliedRate,
     );
@@ -1153,6 +1380,10 @@ WHERE shift_id = ? AND status = 'completed'
         isTicketLost: extras.isTicketLost,
         appliedRate: extras.appliedRate,
         isOnline: true,
+        valetTypeLabel: _valetTypeLabelForDetail(
+          transactionJson: transactionJson,
+          ticket: ticket,
+        ),
       );
     }
 
@@ -1209,6 +1440,61 @@ WHERE shift_id = ? AND status = 'completed'
       isTicketLost: extras.isTicketLost,
       appliedRate: extras.appliedRate,
       isOnline: false,
+      valetTypeLabel: _valetTypeLabelForDetail(
+        transactionJson: null,
+        ticket: ticket,
+      ),
+    );
+  }
+
+  static String? _valetTypeLabelForDetail({
+    Map<String, dynamic>? transactionJson,
+    required Ticket ticket,
+  }) {
+    if (transactionJson != null) {
+      final fromApi = ValetTypeFormat.labelIfPresent(
+        ValetTypeFormat.rawFromTransaction(transactionJson),
+      );
+      if (fromApi != null) return fromApi;
+    }
+    final fromMeta = ValetTypeFormat.fromDriverOutMeta(ticket.driverOut);
+    if (fromMeta != null) return ValetTypeFormat.label(fromMeta);
+    return null;
+  }
+
+  static String? _driverNameFromField(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is Map) {
+      final name = raw['name'] ?? raw['id'];
+      return _normalizedDriverName(name?.toString());
+    }
+    return _normalizedDriverName(_scalarString(raw));
+  }
+
+  static String? _driverOutColumnFromServerTransaction(
+    Map<String, dynamic> json,
+  ) {
+    final checkOutAt = _parseCheckOutTime(json);
+    var status = _normalizeTicketStatus(json['status']?.toString() ?? 'active');
+    if (checkOutAt != null && status == 'active') {
+      status = 'completed';
+    }
+    final isCheckedOut = checkOutAt != null ||
+        status == 'completed' ||
+        status == 'lost';
+
+    if (isCheckedOut) {
+      return _driverNameFromField(json['driver_out'] ?? json['driverOut']);
+    }
+
+    final customer = _asStringKeyedMap(json['customer']) ?? const {};
+    final customerName = customer['name']?.toString();
+    final parkingMap = _mapField(json['parking']);
+    return _encodeCheckoutMetaDriverOut(
+      customerName: customerName,
+      valetType: ValetTypeFormat.rawFromTransaction(json),
+      parkingLevel: parkingMap['level']?.toString(),
+      parkingSlot: parkingMap['slot']?.toString(),
     );
   }
 
@@ -1816,8 +2102,8 @@ WHERE shift_id = ? AND status = 'completed'
       checkOutAt: checkOutAt,
       fee: _feeFromTransaction(json),
       status: status,
-      driverIn: _normalizedDriverName(_scalarString(json['driver_in'])),
-      driverOut: _normalizedDriverName(_scalarString(json['driver_out'])),
+      driverIn: _driverNameFromField(json['driver_in'] ?? json['driverIn']),
+      driverOut: _driverOutColumnFromServerTransaction(json),
       parkingInfo: parkingJson,
     );
   }

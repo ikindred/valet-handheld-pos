@@ -8,23 +8,25 @@ class CloseCashShiftStatsCard extends StatelessWidget {
   const CloseCashShiftStatsCard({
     super.key,
     required this.stats,
-    required this.activeCheckInCount,
-    this.accentColor = const Color(0xFFE8831A),
+    this.accentColor = const Color(0xFFF68D00),
+    this.hideVehicleTypes = false,
   });
 
   final CloseCashShiftStats stats;
-  final int activeCheckInCount;
   final Color accentColor;
+  final bool hideVehicleTypes;
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: tc.cardBg,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.13)),
+        border: Border.all(color: tc.cardBorder),
         boxShadow: const [
           BoxShadow(
             color: Color(0x0C000000),
@@ -36,59 +38,17 @@ class CloseCashShiftStatsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('ACTIVE CHECK-INS', style: CashFigmaStyles.sectionCaps()),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: activeCheckInCount > 0
-                  ? const Color(0xFFFFF4F0)
-                  : const Color(0xFFF8F9FB),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: activeCheckInCount > 0
-                    ? AppColors.error.withValues(alpha: 0.45)
-                    : Colors.black.withValues(alpha: 0.08),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Active check-ins',
-                    style: CashFigmaStyles.fieldLabel(),
-                  ),
-                ),
-                Text(
-                  '$activeCheckInCount',
-                  style: CashFigmaStyles.openingAmountInline().copyWith(
-                    color: activeCheckInCount > 0
-                        ? AppColors.error
-                        : AppColors.textSecondary,
-                    fontSize: 28,
-                  ),
-                ),
-              ],
+          Text(
+            'SHIFT CHECKOUTS',
+            style: CashFigmaStyles.sectionCaps().copyWith(
+              color: tc.textSecondary,
             ),
           ),
-          if (activeCheckInCount > 0) ...[
-            const SizedBox(height: 10),
-            Text(
-              'Vehicles still checked in. They stay on the server for the next '
-              'cashier once all check-ins and checkouts are synced.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                    height: 1.35,
-                  ),
-            ),
-          ],
-          const SizedBox(height: 14),
-          Text('SHIFT CHECKOUTS', style: CashFigmaStyles.sectionCaps()),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF7EC),
+              color: tc.accentSurface,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: accentColor.withValues(alpha: 0.4)),
             ),
@@ -97,7 +57,9 @@ class CloseCashShiftStatsCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Total checkouts',
-                    style: CashFigmaStyles.fieldLabel(),
+                    style: CashFigmaStyles.fieldLabel().copyWith(
+                      color: tc.textSecondary,
+                    ),
                   ),
                 ),
                 Text(
@@ -111,34 +73,41 @@ class CloseCashShiftStatsCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          Text('BY VEHICLE TYPE', style: CashFigmaStyles.fieldLabel()),
-          const SizedBox(height: 8),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              const gap = 8.0;
-              final cardWidth = (constraints.maxWidth - gap) / 2;
-              return Wrap(
-                spacing: gap,
-                runSpacing: gap,
-                children: [
-                  for (final stat in stats.vehicleTypes)
-                    SizedBox(
-                      width: cardWidth,
-                      child: _VehicleTypeCard(
-                        stat: stat,
-                        accentColor: accentColor,
+          if (!hideVehicleTypes) ...[
+            Text(
+              'BY VEHICLE TYPE',
+              style: CashFigmaStyles.fieldLabel().copyWith(
+                color: tc.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const gap = 8.0;
+                final cardWidth = (constraints.maxWidth - gap) / 2;
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: gap,
+                  children: [
+                    for (final stat in stats.vehicleTypes)
+                      SizedBox(
+                        width: cardWidth,
+                        child: _VehicleTypeCard(
+                          stat: stat,
+                          accentColor: accentColor,
+                        ),
                       ),
-                    ),
-                ],
-              );
-            },
-          ),
+                  ],
+                );
+              },
+            ),
+          ],
           if (stats.checkoutCount == 0) ...[
             const SizedBox(height: 10),
             Text(
               'No checkouts recorded since this shift opened.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
+                    color: tc.textSecondary,
                     height: 1.35,
                   ),
             ),
@@ -160,16 +129,17 @@ class _VehicleTypeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     final hasCount = stat.count > 0;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: hasCount ? const Color(0xFFFFF7EC) : const Color(0xFFF8F9FB),
+        color: hasCount ? tc.accentSurface : tc.hintFill,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: hasCount
               ? accentColor.withValues(alpha: 0.35)
-              : Colors.black.withValues(alpha: 0.08),
+              : tc.cardBorder,
         ),
       ),
       child: Row(
@@ -177,7 +147,10 @@ class _VehicleTypeCard extends StatelessWidget {
           Expanded(
             child: Text(
               stat.label,
-              style: CashFigmaStyles.fieldValue().copyWith(fontSize: 12),
+              style: CashFigmaStyles.fieldValue().copyWith(
+                fontSize: 12,
+                color: tc.textPrimary,
+              ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -187,7 +160,7 @@ class _VehicleTypeCard extends StatelessWidget {
             '${stat.count}',
             style: CashFigmaStyles.fieldValue().copyWith(
               fontWeight: FontWeight.w700,
-              color: hasCount ? accentColor : AppColors.textSecondary,
+              color: hasCount ? accentColor : tc.textSecondary,
               fontSize: 18,
             ),
           ),

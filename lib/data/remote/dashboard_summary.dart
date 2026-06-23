@@ -1,5 +1,6 @@
 import '../../core/api/transaction_payment_fields.dart';
 import '../../core/api/void_audit_info.dart';
+import '../../core/formatting/valet_type_format.dart';
 import '../../features/check_in/domain/vehicle_body_type.dart';
 import '../../features/dashboard/domain/dashboard_recent_format.dart';
 
@@ -173,6 +174,7 @@ class DashboardSummaryRecent {
     this.vehicleColor,
     this.parkingSlot,
     this.vrNo,
+    this.valetType,
     this.voidAudit,
     this.rawJson,
   });
@@ -192,6 +194,9 @@ class DashboardSummaryRecent {
   final String? vehicleColor;
   final String? parkingSlot;
   final String? vrNo;
+
+  /// `standard_valet` | `self_park` from API.
+  final String? valetType;
 
   /// Flat void audit from API (`void_reason`, `voided_by`, `voided_at`).
   final VoidAuditInfo? voidAudit;
@@ -289,6 +294,8 @@ class DashboardSummaryRecent {
     final vrNo = _str(json['vr_no'] ?? json['vrNo']) ??
         (vehicle != null ? _str(vehicle['vr_no'] ?? vehicle['vrNo']) : null);
 
+    final valetType = ValetTypeFormat.rawFromTransaction(json);
+
     final cashierIdRaw = _str(json['cashier_id'] ?? json['user_id']);
     return DashboardSummaryRecent(
       id: id,
@@ -308,6 +315,7 @@ class DashboardSummaryRecent {
       vehicleColor: color,
       parkingSlot: slot,
       vrNo: vrNo,
+      valetType: valetType,
       voidAudit: VoidAuditInfo.tryFromJson(json),
       rawJson: json,
     );

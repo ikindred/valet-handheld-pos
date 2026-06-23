@@ -4,6 +4,10 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/local/db/app_database.dart';
+import '../../data/remote/transactions_api.dart';
+import '../../data/repositories/auth_repository.dart';
+import '../../data/services/shift_service.dart';
+import '../../data/services/ticket_service.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/offline_login_screen.dart';
 import '../../features/cash/presentation/close_cash_screen.dart';
@@ -26,6 +30,8 @@ import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/dashboard/presentation/ticket_detail_screen.dart';
 import '../../features/device_setup/cubit/device_setup_cubit.dart';
 import '../../features/device_setup/screens/device_setup_screen.dart';
+import '../../features/express_cashier/presentation/express_cashier_screen.dart';
+import '../../features/express_cashier/state/express_cashier_cubit.dart';
 import '../../features/reports/presentation/reports_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
@@ -172,6 +178,18 @@ GoRouter createAppRouter(
         ],
       ),
       GoRoute(path: '/cash', redirect: (_, __) => '/cash/open'),
+      GoRoute(
+        path: '/express-cashier',
+        builder: (context, state) => BlocProvider(
+          create: (context) => ExpressCashierCubit(
+            authRepository: context.read<AuthRepository>(),
+            ticketService: context.read<TicketService>(),
+            transactionsApi: context.read<TransactionsApi>(),
+            shiftService: context.read<ShiftService>(),
+          ),
+          child: const ExpressCashierScreen(),
+        ),
+      ),
       GoRoute(
         path: '/reports',
         builder: (context, state) => const ReportsScreen(),

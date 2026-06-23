@@ -19,12 +19,45 @@ class AuthRouterGuard {
         loc == '/device-setup';
     final isCashOpen = loc.startsWith('/cash/open');
     final isCashClose = loc.startsWith('/cash/close');
+    final isExpressCashier = loc == '/express-cashier';
 
     if (auth is AuthUnauthenticated) {
       return isPublic ? null : '/login';
     }
 
     if (auth is AuthAuthenticated) {
+      if (auth.isExpressCashier) {
+        if (loc == '/splash' ||
+            loc == '/login' ||
+            loc == '/offline-login' ||
+            loc == '/device-setup') {
+          return auth.cashSessionStatus == CashSessionStatus.closed
+              ? '/cash/open'
+              : '/express-cashier';
+        }
+
+        if (auth.cashSessionStatus == CashSessionStatus.closed) {
+          if (isCashOpen || isCashClose) return null;
+          return '/cash/open';
+        }
+
+        if (loc == '/dashboard' ||
+            loc.startsWith('/check-in') ||
+            loc.startsWith('/check-out') ||
+            loc == '/reports') {
+          return '/express-cashier';
+        }
+
+        if (isExpressCashier ||
+            isCashOpen ||
+            isCashClose ||
+            loc == '/settings') {
+          return null;
+        }
+
+        return '/express-cashier';
+      }
+
       if (loc == '/splash' ||
           loc == '/login' ||
           loc == '/offline-login' ||
@@ -37,6 +70,10 @@ class AuthRouterGuard {
       if (auth.cashSessionStatus == CashSessionStatus.closed) {
         if (isCashOpen || isCashClose) return null;
         return '/cash/open';
+      }
+
+      if (isExpressCashier) {
+        return '/dashboard';
       }
     }
 

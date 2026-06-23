@@ -63,7 +63,9 @@ class OpenCashCubit extends Cubit<OpenCashState> {
         openingNotes: openingNotes,
       );
 
-      final inherited = await _auth.queryInheritedTransactionsPreCheck();
+      final inherited = await _auth.queryInheritedTransactionsPreCheck(
+        localUserId: localUserId,
+      );
 
       if (inherited.isEmpty) {
         ValetLog.debug(

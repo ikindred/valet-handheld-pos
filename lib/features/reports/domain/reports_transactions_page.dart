@@ -1,5 +1,6 @@
 import '../../../core/api/transaction_payment_fields.dart';
 import '../../../core/api/void_audit_info.dart';
+import '../../../core/formatting/valet_type_format.dart';
 import '../../../core/time/philippine_time.dart';
 import 'reports_format.dart';
 import 'reports_models.dart';
@@ -75,6 +76,9 @@ abstract final class ReportsTicketRowMapper {
     final cashTendered = TransactionPaymentFields.cashTenderedFrom(json);
     final voidAudit = VoidAuditInfo.tryFromJson(json);
     final cashierIdRaw = _str(json['cashier_id'] ?? json['user_id']);
+    final valetTypeLabel = ValetTypeFormat.labelIfPresent(
+      ValetTypeFormat.rawFromTransaction(json),
+    );
 
     return ReportsTicketRow(
       ticketId: ticketNumber.isEmpty ? '—' : ticketNumber,
@@ -95,6 +99,7 @@ abstract final class ReportsTicketRowMapper {
       isVoided:
           VoidAuditInfo.isVoidStatus(statusRaw) || voidAudit?.isPopulated == true,
       cashierId: cashierIdRaw.isEmpty ? null : cashierIdRaw,
+      valetTypeLabel: valetTypeLabel,
     );
   }
 

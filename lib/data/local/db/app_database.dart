@@ -82,6 +82,10 @@ class OfflineAccounts extends Table {
   /// JSON array from login `user.shiftSchedule` (empty when unset).
   TextColumn get shiftScheduleJson =>
       text().withDefault(const Constant(''))();
+
+  /// From login `user.express_cashier` — express manual ticketing mode.
+  BoolColumn get isExpressCashier =>
+      boolean().named('is_express_cashier').withDefault(const Constant(false))();
 }
 
 /// Auth token and session flags (`is_active`). Device id + offline mode only in prefs.
@@ -136,6 +140,10 @@ class Shifts extends Table {
 
   /// ISO8601 row creation time.
   TextColumn get createdAt => text()();
+
+  /// Express cashier shift — manual ticketing, no check-out flow.
+  BoolColumn get isExpressCashier =>
+      boolean().named('is_express_cashier').withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -239,6 +247,10 @@ class Tickets extends Table {
   /// Reason for the offline void-at-intake request.
   TextColumn get pendingVoidReason =>
       text().named('pending_void_reason').nullable()();
+
+  /// Express cashier transaction — completed at intake, no check-out.
+  BoolColumn get isExpressCashier =>
+      boolean().named('is_express_cashier').withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -384,7 +396,7 @@ class AppDatabase extends _$AppDatabase {
   final bool _skipDevOfflineSeed;
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -473,6 +485,11 @@ FROM offline_accounts''');
           }
           if (from < 14) {
             await m.createTable(parkingAreaLayouts);
+          }
+          if (from < 15) {
+            await m.addColumn(offlineAccounts, offlineAccounts.isExpressCashier);
+            await m.addColumn(shifts, shifts.isExpressCashier);
+            await m.addColumn(tickets, tickets.isExpressCashier);
           }
         },
       );

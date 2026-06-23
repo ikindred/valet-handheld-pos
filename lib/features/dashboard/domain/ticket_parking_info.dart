@@ -99,6 +99,7 @@ class TicketDetailSnapshot {
     this.isTicketLost,
     this.appliedRate,
     this.isOnline = true,
+    this.valetTypeLabel,
   });
 
   final Ticket ticket;
@@ -114,6 +115,9 @@ class TicketDetailSnapshot {
 
   /// Whether detail was loaded from server (vs pure local Drift).
   final bool isOnline;
+
+  /// Standard Valet / Self-Park when known.
+  final String? valetTypeLabel;
 
   double? get cashTendered => payment?.cashTendered;
   double? get changePesos => payment?.change;

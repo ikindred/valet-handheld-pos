@@ -255,6 +255,93 @@ abstract final class DashboardStyles {
   }
 }
 
+/// Side nav for express cashier: Manual Ticketing + Settings only.
+class ExpressCashierLeftRail extends StatelessWidget {
+  const ExpressCashierLeftRail({super.key});
+
+  static const _width = 72.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final path = GoRouterState.of(context).uri.path;
+
+    final tc = AppThemeColors.of(context);
+    return Container(
+      width: _width,
+      decoration: BoxDecoration(
+        color: tc.railBg,
+        border: Border(
+          right: BorderSide(color: tc.railBorder),
+        ),
+      ),
+      child: SafeArea(
+        left: false,
+        right: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: tc.cardBg,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: tc.cardBorder),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Image.asset(
+                                'assets/images/spid_logo1.png',
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.high,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _RailIcon(
+                            selected: path == '/express-cashier',
+                            icon: Icons.space_dashboard_rounded,
+                            onTap: () => context.go('/express-cashier'),
+                            accentSelection: true,
+                          ),
+                          const SizedBox(height: 10),
+                          _RailIcon(
+                            selected: path == '/settings',
+                            icon: Icons.settings_rounded,
+                            onTap: () => context.go('/settings'),
+                            accentSelection: false,
+                          ),
+                        ],
+                      ),
+                      _RailIcon(
+                        selected: false,
+                        icon: Icons.logout_rounded,
+                        onTap: () => showLogoutFlow(context),
+                        accentSelection: false,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class DashboardLeftRail extends StatelessWidget {
   const DashboardLeftRail({super.key});
 

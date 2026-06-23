@@ -79,6 +79,7 @@ class ShiftService {
     String? notes,
     bool awaitRemoteStart = false,
     bool resumeServerSession = false,
+    bool isExpressCashier = false,
   }) async {
     final existing = await getActiveShift(userId);
     if (existing != null) {
@@ -100,6 +101,7 @@ class ShiftService {
               status: 'open',
               syncStatus: resumeServerSession ? 'synced' : 'pending',
               createdAt: nowUtc,
+              isExpressCashier: Value(isExpressCashier),
             ),
           );
       if (resumeServerSession) return;

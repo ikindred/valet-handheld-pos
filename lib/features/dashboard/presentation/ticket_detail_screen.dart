@@ -321,6 +321,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         mallHours: _defaultMallHours,
         payment: detail.payment,
         appliedRate: detail.appliedRate,
+        valetTypeLabel: detail.valetTypeLabel,
       );
       if (!mounted) return;
       await printCheckOutFromContext(context, data: data);
@@ -493,6 +494,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 'Type',
                 t.vehicleType.trim().isEmpty ? '—' : t.vehicleType.trim(),
               ),
+              if (detail.valetTypeLabel != null)
+                _detailKv(context, 'Service', detail.valetTypeLabel!),
               if (t.vrNo != null && t.vrNo!.trim().isNotEmpty)
                 _detailKv(context, 'VR No.', t.vrNo!.trim()),
             ],
@@ -515,8 +518,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                     ? '—'
                     : t.cellphoneNumber.trim(),
               ),
-              if (driverIn != null) _detailKv(context, 'Driver in', driverIn),
-              if (driverOut != null) _detailKv(context, 'Returning Valet Attendant', driverOut),
+              if (driverIn != null &&
+                  detail.valetTypeLabel != 'Self-Park')
+                _detailKv(context, 'Driver in', driverIn),
+              if (driverOut != null &&
+                  detail.valetTypeLabel != 'Self-Park')
+                _detailKv(context, 'Returning Valet Attendant', driverOut),
             ],
           ),
         ),

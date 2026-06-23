@@ -34,6 +34,7 @@ class CheckInTextField extends StatelessWidget {
     this.hint,
     this.valueStyle,
     this.minHeight = CheckInCompactTokens.inputMinHeight,
+    this.enabled = true,
   });
 
   final TextEditingController controller;
@@ -46,11 +47,13 @@ class CheckInTextField extends StatelessWidget {
   final String? hint;
   final TextStyle? valueStyle;
   final double minHeight;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return AppTextField(
       controller: controller,
+      enabled: enabled,
       focusNode: focusNode,
       keyboardType: keyboardType,
       textCapitalization: textCapitalization,

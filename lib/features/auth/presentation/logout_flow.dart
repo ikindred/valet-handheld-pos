@@ -2,48 +2,212 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../../../core/services/device_id_service.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../state/auth_bloc.dart';
+
+enum LogoutChoice {
+  logoutOnly,
+  closeCashAndLogout,
+}
+
+/// Branded dialog shell shared by logout steps.
+class _LogoutDialogShell extends StatelessWidget {
+  const _LogoutDialogShell({
+    required this.title,
+    required this.icon,
+    required this.content,
+    this.actions,
+  });
+
+  final String title;
+  final IconData icon;
+  final Widget content;
+  final Widget? actions;
+
+  static const _maxWidth = 480.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
+    return Dialog(
+      backgroundColor: tc.cardBg,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: tc.cardBorder),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _maxWidth),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: DashboardStyles.orange.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, size: 20, color: DashboardStyles.orange),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        title,
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          height: 1.25,
+                          color: tc.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              content,
+              if (actions != null) ...[
+                const SizedBox(height: 18),
+                actions!,
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LogoutOptionCard extends StatelessWidget {
+  const _LogoutOptionCard({
+    required this.icon,
+    required this.title,
+    required this.body,
+    this.emphasized = false,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+  final bool emphasized;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
+    final accent = DashboardStyles.orange;
+    final borderColor = emphasized
+        ? accent.withValues(alpha: 0.55)
+        : tc.cardBorder;
+    final bg = emphasized ? tc.accentSurface : tc.hintFill;
+
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: borderColor),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: emphasized ? accent : tc.textSecondary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.35,
+                        color: tc.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      body,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        height: 1.45,
+                        color: tc.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// Simple "Are you sure?" used when there is no open cash session.
 Future<void> _logoutWithSimpleConfirm(BuildContext context) async {
+  final tc = AppThemeColors.of(context);
   final confirmed = await showDialog<bool>(
     context: context,
-    builder: (context) => AlertDialog(
-      scrollable: false,
-      title: Text(
-        'Logout',
-        style: GoogleFonts.poppins(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary,
-        ),
-      ),
+    builder: (context) => _LogoutDialogShell(
+      title: 'Logout',
+      icon: LucideIcons.logOut,
       content: Text(
         'You have no open cash session. Are you sure you want to logout?',
         style: GoogleFonts.poppins(
           fontSize: 14,
           fontWeight: FontWeight.w400,
           height: 1.45,
-          color: AppColors.textPrimary,
+          color: tc.textSecondary,
         ),
       ),
-      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      actionsAlignment: MainAxisAlignment.end,
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Logout'),
-        ),
-      ],
+      actions: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            style: TextButton.styleFrom(foregroundColor: tc.textSecondary),
+            child: const Text('Cancel'),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: DashboardStyles.orange,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(88, 40),
+            ),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
     ),
   );
   if (!context.mounted || confirmed != true) return;
@@ -52,12 +216,8 @@ Future<void> _logoutWithSimpleConfirm(BuildContext context) async {
   await context.read<AuthRepository>().logoutOnly(deviceId: deviceId);
   if (!context.mounted) return;
   context.read<AuthBloc>().add(const AuthLoggedOut());
-  context.go('/login');
-}
-
-enum LogoutChoice {
-  logoutOnly,
-  closeCashAndLogout,
+  await context.read<AuthBloc>().stream.firstWhere((s) => s is AuthUnauthenticated);
+  if (context.mounted) context.go('/login');
 }
 
 /// Shared logout UX from Dashboard, Open Cash, and Settings.
@@ -73,65 +233,58 @@ Future<void> showLogoutFlow(BuildContext context) async {
 
   final choice = await showDialog<LogoutChoice>(
     context: context,
-    builder: (context) => AlertDialog(
-      scrollable: false,
-      title: Text(
-        'Logout',
-        style: GoogleFonts.poppins(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary,
-        ),
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'You are signing out of this device. Choose what should happen '
-            'to your open cash shift:',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              height: 1.45,
-              color: AppColors.textPrimary,
+    builder: (context) {
+      final tc = AppThemeColors.of(context);
+      return _LogoutDialogShell(
+        title: 'Logout',
+        icon: LucideIcons.logOut,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'You are signing out of this device. Choose what should happen '
+              'to your open cash shift:',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                height: 1.45,
+                color: tc.textSecondary,
+              ),
             ),
-          ),
-          const SizedBox(height: 14),
-          const _LogoutOptionHint(
-            title: 'Logout only',
-            body:
-                'End this session but keep the shift open on the server. '
-                'Sign in again later to continue where you left off.',
-          ),
-          const SizedBox(height: 10),
-          const _LogoutOptionHint(
-            title: 'Close cash + logout',
-            body:
-                'Close your shift, reconcile cash, then sign out. '
-                'Use this when you are finished for the day.',
-          ),
-        ],
-      ),
-      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      actionsAlignment: MainAxisAlignment.end,
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+            const SizedBox(height: 14),
+            _LogoutOptionCard(
+              icon: LucideIcons.doorOpen,
+              title: 'Logout only',
+              body:
+                  'End this session but keep the shift open on the server. '
+                  'Sign in again later to continue where you left off.',
+              onTap: () =>
+                  Navigator.of(context).pop(LogoutChoice.logoutOnly),
+            ),
+            const SizedBox(height: 10),
+            _LogoutOptionCard(
+              icon: LucideIcons.wallet,
+              title: 'Close cash + logout',
+              body:
+                  'Close your shift, reconcile cash, then sign out. '
+                  'Use this when you are finished for the day.',
+              emphasized: true,
+              onTap: () => Navigator.of(context)
+                  .pop(LogoutChoice.closeCashAndLogout),
+            ),
+            const SizedBox(height: 10),
+            _LogoutOptionCard(
+              icon: LucideIcons.x,
+              title: 'Cancel',
+              body:
+                  'Stay signed in and return without making any changes.',
+              onTap: () => Navigator.of(context).pop(),
+            ),
+          ],
         ),
-        TextButton(
-          onPressed: () =>
-              Navigator.of(context).pop(LogoutChoice.logoutOnly),
-          child: const Text('Logout only'),
-        ),
-        FilledButton(
-          onPressed: () =>
-              Navigator.of(context).pop(LogoutChoice.closeCashAndLogout),
-          child: const Text('Close Cash + Logout'),
-        ),
-      ],
-    ),
+      );
+    },
   );
 
   if (!context.mounted || choice == null) return;
@@ -142,7 +295,8 @@ Future<void> showLogoutFlow(BuildContext context) async {
     await context.read<AuthRepository>().logoutOnly(deviceId: deviceId);
     if (!context.mounted) return;
     context.read<AuthBloc>().add(const AuthLoggedOut());
-    context.go('/login');
+    await context.read<AuthBloc>().stream.firstWhere((s) => s is AuthUnauthenticated);
+    if (context.mounted) context.go('/login');
     return;
   }
 
@@ -161,44 +315,6 @@ Future<void> showLogoutFlow(BuildContext context) async {
   }
 
   context.go('/cash/close');
-}
-
-class _LogoutOptionHint extends StatelessWidget {
-  const _LogoutOptionHint({
-    required this.title,
-    required this.body,
-  });
-
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            height: 1.35,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          body,
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            fontWeight: FontWeight.w400,
-            height: 1.4,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 Future<String?> _promptPassword(BuildContext context) {
@@ -228,16 +344,10 @@ class _ConfirmPasswordDialogState extends State<_ConfirmPasswordDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      scrollable: false,
-      title: Text(
-        'Confirm password',
-        style: GoogleFonts.poppins(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary,
-        ),
-      ),
+    final tc = AppThemeColors.of(context);
+    return _LogoutDialogShell(
+      title: 'Confirm password',
+      icon: LucideIcons.lock,
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -249,12 +359,18 @@ class _ConfirmPasswordDialogState extends State<_ConfirmPasswordDialog> {
               fontSize: 14,
               fontWeight: FontWeight.w400,
               height: 1.45,
-              color: AppColors.textSecondary,
+              color: tc.textSecondary,
             ),
           ),
           const SizedBox(height: 14),
           LabeledAppTextField(
             label: 'Password',
+            labelStyle: GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
+              color: tc.textSecondary,
+            ),
             child: AppTextField(
               controller: _ctrl,
               obscureText: true,
@@ -266,18 +382,26 @@ class _ConfirmPasswordDialogState extends State<_ConfirmPasswordDialog> {
           ),
         ],
       ),
-      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      actionsAlignment: MainAxisAlignment.end,
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('Continue'),
-        ),
-      ],
+      actions: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(foregroundColor: tc.textSecondary),
+            child: const Text('Cancel'),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: _submit,
+            style: FilledButton.styleFrom(
+              backgroundColor: DashboardStyles.orange,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(96, 40),
+            ),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
     );
   }
 }

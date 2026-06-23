@@ -36,6 +36,7 @@ class CheckInValetTypeCards extends StatelessWidget {
                 selected: state.valetServiceType == ValetServiceType.selfPark,
                 onTap: () => context.read<CheckInCubit>().updateCustomerStep(
                   valetServiceType: ValetServiceType.selfPark,
+                  assignedValetDriver: '',
                 ),
               ),
             ),

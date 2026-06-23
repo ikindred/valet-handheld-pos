@@ -90,7 +90,17 @@ class AuthRepository {
   Future<String> shiftRouteForLocalUser(int localUserId) async {
     final uid = await _shifts.shiftUserIdForLocalAccount(localUserId);
     final open = await _shifts.getActiveShift(uid);
-    return open != null ? '/dashboard' : '/cash/open';
+    if (open == null) return '/cash/open';
+    if (await isExpressCashierForLocalUser(localUserId)) {
+      return '/express-cashier';
+    }
+    return '/dashboard';
+  }
+
+  /// Whether the logged-in user is in express cashier (manual ticketing) mode.
+  Future<bool> isExpressCashierForLocalUser(int localUserId) async {
+    final account = await offlineAccountById(localUserId);
+    return account?.isExpressCashier ?? false;
   }
 
   Future<OfflineAccount?> offlineAccountById(int localId) {
@@ -313,6 +323,7 @@ class AuthRepository {
     required String fullName,
     required String role,
     String shiftScheduleJson = '',
+    bool isExpressCashier = false,
   }) async {
     final now = unixNowSeconds();
     final existing = await offlineAccountByServerId(serverUserId);
@@ -326,6 +337,7 @@ class AuthRepository {
           fullName: Value(fullName),
           role: Value(role),
           shiftScheduleJson: Value(shiftScheduleJson),
+          isExpressCashier: Value(isExpressCashier),
           lastOnlineLogin: Value(now),
           updatedAt: Value(now),
         ),
@@ -340,6 +352,7 @@ class AuthRepository {
             fullName: fullName,
             role: role,
             shiftScheduleJson: Value(shiftScheduleJson),
+            isExpressCashier: Value(isExpressCashier),
             lastOnlineLogin: now,
             createdAt: now,
             updatedAt: now,
@@ -389,6 +402,7 @@ class AuthRepository {
       role: res.role,
       shiftScheduleJson:
           CashierShiftSchedule.encodeToJsonString(res.shiftSchedule),
+      isExpressCashier: res.expressCashier,
     );
 
     await _db.transaction(() async {
@@ -673,12 +687,14 @@ class AuthRepository {
     final uid = await _shifts.shiftUserIdForLocalAccount(localUserId);
     final site = await branchAndAreaFromDb();
     final bid = branch.trim().isNotEmpty ? branch.trim() : site.branch.trim();
+    final account = await offlineAccountById(localUserId);
     final shift = await _shifts.createShift(
       userId: uid,
       branchId: bid.isEmpty ? '_' : bid,
       openingFloat: openingFloat,
       notes: openingNotes,
       awaitRemoteStart: true,
+      isExpressCashier: account?.isExpressCashier ?? false,
     );
     _refresh.notifyAuthChanged();
     return shift.id;
@@ -687,14 +703,28 @@ class AuthRepository {
   /// Pre-open-cash check: returns all currently-parked tickets that the
   /// incoming cashier will need to acknowledge before a shift is created.
   ///
+  /// Express cashiers never inherit or adopt tickets. Normal cashiers never
+  /// inherit express-cashier tickets.
+  ///
   /// Sources (merged, deduplicated by server UUID):
   /// 1. Local Drift DB — all `active` tickets (regardless of shift).
   /// 2. Remote `GET /reports/transactions?status=active` — best-effort; ignored
   ///    on network errors so the flow still works offline.
-  Future<List<OpenTransaction>> queryInheritedTransactionsPreCheck() async {
-    // 1. Local active tickets.
+  Future<List<OpenTransaction>> queryInheritedTransactionsPreCheck({
+    required int localUserId,
+  }) async {
+    if (await isExpressCashierForLocalUser(localUserId)) {
+      return const [];
+    }
+
+    // 1. Local active tickets (normal cashier only — never express).
     final localTickets = await (_db.select(_db.tickets)
-          ..where((t) => t.status.equals('active') & t.checkOutAt.isNull())
+          ..where(
+            (t) =>
+                t.status.equals('active') &
+                t.checkOutAt.isNull() &
+                t.isExpressCashier.equals(false),
+          )
           ..orderBy([(t) => OrderingTerm.asc(t.checkInAt)]))
         .get();
 
@@ -740,13 +770,15 @@ class AuthRepository {
   }
 
   /// Active check-ins from other shifts to optionally adopt into [newShiftId].
+  /// Express-cashier tickets are never transferred between shifts.
   Future<List<Ticket>> queryInheritedOpenTickets(String newShiftId) {
     return (_db.select(_db.tickets)
           ..where(
             (t) =>
                 t.status.equals('active') &
                 t.shiftId.equals(newShiftId).not() &
-                t.checkOutAt.isNull(),
+                t.checkOutAt.isNull() &
+                t.isExpressCashier.equals(false),
           )
           ..orderBy([(t) => OrderingTerm.asc(t.checkInAt)]))
         .get();
@@ -778,6 +810,31 @@ WHERE shift_id = ? AND status = 'completed'
     return (row.data['c'] as num?)?.toInt() ?? 0;
   }
 
+  /// Express cashier tickets on [shiftId] (matches Manual Ticketing list).
+  Future<int> countExpressCompletedForShift(String shiftId) async {
+    final row = await _db.customSelect(
+      '''
+SELECT COUNT(*) AS c FROM tickets
+WHERE shift_id = ? AND status = 'completed' AND is_express_cashier = 1
+''',
+      variables: [Variable<String>(shiftId)],
+      readsFrom: {_db.tickets},
+    ).getSingle();
+    return (row.data['c'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<double> sumExpressSalesForShift(String shiftId) async {
+    final row = await _db.customSelect(
+      '''
+SELECT COALESCE(SUM(fee), 0) AS s FROM tickets
+WHERE shift_id = ? AND status = 'completed' AND is_express_cashier = 1
+''',
+      variables: [Variable<String>(shiftId)],
+      readsFrom: {_db.tickets},
+    ).getSingle();
+    return (row.data['s'] as num?)?.toDouble() ?? 0.0;
+  }
+
   /// Close-cash stats for [shift]: counts activity since shift open (not only
   /// `shift_id` match — checkouts stay on the ticket's original shift row).
   /// When online, pass [remoteCheckoutCount] / [remoteVehiclesIn] from
@@ -793,55 +850,72 @@ WHERE shift_id = ? AND status = 'completed'
     final userId = shift.userId;
 
     final checkInCount = await _countCheckInsSinceOpen(since, userId);
-    var checkoutCount = await _countCompletedSinceOpen(
-      since,
-      userId,
-      shiftId: shift.id,
-    );
     var vehiclesIn = await _countActiveOnShift(shift.id);
-    final totalSales = await _sumCompletedSalesSinceOpen(
-      since,
-      userId,
-      shiftId: shift.id,
-    );
-    var byVehicleType = await _completedByVehicleTypeSinceOpen(
-      since,
-      userId,
-      shiftId: shift.id,
-    );
 
-    if (remoteCheckoutCount != null &&
-        remoteCheckoutCount > checkoutCount) {
-      checkoutCount = remoteCheckoutCount;
-    }
-    if (remoteVehiclesIn != null) {
-      vehiclesIn = remoteVehiclesIn;
-    }
+    late final int checkoutCount;
+    late final double totalSales;
+    late final Map<String, int> byVehicleType;
 
-    final localTypeTotal =
-        byVehicleType.values.fold<int>(0, (sum, n) => sum + n);
-    final remoteTypeTotal = remoteByVehicleType?.values.fold<int>(
-          0,
-          (sum, n) => sum + n,
-        ) ??
-        0;
-    if (remoteByVehicleType != null &&
-        remoteTypeTotal > 0 &&
-        (localTypeTotal == 0 || remoteTypeTotal > localTypeTotal)) {
-      byVehicleType = remoteByVehicleType;
-    }
+    if (shift.isExpressCashier) {
+      // Match Manual Ticketing list — ignore dashboard totals that can include
+      // extra server rows from failed/partial saves.
+      checkoutCount = await countExpressCompletedForShift(shift.id);
+      totalSales = await sumExpressSalesForShift(shift.id);
+      byVehicleType = const {};
+    } else {
+      var localCheckoutCount = await _countCompletedSinceOpen(
+        since,
+        userId,
+        shiftId: shift.id,
+      );
+      var localTotalSales = await _sumCompletedSalesSinceOpen(
+        since,
+        userId,
+        shiftId: shift.id,
+      );
+      var localByVehicleType = await _completedByVehicleTypeSinceOpen(
+        since,
+        userId,
+        shiftId: shift.id,
+      );
 
-    final mergedTypeTotal =
-        byVehicleType.values.fold<int>(0, (sum, n) => sum + n);
-    if (mergedTypeTotal == 0 &&
-        checkoutCount > 0 &&
-        recentCheckouts != null &&
-        recentCheckouts.isNotEmpty) {
-      final fromRecent =
-          await _vehicleTypeCountsFromRecentCheckouts(recentCheckouts);
-      if (fromRecent.isNotEmpty) {
-        byVehicleType = fromRecent;
+      if (remoteCheckoutCount != null &&
+          remoteCheckoutCount > localCheckoutCount) {
+        localCheckoutCount = remoteCheckoutCount;
       }
+      if (remoteVehiclesIn != null) {
+        vehiclesIn = remoteVehiclesIn;
+      }
+
+      final localTypeTotal =
+          localByVehicleType.values.fold<int>(0, (sum, n) => sum + n);
+      final remoteTypeTotal = remoteByVehicleType?.values.fold<int>(
+            0,
+            (sum, n) => sum + n,
+          ) ??
+          0;
+      if (remoteByVehicleType != null &&
+          remoteTypeTotal > 0 &&
+          (localTypeTotal == 0 || remoteTypeTotal > localTypeTotal)) {
+        localByVehicleType = remoteByVehicleType;
+      }
+
+      final mergedTypeTotal =
+          localByVehicleType.values.fold<int>(0, (sum, n) => sum + n);
+      if (mergedTypeTotal == 0 &&
+          localCheckoutCount > 0 &&
+          recentCheckouts != null &&
+          recentCheckouts.isNotEmpty) {
+        final fromRecent =
+            await _vehicleTypeCountsFromRecentCheckouts(recentCheckouts);
+        if (fromRecent.isNotEmpty) {
+          localByVehicleType = fromRecent;
+        }
+      }
+
+      checkoutCount = localCheckoutCount;
+      totalSales = localTotalSales;
+      byVehicleType = localByVehicleType;
     }
 
     return CloseCashShiftStats.fromAggregates(
@@ -1050,8 +1124,14 @@ GROUP BY vehicle_type
   /// Reassigns inherited active tickets to [newShiftId].
   ///
   /// Already-synced tickets (on the server) only move locally; unsynced rows are
-  /// queued for outbound sync.
+  /// queued for outbound sync. Express-cashier shifts never adopt tickets.
   Future<void> adoptInheritedTicketsForShift(String newShiftId) async {
+    final shift = await (_db.select(_db.shifts)
+          ..where((s) => s.id.equals(newShiftId))
+          ..limit(1))
+        .getSingleOrNull();
+    if (shift?.isExpressCashier == true) return;
+
     final rows = await queryInheritedOpenTickets(newShiftId);
     if (rows.isEmpty) return;
     final now = DateTime.now().toIso8601String();
@@ -1151,12 +1231,14 @@ GROUP BY vehicle_type
       if (open != null) return;
       final site = await branchAndAreaFromDb();
       final bid = site.branch.trim().isEmpty ? '_' : site.branch.trim();
+      final isExpress = await isExpressCashierForLocalUser(localUserId);
       try {
         await _shifts.createShift(
           userId: uid,
           branchId: bid,
           openingFloat: 0,
           resumeServerSession: true,
+          isExpressCashier: isExpress,
         );
       } on StateError catch (_) {
         // Race: shift opened concurrently.

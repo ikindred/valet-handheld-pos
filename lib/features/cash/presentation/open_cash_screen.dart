@@ -12,6 +12,7 @@ import '../../../core/time/philippine_time.dart';
 import '../../../core/logging/valet_log.dart';
 import '../../../core/connectivity/internet_reachability.dart';
 import '../../../core/ui/app_text_field.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/branch_config_service.dart';
 import '../../auth/state/auth_bloc.dart';
@@ -71,7 +72,9 @@ class OpenCashScreen extends StatelessWidget {
               );
             }
             if (!context.mounted) return;
-            context.go('/dashboard');
+            final isExpress = authBloc.state is AuthAuthenticated &&
+                (authBloc.state as AuthAuthenticated).isExpressCashier;
+            context.go(isExpress ? '/express-cashier' : '/dashboard');
           }
           if (state is OpenCashError) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -250,8 +253,9 @@ class _OpenCashViewState extends State<_OpenCashView> {
         : '$nowLabel · ${AppConfig.defaultDeviceBranch} : ${AppConfig.defaultDeviceArea}';
 
     final busy = widget.busy;
+    final tc = AppThemeColors.of(context);
     return Scaffold(
-            backgroundColor: const Color(0xFFF4F5F7),
+            backgroundColor: tc.scaffoldBg,
             body: Row(
               children: [
                 const CashLeftRail(),
@@ -282,7 +286,9 @@ class _OpenCashViewState extends State<_OpenCashView> {
                                       children: [
                                         Text(
                                           'SHIFT INFORMATION',
-                                          style: CashFigmaStyles.sectionCaps(),
+                                          style: CashFigmaStyles.sectionCaps().copyWith(
+                                            color: tc.textSecondary,
+                                          ),
                                         ),
                                         const SizedBox(height: 8),
                                         Row(
@@ -329,7 +335,9 @@ class _OpenCashViewState extends State<_OpenCashView> {
                                         const SizedBox(height: 14),
                                         Text(
                                           'OPENING BALANCE',
-                                          style: CashFigmaStyles.sectionCaps(),
+                                          style: CashFigmaStyles.sectionCaps().copyWith(
+                                            color: tc.textSecondary,
+                                          ),
                                         ),
                                         const SizedBox(height: 6),
                                         CashAmountBox(text: _displayAmount),
@@ -347,7 +355,7 @@ class _OpenCashViewState extends State<_OpenCashView> {
                                   ),
                                   child: Container(
                                     width: 1,
-                                    color: Colors.black.withValues(alpha: 0.13),
+                                    color: tc.cardBorder,
                                   ),
                                 ),
                                 Flexible(
@@ -451,9 +459,10 @@ class _ReadOnlyField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return LabeledAppTextField(
       label: label,
-      labelStyle: CashFigmaStyles.fieldLabel(),
+      labelStyle: CashFigmaStyles.fieldLabel().copyWith(color: tc.textSecondary),
       gap: 3,
       child: AppReadOnlyField(
         minHeight: 32,
@@ -463,9 +472,7 @@ class _ReadOnlyField extends StatelessWidget {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: CashFigmaStyles.fieldValue().copyWith(
-            color: emphasizeNoShift
-                ? const Color(0xFF6B7280)
-                : const Color(0xFF0A1B39),
+            color: emphasizeNoShift ? tc.textSecondary : tc.textPrimary,
             fontStyle:
                 emphasizeNoShift ? FontStyle.italic : FontStyle.normal,
           ),
@@ -488,29 +495,40 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: tc.cardBg,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: tc.cardBorder),
       ),
       child: Column(
         children: [
-          Text(title, style: CashFigmaStyles.totalCardLabel()),
+          Text(
+            title,
+            style: CashFigmaStyles.totalCardLabel().copyWith(
+              color: tc.textSecondary,
+            ),
+          ),
           const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
               bigValue,
               textAlign: TextAlign.center,
-              style: CashFigmaStyles.totalCardAmount(),
+              style: CashFigmaStyles.totalCardAmount().copyWith(
+                color: tc.textPrimary,
+              ),
             ),
           ),
           const SizedBox(height: 4),
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: CashFigmaStyles.totalCardLabel(),
+            style: CashFigmaStyles.totalCardLabel().copyWith(
+              color: tc.textSecondary,
+            ),
           ),
         ],
       ),
@@ -525,16 +543,23 @@ class _NotesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: tc.cardBg,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: tc.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('NOTES (OPTIONAL)', style: CashFigmaStyles.notesSectionLabel()),
+          Text(
+            'NOTES (OPTIONAL)',
+            style: CashFigmaStyles.notesSectionLabel().copyWith(
+              color: tc.textSecondary,
+            ),
+          ),
           const SizedBox(height: 6),
           AppTextField(
             controller: controller,
@@ -593,16 +618,24 @@ class _ShiftSummaryCardState extends State<_ShiftSummaryCard> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     Widget row(String left, String right) {
       return Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(left, style: CashFigmaStyles.shiftSummaryRow(isLabel: true)),
+          Text(
+            left,
+            style: CashFigmaStyles.shiftSummaryRow(isLabel: true).copyWith(
+              color: tc.textSecondary,
+            ),
+          ),
           Flexible(
             child: Text(
               right,
               textAlign: TextAlign.end,
-              style: CashFigmaStyles.shiftSummaryRow(isLabel: false),
+              style: CashFigmaStyles.shiftSummaryRow(isLabel: false).copyWith(
+                color: tc.textPrimary,
+              ),
             ),
           ),
         ],
@@ -612,25 +645,31 @@ class _ShiftSummaryCardState extends State<_ShiftSummaryCard> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: tc.cardBg,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: tc.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('SHIFT SUMMARY', style: CashFigmaStyles.shiftSummaryTitle()),
+          Text(
+            'SHIFT SUMMARY',
+            style: CashFigmaStyles.shiftSummaryTitle().copyWith(
+              color: tc.textSecondary,
+            ),
+          ),
           const SizedBox(height: 8),
           row('Staff', widget.staff),
           Container(
             height: 1,
             margin: const EdgeInsets.symmetric(vertical: 6),
-            color: Colors.black.withValues(alpha: 0.13),
+            color: tc.cardBorder,
           ),
           row('Date', _dateLabel),
           Container(
             height: 1,
             margin: const EdgeInsets.symmetric(vertical: 6),
-            color: Colors.black.withValues(alpha: 0.13),
+            color: tc.cardBorder,
           ),
           row('Time', _timeLabel),
         ],

@@ -944,6 +944,16 @@ class $OfflineAccountsTable extends OfflineAccounts
           type: DriftSqlType.string,
           requiredDuringInsert: false,
           defaultValue: const Constant(''));
+  static const VerificationMeta _isExpressCashierMeta =
+      const VerificationMeta('isExpressCashier');
+  @override
+  late final GeneratedColumn<bool> isExpressCashier = GeneratedColumn<bool>(
+      'is_express_cashier', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_express_cashier" IN (0, 1))'),
+      defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -955,7 +965,8 @@ class $OfflineAccountsTable extends OfflineAccounts
         lastOnlineLogin,
         createdAt,
         updatedAt,
-        shiftScheduleJson
+        shiftScheduleJson,
+        isExpressCashier
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1030,6 +1041,12 @@ class $OfflineAccountsTable extends OfflineAccounts
           shiftScheduleJson.isAcceptableOrUnknown(
               data['shift_schedule_json']!, _shiftScheduleJsonMeta));
     }
+    if (data.containsKey('is_express_cashier')) {
+      context.handle(
+          _isExpressCashierMeta,
+          isExpressCashier.isAcceptableOrUnknown(
+              data['is_express_cashier']!, _isExpressCashierMeta));
+    }
     return context;
   }
 
@@ -1059,6 +1076,8 @@ class $OfflineAccountsTable extends OfflineAccounts
           .read(DriftSqlType.int, data['${effectivePrefix}updated_at'])!,
       shiftScheduleJson: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}shift_schedule_json'])!,
+      isExpressCashier: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}is_express_cashier'])!,
     );
   }
 
@@ -1085,6 +1104,9 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
 
   /// JSON array from login `user.shiftSchedule` (empty when unset).
   final String shiftScheduleJson;
+
+  /// From login `user.express_cashier` — express manual ticketing mode.
+  final bool isExpressCashier;
   const OfflineAccount(
       {required this.id,
       required this.serverUserId,
@@ -1095,7 +1117,8 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
       required this.lastOnlineLogin,
       required this.createdAt,
       required this.updatedAt,
-      required this.shiftScheduleJson});
+      required this.shiftScheduleJson,
+      required this.isExpressCashier});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1109,6 +1132,7 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
     map['created_at'] = Variable<int>(createdAt);
     map['updated_at'] = Variable<int>(updatedAt);
     map['shift_schedule_json'] = Variable<String>(shiftScheduleJson);
+    map['is_express_cashier'] = Variable<bool>(isExpressCashier);
     return map;
   }
 
@@ -1124,6 +1148,7 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       shiftScheduleJson: Value(shiftScheduleJson),
+      isExpressCashier: Value(isExpressCashier),
     );
   }
 
@@ -1141,6 +1166,7 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
       shiftScheduleJson: serializer.fromJson<String>(json['shiftScheduleJson']),
+      isExpressCashier: serializer.fromJson<bool>(json['isExpressCashier']),
     );
   }
   @override
@@ -1157,6 +1183,7 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
       'shiftScheduleJson': serializer.toJson<String>(shiftScheduleJson),
+      'isExpressCashier': serializer.toJson<bool>(isExpressCashier),
     };
   }
 
@@ -1170,7 +1197,8 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
           int? lastOnlineLogin,
           int? createdAt,
           int? updatedAt,
-          String? shiftScheduleJson}) =>
+          String? shiftScheduleJson,
+          bool? isExpressCashier}) =>
       OfflineAccount(
         id: id ?? this.id,
         serverUserId: serverUserId ?? this.serverUserId,
@@ -1182,6 +1210,7 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
         shiftScheduleJson: shiftScheduleJson ?? this.shiftScheduleJson,
+        isExpressCashier: isExpressCashier ?? this.isExpressCashier,
       );
   OfflineAccount copyWithCompanion(OfflineAccountsCompanion data) {
     return OfflineAccount(
@@ -1203,6 +1232,9 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
       shiftScheduleJson: data.shiftScheduleJson.present
           ? data.shiftScheduleJson.value
           : this.shiftScheduleJson,
+      isExpressCashier: data.isExpressCashier.present
+          ? data.isExpressCashier.value
+          : this.isExpressCashier,
     );
   }
 
@@ -1218,14 +1250,25 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
           ..write('lastOnlineLogin: $lastOnlineLogin, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('shiftScheduleJson: $shiftScheduleJson')
+          ..write('shiftScheduleJson: $shiftScheduleJson, ')
+          ..write('isExpressCashier: $isExpressCashier')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, serverUserId, email, passwordHash,
-      fullName, role, lastOnlineLogin, createdAt, updatedAt, shiftScheduleJson);
+  int get hashCode => Object.hash(
+      id,
+      serverUserId,
+      email,
+      passwordHash,
+      fullName,
+      role,
+      lastOnlineLogin,
+      createdAt,
+      updatedAt,
+      shiftScheduleJson,
+      isExpressCashier);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1239,7 +1282,8 @@ class OfflineAccount extends DataClass implements Insertable<OfflineAccount> {
           other.lastOnlineLogin == this.lastOnlineLogin &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
-          other.shiftScheduleJson == this.shiftScheduleJson);
+          other.shiftScheduleJson == this.shiftScheduleJson &&
+          other.isExpressCashier == this.isExpressCashier);
 }
 
 class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
@@ -1253,6 +1297,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
   final Value<int> createdAt;
   final Value<int> updatedAt;
   final Value<String> shiftScheduleJson;
+  final Value<bool> isExpressCashier;
   const OfflineAccountsCompanion({
     this.id = const Value.absent(),
     this.serverUserId = const Value.absent(),
@@ -1264,6 +1309,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.shiftScheduleJson = const Value.absent(),
+    this.isExpressCashier = const Value.absent(),
   });
   OfflineAccountsCompanion.insert({
     this.id = const Value.absent(),
@@ -1276,6 +1322,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
     required int createdAt,
     required int updatedAt,
     this.shiftScheduleJson = const Value.absent(),
+    this.isExpressCashier = const Value.absent(),
   })  : serverUserId = Value(serverUserId),
         email = Value(email),
         passwordHash = Value(passwordHash),
@@ -1295,6 +1342,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
     Expression<String>? shiftScheduleJson,
+    Expression<bool>? isExpressCashier,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1307,6 +1355,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (shiftScheduleJson != null) 'shift_schedule_json': shiftScheduleJson,
+      if (isExpressCashier != null) 'is_express_cashier': isExpressCashier,
     });
   }
 
@@ -1320,7 +1369,8 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
       Value<int>? lastOnlineLogin,
       Value<int>? createdAt,
       Value<int>? updatedAt,
-      Value<String>? shiftScheduleJson}) {
+      Value<String>? shiftScheduleJson,
+      Value<bool>? isExpressCashier}) {
     return OfflineAccountsCompanion(
       id: id ?? this.id,
       serverUserId: serverUserId ?? this.serverUserId,
@@ -1332,6 +1382,7 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       shiftScheduleJson: shiftScheduleJson ?? this.shiftScheduleJson,
+      isExpressCashier: isExpressCashier ?? this.isExpressCashier,
     );
   }
 
@@ -1368,6 +1419,9 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
     if (shiftScheduleJson.present) {
       map['shift_schedule_json'] = Variable<String>(shiftScheduleJson.value);
     }
+    if (isExpressCashier.present) {
+      map['is_express_cashier'] = Variable<bool>(isExpressCashier.value);
+    }
     return map;
   }
 
@@ -1383,7 +1437,8 @@ class OfflineAccountsCompanion extends UpdateCompanion<OfflineAccount> {
           ..write('lastOnlineLogin: $lastOnlineLogin, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('shiftScheduleJson: $shiftScheduleJson')
+          ..write('shiftScheduleJson: $shiftScheduleJson, ')
+          ..write('isExpressCashier: $isExpressCashier')
           ..write(')'))
         .toString();
   }
@@ -1887,6 +1942,16 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
   late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
       'created_at', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _isExpressCashierMeta =
+      const VerificationMeta('isExpressCashier');
+  @override
+  late final GeneratedColumn<bool> isExpressCashier = GeneratedColumn<bool>(
+      'is_express_cashier', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_express_cashier" IN (0, 1))'),
+      defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -1898,7 +1963,8 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
         closingCash,
         status,
         syncStatus,
-        createdAt
+        createdAt,
+        isExpressCashier
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1971,6 +2037,12 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('is_express_cashier')) {
+      context.handle(
+          _isExpressCashierMeta,
+          isExpressCashier.isAcceptableOrUnknown(
+              data['is_express_cashier']!, _isExpressCashierMeta));
+    }
     return context;
   }
 
@@ -2000,6 +2072,8 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
           .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}created_at'])!,
+      isExpressCashier: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}is_express_cashier'])!,
     );
   }
 
@@ -2032,6 +2106,9 @@ class Shift extends DataClass implements Insertable<Shift> {
 
   /// ISO8601 row creation time.
   final String createdAt;
+
+  /// Express cashier shift — manual ticketing, no check-out flow.
+  final bool isExpressCashier;
   const Shift(
       {required this.id,
       required this.userId,
@@ -2042,7 +2119,8 @@ class Shift extends DataClass implements Insertable<Shift> {
       this.closingCash,
       required this.status,
       required this.syncStatus,
-      required this.createdAt});
+      required this.createdAt,
+      required this.isExpressCashier});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -2060,6 +2138,7 @@ class Shift extends DataClass implements Insertable<Shift> {
     map['status'] = Variable<String>(status);
     map['sync_status'] = Variable<String>(syncStatus);
     map['created_at'] = Variable<String>(createdAt);
+    map['is_express_cashier'] = Variable<bool>(isExpressCashier);
     return map;
   }
 
@@ -2079,6 +2158,7 @@ class Shift extends DataClass implements Insertable<Shift> {
       status: Value(status),
       syncStatus: Value(syncStatus),
       createdAt: Value(createdAt),
+      isExpressCashier: Value(isExpressCashier),
     );
   }
 
@@ -2096,6 +2176,7 @@ class Shift extends DataClass implements Insertable<Shift> {
       status: serializer.fromJson<String>(json['status']),
       syncStatus: serializer.fromJson<String>(json['syncStatus']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
+      isExpressCashier: serializer.fromJson<bool>(json['isExpressCashier']),
     );
   }
   @override
@@ -2112,6 +2193,7 @@ class Shift extends DataClass implements Insertable<Shift> {
       'status': serializer.toJson<String>(status),
       'syncStatus': serializer.toJson<String>(syncStatus),
       'createdAt': serializer.toJson<String>(createdAt),
+      'isExpressCashier': serializer.toJson<bool>(isExpressCashier),
     };
   }
 
@@ -2125,7 +2207,8 @@ class Shift extends DataClass implements Insertable<Shift> {
           Value<double?> closingCash = const Value.absent(),
           String? status,
           String? syncStatus,
-          String? createdAt}) =>
+          String? createdAt,
+          bool? isExpressCashier}) =>
       Shift(
         id: id ?? this.id,
         userId: userId ?? this.userId,
@@ -2137,6 +2220,7 @@ class Shift extends DataClass implements Insertable<Shift> {
         status: status ?? this.status,
         syncStatus: syncStatus ?? this.syncStatus,
         createdAt: createdAt ?? this.createdAt,
+        isExpressCashier: isExpressCashier ?? this.isExpressCashier,
       );
   Shift copyWithCompanion(ShiftsCompanion data) {
     return Shift(
@@ -2154,6 +2238,9 @@ class Shift extends DataClass implements Insertable<Shift> {
       syncStatus:
           data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      isExpressCashier: data.isExpressCashier.present
+          ? data.isExpressCashier.value
+          : this.isExpressCashier,
     );
   }
 
@@ -2169,14 +2256,25 @@ class Shift extends DataClass implements Insertable<Shift> {
           ..write('closingCash: $closingCash, ')
           ..write('status: $status, ')
           ..write('syncStatus: $syncStatus, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('isExpressCashier: $isExpressCashier')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, userId, branchId, openedAt, closedAt,
-      openingFloat, closingCash, status, syncStatus, createdAt);
+  int get hashCode => Object.hash(
+      id,
+      userId,
+      branchId,
+      openedAt,
+      closedAt,
+      openingFloat,
+      closingCash,
+      status,
+      syncStatus,
+      createdAt,
+      isExpressCashier);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2190,7 +2288,8 @@ class Shift extends DataClass implements Insertable<Shift> {
           other.closingCash == this.closingCash &&
           other.status == this.status &&
           other.syncStatus == this.syncStatus &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.isExpressCashier == this.isExpressCashier);
 }
 
 class ShiftsCompanion extends UpdateCompanion<Shift> {
@@ -2204,6 +2303,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
   final Value<String> status;
   final Value<String> syncStatus;
   final Value<String> createdAt;
+  final Value<bool> isExpressCashier;
   final Value<int> rowid;
   const ShiftsCompanion({
     this.id = const Value.absent(),
@@ -2216,6 +2316,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
     this.status = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.isExpressCashier = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ShiftsCompanion.insert({
@@ -2229,6 +2330,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
     required String status,
     required String syncStatus,
     required String createdAt,
+    this.isExpressCashier = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         userId = Value(userId),
@@ -2249,6 +2351,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
     Expression<String>? status,
     Expression<String>? syncStatus,
     Expression<String>? createdAt,
+    Expression<bool>? isExpressCashier,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2262,6 +2365,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
       if (status != null) 'status': status,
       if (syncStatus != null) 'sync_status': syncStatus,
       if (createdAt != null) 'created_at': createdAt,
+      if (isExpressCashier != null) 'is_express_cashier': isExpressCashier,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2277,6 +2381,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
       Value<String>? status,
       Value<String>? syncStatus,
       Value<String>? createdAt,
+      Value<bool>? isExpressCashier,
       Value<int>? rowid}) {
     return ShiftsCompanion(
       id: id ?? this.id,
@@ -2289,6 +2394,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
       status: status ?? this.status,
       syncStatus: syncStatus ?? this.syncStatus,
       createdAt: createdAt ?? this.createdAt,
+      isExpressCashier: isExpressCashier ?? this.isExpressCashier,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2326,6 +2432,9 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
+    if (isExpressCashier.present) {
+      map['is_express_cashier'] = Variable<bool>(isExpressCashier.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2345,6 +2454,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
           ..write('status: $status, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('createdAt: $createdAt, ')
+          ..write('isExpressCashier: $isExpressCashier, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2567,6 +2677,16 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
   late final GeneratedColumn<String> pendingVoidReason =
       GeneratedColumn<String>('pending_void_reason', aliasedName, true,
           type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isExpressCashierMeta =
+      const VerificationMeta('isExpressCashier');
+  @override
+  late final GeneratedColumn<bool> isExpressCashier = GeneratedColumn<bool>(
+      'is_express_cashier', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_express_cashier" IN (0, 1))'),
+      defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -2602,7 +2722,8 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
         voidedByJson,
         voidedAt,
         pendingVoidRequest,
-        pendingVoidReason
+        pendingVoidReason,
+        isExpressCashier
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2823,6 +2944,12 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
           pendingVoidReason.isAcceptableOrUnknown(
               data['pending_void_reason']!, _pendingVoidReasonMeta));
     }
+    if (data.containsKey('is_express_cashier')) {
+      context.handle(
+          _isExpressCashierMeta,
+          isExpressCashier.isAcceptableOrUnknown(
+              data['is_express_cashier']!, _isExpressCashierMeta));
+    }
     return context;
   }
 
@@ -2900,6 +3027,8 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
           DriftSqlType.bool, data['${effectivePrefix}pending_void_request'])!,
       pendingVoidReason: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}pending_void_reason']),
+      isExpressCashier: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}is_express_cashier'])!,
     );
   }
 
@@ -2986,6 +3115,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
 
   /// Reason for the offline void-at-intake request.
   final String? pendingVoidReason;
+
+  /// Express cashier transaction — completed at intake, no check-out.
+  final bool isExpressCashier;
   const Ticket(
       {required this.id,
       required this.shiftId,
@@ -3020,7 +3152,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       this.voidedByJson,
       this.voidedAt,
       required this.pendingVoidRequest,
-      this.pendingVoidReason});
+      this.pendingVoidReason,
+      required this.isExpressCashier});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -3094,6 +3227,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
     if (!nullToAbsent || pendingVoidReason != null) {
       map['pending_void_reason'] = Variable<String>(pendingVoidReason);
     }
+    map['is_express_cashier'] = Variable<bool>(isExpressCashier);
     return map;
   }
 
@@ -3164,6 +3298,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       pendingVoidReason: pendingVoidReason == null && nullToAbsent
           ? const Value.absent()
           : Value(pendingVoidReason),
+      isExpressCashier: Value(isExpressCashier),
     );
   }
 
@@ -3208,6 +3343,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       pendingVoidRequest: serializer.fromJson<bool>(json['pendingVoidRequest']),
       pendingVoidReason:
           serializer.fromJson<String?>(json['pendingVoidReason']),
+      isExpressCashier: serializer.fromJson<bool>(json['isExpressCashier']),
     );
   }
   @override
@@ -3248,6 +3384,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       'voidedAt': serializer.toJson<String?>(voidedAt),
       'pendingVoidRequest': serializer.toJson<bool>(pendingVoidRequest),
       'pendingVoidReason': serializer.toJson<String?>(pendingVoidReason),
+      'isExpressCashier': serializer.toJson<bool>(isExpressCashier),
     };
   }
 
@@ -3285,7 +3422,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           Value<String?> voidedByJson = const Value.absent(),
           Value<String?> voidedAt = const Value.absent(),
           bool? pendingVoidRequest,
-          Value<String?> pendingVoidReason = const Value.absent()}) =>
+          Value<String?> pendingVoidReason = const Value.absent(),
+          bool? isExpressCashier}) =>
       Ticket(
         id: id ?? this.id,
         shiftId: shiftId ?? this.shiftId,
@@ -3332,6 +3470,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
         pendingVoidReason: pendingVoidReason.present
             ? pendingVoidReason.value
             : this.pendingVoidReason,
+        isExpressCashier: isExpressCashier ?? this.isExpressCashier,
       );
   Ticket copyWithCompanion(TicketsCompanion data) {
     return Ticket(
@@ -3403,6 +3542,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       pendingVoidReason: data.pendingVoidReason.present
           ? data.pendingVoidReason.value
           : this.pendingVoidReason,
+      isExpressCashier: data.isExpressCashier.present
+          ? data.isExpressCashier.value
+          : this.isExpressCashier,
     );
   }
 
@@ -3442,7 +3584,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           ..write('voidedByJson: $voidedByJson, ')
           ..write('voidedAt: $voidedAt, ')
           ..write('pendingVoidRequest: $pendingVoidRequest, ')
-          ..write('pendingVoidReason: $pendingVoidReason')
+          ..write('pendingVoidReason: $pendingVoidReason, ')
+          ..write('isExpressCashier: $isExpressCashier')
           ..write(')'))
         .toString();
   }
@@ -3482,7 +3625,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
         voidedByJson,
         voidedAt,
         pendingVoidRequest,
-        pendingVoidReason
+        pendingVoidReason,
+        isExpressCashier
       ]);
   @override
   bool operator ==(Object other) =>
@@ -3521,7 +3665,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           other.voidedByJson == this.voidedByJson &&
           other.voidedAt == this.voidedAt &&
           other.pendingVoidRequest == this.pendingVoidRequest &&
-          other.pendingVoidReason == this.pendingVoidReason);
+          other.pendingVoidReason == this.pendingVoidReason &&
+          other.isExpressCashier == this.isExpressCashier);
 }
 
 class TicketsCompanion extends UpdateCompanion<Ticket> {
@@ -3559,6 +3704,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
   final Value<String?> voidedAt;
   final Value<bool> pendingVoidRequest;
   final Value<String?> pendingVoidReason;
+  final Value<bool> isExpressCashier;
   final Value<int> rowid;
   const TicketsCompanion({
     this.id = const Value.absent(),
@@ -3595,6 +3741,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     this.voidedAt = const Value.absent(),
     this.pendingVoidRequest = const Value.absent(),
     this.pendingVoidReason = const Value.absent(),
+    this.isExpressCashier = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TicketsCompanion.insert({
@@ -3632,6 +3779,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     this.voidedAt = const Value.absent(),
     this.pendingVoidRequest = const Value.absent(),
     this.pendingVoidReason = const Value.absent(),
+    this.isExpressCashier = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         shiftId = Value(shiftId),
@@ -3683,6 +3831,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     Expression<String>? voidedAt,
     Expression<bool>? pendingVoidRequest,
     Expression<String>? pendingVoidReason,
+    Expression<bool>? isExpressCashier,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3722,6 +3871,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       if (pendingVoidRequest != null)
         'pending_void_request': pendingVoidRequest,
       if (pendingVoidReason != null) 'pending_void_reason': pendingVoidReason,
+      if (isExpressCashier != null) 'is_express_cashier': isExpressCashier,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3761,6 +3911,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       Value<String?>? voidedAt,
       Value<bool>? pendingVoidRequest,
       Value<String?>? pendingVoidReason,
+      Value<bool>? isExpressCashier,
       Value<int>? rowid}) {
     return TicketsCompanion(
       id: id ?? this.id,
@@ -3797,6 +3948,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       voidedAt: voidedAt ?? this.voidedAt,
       pendingVoidRequest: pendingVoidRequest ?? this.pendingVoidRequest,
       pendingVoidReason: pendingVoidReason ?? this.pendingVoidReason,
+      isExpressCashier: isExpressCashier ?? this.isExpressCashier,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3906,6 +4058,9 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     if (pendingVoidReason.present) {
       map['pending_void_reason'] = Variable<String>(pendingVoidReason.value);
     }
+    if (isExpressCashier.present) {
+      map['is_express_cashier'] = Variable<bool>(isExpressCashier.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3949,6 +4104,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
           ..write('voidedAt: $voidedAt, ')
           ..write('pendingVoidRequest: $pendingVoidRequest, ')
           ..write('pendingVoidReason: $pendingVoidReason, ')
+          ..write('isExpressCashier: $isExpressCashier, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6015,6 +6171,7 @@ typedef $$OfflineAccountsTableCreateCompanionBuilder = OfflineAccountsCompanion
   required int createdAt,
   required int updatedAt,
   Value<String> shiftScheduleJson,
+  Value<bool> isExpressCashier,
 });
 typedef $$OfflineAccountsTableUpdateCompanionBuilder = OfflineAccountsCompanion
     Function({
@@ -6028,6 +6185,7 @@ typedef $$OfflineAccountsTableUpdateCompanionBuilder = OfflineAccountsCompanion
   Value<int> createdAt,
   Value<int> updatedAt,
   Value<String> shiftScheduleJson,
+  Value<bool> isExpressCashier,
 });
 
 class $$OfflineAccountsTableTableManager extends RootTableManager<
@@ -6058,6 +6216,7 @@ class $$OfflineAccountsTableTableManager extends RootTableManager<
             Value<int> createdAt = const Value.absent(),
             Value<int> updatedAt = const Value.absent(),
             Value<String> shiftScheduleJson = const Value.absent(),
+            Value<bool> isExpressCashier = const Value.absent(),
           }) =>
               OfflineAccountsCompanion(
             id: id,
@@ -6070,6 +6229,7 @@ class $$OfflineAccountsTableTableManager extends RootTableManager<
             createdAt: createdAt,
             updatedAt: updatedAt,
             shiftScheduleJson: shiftScheduleJson,
+            isExpressCashier: isExpressCashier,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -6082,6 +6242,7 @@ class $$OfflineAccountsTableTableManager extends RootTableManager<
             required int createdAt,
             required int updatedAt,
             Value<String> shiftScheduleJson = const Value.absent(),
+            Value<bool> isExpressCashier = const Value.absent(),
           }) =>
               OfflineAccountsCompanion.insert(
             id: id,
@@ -6094,6 +6255,7 @@ class $$OfflineAccountsTableTableManager extends RootTableManager<
             createdAt: createdAt,
             updatedAt: updatedAt,
             shiftScheduleJson: shiftScheduleJson,
+            isExpressCashier: isExpressCashier,
           ),
         ));
 }
@@ -6148,6 +6310,11 @@ class $$OfflineAccountsTableFilterComposer
 
   ColumnFilters<String> get shiftScheduleJson => $state.composableBuilder(
       column: $state.table.shiftScheduleJson,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<bool> get isExpressCashier => $state.composableBuilder(
+      column: $state.table.isExpressCashier,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -6215,6 +6382,11 @@ class $$OfflineAccountsTableOrderingComposer
 
   ColumnOrderings<String> get shiftScheduleJson => $state.composableBuilder(
       column: $state.table.shiftScheduleJson,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<bool> get isExpressCashier => $state.composableBuilder(
+      column: $state.table.isExpressCashier,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 }
@@ -6414,6 +6586,7 @@ typedef $$ShiftsTableCreateCompanionBuilder = ShiftsCompanion Function({
   required String status,
   required String syncStatus,
   required String createdAt,
+  Value<bool> isExpressCashier,
   Value<int> rowid,
 });
 typedef $$ShiftsTableUpdateCompanionBuilder = ShiftsCompanion Function({
@@ -6427,6 +6600,7 @@ typedef $$ShiftsTableUpdateCompanionBuilder = ShiftsCompanion Function({
   Value<String> status,
   Value<String> syncStatus,
   Value<String> createdAt,
+  Value<bool> isExpressCashier,
   Value<int> rowid,
 });
 
@@ -6457,6 +6631,7 @@ class $$ShiftsTableTableManager extends RootTableManager<
             Value<String> status = const Value.absent(),
             Value<String> syncStatus = const Value.absent(),
             Value<String> createdAt = const Value.absent(),
+            Value<bool> isExpressCashier = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ShiftsCompanion(
@@ -6470,6 +6645,7 @@ class $$ShiftsTableTableManager extends RootTableManager<
             status: status,
             syncStatus: syncStatus,
             createdAt: createdAt,
+            isExpressCashier: isExpressCashier,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -6483,6 +6659,7 @@ class $$ShiftsTableTableManager extends RootTableManager<
             required String status,
             required String syncStatus,
             required String createdAt,
+            Value<bool> isExpressCashier = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ShiftsCompanion.insert(
@@ -6496,6 +6673,7 @@ class $$ShiftsTableTableManager extends RootTableManager<
             status: status,
             syncStatus: syncStatus,
             createdAt: createdAt,
+            isExpressCashier: isExpressCashier,
             rowid: rowid,
           ),
         ));
@@ -6551,6 +6729,11 @@ class $$ShiftsTableFilterComposer
 
   ColumnFilters<String> get createdAt => $state.composableBuilder(
       column: $state.table.createdAt,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<bool> get isExpressCashier => $state.composableBuilder(
+      column: $state.table.isExpressCashier,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -6620,6 +6803,11 @@ class $$ShiftsTableOrderingComposer
       column: $state.table.createdAt,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<bool> get isExpressCashier => $state.composableBuilder(
+      column: $state.table.isExpressCashier,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
 }
 
 typedef $$TicketsTableCreateCompanionBuilder = TicketsCompanion Function({
@@ -6657,6 +6845,7 @@ typedef $$TicketsTableCreateCompanionBuilder = TicketsCompanion Function({
   Value<String?> voidedAt,
   Value<bool> pendingVoidRequest,
   Value<String?> pendingVoidReason,
+  Value<bool> isExpressCashier,
   Value<int> rowid,
 });
 typedef $$TicketsTableUpdateCompanionBuilder = TicketsCompanion Function({
@@ -6694,6 +6883,7 @@ typedef $$TicketsTableUpdateCompanionBuilder = TicketsCompanion Function({
   Value<String?> voidedAt,
   Value<bool> pendingVoidRequest,
   Value<String?> pendingVoidReason,
+  Value<bool> isExpressCashier,
   Value<int> rowid,
 });
 
@@ -6748,6 +6938,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             Value<String?> voidedAt = const Value.absent(),
             Value<bool> pendingVoidRequest = const Value.absent(),
             Value<String?> pendingVoidReason = const Value.absent(),
+            Value<bool> isExpressCashier = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TicketsCompanion(
@@ -6785,6 +6976,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             voidedAt: voidedAt,
             pendingVoidRequest: pendingVoidRequest,
             pendingVoidReason: pendingVoidReason,
+            isExpressCashier: isExpressCashier,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -6822,6 +7014,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             Value<String?> voidedAt = const Value.absent(),
             Value<bool> pendingVoidRequest = const Value.absent(),
             Value<String?> pendingVoidReason = const Value.absent(),
+            Value<bool> isExpressCashier = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TicketsCompanion.insert(
@@ -6859,6 +7052,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             voidedAt: voidedAt,
             pendingVoidRequest: pendingVoidRequest,
             pendingVoidReason: pendingVoidReason,
+            isExpressCashier: isExpressCashier,
             rowid: rowid,
           ),
         ));
@@ -7029,6 +7223,11 @@ class $$TicketsTableFilterComposer
 
   ColumnFilters<String> get pendingVoidReason => $state.composableBuilder(
       column: $state.table.pendingVoidReason,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<bool> get isExpressCashier => $state.composableBuilder(
+      column: $state.table.isExpressCashier,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -7210,6 +7409,11 @@ class $$TicketsTableOrderingComposer
 
   ColumnOrderings<String> get pendingVoidReason => $state.composableBuilder(
       column: $state.table.pendingVoidReason,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<bool> get isExpressCashier => $state.composableBuilder(
+      column: $state.table.isExpressCashier,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 

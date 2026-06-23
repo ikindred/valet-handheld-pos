@@ -10,6 +10,7 @@ class CheckoutPreviewResponse extends Equatable {
     this.customerContact,
     this.belongings = const [],
     this.rates,
+    this.valetType,
     required this.releaseSummary,
     required this.ticket,
     this.checkInConditions = const [],
@@ -19,6 +20,9 @@ class CheckoutPreviewResponse extends Equatable {
   final String transactionId;
   final String? customerContact;
   final List<String> belongings;
+
+  /// `standard_valet` | `self_park` from transaction payload.
+  final String? valetType;
 
   /// Server-resolved fees for this transaction; null when absent (offline).
   final CheckoutPreviewRates? rates;
@@ -59,6 +63,7 @@ class CheckoutPreviewResponse extends Equatable {
       customerContact: txMeta.contact,
       belongings: txMeta.belongings,
       rates: CheckoutPreviewRates.fromJson(json['rates']),
+      valetType: txMeta.valetType,
       releaseSummary: ReleaseSummary.fromJson(summaryJson),
       ticket: CheckoutPreviewTicket.fromJson(ticketJson),
       checkInConditions: _parseConditionCheckin(txMap['condition_checkin']),
@@ -176,7 +181,7 @@ class CheckoutPreviewResponse extends Equatable {
 
   static _TransactionMeta _parseTransactionMeta(dynamic raw) {
     if (raw is! Map) {
-      return const _TransactionMeta('', null, []);
+      return const _TransactionMeta('', null, [], null);
     }
     final m = Map<String, dynamic>.from(raw);
     final id = m['id']?.toString().trim() ?? '';
@@ -195,7 +200,13 @@ class CheckoutPreviewResponse extends Equatable {
         if (s.isNotEmpty) belongings.add(s);
       }
     }
-    return _TransactionMeta(id, contact, belongings);
+    final valetType = _optionalStr(m['valet_type'] ?? m['valetType']);
+    return _TransactionMeta(id, contact, belongings, valetType);
+  }
+
+  static String? _optionalStr(dynamic v) {
+    final s = v?.toString().trim() ?? '';
+    return s.isEmpty ? null : s;
   }
 
   static List<ConditionComparison> _parseConditionList(dynamic raw) {
@@ -215,6 +226,7 @@ class CheckoutPreviewResponse extends Equatable {
         customerContact,
         belongings,
         rates,
+        valetType,
         releaseSummary,
         ticket,
         checkInConditions,
@@ -223,10 +235,11 @@ class CheckoutPreviewResponse extends Equatable {
 }
 
 class _TransactionMeta {
-  const _TransactionMeta(this.id, this.contact, this.belongings);
+  const _TransactionMeta(this.id, this.contact, this.belongings, this.valetType);
   final String id;
   final String? contact;
   final List<String> belongings;
+  final String? valetType;
 }
 
 class ReleaseSummary extends Equatable {

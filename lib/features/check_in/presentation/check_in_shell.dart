@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
+import '../domain/check_in_validation.dart';
 import '../routing/check_in_step.dart';
 import '../state/check_in_cubit.dart';
 import 'widgets/check_in_flow_header.dart';
@@ -54,6 +55,19 @@ class _CheckInShellState extends State<CheckInShell> {
       await cubit.ensureDraftTicketReserved();
     }
     if (mounted) setState(() => _awaitingDraft = false);
+    if (mounted) {
+      _applyStepGuard(GoRouterState.of(context).uri.path);
+    }
+  }
+
+  void _applyStepGuard(String path) {
+    if (!mounted) return;
+    final redirect = CheckInValidation.forwardGuardPath(
+      path,
+      context.read<CheckInCubit>().state,
+    );
+    if (redirect == null || redirect == path) return;
+    context.go(redirect);
   }
 
   @override
@@ -62,6 +76,10 @@ class _CheckInShellState extends State<CheckInShell> {
     final stepIndex = checkInStepIndexFromPath(path);
 
     final scaffoldBg = AppThemeColors.of(context).scaffoldBg;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _applyStepGuard(path);
+    });
 
     if (_awaitingDraft) {
       return Scaffold(
@@ -83,36 +101,54 @@ class _CheckInShellState extends State<CheckInShell> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: scaffoldBg,
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const DashboardLeftRail(),
-          Expanded(
-            child: SafeArea(
-              left: false,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  BlocBuilder<CheckInCubit, CheckInState>(
-                    buildWhen: (a, b) =>
-                        stepIndex == 5 && a.receiptParts != b.receiptParts,
-                    builder: (context, state) {
-                      return CheckInFlowHeader(
-                        stepIndex: stepIndex,
-                        totalSteps: 6,
-                        allStepsComplete:
-                            stepIndex == 5 && state.allPartsPrinted,
-                      );
-                    },
-                  ),
-                  Expanded(child: widget.child),
-                ],
+    return BlocListener<CheckInCubit, CheckInState>(
+      listenWhen: (prev, next) =>
+          prev.customerFullName != next.customerFullName ||
+          prev.contactNumber != next.contactNumber ||
+          prev.plateNumber != next.plateNumber ||
+          prev.vehicleBrand != next.vehicleBrand ||
+          prev.vehicleColor != next.vehicleColor ||
+          prev.vehicleVrNo != next.vehicleVrNo ||
+          prev.parkingLevel != next.parkingLevel ||
+          prev.parkingSlot != next.parkingSlot ||
+          prev.parkingSlotId != next.parkingSlotId ||
+          prev.signaturePng != next.signaturePng ||
+          prev.serverTicketId != next.serverTicketId ||
+          prev.qrCode != next.qrCode,
+      listener: (context, _) {
+        _applyStepGuard(GoRouterState.of(context).uri.path);
+      },
+      child: Scaffold(
+        backgroundColor: scaffoldBg,
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const DashboardLeftRail(),
+            Expanded(
+              child: SafeArea(
+                left: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    BlocBuilder<CheckInCubit, CheckInState>(
+                      buildWhen: (a, b) =>
+                          stepIndex == 5 && a.receiptParts != b.receiptParts,
+                      builder: (context, state) {
+                        return CheckInFlowHeader(
+                          stepIndex: stepIndex,
+                          totalSteps: 6,
+                          allStepsComplete:
+                              stepIndex == 5 && state.allPartsPrinted,
+                        );
+                      },
+                    ),
+                    Expanded(child: widget.child),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

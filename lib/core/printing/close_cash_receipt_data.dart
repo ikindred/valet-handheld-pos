@@ -14,6 +14,7 @@ class CloseCashReceiptData {
     required this.vehicleTypeStats,
     required this.activeCheckInCount,
     required this.actualCashLabel,
+    this.isExpressCashier = false,
   });
 
   final String branchName;
@@ -25,6 +26,7 @@ class CloseCashReceiptData {
   final List<CloseCashVehicleTypeStat> vehicleTypeStats;
   final int activeCheckInCount;
   final String actualCashLabel;
+  final bool isExpressCashier;
 
   String get headerBranchLine {
     final branch = branchName.trim();
@@ -44,6 +46,7 @@ class CloseCashReceiptData {
     required CloseCashShiftStats stats,
     required int activeCheckInCount,
     required double actualCash,
+    bool isExpressCashier = false,
   }) {
     final opened = PhilippineTime.fromApiIso(openedAtIso);
     final closed = PhilippineTime.fromApiIso(closedAtIso);
@@ -57,6 +60,7 @@ class CloseCashReceiptData {
       vehicleTypeStats: stats.vehicleTypes,
       activeCheckInCount: activeCheckInCount,
       actualCashLabel: ReceiptPrintFormat.pesoAmount(actualCash),
+      isExpressCashier: isExpressCashier,
     );
   }
 }

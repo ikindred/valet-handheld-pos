@@ -24,6 +24,7 @@ import '../../../data/services/check_in_sync_payload.dart';
 import '../../../data/services/shift_service.dart';
 import '../../../data/services/ticket_service.dart';
 import '../domain/check_in_demo_defaults.dart';
+import '../domain/check_in_validation.dart';
 import '../models/receipt_part.dart';
 import '../domain/check_in_form_data.dart';
 import '../domain/vehicle_body_type.dart';
@@ -387,17 +388,17 @@ class CheckInCubit extends Cubit<CheckInState> {
       return;
     }
 
-    final data = _buildFormData();
-    if (!data.isComplete) {
+    final step2Error = CheckInValidation.validateStep2FromState(state);
+    if (step2Error != null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Complete plate, brand, color, and cellphone.'),
-          ),
+          SnackBar(content: Text(step2Error)),
         );
       }
       return;
     }
+
+    final data = _buildFormData();
 
     emit(state.copyWith(isSubmitting: true));
 
@@ -445,6 +446,7 @@ class CheckInCubit extends Cubit<CheckInState> {
         cellphoneNumber: data.cellphoneNumber,
         damageMarkersJson: data.damageMarkersJson,
         personalBelongingsJson: data.personalBelongingsJson,
+        vrNo: state.vehicleVrNo,
         driverIn: data.driverIn,
         customerName: state.customerFullName.trim(),
         valetType: _valetTypeApi(state.valetServiceType),
@@ -482,16 +484,14 @@ class CheckInCubit extends Cubit<CheckInState> {
         vehicle: vehicle,
         belongings: belongings,
         damages: damages,
-        customerName: _optionalTrim(state.customerFullName),
+        customerName: state.customerFullName.trim(),
         driverIn: data.driverIn,
         notes: _optionalTrim(state.specialInstructions),
-        vrNo: vrNo.isEmpty ? null : vrNo,
+        vrNo: vrNo,
       );
 
       await ts.updateServerTicketId(ticketId, response.id);
-      if (vrNo.isNotEmpty) {
-        await ts.persistVrNo(ticketId, vrNo);
-      }
+      await ts.persistVrNo(ticketId, vrNo);
 
       emit(
         state.copyWith(
@@ -536,6 +536,15 @@ class CheckInCubit extends Cubit<CheckInState> {
             'retrieve the existing ticket before starting a new check-in.',
         icon: AppAlertIcon.warning,
       );
+    } on VrNumberAlreadyUsedException catch (_) {
+      emit(state.copyWith(isSubmitting: false));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This VR number is already in use.'),
+          ),
+        );
+      }
     } on CheckInValidationException catch (e) {
       emit(state.copyWith(isSubmitting: false));
       if (context.mounted) {
@@ -577,7 +586,7 @@ class CheckInCubit extends Cubit<CheckInState> {
       customerName: _optionalTrim(state.customerFullName),
       driverIn: _optionalTrim(state.assignedValetDriver),
       notes: _optionalTrim(state.specialInstructions),
-      vrNo: _optionalTrim(state.vehicleVrNo),
+      vrNo: state.vehicleVrNo.trim(),
     );
     await ts.enqueueCheckInSync(localTicketId: ticketId, payload: payload);
   }
@@ -649,7 +658,9 @@ class CheckInCubit extends Cubit<CheckInState> {
       vehicleBrand: state.vehicleBrand.trim(),
       vehicleColor: state.vehicleColor.trim(),
       vehicleType: _vehicleTypeApi(state.vehicleBodyType),
-      driverIn: valet.isEmpty ? null : valet,
+      driverIn: state.valetServiceType == ValetServiceType.selfPark
+          ? null
+          : (valet.isEmpty ? null : valet),
       cellphoneNumber: state.contactNumber.trim(),
       damageMarkersJson: _damageMarkersJson(state.vehicleDamageEntries),
       personalBelongingsJson: jsonEncode(belongings),
@@ -687,11 +698,13 @@ class CheckInCubit extends Cubit<CheckInState> {
     DateTime? dateTimeIn,
     ValetServiceType? valetServiceType,
   }) {
+    final nextType = valetServiceType ?? state.valetServiceType;
+    final selfPark = nextType == ValetServiceType.selfPark;
     emit(
       state.copyWith(
         customerFullName: customerFullName,
         contactNumber: contactNumber,
-        assignedValetDriver: assignedValetDriver,
+        assignedValetDriver: selfPark ? '' : assignedValetDriver,
         specialInstructions: specialInstructions,
         dateTimeIn: dateTimeIn,
         valetServiceType: valetServiceType,

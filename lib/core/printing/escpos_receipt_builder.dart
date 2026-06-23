@@ -8,6 +8,7 @@ import '../time/philippine_time.dart';
 import 'check_in_receipt_data.dart';
 import 'checkout_receipt_data.dart';
 import 'close_cash_receipt_data.dart';
+import 'express_checkout_receipt_data.dart';
 import 'esc_pos_text_sanitize.dart';
 import 'receipt_print_format.dart';
 
@@ -74,6 +75,9 @@ class EscPosReceiptBuilder {
         data.vehicleReceiptLine != '—') {
       bytes.addAll(_labeledRow('Vehicle', data.vehicleReceiptLine));
     }
+    if (data.valetTypeLabel?.trim().isNotEmpty == true) {
+      bytes.addAll(_labeledRow('Valet type', data.valetTypeLabel!.trim()));
+    }
     if (data.invoiceNumber != null && data.invoiceNumber!.isNotEmpty) {
       bytes.addAll(_labeledRow('Invoice', data.invoiceNumber!));
     }
@@ -81,8 +85,12 @@ class EscPosReceiptBuilder {
     bytes.addAll(_labeledRow('Time out', data.timeOutLabel));
     bytes.addAll(_labeledRow('Duration', data.durationLabel));
     bytes.addAll(_labeledRow('Parking', data.slotLine));
-    bytes.addAll(_labeledRow('Valet in', data.valetInLabel));
-    bytes.addAll(_labeledRow('Returning Valet Attendant', data.valetOutLabel));
+    if (data.showValetStaff) {
+      bytes.addAll(_labeledRow('Valet in', data.valetInLabel));
+      bytes.addAll(
+        _labeledRow('Returning Valet Attendant', data.valetOutLabel),
+      );
+    }
 
     bytes.addAll(_hr());
     bytes.addAll(gen.feed(1));
@@ -118,6 +126,34 @@ class EscPosReceiptBuilder {
     return bytes;
   }
 
+  /// Express cashier checkout — compact single tear-off.
+  List<int> buildExpressCheckoutReceipt(
+    ExpressCheckoutReceiptData data, {
+    img.Image? logo,
+  }) {
+    final gen = _generator();
+    final bytes = <int>[];
+
+    bytes.addAll(gen.reset());
+    bytes.addAll(_printerInit());
+    bytes.addAll(_brandHeader(gen, data.branchName, logo: logo));
+    bytes.addAll(_checkoutSectionTitle());
+    bytes.addAll(_labeledRow('Ticket', data.ticketNumber));
+    bytes.addAll(_labeledRow('Plate', data.plateNumber));
+    bytes.addAll(_labeledRow('Valet in', data.valetInLabel));
+    bytes.addAll(
+      _labeledRow('Returning Valet Attendant', data.valetOutLabel),
+    );
+    bytes.addAll(_hr());
+    bytes.addAll(gen.feed(1));
+    bytes.addAll(_moneyRow('Total', data.totalPesosLabel, bold: true));
+    bytes.addAll(gen.feed(1));
+    bytes.addAll(_checkoutFooter(mallHours: data.mallHours));
+    bytes.addAll(gen.feed(3));
+    bytes.addAll(gen.cut());
+    return bytes;
+  }
+
   /// End-of-shift close cash receipt (single tear-off).
   List<int> buildCloseCashReceipt(CloseCashReceiptData data, {img.Image? logo}) {
     final gen = _generator();
@@ -138,21 +174,29 @@ class EscPosReceiptBuilder {
     bytes.addAll(_labeledRow('Opened at', data.openedAtLabel));
     bytes.addAll(_labeledRow('Closed at', data.closedAtLabel));
 
-    bytes.addAll(_hr());
-    bytes.addAll(gen.feed(1));
-    bytes.addAll(_printLines('ACTIVE CHECK-INS', bold: true));
-    bytes.addAll(
-      _labeledRow('Active check-ins', '${data.activeCheckInCount}'),
-    );
+    if (data.isExpressCashier) {
+      bytes.addAll(gen.feed(1));
+      bytes.addAll(_hr());
+      bytes.addAll(gen.feed(1));
+      bytes.addAll(_printLines('SHIFT CHECKOUTS', bold: true));
+      bytes.addAll(_labeledRow('Total checkouts', '${data.checkoutCount}'));
+    } else {
+      bytes.addAll(_hr());
+      bytes.addAll(gen.feed(1));
+      bytes.addAll(_printLines('ACTIVE CHECK-INS', bold: true));
+      bytes.addAll(
+        _labeledRow('Active check-ins', '${data.activeCheckInCount}'),
+      );
 
-    bytes.addAll(gen.feed(1));
-    bytes.addAll(_printLines('SHIFT CHECKOUTS', bold: true));
-    bytes.addAll(_labeledRow('Total checkouts', '${data.checkoutCount}'));
+      bytes.addAll(gen.feed(1));
+      bytes.addAll(_printLines('SHIFT CHECKOUTS', bold: true));
+      bytes.addAll(_labeledRow('Total checkouts', '${data.checkoutCount}'));
 
-    bytes.addAll(gen.feed(1));
-    bytes.addAll(_printLines('BY VEHICLE TYPE', bold: true));
-    for (final row in data.vehicleTypeStats) {
-      bytes.addAll(_labeledRow(row.label, '${row.count}'));
+      bytes.addAll(gen.feed(1));
+      bytes.addAll(_printLines('BY VEHICLE TYPE', bold: true));
+      for (final row in data.vehicleTypeStats) {
+        bytes.addAll(_labeledRow(row.label, '${row.count}'));
+      }
     }
 
     bytes.addAll(gen.feed(1));

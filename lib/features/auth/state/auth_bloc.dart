@@ -22,12 +22,16 @@ enum CashSessionStatus {
 final class AuthLoggedIn extends AuthEvent {
   const AuthLoggedIn({
     required this.cashSessionStatus,
+    this.isExpressCashier = false,
     this.standardRates,
     this.userId,
     this.email,
   });
 
   final CashSessionStatus cashSessionStatus;
+
+  /// From login `user.express_cashier` — manual ticketing mode.
+  final bool isExpressCashier;
 
   /// From login / setup API (`standard_rates`); optional until backend is wired.
   final StandardParkingRates? standardRates;
@@ -37,7 +41,8 @@ final class AuthLoggedIn extends AuthEvent {
   final String? email;
 
   @override
-  List<Object?> get props => [cashSessionStatus, standardRates, userId, email];
+  List<Object?> get props =>
+      [cashSessionStatus, isExpressCashier, standardRates, userId, email];
 }
 
 final class AuthLogoutRequested extends AuthEvent {
@@ -71,12 +76,16 @@ final class AuthUnknown extends AuthState {
 final class AuthAuthenticated extends AuthState {
   const AuthAuthenticated({
     required this.cashSessionStatus,
+    this.isExpressCashier = false,
     this.standardRates,
     this.userId,
     this.email,
   });
 
   final CashSessionStatus cashSessionStatus;
+
+  /// Express cashier — manual ticketing, no dashboard/check-out.
+  final bool isExpressCashier;
 
   final StandardParkingRates? standardRates;
 
@@ -85,7 +94,8 @@ final class AuthAuthenticated extends AuthState {
   final String? email;
 
   @override
-  List<Object?> get props => [cashSessionStatus, standardRates, userId, email];
+  List<Object?> get props =>
+      [cashSessionStatus, isExpressCashier, standardRates, userId, email];
 }
 
 final class AuthUnauthenticated extends AuthState {
@@ -102,6 +112,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(
         AuthAuthenticated(
           cashSessionStatus: event.cashSessionStatus,
+          isExpressCashier: event.isExpressCashier,
           standardRates: event.standardRates,
           userId: event.userId,
           email: event.email,
@@ -119,6 +130,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(
         AuthAuthenticated(
           cashSessionStatus: event.cashSessionStatus,
+          isExpressCashier: current.isExpressCashier,
           standardRates: current.standardRates,
           userId: current.userId,
           email: current.email,

@@ -5,10 +5,10 @@ import 'package:provider/provider.dart';
 
 import '../../core/session/standard_parking_rates.dart';
 import '../../data/repositories/auth_repository.dart';
-import 'bluetooth_pos_printer.dart';
 import 'check_in_receipt_data.dart';
 import 'checkout_receipt_data.dart';
 import 'close_cash_receipt_data.dart';
+import 'express_checkout_receipt_data.dart';
 import 'printer_connection_notifier.dart';
 import 'valet_print_service.dart';
 import 'widgets/printer_pairing_sheet.dart';
@@ -46,21 +46,20 @@ Future<bool> runBluetoothPrint(
 /// The pairing sheet is shown only when no printer has been saved yet.
 Future<bool> _ensurePrinterReady(BuildContext context) async {
   final notifier = context.read<PrinterConnectionNotifier>();
-  final printer = context.read<BluetoothPosPrinter>();
 
   if (!notifier.hasPairedPrinter) {
     if (!context.mounted) return false;
     final paired = await showPrinterPairingSheet(context);
     if (paired != true || !context.mounted) return false;
-    notifier.refresh();
-    return printer.isConnected;
+    await notifier.tryConnectPaired();
+    return notifier.isConnected;
   }
 
-  if (!printer.isConnected) {
+  if (!notifier.isConnected) {
     await notifier.tryConnectPaired();
   }
 
-  if (printer.isConnected) {
+  if (notifier.isConnected) {
     return true;
   }
 
@@ -99,6 +98,18 @@ Future<bool> printCheckOutFromContext(
     context,
     printJob: () =>
         context.read<ValetPrintService>().printCheckOut(data),
+  );
+}
+
+/// Prints express cashier checkout receipt.
+Future<bool> printExpressCheckOutFromContext(
+  BuildContext context, {
+  required ExpressCheckoutReceiptData data,
+}) {
+  return runBluetoothPrint(
+    context,
+    printJob: () =>
+        context.read<ValetPrintService>().printExpressCheckOut(data),
   );
 }
 

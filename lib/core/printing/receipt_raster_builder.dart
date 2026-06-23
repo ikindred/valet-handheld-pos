@@ -9,6 +9,7 @@ import 'package:qr/qr.dart';
 import '../time/philippine_time.dart';
 import 'check_in_receipt_data.dart';
 import 'checkout_receipt_data.dart';
+import 'express_checkout_receipt_data.dart';
 import 'close_cash_receipt_data.dart';
 import 'esc_pos_text_sanitize.dart';
 import 'receipt_print_format.dart';
@@ -110,21 +111,33 @@ class ReceiptRasterBuilder {
       _TwoColumnFieldBlock('Opened at', data.openedAtLabel),
       _TwoColumnFieldBlock('Closed at', data.closedAtLabel),
       const _GapBlock(4),
-      const _RuleBlock(),
-      const _GapBlock(4),
-      const _TextBlock('ACTIVE CHECK-INS', bold: true),
-      const _GapBlock(2),
-      _TwoColumnFieldBlock('Active check-ins', '${data.activeCheckInCount}'),
-      const _GapBlock(4),
-      const _TextBlock('SHIFT CHECKOUTS', bold: true),
-      const _GapBlock(2),
-      _TwoColumnFieldBlock('Total checkouts', '${data.checkoutCount}'),
-      const _GapBlock(4),
-      const _TextBlock('BY VEHICLE TYPE', bold: true),
-      const _GapBlock(2),
     ]);
-    for (final row in data.vehicleTypeStats) {
-      blocks.add(_TwoColumnFieldBlock(row.label, '${row.count}'));
+    if (data.isExpressCashier) {
+      blocks.addAll([
+        const _RuleBlock(),
+        const _GapBlock(4),
+        const _TextBlock('SHIFT CHECKOUTS', bold: true),
+        const _GapBlock(2),
+        _TwoColumnFieldBlock('Total checkouts', '${data.checkoutCount}'),
+      ]);
+    } else {
+      blocks.addAll([
+        const _RuleBlock(),
+        const _GapBlock(4),
+        const _TextBlock('ACTIVE CHECK-INS', bold: true),
+        const _GapBlock(2),
+        _TwoColumnFieldBlock('Active check-ins', '${data.activeCheckInCount}'),
+        const _GapBlock(4),
+        const _TextBlock('SHIFT CHECKOUTS', bold: true),
+        const _GapBlock(2),
+        _TwoColumnFieldBlock('Total checkouts', '${data.checkoutCount}'),
+        const _GapBlock(4),
+        const _TextBlock('BY VEHICLE TYPE', bold: true),
+        const _GapBlock(2),
+      ]);
+      for (final row in data.vehicleTypeStats) {
+        blocks.add(_TwoColumnFieldBlock(row.label, '${row.count}'));
+      }
     }
     blocks.addAll([
       const _GapBlock(4),
@@ -169,6 +182,56 @@ class ReceiptRasterBuilder {
     return _render(_checkoutBlocks(data, logo: logo));
   }
 
+  List<int> buildExpressCheckoutEscPosBytes(
+    ExpressCheckoutReceiptData data,
+    CapabilityProfile profile, {
+    img.Image? logo,
+  }) {
+    final gen = Generator(paperSize, profile);
+    return [
+      ...gen.reset(),
+      ...gen.image(
+        buildExpressCheckoutImage(data, logo: logo),
+        align: PosAlign.center,
+      ),
+      ...gen.feed(3),
+      ...gen.cut(),
+    ];
+  }
+
+  img.Image buildExpressCheckoutImage(
+    ExpressCheckoutReceiptData data, {
+    img.Image? logo,
+  }) {
+    return _render(_expressCheckoutBlocks(data, logo: logo));
+  }
+
+  List<_Block> _expressCheckoutBlocks(
+    ExpressCheckoutReceiptData data, {
+    img.Image? logo,
+  }) {
+    return [
+      ..._brandHeader(data.branchName, logo: logo),
+      const _RuleBlock(),
+      const _TextBlock('CHECKOUT RECEIPT', center: true, bold: true),
+      const _RuleBlock(),
+      const _GapBlock(6),
+      _TwoColumnFieldBlock('Ticket', data.ticketNumber),
+      _TwoColumnFieldBlock('Plate', data.plateNumber),
+      _TwoColumnFieldBlock('Valet in', data.valetInLabel),
+      _TwoColumnFieldBlock(
+        'Returning Valet Attendant',
+        data.valetOutLabel,
+      ),
+      const _GapBlock(4),
+      const _RuleBlock(),
+      const _GapBlock(4),
+      _TwoColumnFieldBlock('Total', data.totalPesosLabel, boldValue: true),
+      ..._checkoutFooter(mallHours: data.mallHours),
+      const _GapBlock(4),
+    ];
+  }
+
   List<_Block> _checkoutBlocks(
     CheckoutReceiptData data, {
     img.Image? logo,
@@ -185,14 +248,18 @@ class ReceiptRasterBuilder {
           data.vehicleReceiptLine != '-' &&
           data.vehicleReceiptLine != '—')
         _TwoColumnFieldBlock('Vehicle', data.vehicleReceiptLine),
+      if (data.valetTypeLabel?.trim().isNotEmpty == true)
+        _TwoColumnFieldBlock('Valet type', data.valetTypeLabel!.trim()),
       if (data.invoiceNumber != null && data.invoiceNumber!.isNotEmpty)
         _TwoColumnFieldBlock('Invoice', data.invoiceNumber!),
       _TwoColumnFieldBlock('Time in', data.timeInLabel),
       _TwoColumnFieldBlock('Time out', data.timeOutLabel),
       _TwoColumnFieldBlock('Duration', data.durationLabel),
       _TwoColumnFieldBlock('Parking', data.slotLine),
-      _TwoColumnFieldBlock('Valet in', data.valetInLabel),
-      _TwoColumnFieldBlock('Returning Valet Attendant', data.valetOutLabel),
+      if (data.showValetStaff) ...[
+        _TwoColumnFieldBlock('Valet in', data.valetInLabel),
+        _TwoColumnFieldBlock('Returning Valet Attendant', data.valetOutLabel),
+      ],
       const _GapBlock(4),
       const _RuleBlock(),
       const _GapBlock(4),
@@ -365,7 +432,7 @@ class ReceiptRasterBuilder {
       _CheckInRowBlock('Plate', plate.isEmpty ? 'N/A' : plate),
       if (vehicle.isNotEmpty) _CheckInRowBlock('Vehicle', vehicle),
       if (data.valetTypeLabel?.trim().isNotEmpty == true)
-        _CheckInRowBlock('Type', data.valetTypeLabel!.trim()),
+        _CheckInRowBlock('Valet type', data.valetTypeLabel!.trim()),
       if (slot.isNotEmpty) _CheckInRowBlock('Slot', slot),
       _CheckInRowBlock('Time in', timeIn),
       const _DashedRuleBlock(),

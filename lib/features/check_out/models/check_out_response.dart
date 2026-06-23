@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../core/api/transaction_payment_fields.dart';
+import '../../../core/formatting/valet_type_format.dart';
 
 /// POST `/transactions/{id}/check-out` — `{ invoice_number, transaction, preview }`.
 class CheckOutResponse extends Equatable {
@@ -11,6 +12,7 @@ class CheckOutResponse extends Equatable {
     required this.total,
     this.cashTendered,
     this.changePesos,
+    this.valetType,
   });
 
   final String invoiceNumber;
@@ -22,6 +24,7 @@ class CheckOutResponse extends Equatable {
 
   final double? cashTendered;
   final double? changePesos;
+  final String? valetType;
 
   factory CheckOutResponse.fromResponseBody(Map<String, dynamic> root) {
     final invoice =
@@ -44,10 +47,18 @@ class CheckOutResponse extends Equatable {
       total: total,
       cashTendered: payment.cashTendered,
       changePesos: payment.change,
+      valetType: ValetTypeFormat.rawFromTransaction(tx),
     );
   }
 
   @override
-  List<Object?> get props =>
-      [invoiceNumber, transactionId, status, total, cashTendered, changePesos];
+  List<Object?> get props => [
+        invoiceNumber,
+        transactionId,
+        status,
+        total,
+        cashTendered,
+        changePesos,
+        valetType,
+      ];
 }

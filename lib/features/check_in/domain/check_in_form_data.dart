@@ -20,6 +20,7 @@ class CheckInFormData {
 
   /// Valet attendant who received the vehicle (optional).
   final String? driverIn;
+
   final String cellphoneNumber;
   final String damageMarkersJson;
   final String personalBelongingsJson;

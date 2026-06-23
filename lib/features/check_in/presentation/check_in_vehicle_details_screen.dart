@@ -11,6 +11,7 @@ import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/parking_layout_service.dart';
 import '../../../data/services/rate_fetch_service.dart';
 import '../../../data/services/rate_service.dart';
+import '../domain/check_in_validation.dart';
 import '../domain/vehicle_body_type.dart';
 import '../state/check_in_cubit.dart';
 import 'widgets/check_in_compact_tokens.dart';
@@ -212,26 +213,23 @@ class _CheckInVehicleDetailsScreenState
 
   void _onNext() {
     final cubit = context.read<CheckInCubit>();
-    final s = cubit.state;
-    if (s.contactNumber.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add cellphone on step 1 before continuing.')),
-      );
-      return;
-    }
-    if (_areaLevels.isNotEmpty && cubit.state.parkingSlotId.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select a parking slot before continuing.')),
-      );
-      return;
-    }
-
     cubit.updateVehicleStep(
       plateNumber: _plateCtrl.text.trim(),
       vehicleBrand: _brandCtrl.text.trim(),
       vehicleColor: _colorCtrl.text.trim(),
-      vehicleVrNo: _vrNoCtrl.text.trim(),
+      vehicleVrNo: _vrNoCtrl.text.trim().toUpperCase(),
     );
+    final error = CheckInValidation.validateStep2FromState(
+      cubit.state,
+      requireParkingSlot: _areaLevels.isNotEmpty,
+    );
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+      return;
+    }
+
     final normalizedPlate = cubit.state.plateNumber;
     if (_plateCtrl.text != normalizedPlate) {
       _plateCtrl.text = normalizedPlate;
@@ -262,35 +260,57 @@ class _CheckInVehicleDetailsScreenState
     );
   }
 
-  Widget _brandVrNoRow() {
+  Widget _brandField() {
+    return CheckInFormField(
+      label: 'BRAND / MODEL',
+      child: CheckInTextField(
+        controller: _brandCtrl,
+        hint: 'e.g. Toyota Vios',
+      ),
+    );
+  }
+
+  Widget _vrNoField() {
+    return CheckInFormField(
+      label: 'VR NO.',
+      child: CheckInTextField(
+        controller: _vrNoCtrl,
+        hint: 'e.g. VR-12345',
+        keyboardType: TextInputType.text,
+        textCapitalization: TextCapitalization.characters,
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-]')),
+          TextInputFormatter.withFunction(
+            (old, value) => value.copyWith(text: value.text.toUpperCase()),
+          ),
+        ],
+        valueStyle: CheckInCompactTokens.fieldValue(),
+      ),
+    );
+  }
+
+  Widget _brandVrNoRow(BoxConstraints constraints) {
+    final stackFields =
+        MediaQuery.orientationOf(context) == Orientation.portrait ||
+        constraints.maxWidth < 520;
+
+    if (stackFields) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _brandField(),
+          const SizedBox(height: CheckInCompactTokens.fieldGap),
+          _vrNoField(),
+        ],
+      );
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: CheckInFormField(
-            label: 'BRAND / MODEL',
-            child: CheckInTextField(
-              controller: _brandCtrl,
-              hint: 'e.g. Toyota Vios',
-            ),
-          ),
-        ),
+        Expanded(child: _brandField()),
         const SizedBox(width: CheckInCompactTokens.fieldGap),
-        Expanded(
-          child: CheckInFormField(
-            label: 'VR NO. (OPTIONAL)',
-            child: CheckInTextField(
-              controller: _vrNoCtrl,
-              hint: 'e.g. VR-12345',
-              keyboardType: TextInputType.text,
-              textCapitalization: TextCapitalization.characters,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-]')),
-              ],
-              valueStyle: CheckInCompactTokens.fieldValue(),
-            ),
-          ),
-        ),
+        Expanded(child: _vrNoField()),
       ],
     );
   }
@@ -415,7 +435,7 @@ class _CheckInVehicleDetailsScreenState
     );
   }
 
-  Widget _columnVehicleId() {
+  Widget _columnVehicleId(BoxConstraints constraints) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -423,7 +443,7 @@ class _CheckInVehicleDetailsScreenState
         const SizedBox(height: CheckInCompactTokens.sectionGap),
         _plateBlock(),
         const SizedBox(height: CheckInCompactTokens.fieldGap),
-        _brandVrNoRow(),
+        _brandVrNoRow(constraints),
         const SizedBox(height: CheckInCompactTokens.fieldGap),
         _colorRow(),
         const SizedBox(height: CheckInCompactTokens.blockGap),
@@ -445,15 +465,24 @@ class _CheckInVehicleDetailsScreenState
     );
   }
 
-  Widget _narrowBody() {
+  Widget _narrowBody(BoxConstraints constraints) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _columnVehicleId(),
+        _columnVehicleId(constraints),
         const SizedBox(height: CheckInCompactTokens.blockGap),
         _columnParkingOnly(),
       ],
     );
+  }
+
+  bool _useTwoColumnLayout(BoxConstraints constraints) {
+    final isLandscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final shortestSide = MediaQuery.sizeOf(context).shortestSide;
+    return isLandscape &&
+        constraints.maxWidth >= 560 &&
+        shortestSide >= 600;
   }
 
   @override
@@ -471,22 +500,19 @@ class _CheckInVehicleDetailsScreenState
           children: [
             Expanded(
               child: SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.viewInsetsOf(context).bottom,
+                ),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isLandscape =
-                        MediaQuery.orientationOf(context) ==
-                        Orientation.landscape;
-                    final useTwoColumns =
-                        isLandscape && constraints.maxWidth >= 400;
-
-                    if (!useTwoColumns) {
-                      return _narrowBody();
+                    if (!_useTwoColumnLayout(constraints)) {
+                      return _narrowBody(constraints);
                     }
 
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: _columnVehicleId()),
+                        Expanded(child: _columnVehicleId(constraints)),
                         VerticalDivider(
                           width: CheckInCompactTokens.columnDividerWidth,
                           thickness: 1,

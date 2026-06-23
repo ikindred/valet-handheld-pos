@@ -57,13 +57,14 @@ class OpenTransactionsDataTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     final now = PhilippineTime.now();
     final dateFmt = DateFormat.MMMd();
     final timeFmt = DateFormat.jm();
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
+        border: Border.all(color: tc.cardBorder),
         borderRadius: BorderRadius.circular(8),
       ),
       child: ClipRRect(
@@ -81,7 +82,7 @@ class OpenTransactionsDataTable extends StatelessWidget {
                     Divider(
                       height: 1,
                       thickness: 1,
-                      color: Colors.black.withValues(alpha: 0.06),
+                      color: tc.divider,
                     ),
                   _DataRow(
                     tx: transactions[i],
@@ -107,9 +108,10 @@ class _HeaderRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     final labels = [...OpenTransactionsDataTable._headers, durationColumnLabel];
     return Container(
-      color: const Color(0xFFF9F9F9),
+      color: tc.hintFill,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
@@ -120,7 +122,9 @@ class _HeaderRow extends StatelessWidget {
                 padding: EdgeInsets.only(right: i < labels.length - 1 ? 8 : 0),
                 child: Text(
                   labels[i].toUpperCase(),
-                  style: OpenTransactionsDataTable._headerStyle,
+                  style: OpenTransactionsDataTable._headerStyle.copyWith(
+                    color: tc.textSecondary,
+                  ),
                 ),
               ),
             ),
@@ -147,10 +151,11 @@ class _DataRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
     final parkedFor = OpenTransaction.formatParkedDuration(tx.checkInAtRaw, now);
 
     return Container(
-      color: shaded ? const Color(0xFFFCFCFC) : Colors.white,
+      color: shaded ? tc.checkboxFill : tc.cardBg,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,7 +168,9 @@ class _DataRow extends StatelessWidget {
                 tx.ticketNumber,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: OpenTransactionsDataTable._cellStyle,
+                style: OpenTransactionsDataTable._cellStyle.copyWith(
+                  color: tc.textPrimary,
+                ),
               ),
             ),
           ),
@@ -175,7 +182,9 @@ class _DataRow extends StatelessWidget {
                 tx.plateNumber,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: OpenTransactionsDataTable._cellStyle,
+                style: OpenTransactionsDataTable._cellStyle.copyWith(
+                  color: tc.textPrimary,
+                ),
               ),
             ),
           ),
@@ -187,7 +196,9 @@ class _DataRow extends StatelessWidget {
                 tx.vehicleLabel,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: OpenTransactionsDataTable._cellStyle,
+                style: OpenTransactionsDataTable._cellStyle.copyWith(
+                  color: tc.textPrimary,
+                ),
               ),
             ),
           ),
@@ -199,7 +210,9 @@ class _DataRow extends StatelessWidget {
                 tx.vehicleTypeLabel,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: OpenTransactionsDataTable._cellStyle,
+                style: OpenTransactionsDataTable._cellStyle.copyWith(
+                  color: tc.textPrimary,
+                ),
               ),
             ),
           ),
@@ -211,7 +224,9 @@ class _DataRow extends StatelessWidget {
                 tx.slot,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: OpenTransactionsDataTable._cellStyle,
+                style: OpenTransactionsDataTable._cellStyle.copyWith(
+                  color: tc.textPrimary,
+                ),
               ),
             ),
           ),
@@ -224,11 +239,15 @@ class _DataRow extends StatelessWidget {
                 children: [
                   Text(
                     dateFmt.format(tx.timeIn),
-                    style: OpenTransactionsDataTable._cellStyle,
+                    style: OpenTransactionsDataTable._cellStyle.copyWith(
+                      color: tc.textPrimary,
+                    ),
                   ),
                   Text(
                     timeFmt.format(tx.timeIn),
-                    style: OpenTransactionsDataTable._subCellStyle,
+                    style: OpenTransactionsDataTable._subCellStyle.copyWith(
+                      color: tc.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -240,7 +259,7 @@ class _DataRow extends StatelessWidget {
               parkedFor,
               style: OpenTransactionsDataTable._cellStyle.copyWith(
                 fontWeight: FontWeight.w600,
-                color: const Color(0xFFE8831A),
+                color: const Color(0xFFF68D00),
               ),
             ),
           ),

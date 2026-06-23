@@ -393,7 +393,7 @@ class _CustomerValetCard extends StatelessWidget {
           ),
           const SizedBox(height: CheckInCompactTokens.sectionGap),
           _ReviewRow(
-            label: 'Valet Driver',
+            label: 'Driver In',
             value: state.assignedValetDriver.trim().isEmpty
                 ? '—'
                 : state.assignedValetDriver.trim(),

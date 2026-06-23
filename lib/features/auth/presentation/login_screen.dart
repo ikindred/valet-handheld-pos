@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/storage/offline_mode_prefs.dart';
 import '../../../core/storage/prefs_keys.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_background.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../../../data/remote/api_error_message.dart';
@@ -17,8 +18,6 @@ import '../auth_session_sync.dart';
 abstract final class _LoginTokens {
   static const titleOrange = Color(0xFFF68D00);
   static const subtitleGrey = Color(0xFFAEAEAE);
-  static const hintGrey300 = Color(0xFF9DA4B0);
-  static const offlineBg = Color(0xFFFAFAFA);
   static const footerGrey = Color(0xFFAFAFAF);
 
   static const double cardMaxWidth = 440;
@@ -77,17 +76,17 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  TextStyle get _fieldLabelStyle => _poppins(
+  TextStyle _fieldLabelStyle(BuildContext context) => _poppins(
         11,
         FontWeight.w600,
-        const Color(0xFF0A1B39),
+        AppThemeColors.of(context).textPrimary,
         height: 1.2,
       );
 
-  TextStyle get _fieldValueStyle => _poppins(
+  TextStyle _fieldValueStyle(BuildContext context) => _poppins(
         12,
         FontWeight.w400,
-        const Color(0xFF0A1B39),
+        AppThemeColors.of(context).textPrimary,
         height: 1.35,
       );
 
@@ -184,6 +183,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = AppThemeColors.of(context);
+    final isDark = AppThemeColors.isDark(context);
+    final iconMuted = tc.textSubtitleMuted;
+
     return Scaffold(
       body: AppBackground(
         child: SafeArea(
@@ -203,19 +206,21 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: tc.cardBg,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: Colors.black.withValues(alpha: 0.13),
+                            color: tc.cardBorder,
                             width: 1,
                           ),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x14000000),
-                              blurRadius: 12,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
+                          boxShadow: isDark
+                              ? const []
+                              : const [
+                                  BoxShadow(
+                                    color: Color(0x14000000),
+                                    blurRadius: 12,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
                         ),
                         child: Padding(
                           padding: EdgeInsets.symmetric(
@@ -247,7 +252,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 22),
                       LabeledAppTextField(
                         label: 'Email Address',
-                        labelStyle: _fieldLabelStyle,
+                        labelStyle: _fieldLabelStyle(context),
                         gap: 3,
                         child: AppTextField(
                           controller: _emailCtrl,
@@ -255,13 +260,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           keyboardType: TextInputType.emailAddress,
                           minHeight: _LoginTokens.fieldMinHeight,
                           hint: 'Enter Email Address',
-                          style: _fieldValueStyle,
-                          prefixIcon: const Padding(
-                            padding: EdgeInsets.only(left: 4),
+                          style: _fieldValueStyle(context),
+                          prefixIcon: Padding(
+                            padding: const EdgeInsets.only(left: 4),
                             child: Icon(
                               LucideIcons.user,
                               size: 12,
-                              color: _LoginTokens.hintGrey300,
+                              color: iconMuted,
                             ),
                           ),
                         ),
@@ -269,7 +274,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 12),
                       LabeledAppTextField(
                         label: 'Password',
-                        labelStyle: _fieldLabelStyle,
+                        labelStyle: _fieldLabelStyle(context),
                         gap: 3,
                         child: AppTextField(
                           controller: _passwordCtrl,
@@ -277,13 +282,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           obscureText: _obscure,
                           minHeight: _LoginTokens.fieldMinHeight,
                           hint: '************',
-                          style: _fieldValueStyle,
-                          prefixIcon: const Padding(
-                            padding: EdgeInsets.only(left: 4),
+                          style: _fieldValueStyle(context),
+                          prefixIcon: Padding(
+                            padding: const EdgeInsets.only(left: 4),
                             child: Icon(
                               LucideIcons.lock,
                               size: 12,
-                              color: _LoginTokens.hintGrey300,
+                              color: iconMuted,
                             ),
                           ),
                           suffixIcon: IconButton(
@@ -299,7 +304,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ? LucideIcons.eyeOff
                                   : LucideIcons.eye,
                               size: 12,
-                              color: _LoginTokens.hintGrey300,
+                              color: iconMuted,
                             ),
                           ),
                         ),
@@ -313,9 +318,15 @@ class _LoginScreenState extends State<LoginScreen> {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.red.shade50,
+                            color: isDark
+                                ? const Color(0xFF3D1A1A)
+                                : Colors.red.shade50,
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.red.shade200),
+                            border: Border.all(
+                              color: isDark
+                                  ? const Color(0xFF7F1D1D)
+                                  : Colors.red.shade200,
+                            ),
                           ),
                           child: Text(
                             _error!,
@@ -323,7 +334,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: _poppins(
                               11,
                               FontWeight.w500,
-                              Colors.red.shade800,
+                              isDark
+                                  ? const Color(0xFFFCA5A5)
+                                  : Colors.red.shade800,
                               height: 1.3,
                             ),
                           ),
@@ -386,7 +399,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 height: _LoginTokens.buttonHeight,
                                 child: OutlinedButton(
                                   style: OutlinedButton.styleFrom(
-                                    backgroundColor: _LoginTokens.offlineBg,
+                                    backgroundColor: tc.cardBg,
                                     foregroundColor: _LoginTokens.titleOrange,
                                     side: const BorderSide(
                                       color: _LoginTokens.titleOrange,

@@ -107,7 +107,7 @@ class _CheckInPrintTicketScreenState extends State<CheckInPrintTicketScreen> {
   static String _valetTypeLabel(ValetServiceType t) {
     return switch (t) {
       ValetServiceType.standardValet => 'Standard Valet',
-      ValetServiceType.selfPark => 'Self Park',
+      ValetServiceType.selfPark => 'Self-Park',
     };
   }
 

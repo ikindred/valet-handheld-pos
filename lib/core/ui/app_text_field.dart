@@ -178,6 +178,7 @@ class AppTextField extends StatefulWidget {
     this.prefixIcon,
     this.suffixIcon,
     this.autofocus = false,
+    this.enabled = true,
     this.onSubmitted,
     this.onChanged,
   });
@@ -195,6 +196,7 @@ class AppTextField extends StatefulWidget {
   final Widget? prefixIcon;
   final Widget? suffixIcon;
   final bool autofocus;
+  final bool enabled;
   final ValueChanged<String>? onSubmitted;
   final ValueChanged<String>? onChanged;
 
@@ -245,6 +247,7 @@ class _AppTextFieldState extends State<AppTextField> {
       child: TextField(
         controller: widget.controller,
         focusNode: _focusNode,
+        enabled: widget.enabled,
         keyboardType: widget.keyboardType,
         textCapitalization: widget.textCapitalization,
         inputFormatters: widget.inputFormatters,

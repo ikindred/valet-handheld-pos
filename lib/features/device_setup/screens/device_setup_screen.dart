@@ -266,22 +266,60 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                child: Column(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Select Your Device',
-                      style: poppins(24, FontWeight.w700, _T.textPrimary),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Choose the terminal assigned to this tablet',
-                      style: poppins(
-                        14,
-                        FontWeight.w400,
-                        _T.greySubtitle,
-                        height: 1.45,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Select Your Device',
+                            style: poppins(24, FontWeight.w700, _T.textPrimary),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Choose the terminal assigned to this tablet',
+                            style: poppins(
+                              14,
+                              FontWeight.w400,
+                              _T.greySubtitle,
+                              height: 1.45,
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    BlocBuilder<DeviceSetupCubit, DeviceSetupState>(
+                      buildWhen: (prev, next) =>
+                          prev.runtimeType != next.runtimeType,
+                      builder: (context, state) {
+                        final busy = state is DeviceSetupLoadingDevices ||
+                            state is DeviceSetupClaiming ||
+                            state is DeviceClaimSuccess;
+                        return IconButton(
+                          tooltip: 'Refresh',
+                          onPressed: busy
+                              ? null
+                              : () => context
+                                  .read<DeviceSetupCubit>()
+                                  .fetchDevices(),
+                          icon: busy
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: _T.orange,
+                                  ),
+                                )
+                              : const Icon(
+                                  LucideIcons.refreshCw,
+                                  color: _T.orange,
+                                  size: 22,
+                                ),
+                        );
+                      },
                     ),
                   ],
                 ),

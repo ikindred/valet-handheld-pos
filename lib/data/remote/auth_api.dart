@@ -63,6 +63,7 @@ class AuthApi {
         fullName: 'Stub User',
         role: 'staff',
         isOpenCash: false,
+        expressCashier: false,
         shiftSchedule: const [],
         standardRates: const StandardParkingRates(
           flatRatePesos: 150,
@@ -349,6 +350,7 @@ class LoginResponse {
     required this.fullName,
     required this.role,
     required this.isOpenCash,
+    required this.expressCashier,
     required this.shiftSchedule,
     this.standardRates,
     this.userSite,
@@ -368,12 +370,20 @@ class LoginResponse {
     var fullName = '';
     var role = '';
     var userId = _parseServerUserId(json);
+    var expressCashier = false;
     LoginUserSite? userSite;
     if (user is Map<String, dynamic>) {
       userId = _parseServerUserId({'user': user});
       fullName = _fullNameFromUser(user);
       role = (user['role'] ?? '').toString();
       userSite = LoginUserSite.fromUserJson(user);
+      final express = user['express_cashier'] ?? user['expressCashier'];
+      if (express is bool) {
+        expressCashier = express;
+      } else if (express != null) {
+        expressCashier =
+            express.toString() == '1' || express.toString().toLowerCase() == 'true';
+      }
     }
 
     return LoginResponse(
@@ -382,6 +392,7 @@ class LoginResponse {
       fullName: fullName,
       role: role,
       isOpenCash: isOpen,
+      expressCashier: expressCashier,
       shiftSchedule: _parseShiftScheduleFromLoginJson(json),
       standardRates: rates,
       userSite: userSite,
@@ -399,6 +410,9 @@ class LoginResponse {
   final String role;
 
   final bool isOpenCash;
+
+  /// From login `user.express_cashier` — manual ticketing mode.
+  final bool expressCashier;
 
   final List<ShiftScheduleEntry> shiftSchedule;
 

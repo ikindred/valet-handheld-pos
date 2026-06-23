@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/formatting/valet_type_format.dart';
 import '../../../core/time/philippine_time.dart';
 import '../../check_in/presentation/widgets/check_in_compact_tokens.dart';
 import '../../check_in/presentation/widgets/check_in_vehicle_details_widgets.dart';
@@ -153,6 +154,9 @@ class _PreviewVehicleBody extends StatelessWidget {
         (valetOutPrefill ?? '').trim().isEmpty ? '—' : valetOutPrefill!.trim();
 
     final belongings = CheckOutVehicleInfoScreen._belongingsFromPreview(preview);
+    final valetTypeLabel = ValetTypeFormat.labelIfPresent(
+      preview.valetType ?? ValetTypeFormat.fromDriverOutMeta(row.driverOut),
+    );
 
     final tabs = CheckoutVehicleReviewTabs(
       vehicleInfoSelected: true,
@@ -194,8 +198,13 @@ class _PreviewVehicleBody extends StatelessWidget {
           color: colorDisplay,
           type: typeDisplay,
           slot: parkingLabel,
+          serviceType: valetTypeLabel,
         ),
-        staffCard: _StaffCard(valetIn: valetIn, valetOut: valetOut),
+        staffCard: _StaffCard(
+          valetIn: valetIn,
+          valetOut: valetOut,
+          hideValetStaff: state.isSelfPark,
+        ),
         belongingsCard: _BelongingsCard(belongings: belongings),
       ),
     );
@@ -217,6 +226,9 @@ class _OfflineVehicleBody extends StatelessWidget {
     );
     final vrRaw = row.vrNo?.trim() ?? '';
     final vrNo = vrRaw.isEmpty ? '—' : vrRaw;
+    final valetTypeLabel = ValetTypeFormat.labelIfPresent(
+      ValetTypeFormat.fromDriverOutMeta(row.driverOut),
+    );
 
     final tabs = CheckoutVehicleReviewTabs(
       vehicleInfoSelected: true,
@@ -260,12 +272,14 @@ class _OfflineVehicleBody extends StatelessWidget {
               ? '—'
               : vehicleTypeDisplayLabel(row.vehicleType),
           slot: '—',
+          serviceType: valetTypeLabel,
         ),
         staffCard: _StaffCard(
           valetIn: (row.driverIn ?? '').trim().isEmpty ? '—' : row.driverIn!,
           valetOut: (state.driverOut ?? '').trim().isEmpty
               ? '—'
               : state.driverOut!.trim(),
+          hideValetStaff: state.isSelfPark,
         ),
         belongingsCard: _BelongingsCard(belongings: belongings),
       ),
@@ -424,6 +438,7 @@ class _VehicleCard extends StatelessWidget {
     required this.color,
     required this.type,
     required this.slot,
+    this.serviceType,
   });
 
   final String plate;
@@ -432,6 +447,7 @@ class _VehicleCard extends StatelessWidget {
   final String color;
   final String type;
   final String slot;
+  final String? serviceType;
 
   @override
   Widget build(BuildContext context) {
@@ -469,6 +485,11 @@ class _VehicleCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text('Type', style: CheckOutUiTokens.fieldLabelOf(context)),
           Text(type, style: CheckOutUiTokens.bodyOf(context)),
+          if (serviceType != null) ...[
+            const SizedBox(height: 6),
+            Text('Service', style: CheckOutUiTokens.fieldLabelOf(context)),
+            Text(serviceType!, style: CheckOutUiTokens.bodyOf(context)),
+          ],
           const SizedBox(height: 10),
           _OrangeChip(text: slot),
         ],
@@ -478,13 +499,21 @@ class _VehicleCard extends StatelessWidget {
 }
 
 class _StaffCard extends StatelessWidget {
-  const _StaffCard({required this.valetIn, required this.valetOut});
+  const _StaffCard({
+    required this.valetIn,
+    required this.valetOut,
+    this.hideValetStaff = false,
+  });
 
   final String valetIn;
   final String valetOut;
+  final bool hideValetStaff;
 
   @override
   Widget build(BuildContext context) {
+    if (hideValetStaff) {
+      return const SizedBox.shrink();
+    }
     return _ReviewCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

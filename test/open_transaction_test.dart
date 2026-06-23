@@ -97,5 +97,6 @@ Ticket _ticket({
     createdAt: checkInAt,
     parkingInfo: parkingInfo,
     pendingVoidRequest: false,
+    isExpressCashier: false,
   );
 }

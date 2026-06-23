@@ -5,6 +5,7 @@ import '../../features/check_out/domain/checkout_pricing.dart';
 import '../../features/check_out/domain/checkout_receipt_snapshot.dart';
 import '../../features/dashboard/domain/ticket_parking_info.dart';
 import '../time/philippine_time.dart';
+import '../formatting/valet_type_format.dart';
 import 'receipt_print_format.dart';
 
 /// Thermal checkout receipt payload (ESC/POS + raster).
@@ -19,6 +20,7 @@ class CheckoutReceiptData {
     required this.slotLine,
     required this.valetInLabel,
     required this.valetOutLabel,
+    this.valetTypeLabel,
     required this.flatRateLabel,
     required this.flatPesosLabel,
     required this.succeedingLabel,
@@ -51,6 +53,7 @@ class CheckoutReceiptData {
   final String slotLine;
   final String valetInLabel;
   final String valetOutLabel;
+  final String? valetTypeLabel;
   final String flatRateLabel;
   final String flatPesosLabel;
   final String succeedingLabel;
@@ -75,6 +78,8 @@ class CheckoutReceiptData {
   final String? invoiceNumber;
 
   bool get changeIsNonZero => changePesos > 0.009;
+
+  bool get showValetStaff => !ValetTypeFormat.isSelfParkDisplayLabel(valetTypeLabel);
 
   factory CheckoutReceiptData.fromSnapshot(
     CheckoutReceiptSnapshot snap, {
@@ -157,6 +162,7 @@ class CheckoutReceiptData {
       slotLine: snap.slotLine.trim().isEmpty ? '-' : snap.slotLine.trim(),
       valetInLabel: _driverLabel(snap.valetName),
       valetOutLabel: _driverLabel(snap.valetOutName),
+      valetTypeLabel: snap.valetTypeLabel,
       flatRateLabel: flatLabel,
       flatPesosLabel: pesoNum(snap.flatPesos),
       succeedingLabel: showSucceeding ? succeedingLabel : '',
@@ -193,6 +199,7 @@ class CheckoutReceiptData {
     CheckoutPreviewRates? appliedRate,
     double? cashTendered,
     double? changePesos,
+    String? valetTypeLabel,
   }) {
     String pesoNum(double v) => ReceiptPrintFormat.pesoAmount(v);
 
@@ -259,6 +266,12 @@ class CheckoutReceiptData {
       endHhMm24: p?.overnightEnd ?? '',
     );
 
+    final valetType = valetTypeLabel ??
+        ValetTypeFormat.labelIfPresent(
+          ValetTypeFormat.fromDriverOutMeta(ticket.driverOut),
+        );
+    final showValetStaff = !ValetTypeFormat.isSelfParkDisplayLabel(valetType);
+
     return CheckoutReceiptData(
       ticketNumber: ticket.id,
       plateNumber:
@@ -269,8 +282,11 @@ class CheckoutReceiptData {
       timeOutLabel: _formatUnix(timeOutUnix),
       durationLabel: durationLabel,
       slotLine: _slotLineFromParking(parking),
-      valetInLabel: _plainDriverLabel(ticket.driverIn),
-      valetOutLabel: _plainDriverLabel(ticket.driverOut),
+      valetInLabel:
+          showValetStaff ? _plainDriverLabel(ticket.driverIn) : '-',
+      valetOutLabel:
+          showValetStaff ? _plainDriverLabel(ticket.driverOut) : '-',
+      valetTypeLabel: valetType,
       flatRateLabel: flatLabel,
       flatPesosLabel: pesoNum(flatAmount),
       succeedingLabel: showSucceeding ? succeedingLabel : '',

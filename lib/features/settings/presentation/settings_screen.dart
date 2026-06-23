@@ -8,7 +8,6 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/printing/bluetooth_pos_printer.dart';
 import '../../../core/printing/print_flow.dart';
 import '../../../core/printing/printer_connection_notifier.dart';
 import '../../../core/printing/valet_print_service.dart';
@@ -45,6 +44,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int _pendingCount = 0;
   String _lastSyncLabel = 'Never';
   bool _syncing = false;
+  bool _isExpressCashier = false;
 
   @override
   void initState() {
@@ -73,6 +73,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     var firstName = '';
     var fullName = '';
     var role = '';
+    var isExpressCashier = false;
 
     if (auth is AuthAuthenticated && auth.userId != null) {
       final localId = int.tryParse(auth.userId!);
@@ -82,6 +83,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (acct != null) {
           fullName = acct.fullName.trim();
           role = acct.role.trim();
+          isExpressCashier = acct.isExpressCashier;
           final parts = fullName.split(RegExp(r'\s+'));
           firstName = parts.isNotEmpty ? parts.first : '';
         }
@@ -96,6 +98,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _roleBadge = _formatRoleBadge(role);
       _roleSubtitle =
           '${_formatRoleLabel(role)} · $branchName';
+      _isExpressCashier = isExpressCashier;
     });
   }
 
@@ -162,9 +165,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _reconnectPrinter() async {
-    await context.read<BluetoothPosPrinter>().connectPaired();
-    if (!mounted) return;
-    context.read<PrinterConnectionNotifier>().refresh();
+    await context.read<PrinterConnectionNotifier>().tryConnectPaired();
   }
 
   static String _formatRoleBadge(String role) {
@@ -206,12 +207,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final syncState = context.watch<SyncCubit>().state;
     final isSyncing = _syncing || syncState is SyncInProgress;
 
+    final auth = context.watch<AuthBloc>().state;
+    final isExpressCashier = _isExpressCashier ||
+        (auth is AuthAuthenticated && auth.isExpressCashier);
+
     return Scaffold(
       backgroundColor: null,
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const DashboardLeftRail(),
+          isExpressCashier
+              ? const ExpressCashierLeftRail()
+              : const DashboardLeftRail(),
           Expanded(
             child: SafeArea(
               left: false,
@@ -227,6 +234,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _SettingsHeader(
                           firstName: _firstName,
                           siteSubtitle: _siteSubtitle,
+                          isExpressCashier: isExpressCashier,
                         ),
                         const SizedBox(height: 16),
                         if (wide)
@@ -278,10 +286,12 @@ class _SettingsHeader extends StatelessWidget {
   const _SettingsHeader({
     required this.firstName,
     required this.siteSubtitle,
+    this.isExpressCashier = false,
   });
 
   final String firstName;
   final String siteSubtitle;
+  final bool isExpressCashier;
 
   @override
   Widget build(BuildContext context) {
@@ -309,7 +319,10 @@ class _SettingsHeader extends StatelessWidget {
             ],
           ),
         ),
-        const BranchRatesSlotsHeaderActions(),
+        BranchRatesSlotsHeaderActions(
+          showRates: !isExpressCashier,
+          showSlots: !isExpressCashier,
+        ),
       ],
     );
   }

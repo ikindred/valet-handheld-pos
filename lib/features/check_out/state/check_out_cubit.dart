@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/connectivity/internet_reachability.dart';
 import '../../../core/pricing/transaction_payment_calculator.dart';
+import '../../../core/formatting/valet_type_format.dart';
 import '../../../core/time/philippine_time.dart';
 import '../../../core/formatting/plate_number.dart';
 import '../../../core/logging/valet_log.dart';
@@ -28,6 +29,7 @@ import '../domain/checkout_preview_format.dart';
 import '../domain/checkout_pricing.dart';
 import '../domain/checkout_rate_resolution.dart';
 import '../domain/checkout_receipt_snapshot.dart';
+import '../domain/checkout_valet_type.dart';
 import '../domain/ticket_damage_markers.dart';
 import '../models/check_out_response.dart';
 import '../models/checkout_preview_rates.dart';
@@ -99,6 +101,15 @@ class CheckOutState extends Equatable {
 
   /// Non-dismissable checkout block (e.g. pending void request).
   final String? checkoutBlockMessage;
+
+  /// True when check-in was self-park (no returning valet attendant).
+  bool get isSelfPark {
+    final previewType = preview?.valetType;
+    if (previewType != null && previewType.trim().isNotEmpty) {
+      return CheckoutValetType.isSelfPark(previewType);
+    }
+    return CheckoutValetType.isSelfParkFromDriverOutMeta(ticket?.driverOut);
+  }
 
   List<VehicleDamageEntry> get diagramEntries => [
     ...checkInDamage,
@@ -350,6 +361,9 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         mallHours: state.mallHours,
         ticket: t,
         driverIn: t.driverIn,
+        driverOut: CheckoutValetType.isSelfParkFromDriverOutMeta(t.driverOut)
+            ? null
+            : (state.driverOut ?? driverOutNameFromColumn(t.driverOut)),
         checkInDamage: checkIn,
         checkoutAddedDamage: const [],
         selectedDamageType: DamageType.dent,
@@ -433,7 +447,13 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         serverTicketId: preview.transactionId,
         clearServerTotal: true,
         ticket: ticket,
-        driverIn: ticket.driverIn,
+        driverIn: ticket.driverIn ?? preview.ticket.valetIn,
+        driverOut: preview.valetType != null &&
+                CheckoutValetType.isSelfPark(preview.valetType)
+            ? null
+            : (state.driverOut ??
+                preview.ticket.valetOut ??
+                driverOutNameFromColumn(ticket.driverOut)),
         isLookupBusy: false,
         isLoadingPreview: false,
         checkInDamage: dmg.checkIn,
@@ -504,6 +524,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       voidedAt: base.voidedAt,
       pendingVoidRequest: base.pendingVoidRequest,
       pendingVoidReason: base.pendingVoidReason,
+      isExpressCashier: base.isExpressCashier,
     );
   }
 
@@ -539,6 +560,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       serverTicketId: preview.transactionId,
       driverIn: pt.valetIn,
       pendingVoidRequest: false,
+      isExpressCashier: false,
     );
   }
 
@@ -650,6 +672,12 @@ class CheckOutCubit extends Cubit<CheckOutState> {
   }
 
   void setDriverOut(String raw) {
+    if (state.isSelfPark) {
+      if (state.driverOut != null) {
+        emit(state.copyWith(driverOut: null));
+      }
+      return;
+    }
     final t = raw.trim();
     emit(state.copyWith(driverOut: t.isEmpty ? null : t));
   }
@@ -1265,6 +1293,14 @@ class CheckOutCubit extends Cubit<CheckOutState> {
               return 'Checkout preview is not loaded.';
             }
             final appliedRate = _buildAppliedRate();
+            final driverOut = state.driverOut?.trim();
+            if (driverOut != null && driverOut.isNotEmpty) {
+              await _transactionsApi.patchTransactionDrivers(
+                token: token,
+                ticketId: pathId,
+                driverOut: driverOut,
+              );
+            }
             response = await _transactionsApi.submitCheckOut(
               token: token,
               ticketId: pathId,
@@ -1273,7 +1309,6 @@ class CheckOutCubit extends Cubit<CheckOutState> {
               isOvernight: isOvernight,
               ticketLost: ticketLost,
               cashTendered: tendered,
-              driverOut: state.driverOut,
               conditionCheckout: conditionBody,
               appliedRate: appliedRate,
             );
@@ -1422,8 +1457,14 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         slotLine: pt?.parkingLocationLine.isNotEmpty == true
             ? pt!.parkingLocationLine
             : null,
-        valetIn: pt?.valetIn ?? state.driverIn,
-        valetOut: state.driverOut,
+        valetIn: state.isSelfPark
+            ? null
+            : (pt?.valetIn ?? state.driverIn),
+        valetOut: state.isSelfPark ? null : state.driverOut,
+        valetTypeLabel: ValetTypeFormat.labelIfPresent(
+          preview?.valetType ??
+              ValetTypeFormat.fromDriverOutMeta(t.driverOut),
+        ),
         overnightStart: resolved.overnightStart,
         overnightEnd: resolved.overnightEnd,
       );

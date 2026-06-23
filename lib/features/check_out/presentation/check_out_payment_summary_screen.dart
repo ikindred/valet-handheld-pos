@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/formatting/peso_currency.dart';
+import '../../../core/formatting/valet_type_format.dart';
 import '../../../core/time/philippine_time.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/repositories/auth_repository.dart';
@@ -46,13 +47,12 @@ class _CheckOutPaymentSummaryScreenState
     if (id == null) return;
     if (_driverOutFieldTicketId != id) {
       _driverOutFieldTicketId = id;
-      final text = state.driverOut ?? '';
-      if (_driverOutCtrl.text != text) {
-        _driverOutCtrl.removeListener(_onDriverOutChanged);
-        _driverOutCtrl.text = text;
-        _driverOutCtrl.addListener(_onDriverOutChanged);
-      }
     }
+    final text = state.isSelfPark ? '' : (state.driverOut ?? '');
+    if (_driverOutCtrl.text == text) return;
+    _driverOutCtrl.removeListener(_onDriverOutChanged);
+    _driverOutCtrl.text = text;
+    _driverOutCtrl.addListener(_onDriverOutChanged);
   }
 
   /// Keypad stores whole pesos as digits (e.g. `150` → ₱150.00).
@@ -176,6 +176,7 @@ class _CheckOutPaymentSummaryScreenState
           a.ticket != b.ticket ||
           a.receiptTicket != b.receiptTicket ||
           a.preview != b.preview ||
+          a.preview?.valetType != b.preview?.valetType ||
           a.breakdown != b.breakdown ||
           a.serverTotal != b.serverTotal ||
           a.isLoadingPreview != b.isLoadingPreview ||
@@ -222,6 +223,10 @@ class _CheckOutPaymentSummaryScreenState
             : '—';
 
         final blockMsg = state.checkoutBlockMessage;
+        final valetTypeLabel = ValetTypeFormat.labelIfPresent(
+          preview?.valetType ??
+              ValetTypeFormat.fromDriverOutMeta(row.driverOut),
+        );
         final canConfirm = blockMsg == null &&
             !state.isSubmitting &&
             !state.isLoadingPreview &&
@@ -266,7 +271,10 @@ class _CheckOutPaymentSummaryScreenState
                     timeOutLabel: timeOutLabel,
                     durationLabel: durationLabel,
                     flatBlockHours: state.flatBlockHours,
+                    driverInLabel: state.driverIn,
                     driverOutController: _driverOutCtrl,
+                    driverOutEnabled: !state.isSelfPark,
+                    valetTypeLabel: valetTypeLabel,
                     isLostTicket: state.isLostTicket,
                     lostTicketFee: state.lostTicketFeePesos,
                     onLostTicketChanged: cubit.setLostTicket,

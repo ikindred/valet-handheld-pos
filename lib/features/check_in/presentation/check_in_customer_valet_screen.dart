@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_text_field.dart';
+import '../domain/check_in_validation.dart';
 import '../state/check_in_cubit.dart';
 import 'widgets/check_in_compact_tokens.dart';
 import 'widgets/check_in_footer_actions.dart';
@@ -64,10 +65,26 @@ class _CheckInCustomerValetScreenState
   }
 
   void _onNext() {
+    final fullName = _fullNameCtrl.text.trim();
+    final contact = _contactCtrl.text.trim();
+    final error = CheckInValidation.validateStep1(
+      customerFullName: fullName,
+      contactNumber: contact,
+    );
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+      return;
+    }
+
     context.read<CheckInCubit>().updateCustomerStep(
-      customerFullName: _fullNameCtrl.text.trim(),
-      contactNumber: _contactCtrl.text.trim(),
-      assignedValetDriver: _valetCtrl.text.trim(),
+      customerFullName: fullName,
+      contactNumber: contact,
+      assignedValetDriver: context.read<CheckInCubit>().state.valetServiceType ==
+              ValetServiceType.selfPark
+          ? ''
+          : _valetCtrl.text.trim(),
       specialInstructions: _instructionsCtrl.text.trim(),
     );
     context.go('/check-in/step-2');
@@ -133,6 +150,29 @@ class _CheckInCustomerValetScreenState
     );
   }
 
+  Widget _assignedValetDriverField() {
+    return BlocBuilder<CheckInCubit, CheckInState>(
+      buildWhen: (a, b) => a.valetServiceType != b.valetServiceType,
+      builder: (context, state) {
+        final selfPark = state.valetServiceType == ValetServiceType.selfPark;
+        if (selfPark && _valetCtrl.text.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _valetCtrl.clear();
+          });
+        }
+        return CheckInFormField(
+          label: 'DRIVER IN (OPTIONAL)',
+          child: CheckInTextField(
+            controller: _valetCtrl,
+            hint: selfPark ? 'Not applicable for self-park' : 'Carlos Mendoza',
+            enabled: !selfPark,
+          ),
+        );
+      },
+    );
+  }
+
   /// Right column: valet assignment + special request.
   Widget _columnValetAssignmentAndSpecial() {
     return Column(
@@ -140,13 +180,7 @@ class _CheckInCustomerValetScreenState
       children: [
         const CheckInSectionTitle(text: 'VALET ASSIGNMENT'),
         const SizedBox(height: CheckInCompactTokens.sectionGap),
-        CheckInFormField(
-          label: 'ASSIGNED VALET DRIVER',
-          child: CheckInTextField(
-            controller: _valetCtrl,
-            hint: 'Carlos Mendoza',
-          ),
-        ),
+        _assignedValetDriverField(),
         const SizedBox(height: CheckInCompactTokens.fieldGap),
         _dateTimeField(),
         const SizedBox(height: 20),
@@ -181,13 +215,7 @@ class _CheckInCustomerValetScreenState
         const SizedBox(height: CheckInCompactTokens.blockGap),
         const CheckInSectionTitle(text: 'VALET ASSIGNMENT'),
         const SizedBox(height: CheckInCompactTokens.sectionGap),
-        CheckInFormField(
-          label: 'ASSIGNED VALET DRIVER',
-          child: CheckInTextField(
-            controller: _valetCtrl,
-            hint: 'Carlos Mendoza',
-          ),
-        ),
+        _assignedValetDriverField(),
         const SizedBox(height: CheckInCompactTokens.fieldGap),
         _dateTimeField(),
         const SizedBox(height: CheckInCompactTokens.blockGap),

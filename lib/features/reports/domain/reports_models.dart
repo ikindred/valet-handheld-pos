@@ -22,6 +22,7 @@ class ReportsTicketRow extends Equatable {
     this.hasPendingVoid = false,
     this.isVoided = false,
     this.cashierId,
+    this.valetTypeLabel,
   });
 
   /// Display ticket number (e.g. `TKT-0123`).
@@ -62,6 +63,9 @@ class ReportsTicketRow extends Equatable {
 
   /// Server user UUID (`user.id` from login) who owns this transaction.
   final String? cashierId;
+
+  /// Human label: Standard Valet / Self-Park.
+  final String? valetTypeLabel;
 
   /// Route / detail key: server id when available, else local ticket number.
   String get detailId {
@@ -104,6 +108,7 @@ class ReportsTicketRow extends Equatable {
         hasPendingVoid,
         isVoided,
         cashierId,
+        valetTypeLabel,
       ];
 }
 

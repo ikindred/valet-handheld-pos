@@ -25,6 +25,7 @@ Map<String, dynamic> ticketSyncPayload(Ticket t) {
     'status': t.status,
     'sync_status': t.syncStatus,
     'created_at': t.createdAt,
+    'is_express_cashier': t.isExpressCashier,
     'driver_in': t.driverIn,
     'driver_out': t.driverOut,
   };
@@ -92,5 +93,6 @@ Ticket ticketFromSyncQueuePayload(Map<String, dynamic> p) {
     driverIn: _optionalTrimmedStr(p['driver_in']),
     driverOut: _optionalTrimmedStr(p['driver_out']),
     pendingVoidRequest: false,
+    isExpressCashier: p['is_express_cashier'] == true,
   );
 }

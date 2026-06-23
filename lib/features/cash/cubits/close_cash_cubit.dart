@@ -165,6 +165,7 @@ class CloseCashCubit extends Cubit<CloseCashState> {
         stats: cur.stats,
         activeCheckInCount: cur.openTransactions.length,
         actualCash: cur.actualCash,
+        isExpressCashier: cur.shift.isExpressCashier,
       );
       await _auth.confirmCloseCash(
         localUserId: localUserId,

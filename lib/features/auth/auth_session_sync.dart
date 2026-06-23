@@ -18,12 +18,14 @@ Future<void> syncAuthBlocAndNavigate(
   StandardParkingRates? standardRates,
 }) async {
   final route = await repo.shiftRouteForLocalUser(localUserId);
-  final open = route == '/dashboard';
+  final isExpressCashier = await repo.isExpressCashierForLocalUser(localUserId);
+  final open = route != '/cash/open';
   if (!context.mounted) return;
   context.read<AuthBloc>().add(
         AuthLoggedIn(
           cashSessionStatus:
               open ? CashSessionStatus.open : CashSessionStatus.closed,
+          isExpressCashier: isExpressCashier,
           standardRates: standardRates,
           userId: localUserId.toString(),
           email: email,

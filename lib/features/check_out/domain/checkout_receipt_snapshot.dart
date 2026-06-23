@@ -20,6 +20,7 @@ class CheckoutReceiptSnapshot extends Equatable {
     required this.slotLine,
     this.valetName,
     this.valetOutName,
+    this.valetTypeLabel,
     this.flatRateLabel,
     this.succeedingTimeLabel,
     required this.flatBlockHours,
@@ -48,6 +49,7 @@ class CheckoutReceiptSnapshot extends Equatable {
   final String slotLine;
   final String? valetName;
   final String? valetOutName;
+  final String? valetTypeLabel;
   final String? flatRateLabel;
   final String? succeedingTimeLabel;
   final int flatBlockHours;
@@ -104,6 +106,7 @@ class CheckoutReceiptSnapshot extends Equatable {
     String? slotLine,
     String? valetIn,
     String? valetOut,
+    String? valetTypeLabel,
     String overnightStart = '',
     String overnightEnd = '',
   }) {
@@ -130,6 +133,7 @@ class CheckoutReceiptSnapshot extends Equatable {
       slotLine: slotLine ?? slotLineFromTicket(ticket),
       valetName: valetIn,
       valetOutName: valetOut,
+      valetTypeLabel: valetTypeLabel,
       flatBlockHours: flatBlockHours,
       flatPesos: breakdown.flatRateAmount,
       flatRateLabel: 'Flat rate (${flatBlockHours}h)',
@@ -230,6 +234,8 @@ class CheckoutReceiptSnapshot extends Equatable {
         durationMinutes,
         slotLine,
         valetName,
+        valetOutName,
+        valetTypeLabel,
         flatBlockHours,
         flatPesos,
         succeedingPesos,

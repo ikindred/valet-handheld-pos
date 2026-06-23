@@ -15,6 +15,8 @@ class BranchRatesSlotsHeaderActions extends StatelessWidget {
     super.key,
     this.leading,
     this.trailing,
+    this.showRates = true,
+    this.showSlots = true,
     this.showOnlineStatus = true,
   });
 
@@ -24,6 +26,8 @@ class BranchRatesSlotsHeaderActions extends StatelessWidget {
   /// Widget after Slots, before Online (e.g. extra actions).
   final Widget? trailing;
 
+  final bool showRates;
+  final bool showSlots;
   final bool showOnlineStatus;
 
   static Future<void> openRatesDialog(BuildContext context) async {
@@ -65,17 +69,19 @@ class BranchRatesSlotsHeaderActions extends StatelessWidget {
           leading!,
           const SizedBox(width: 8),
         ],
-        RatesOutlinePill(onPressed: () => openRatesDialog(context)),
-        const SizedBox(width: 8),
-        ParkingSlotsOutlinePill(onPressed: () => openSlotsDialog(context)),
+        if (showRates) ...[
+          RatesOutlinePill(onPressed: () => openRatesDialog(context)),
+          const SizedBox(width: 8),
+        ],
+        if (showSlots) ...[
+          ParkingSlotsOutlinePill(onPressed: () => openSlotsDialog(context)),
+          if (trailing != null || showOnlineStatus) const SizedBox(width: 8),
+        ],
         if (trailing != null) ...[
-          const SizedBox(width: 8),
           trailing!,
+          if (showOnlineStatus) const SizedBox(width: 8),
         ],
-        if (showOnlineStatus) ...[
-          const SizedBox(width: 8),
-          const DashboardStatusPillLive(),
-        ],
+        if (showOnlineStatus) const DashboardStatusPillLive(),
       ],
     );
   }

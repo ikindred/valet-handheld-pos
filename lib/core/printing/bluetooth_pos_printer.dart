@@ -13,6 +13,16 @@ import '../storage/printer_prefs.dart';
 import 'printer_config.dart';
 import 'printer_service.dart';
 
+/// Normalizes Bluetooth MAC addresses for comparison (case/colon agnostic).
+bool bluetoothAddressesMatch(String? a, String? b) {
+  if (a == null || b == null) return false;
+  String norm(String value) =>
+      value.trim().toUpperCase().replaceAll(':', '').replaceAll('-', '');
+  final left = norm(a);
+  final right = norm(b);
+  return left.isNotEmpty && left == right;
+}
+
 /// Bluetooth ESC/POS printer via [PrinterManager].
 ///
 /// Works with any Bluetooth thermal printer that accepts standard ESC/POS
@@ -28,6 +38,9 @@ class BluetoothPosPrinter implements PrinterService {
   CapabilityProfile? _profile;
   StreamSubscription<pos.BTStatus>? _statusSub;
 
+  /// Address of the printer this app session last connected to via [connect].
+  String? _activeConnectionAddress;
+
   Future<PrinterPrefs> get _prefsAsync async {
     _prefs ??= await PrinterPrefs.load();
     return _prefs!;
@@ -42,7 +55,26 @@ class BluetoothPosPrinter implements PrinterService {
   Future<PrinterPaperWidth> get paperWidth async =>
       (await _prefsAsync).paperWidth;
 
-  bool get isConnected => _manager.currentStatusBT == pos.BTStatus.connected;
+  /// Raw native Bluetooth link (any paired device — may differ from saved prefs).
+  bool get hasBluetoothLink =>
+      _manager.currentStatusBT == pos.BTStatus.connected;
+
+  /// Back-compat alias; prefer [isConnectedToSavedPrinter] for print/UI gating.
+  bool get isConnected => hasBluetoothLink;
+
+  /// True when the active link targets the printer saved in app settings.
+  Future<bool> isConnectedToSavedPrinter() async {
+    if (!hasBluetoothLink) return false;
+    final prefs = await _prefsAsync;
+    final saved = prefs.address?.trim();
+    if (saved == null || saved.isEmpty) return false;
+    final active = _activeConnectionAddress?.trim();
+    if (active == null || active.isEmpty) {
+      // System Bluetooth may be connected to another printer; not our saved one.
+      return false;
+    }
+    return bluetoothAddressesMatch(active, saved);
+  }
 
   Future<String?> get pairedName async => (await _prefsAsync).name;
 
@@ -59,6 +91,7 @@ class BluetoothPosPrinter implements PrinterService {
   Future<void> disconnect() async {
     if (!Platform.isAndroid && !Platform.isIOS) return;
     await _manager.disconnect(type: pos.PrinterType.bluetooth);
+    _activeConnectionAddress = null;
   }
 
   @override
@@ -146,6 +179,11 @@ class BluetoothPosPrinter implements PrinterService {
     await ensureBluetoothPermissions();
 
     final prefs = await _prefsAsync;
+    if (hasBluetoothLink &&
+        !bluetoothAddressesMatch(_activeConnectionAddress, device.id)) {
+      await disconnect();
+    }
+
     final preferBle = useBle ?? prefs.useBle;
     final modes = preferBle ? [true, false] : [false, true];
 
@@ -160,6 +198,7 @@ class BluetoothPosPrinter implements PrinterService {
         ),
       );
       if (ok) {
+        _activeConnectionAddress = device.id;
         await prefs.save(
           address: device.id,
           name: device.name,
@@ -181,6 +220,13 @@ class BluetoothPosPrinter implements PrinterService {
     final prefs = await _prefsAsync;
     final addr = prefs.address?.trim() ?? '';
     if (addr.isEmpty) return false;
+
+    if (await isConnectedToSavedPrinter()) return true;
+
+    if (hasBluetoothLink) {
+      await disconnect();
+    }
+
     try {
       await connect(
         PrinterDevice(
@@ -192,32 +238,50 @@ class BluetoothPosPrinter implements PrinterService {
         ),
         useBle: prefs.useBle,
       );
-      return await waitUntilConnected();
+      return await waitUntilConnectedToSaved();
     } catch (e, st) {
       ValetLog.error('BluetoothPosPrinter.connectPaired', 'failed', e, st);
       return false;
     }
   }
 
-  /// Waits until [isConnected] or [timeout] elapses.
+  /// Waits until connected to the saved printer or [timeout] elapses.
+  Future<bool> waitUntilConnectedToSaved({
+    Duration timeout = const Duration(seconds: 4),
+  }) async {
+    if (await isConnectedToSavedPrinter()) return true;
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      if (await isConnectedToSavedPrinter()) return true;
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    }
+    return isConnectedToSavedPrinter();
+  }
+
+  /// Waits until [hasBluetoothLink] or [timeout] elapses.
   Future<bool> waitUntilConnected({
     Duration timeout = const Duration(seconds: 4),
   }) async {
-    if (isConnected) return true;
+    if (hasBluetoothLink) return true;
     final deadline = DateTime.now().add(timeout);
     while (DateTime.now().isBefore(deadline)) {
-      if (isConnected) return true;
+      if (hasBluetoothLink) return true;
       await Future<void>.delayed(const Duration(milliseconds: 150));
     }
-    return isConnected;
+    return hasBluetoothLink;
   }
 
-  /// Ensures a connection before sending bytes.
+  /// Ensures a connection to the saved printer before sending bytes.
   Future<void> ensureConnected() async {
-    if (isConnected) return;
+    if (await isConnectedToSavedPrinter()) return;
+
+    if (hasBluetoothLink) {
+      await disconnect();
+    }
+
     if ((await _prefsAsync).hasPairedPrinter) {
       final ok = await connectPaired();
-      if (ok) return;
+      if (ok && await isConnectedToSavedPrinter()) return;
     }
     throw StateError(
       'No Bluetooth printer connected. Pair a printer in Settings.',
