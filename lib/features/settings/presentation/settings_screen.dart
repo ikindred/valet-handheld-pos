@@ -24,6 +24,7 @@ import '../../../shared/widgets/branch_rates_slots_header_actions.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../../sync/state/sync_cubit.dart';
 import '../../sync/state/sync_state.dart';
+import 'widgets/pending_sync_sheet.dart';
 
 import '../../../core/storage/prefs_keys.dart';
 const _kLastSyncKey = 'spid_last_sync_at_ms';
@@ -210,6 +211,18 @@ class _SettingsScreenState extends State<SettingsScreen>
     setState(() => _autoSyncEnabled = value);
   }
 
+  Future<void> _openPendingSyncSheet() async {
+    final auth = context.read<AuthBloc>().state;
+    final isExpressCashier = _isExpressCashier ||
+        (auth is AuthAuthenticated && auth.isExpressCashier);
+    await showPendingSyncSheet(
+      context,
+      isExpressCashier: isExpressCashier,
+    );
+    if (!mounted) return;
+    await _loadSyncInfo();
+  }
+
   Future<void> _testPrint() async {
     final auth = context.read<AuthRepository>();
     final site = await auth.branchAndAreaFromDb();
@@ -311,6 +324,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                             roleSubtitle: _roleSubtitle,
                             onSyncNow: _triggerSync,
                             onToggleAutoSync: _toggleAutoSync,
+                            onViewPendingSync: _openPendingSyncSheet,
                             onTestPrint: _testPrint,
                             onReconnect: _reconnectPrinter,
                           )
@@ -328,6 +342,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                             roleSubtitle: _roleSubtitle,
                             onSyncNow: _triggerSync,
                             onToggleAutoSync: _toggleAutoSync,
+                            onViewPendingSync: _openPendingSyncSheet,
                             onTestPrint: _testPrint,
                             onReconnect: _reconnectPrinter,
                           ),
@@ -408,6 +423,7 @@ class _WideLayout extends StatelessWidget {
     required this.roleSubtitle,
     required this.onSyncNow,
     required this.onToggleAutoSync,
+    required this.onViewPendingSync,
     required this.onTestPrint,
     required this.onReconnect,
   });
@@ -424,6 +440,7 @@ class _WideLayout extends StatelessWidget {
   final String roleSubtitle;
   final VoidCallback onSyncNow;
   final ValueChanged<bool> onToggleAutoSync;
+  final VoidCallback onViewPendingSync;
   final VoidCallback onTestPrint;
   final VoidCallback onReconnect;
 
@@ -445,6 +462,7 @@ class _WideLayout extends StatelessWidget {
                 isOnline: isOnline,
                 onSyncNow: onSyncNow,
                 onToggleAutoSync: onToggleAutoSync,
+                onViewPendingSync: onViewPendingSync,
               ),
               const SizedBox(height: 10),
               _PrinterCard(
@@ -491,6 +509,7 @@ class _NarrowLayout extends StatelessWidget {
     required this.roleSubtitle,
     required this.onSyncNow,
     required this.onToggleAutoSync,
+    required this.onViewPendingSync,
     required this.onTestPrint,
     required this.onReconnect,
   });
@@ -507,6 +526,7 @@ class _NarrowLayout extends StatelessWidget {
   final String roleSubtitle;
   final VoidCallback onSyncNow;
   final ValueChanged<bool> onToggleAutoSync;
+  final VoidCallback onViewPendingSync;
   final VoidCallback onTestPrint;
   final VoidCallback onReconnect;
 
@@ -524,6 +544,7 @@ class _NarrowLayout extends StatelessWidget {
           isOnline: isOnline,
           onSyncNow: onSyncNow,
           onToggleAutoSync: onToggleAutoSync,
+          onViewPendingSync: onViewPendingSync,
         ),
         const SizedBox(height: 10),
         _PrinterCard(
@@ -597,6 +618,7 @@ class _DataSyncCard extends StatelessWidget {
     required this.isOnline,
     required this.onSyncNow,
     required this.onToggleAutoSync,
+    required this.onViewPendingSync,
   });
 
   final int pendingCount;
@@ -607,6 +629,7 @@ class _DataSyncCard extends StatelessWidget {
   final bool isOnline;
   final VoidCallback onSyncNow;
   final ValueChanged<bool> onToggleAutoSync;
+  final VoidCallback onViewPendingSync;
 
   static const _green = Color(0xFF27AE60);
 
@@ -636,10 +659,20 @@ class _DataSyncCard extends StatelessWidget {
     return null;
   }
 
+  String? get _unsyncedSubtitle {
+    final total = pendingCount + failedCount;
+    if (total == 0) return 'No items waiting to upload';
+    final parts = <String>[];
+    if (pendingCount > 0) parts.add('$pendingCount pending');
+    if (failedCount > 0) parts.add('$failedCount failed');
+    return '${parts.join(' · ')} — tap View';
+  }
+
   @override
   Widget build(BuildContext context) {
     final syncTone = _SettingsIconTone.green(context);
     final historyTone = _SettingsIconTone.amber(context);
+    final listTone = _SettingsIconTone.blue(context);
     final autoTone = _SettingsIconTone.emerald(context);
     return _SettingsCard(
       sectionLabel: 'DATA & SYNC',
@@ -657,6 +690,19 @@ class _DataSyncCard extends StatelessWidget {
           trailing: _GreenFilledButton(
             label: isSyncing ? 'Syncing…' : 'Sync Now',
             onPressed: (isSyncing || !isOnline) ? null : onSyncNow,
+          ),
+        ),
+        const _RowDivider(),
+        _SettingsRow(
+          iconBg: listTone.$1,
+          iconColor: listTone.$2,
+          icon: Icons.list_alt_rounded,
+          title: 'Unsynced Data',
+          subtitle: _unsyncedSubtitle,
+          onTap: onViewPendingSync,
+          trailing: _OutlinedActionButton(
+            label: 'View',
+            onPressed: onViewPendingSync,
           ),
         ),
         const _RowDivider(),

@@ -14,6 +14,7 @@ import '../../../data/services/cash_session_http.dart';
 import '../../../data/services/cash_session_start_payload.dart';
 import '../../../data/services/ticket_service.dart';
 import '../../../data/services/ticket_sync_payload.dart';
+import '../domain/pending_sync_item.dart';
 import 'sync_state.dart';
 
 class _SyncHop {
@@ -56,6 +57,59 @@ class SyncCubit extends Cubit<SyncState> {
       readsFrom: {_db.syncQueue},
     ).getSingle();
     return (row.data['c'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Pending + failed queue rows and orphan tickets for the settings unsynced list.
+  Future<List<PendingSyncItem>> listUnsyncedItems() async {
+    final rows = await (_db.select(_db.syncQueue)
+          ..where((q) => q.syncStatus.isIn(['pending', 'failed']))
+          ..orderBy([(q) => OrderingTerm.asc(q.createdAt)]))
+        .get();
+
+    final items = <PendingSyncItem>[];
+    for (final row in rows) {
+      Ticket? ticket;
+      Shift? shift;
+      if (row.queueTableName == 'tickets') {
+        ticket = await (_db.select(_db.tickets)
+              ..where((t) => t.id.equals(row.recordId)))
+            .getSingleOrNull();
+      } else if (row.queueTableName == 'shifts') {
+        shift = await (_db.select(_db.shifts)
+              ..where((s) => s.id.equals(row.recordId)))
+            .getSingleOrNull();
+      }
+      items.add(
+        PendingSyncItem.fromQueueRow(row, ticket: ticket, shift: shift),
+      );
+    }
+
+    final orphanRows = await _db.customSelect(
+      '''
+SELECT t.id FROM tickets t
+WHERE t.sync_status = 'pending'
+  AND t.status != 'draft'
+  AND t.id NOT IN (
+    SELECT q.record_id FROM sync_queue q
+    WHERE q.table_name = 'tickets'
+      AND q.sync_status IN ('pending', 'failed')
+  )
+ORDER BY t.check_in_at ASC
+''',
+      readsFrom: {_db.tickets, _db.syncQueue},
+    ).get();
+
+    for (final row in orphanRows) {
+      final tid = row.read<String>('id');
+      final ticket = await (_db.select(_db.tickets)
+            ..where((t) => t.id.equals(tid)))
+          .getSingleOrNull();
+      if (ticket != null) {
+        items.add(PendingSyncItem.fromOrphanTicket(ticket));
+      }
+    }
+
+    return items;
   }
 
   Future<void> retryFailed() async {
