@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/header_sync_status_pill.dart';
 import '../../../auth/presentation/logout_flow.dart';
 import 'cash_figma_text_styles.dart';
 
@@ -102,6 +103,8 @@ class CashPageHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
+            const HeaderSyncStatusPill(),
+            const SizedBox(width: 8),
             _OnlinePill(online: online),
           ],
         ),

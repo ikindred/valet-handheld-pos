@@ -35,8 +35,6 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
   bool _scanning = false;
   String? _error;
   PrinterDevice? _selected;
-  bool _preferBle = false;
-  PrinterPrefs? _prefs;
 
   @override
   void initState() {
@@ -60,8 +58,6 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
     }
 
     setState(() {
-      _prefs = prefs;
-      _preferBle = prefs.useBle;
       _selected = savedDevice;
       if (savedDevice != null && !(_devices.any((d) => d.id == savedDevice!.id))) {
         _devices = [savedDevice, ..._devices];
@@ -100,8 +96,8 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
         _scanning = false;
         if (list.isEmpty) {
           _error =
-              'No devices found. Turn on the printer, pair it in system Bluetooth '
-              'settings if needed, then tap Scan again.';
+              'No printers found. Make sure the printer is on and paired in your '
+              "device's Bluetooth settings, then tap Scan again.";
         }
       });
     } catch (e) {
@@ -113,22 +109,12 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
     }
   }
 
-  Future<void> _savePreferBle(bool value) async {
-    setState(() => _preferBle = value);
-    final prefs = _prefs ?? await PrinterPrefs.load();
-    await prefs.setUseBle(value);
-    _prefs = prefs;
-  }
-
   Future<void> _connectSelected() async {
     final device = _selected;
     if (device == null) return;
     setState(() => _scanning = true);
     try {
-      await context.read<BluetoothPosPrinter>().connect(
-            device,
-            useBle: _preferBle,
-          );
+      await context.read<BluetoothPosPrinter>().connect(device);
       if (!mounted) return;
       final notifier = context.read<PrinterConnectionNotifier>();
       await notifier.tryConnectPaired();
@@ -166,6 +152,7 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
   @override
   Widget build(BuildContext context) {
     final notifier = context.watch<PrinterConnectionNotifier>();
+    final theme = AppThemeColors.of(context);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final maxSheetHeight = MediaQuery.sizeOf(context).height * 0.88;
 
@@ -176,38 +163,68 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Bluetooth printer', style: CheckInCompactTokens.pageHeading()),
-            const SizedBox(height: 4),
-          Text(
-            'Any ESC/POS thermal printer (HPRT, Xprinter, Epson-compatible, etc.).',
-            style: CheckInCompactTokens.bodyHint(),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'HPRT HM-A300: set printer menu Paper to Receipt (not Label). '
-            'App paper: 3 in (80 mm).',
-            style: CheckInCompactTokens.helperText(),
-          ),
-            const SizedBox(height: 4),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Bluetooth printer',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: theme.textPrimary,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+                _PrinterStatusChip(notifier: notifier),
+              ],
+            ),
+            const SizedBox(height: 8),
             Text(
-              notifier.statusSubtitle,
-              style: CheckInCompactTokens.bodyHint(),
+              'Connect a thermal receipt printer to print valet tickets.',
+              style: CheckInCompactTokens.bodyHintOf(context),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              decoration: BoxDecoration(
+                color: theme.hintFill,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: theme.cardBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'How to connect',
+                    style: CheckInCompactTokens.sectionTitleOf(context),
+                  ),
+                  const SizedBox(height: 8),
+                  const _SetupStep(
+                    number: 1,
+                    text: 'Turn on the printer and keep it nearby.',
+                  ),
+                  const SizedBox(height: 6),
+                  const _SetupStep(
+                    number: 2,
+                    text: 'Tap Scan, then select your printer from the list.',
+                  ),
+                  const SizedBox(height: 6),
+                  const _SetupStep(
+                    number: 3,
+                    text: 'Tap Connect. Use Test print to confirm it works.',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Works with HPRT, Xprinter, Epson-compatible, and similar models. '
+              'Paper: 80 mm (3 in). HPRT HM-A300 owners: set printer Paper to Receipt.',
+              style: CheckInCompactTokens.helperText(),
             ),
             const SizedBox(height: 12),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(
-                'Prefer Bluetooth LE',
-                style: GoogleFonts.poppins(fontSize: 13),
-              ),
-              subtitle: Text(
-                'Enable if your printer only shows up as a BLE device.',
-                style: CheckInCompactTokens.helperText(),
-              ),
-              value: _preferBle,
-              onChanged: _savePreferBle,
-            ),
             Row(
               children: [
                 Expanded(
@@ -227,9 +244,36 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
             ),
             if (_error != null) ...[
               const SizedBox(height: 8),
-              Text(
-                _error!,
-                style: TextStyle(color: AppColors.error, fontSize: 11),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.error.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      size: 16,
+                      color: AppColors.error,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          height: 1.35,
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
             const SizedBox(height: 8),
@@ -278,6 +322,112 @@ class _PrinterPairingSheetState extends State<_PrinterPairingSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PrinterStatusChip extends StatelessWidget {
+  const _PrinterStatusChip({required this.notifier});
+
+  final PrinterConnectionNotifier notifier;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = AppThemeColors.of(context);
+    final String label;
+    final Color bg;
+    final Color fg;
+    final IconData icon;
+
+    if (notifier.isConnected) {
+      label = 'Connected';
+      bg = AppColors.success.withValues(alpha: 0.12);
+      fg = AppColors.success;
+      icon = Icons.check_circle_rounded;
+    } else if (notifier.hasPairedPrinter) {
+      label = 'Saved';
+      bg = AppColors.warning.withValues(alpha: 0.14);
+      fg = const Color(0xFFB87A00);
+      icon = Icons.bluetooth_connected_rounded;
+    } else {
+      label = 'Not connected';
+      bg = theme.chipBg;
+      fg = theme.textSecondary;
+      icon = Icons.bluetooth_disabled_rounded;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: fg,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SetupStep extends StatelessWidget {
+  const _SetupStep({required this.number, required this.text});
+
+  final int number;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = AppThemeColors.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 18,
+          height: 18,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF68D00).withValues(alpha: 0.14),
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            '$number',
+            style: GoogleFonts.poppins(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFFF68D00),
+              height: 1,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                fontWeight: FontWeight.w400,
+                height: 1.35,
+                color: theme.textPrimary,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../logging/valet_log.dart';
+import '../storage/prefs_keys.dart';
 import '../../data/services/branch_config_service.dart';
 import '../../features/sync/state/sync_cubit.dart';
 
@@ -45,11 +47,20 @@ class ConnectivityService {
 
   Future<void> _runOnlineHooks() async {
     try {
-      ValetLog.debug(
-        'ConnectivityService',
-        'online — SyncCubit.flush + branch_config',
-      );
-      await _syncCubit.flush();
+      final prefs = await SharedPreferences.getInstance();
+      final autoSync = prefs.getBool(PrefsKeys.autoSyncOnConnect) ?? true;
+      if (autoSync) {
+        ValetLog.debug(
+          'ConnectivityService',
+          'online — SyncCubit.flush + branch_config',
+        );
+        await _syncCubit.flush();
+      } else {
+        ValetLog.debug(
+          'ConnectivityService',
+          'online — auto-sync off, branch_config only',
+        );
+      }
       await _branchConfig.syncFromServerForDeviceBranch();
     } catch (e, st) {
       ValetLog.error('ConnectivityService', 'online hooks failed', e, st);
@@ -97,9 +108,13 @@ class _ConnectivityScopeState extends State<ConnectivityScope>
     final initial = await _connectivity.checkConnectivity();
     if (!mounted) return;
     final online = _resultsOnline(initial);
-    context.read<ConnectivityService>().emitOnline(online);
+    final svc = context.read<ConnectivityService>();
+    svc.emitOnline(online);
     _hadPlatformConnection = online;
     _sub = _connectivity.onConnectivityChanged.listen(_apply);
+    if (online) {
+      unawaited(svc.onApplicationResumed());
+    }
   }
 
   void _apply(List<ConnectivityResult> results) {

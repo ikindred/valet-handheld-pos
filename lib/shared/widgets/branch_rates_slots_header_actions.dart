@@ -8,6 +8,7 @@ import '../../data/services/rate_service.dart';
 import '../../features/dashboard/presentation/widgets/dashboard_widgets.dart';
 import 'area_parking_slots_dialog.dart';
 import 'branch_rates_dialog.dart';
+import 'header_sync_status_pill.dart';
 
 /// Rates + Slots pills for cashier headers (dashboard, check-in, checkout, reports, settings).
 class BranchRatesSlotsHeaderActions extends StatelessWidget {
@@ -81,7 +82,11 @@ class BranchRatesSlotsHeaderActions extends StatelessWidget {
           trailing!,
           if (showOnlineStatus) const SizedBox(width: 8),
         ],
-        if (showOnlineStatus) const DashboardStatusPillLive(),
+        if (showOnlineStatus) ...[
+          const HeaderSyncStatusPill(),
+          const SizedBox(width: 8),
+          const DashboardStatusPillLive(),
+        ],
       ],
     );
   }

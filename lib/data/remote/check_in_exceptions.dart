@@ -20,6 +20,19 @@ class VrNumberAlreadyUsedException implements Exception {
   String toString() => 'This VR number is already in use.';
 }
 
+/// Thrown when `POST /transactions/check-in` returns 409 because [vr_no] exists remotely.
+class VrNumberConflictOnServerException implements Exception {
+  VrNumberConflictOnServerException([this.message]);
+
+  final String? message;
+
+  @override
+  String toString() =>
+      message?.trim().isNotEmpty == true
+          ? message!.trim()
+          : 'This VR number already exists on the server.';
+}
+
 /// Thrown for unexpected check-in API status codes.
 class CheckInApiException implements Exception {
   CheckInApiException(this.message, {this.statusCode});

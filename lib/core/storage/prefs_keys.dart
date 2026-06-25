@@ -35,4 +35,7 @@ abstract final class PrefsKeys {
 
   /// `true` when the saved printer uses Bluetooth Low Energy.
   static const printerUseBle = 'spid_printer_use_ble';
+
+  /// Auto-sync offline queue when connectivity is restored (default on).
+  static const autoSyncOnConnect = 'spid_auto_sync_on_connect';
 }

@@ -10,6 +10,7 @@ import '../../features/check_out/models/checkout_preview_rates.dart';
 import '../../features/check_out/models/checkout_preview_response.dart';
 import '../../features/reports/domain/reports_transactions_page.dart';
 import 'api_error_message.dart';
+import 'check_in_http.dart';
 import 'check_in_exceptions.dart';
 import 'checkout_exceptions.dart';
 
@@ -376,6 +377,11 @@ class TransactionsApi {
         );
       }
       if (code == 409) {
+        if (isVrNumberAlreadyExistsResponse(code, res.data)) {
+          throw VrNumberConflictOnServerException(
+            messageFromResponseData(res.data),
+          );
+        }
         throw VehicleAlreadyCheckedInException();
       }
       throw CheckInApiException(
@@ -399,6 +405,11 @@ class TransactionsApi {
         );
       }
       if (code == 409) {
+        if (isVrNumberAlreadyExistsResponse(code, e.response?.data)) {
+          throw VrNumberConflictOnServerException(
+            messageFromResponseData(e.response?.data),
+          );
+        }
         throw VehicleAlreadyCheckedInException();
       }
       throw CheckInApiException(
@@ -481,6 +492,11 @@ class TransactionsApi {
         );
       }
       if (code == 409) {
+        if (isVrNumberAlreadyExistsResponse(code, res.data)) {
+          throw VrNumberConflictOnServerException(
+            messageFromResponseData(res.data),
+          );
+        }
         throw VehicleAlreadyCheckedInException();
       }
       throw CheckInApiException(
@@ -504,6 +520,11 @@ class TransactionsApi {
         );
       }
       if (code == 409) {
+        if (isVrNumberAlreadyExistsResponse(code, e.response?.data)) {
+          throw VrNumberConflictOnServerException(
+            messageFromResponseData(e.response?.data),
+          );
+        }
         throw VehicleAlreadyCheckedInException();
       }
       throw CheckInApiException(

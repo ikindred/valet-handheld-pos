@@ -5,8 +5,9 @@ import 'package:dio/dio.dart';
 
 import '../../../core/formatting/plate_number.dart';
 import '../../../core/formatting/vr_number.dart';
-import '../../../data/local/db/app_database.dart';
+import '../../../core/logging/valet_log.dart';
 import '../../../data/remote/check_in_exceptions.dart';
+import '../../../data/local/db/app_database.dart';
 import '../../../data/remote/transactions_api.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/check_in_sync_payload.dart';
@@ -135,16 +136,45 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
             driverIn: driverInName,
             driverOut: driverOutName,
           );
-          await _tickets.updateServerTicketId(ticket, response.id);
-          synced = true;
+          final serverId = response.id.trim();
+          if (serverId.isEmpty) {
+            ValetLog.warning(
+              'ExpressCashierCubit.save',
+              'check-in HTTP 201 but missing server id ticket=$ticket',
+            );
+          } else {
+            await _tickets.updateServerTicketId(ticket, serverId);
+            synced = true;
+          }
+        } on VrNumberConflictOnServerException catch (_) {
+          final serverId = await _tickets.resolveServerTransactionIdByVr(
+            token: token,
+            vrNo: vr,
+            plateNumber: plate,
+            ticketNumber: ticket,
+          );
+          if (serverId != null) {
+            await _tickets.updateServerTicketId(ticket, serverId);
+            synced = true;
+          }
         } on DioException catch (e) {
           if (e.type != DioExceptionType.connectionError &&
               e.error is! SocketException) {
-            rethrow;
+            ValetLog.warning(
+              'ExpressCashierCubit.save',
+              'check-in failed, queueing for sync ticket=$ticket: $e',
+            );
           }
         } on CheckInValidationException {
           await _tickets.deleteExpressPendingTicket(ticket);
           rethrow;
+        } catch (e, st) {
+          ValetLog.error(
+            'ExpressCashierCubit.save',
+            'check-in failed, queueing for sync ticket=$ticket',
+            e,
+            st,
+          );
         }
       }
 

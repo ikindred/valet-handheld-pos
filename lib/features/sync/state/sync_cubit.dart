@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/connectivity/internet_reachability.dart';
 import '../../../core/logging/valet_log.dart';
 import '../../../data/local/db/app_database.dart';
 import '../../../data/repositories/auth_repository.dart';
@@ -44,7 +45,9 @@ class SyncCubit extends Cubit<SyncState> {
       "SELECT COUNT(*) AS c FROM sync_queue WHERE sync_status = 'pending'",
       readsFrom: {_db.syncQueue},
     ).getSingle();
-    return (row.data['c'] as num?)?.toInt() ?? 0;
+    final queuePending = (row.data['c'] as num?)?.toInt() ?? 0;
+    final orphans = await _ticketService.countOrphanPendingTickets();
+    return queuePending + orphans;
   }
 
   Future<int> failedCount() async {
@@ -82,12 +85,10 @@ WHERE sync_status IN ('pending', 'failed')
 ''',
     );
     await _reconcileResumedShiftCreates();
-    await _reconcileServerBackedTickets();
   }
 
-  /// Tickets already on the server (`server_ticket_id` set) should not block
-  /// close cash — e.g. online checkout left `sync_status = pending` locally.
-  Future<void> _reconcileServerBackedTickets() async {
+  /// Stub-only: marks pending tickets with `server_ticket_id` without HTTP.
+  Future<void> _reconcileServerBackedTicketsStub() async {
     await _db.customStatement(
       '''
 UPDATE tickets
@@ -132,11 +133,38 @@ WHERE table_name = 'shifts'
     );
   }
 
-  Future<void> flush() async {
+  Future<void>? _flushFuture;
+
+  Future<void> flush() {
+    return _flushFuture ??= _flushBody().whenComplete(() {
+      _flushFuture = null;
+    });
+  }
+
+  Future<void> _flushBody() async {
     emit(const SyncInProgress());
+    if (!AppConfig.useStubApi && !await InternetReachability.hasInternet()) {
+      ValetLog.debug('SyncCubit.flush', 'skip — offline');
+      emit(SyncComplete(
+        synced: 0,
+        failed: await failedCount(),
+        pending: await pendingCount(),
+      ));
+      return;
+    }
     var syncedThisRun = 0;
     try {
+      if (AppConfig.useStubApi) {
+        await _reconcileServerBackedTicketsStub();
+      }
       await _reconcileOrphanQueueEntries();
+      final reEnqueued = await _ticketService.reconcileOrphanPendingTickets();
+      if (reEnqueued > 0) {
+        ValetLog.debug(
+          'SyncCubit.flush',
+          're-enqueued $reEnqueued orphan pending ticket(s)',
+        );
+      }
       final pending = await (_db.select(_db.syncQueue)
             ..where((q) => q.syncStatus.equals('pending'))
             ..orderBy([(q) => OrderingTerm.asc(q.createdAt)]))
@@ -163,205 +191,30 @@ WHERE table_name = 'shifts'
         if (token == null || token.isEmpty) {
           ValetLog.debug('SyncCubit.flush', 'skip HTTP — no bearer token');
         } else {
+          final verified =
+              await _ticketService.reconcilePendingServerBackedTickets(token);
+          if (verified > 0) {
+            ValetLog.debug(
+              'SyncCubit.flush',
+              'verified $verified server-backed ticket(s)',
+            );
+            await _reconcileOrphanQueueEntries();
+          }
           for (final row in pending) {
-            Object? rawPayload;
             try {
-              rawPayload = jsonDecode(row.payload);
+              await _syncQueueRow(
+                row: row,
+                token: token,
+                onSynced: () => syncedThisRun++,
+              );
             } catch (e, st) {
               ValetLog.error(
                 'SyncCubit.flush',
-                'invalid JSON payload queueId=${row.id}',
+                'unexpected row error queueId=${row.id} recordId=${row.recordId}',
                 e,
                 st,
               );
               await _markQueueFailed(row);
-              continue;
-            }
-            final payloadMap = _asPayloadMap(rawPayload);
-            if (payloadMap == null) {
-              ValetLog.error(
-                'SyncCubit.flush',
-                'payload is not a JSON object queueId=${row.id}',
-                StateError('SYNC_PAYLOAD'),
-              );
-              await _markQueueFailed(row);
-              continue;
-            }
-
-            if (row.queueTableName == 'tickets' && row.operation == 'checkin') {
-              try {
-                await _ticketService.syncQueuedCheckIn(payloadMap, token);
-                await _markQueueSynced(row);
-                await _markEntitySynced(row);
-                syncedThisRun++;
-              } on DioException catch (e, st) {
-                final status = e.response?.statusCode;
-                if (status != null && status >= 400 && status < 500) {
-                  ValetLog.error(
-                    'SyncCubit.flush',
-                    'check-in client error $status recordId=${row.recordId}',
-                    e,
-                    st,
-                  );
-                  await _markQueueFailed(row);
-                } else {
-                  ValetLog.error(
-                    'SyncCubit.flush',
-                    'check-in retry recordId=${row.recordId}',
-                    e,
-                    st,
-                  );
-                  await _incrementRetry(row);
-                }
-              } catch (e, st) {
-                ValetLog.error(
-                  'SyncCubit.flush',
-                  'check-in failed recordId=${row.recordId}',
-                  e,
-                  st,
-                );
-                await _markQueueFailed(row);
-              }
-              continue;
-            }
-
-            if (row.queueTableName == 'tickets' &&
-                row.operation == 'checkout/finalize') {
-              try {
-                await _ticketService.syncQueuedCheckoutFinalize(
-                  payloadMap,
-                  token,
-                );
-                await _markQueueSynced(row);
-                await _markEntitySynced(row);
-                syncedThisRun++;
-              } on DioException catch (e, st) {
-                final status = e.response?.statusCode;
-                if (status != null && status >= 400 && status < 500) {
-                  ValetLog.error(
-                    'SyncCubit.flush',
-                    'checkout/finalize client error $status recordId=${row.recordId}',
-                    e,
-                    st,
-                  );
-                  await _markQueueFailed(row);
-                } else {
-                  ValetLog.error(
-                    'SyncCubit.flush',
-                    'checkout/finalize retry recordId=${row.recordId}',
-                    e,
-                    st,
-                  );
-                  await _incrementRetry(row);
-                }
-              } catch (e, st) {
-                ValetLog.error(
-                  'SyncCubit.flush',
-                  'checkout/finalize failed recordId=${row.recordId}',
-                  e,
-                  st,
-                );
-                await _markQueueFailed(row);
-              }
-              continue;
-            }
-
-            final hops = _syncHopsForRow(row, payloadMap);
-            if (hops == null) {
-              ValetLog.error(
-                'SyncCubit.flush',
-                'unknown route table=${row.queueTableName} op=${row.operation} '
-                    'id=${row.id} recordId=${row.recordId} payload=${row.payload}',
-                StateError('SYNC_ROUTE'),
-              );
-              await _markQueueFailed(row);
-              continue;
-            }
-            if (hops.isEmpty) {
-              ValetLog.error(
-                'SyncCubit.flush',
-                'cannot sync ticket ${row.operation} queueId=${row.id}: missing server_ticket_id '
-                    '(server transaction must exist first)',
-                StateError('SYNC_TICKET_NO_SERVER_ID'),
-              );
-              await _markQueueFailed(row);
-              continue;
-            }
-
-            var method = '';
-            var url = '';
-            Object? body;
-            try {
-              var allOk = true;
-              for (final h in hops) {
-                method = h.method;
-                url = h.url;
-                body = h.body;
-                final response = await _send(
-                  method: h.method,
-                  url: h.url,
-                  token: token,
-                  body: h.body,
-                );
-                final code = response.statusCode ?? 0;
-                if (code == 200 || code == 201) {
-                  continue;
-                }
-                if (code >= 400 && code < 500) {
-                  if (row.queueTableName == 'shifts' &&
-                      row.operation == 'create' &&
-                      isCashSessionAlreadyOpenResponse(code, response.data)) {
-                    await _markQueueSynced(row);
-                    await _markEntitySynced(row);
-                    syncedThisRun++;
-                    allOk = false;
-                    break;
-                  }
-                  ValetLog.error(
-                    'SyncCubit.flush',
-                    'client error $code ${h.method} ${h.url} body=${h.body}',
-                    StateError('HTTP_$code'),
-                  );
-                  await _markQueueFailed(row);
-                  allOk = false;
-                  break;
-                }
-                await _incrementRetry(row);
-                allOk = false;
-                break;
-              }
-              if (allOk) {
-                await _markQueueSynced(row);
-                await _markEntitySynced(row);
-                syncedThisRun++;
-              }
-            } on DioException catch (e, st) {
-              final status = e.response?.statusCode;
-              if (status != null && status >= 400 && status < 500) {
-                if (row.queueTableName == 'shifts' &&
-                    row.operation == 'create' &&
-                    isCashSessionAlreadyOpenResponse(status, e.response?.data)) {
-                  await _markQueueSynced(row);
-                  await _markEntitySynced(row);
-                  syncedThisRun++;
-                } else {
-                  ValetLog.error(
-                    'SyncCubit.flush',
-                    'client error $status $method $url body=$body',
-                    e,
-                    st,
-                  );
-                  await _markQueueFailed(row);
-                }
-              } else {
-                ValetLog.error(
-                  'SyncCubit.flush',
-                  'retry $method $url',
-                  e,
-                  st,
-                );
-                await _incrementRetry(row);
-              }
             }
           }
         }
@@ -374,7 +227,213 @@ WHERE table_name = 'shifts'
       ));
     } catch (e, st) {
       ValetLog.error('SyncCubit.flush', 'unexpected', e, st);
-      emit(SyncError(e.toString()));
+      emit(SyncComplete(
+        synced: syncedThisRun,
+        failed: await failedCount(),
+        pending: await pendingCount(),
+      ));
+    }
+  }
+
+  Future<void> _syncQueueRow({
+    required SyncQueueData row,
+    required String token,
+    required void Function() onSynced,
+  }) async {
+    Object? rawPayload;
+    try {
+      rawPayload = jsonDecode(row.payload);
+    } catch (e, st) {
+      ValetLog.error(
+        'SyncCubit.flush',
+        'invalid JSON payload queueId=${row.id}',
+        e,
+        st,
+      );
+      await _markQueueFailed(row);
+      return;
+    }
+    final payloadMap = _asPayloadMap(rawPayload);
+    if (payloadMap == null) {
+      ValetLog.error(
+        'SyncCubit.flush',
+        'payload is not a JSON object queueId=${row.id}',
+        StateError('SYNC_PAYLOAD'),
+      );
+      await _markQueueFailed(row);
+      return;
+    }
+
+    if (row.queueTableName == 'tickets' && row.operation == 'checkin') {
+      try {
+        await _ticketService.syncQueuedCheckIn(payloadMap, token);
+        await _markQueueSynced(row);
+        onSynced();
+      } on DioException catch (e, st) {
+        final status = e.response?.statusCode;
+        if (status != null && status >= 400 && status < 500) {
+          ValetLog.error(
+            'SyncCubit.flush',
+            'check-in client error $status recordId=${row.recordId}',
+            e,
+            st,
+          );
+          await _markQueueFailed(row);
+        } else {
+          ValetLog.error(
+            'SyncCubit.flush',
+            'check-in retry recordId=${row.recordId}',
+            e,
+            st,
+          );
+          await _incrementRetry(row);
+        }
+      } catch (e, st) {
+        ValetLog.error(
+          'SyncCubit.flush',
+          'check-in failed recordId=${row.recordId}',
+          e,
+          st,
+        );
+        await _markQueueFailed(row);
+      }
+      return;
+    }
+
+    if (row.queueTableName == 'tickets' &&
+        row.operation == 'checkout/finalize') {
+      try {
+        await _ticketService.syncQueuedCheckoutFinalize(payloadMap, token);
+        await _markQueueSynced(row);
+        await _markEntitySynced(row);
+        onSynced();
+      } on DioException catch (e, st) {
+        final status = e.response?.statusCode;
+        if (status != null && status >= 400 && status < 500) {
+          ValetLog.error(
+            'SyncCubit.flush',
+            'checkout/finalize client error $status recordId=${row.recordId}',
+            e,
+            st,
+          );
+          await _markQueueFailed(row);
+        } else {
+          ValetLog.error(
+            'SyncCubit.flush',
+            'checkout/finalize retry recordId=${row.recordId}',
+            e,
+            st,
+          );
+          await _incrementRetry(row);
+        }
+      } catch (e, st) {
+        ValetLog.error(
+          'SyncCubit.flush',
+          'checkout/finalize failed recordId=${row.recordId}',
+          e,
+          st,
+        );
+        await _markQueueFailed(row);
+      }
+      return;
+    }
+
+    final hops = _syncHopsForRow(row, payloadMap);
+    if (hops == null) {
+      ValetLog.error(
+        'SyncCubit.flush',
+        'unknown route table=${row.queueTableName} op=${row.operation} '
+            'id=${row.id} recordId=${row.recordId} payload=${row.payload}',
+        StateError('SYNC_ROUTE'),
+      );
+      await _markQueueFailed(row);
+      return;
+    }
+    if (hops.isEmpty) {
+      ValetLog.error(
+        'SyncCubit.flush',
+        'cannot sync ticket ${row.operation} queueId=${row.id}: missing server_ticket_id '
+            '(server transaction must exist first)',
+        StateError('SYNC_TICKET_NO_SERVER_ID'),
+      );
+      await _markQueueFailed(row);
+      return;
+    }
+
+    var method = '';
+    var url = '';
+    Object? body;
+    try {
+      var allOk = true;
+      for (final h in hops) {
+        method = h.method;
+        url = h.url;
+        body = h.body;
+        final response = await _send(
+          method: h.method,
+          url: h.url,
+          token: token,
+          body: h.body,
+        );
+        final code = response.statusCode ?? 0;
+        if (code == 200 || code == 201) {
+          continue;
+        }
+        if (code >= 400 && code < 500) {
+          if (row.queueTableName == 'shifts' &&
+              row.operation == 'create' &&
+              isCashSessionAlreadyOpenResponse(code, response.data)) {
+            await _markQueueSynced(row);
+            await _markEntitySynced(row);
+            onSynced();
+            allOk = false;
+            break;
+          }
+          ValetLog.error(
+            'SyncCubit.flush',
+            'client error $code ${h.method} ${h.url} body=${h.body}',
+            StateError('HTTP_$code'),
+          );
+          await _markQueueFailed(row);
+          allOk = false;
+          break;
+        }
+        await _incrementRetry(row);
+        allOk = false;
+        break;
+      }
+      if (allOk) {
+        await _markQueueSynced(row);
+        await _markEntitySynced(row);
+        onSynced();
+      }
+    } on DioException catch (e, st) {
+      final status = e.response?.statusCode;
+      if (status != null && status >= 400 && status < 500) {
+        if (row.queueTableName == 'shifts' &&
+            row.operation == 'create' &&
+            isCashSessionAlreadyOpenResponse(status, e.response?.data)) {
+          await _markQueueSynced(row);
+          await _markEntitySynced(row);
+          onSynced();
+        } else {
+          ValetLog.error(
+            'SyncCubit.flush',
+            'client error $status $method $url body=$body',
+            e,
+            st,
+          );
+          await _markQueueFailed(row);
+        }
+      } else {
+        ValetLog.error(
+          'SyncCubit.flush',
+          'retry $method $url',
+          e,
+          st,
+        );
+        await _incrementRetry(row);
+      }
     }
   }
 

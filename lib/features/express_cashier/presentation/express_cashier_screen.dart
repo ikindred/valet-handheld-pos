@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/connectivity/internet_reachability.dart';
 import '../../../core/formatting/peso_currency.dart';
 import '../../../core/formatting/plate_number.dart';
 import '../../../core/formatting/vr_number.dart';
@@ -18,10 +17,12 @@ import '../../../core/printing/print_flow.dart';
 import '../../../core/printing/printer_connection_notifier.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/ticket_service.dart';
+import '../../../shared/widgets/cashier_greeting_header.dart';
 import '../../auth/state/auth_bloc.dart';
 import '../../cash/presentation/widgets/cash_figma_text_styles.dart';
-import '../../cash/presentation/widgets/cash_widgets.dart';
+import '../../dashboard/presentation/dashboard_screen.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
+import '../domain/express_cashier_demo_defaults.dart';
 import '../state/express_cashier_cubit.dart';
 import '../state/express_cashier_state.dart';
 
@@ -138,8 +139,8 @@ class _ExpressCashierScreenState extends State<ExpressCashierScreen> {
   final _driverOutFocus = FocusNode();
   final _amountFocus = FocusNode();
 
+  String _firstName = '';
   String _headerSubtitle = '';
-  bool _online = true;
   bool _printAfterSave = false;
   bool _isPrinting = false;
 
@@ -176,12 +177,30 @@ class _ExpressCashierScreenState extends State<ExpressCashierScreen> {
     ]) {
       ctrl.addListener(_onFormChanged);
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadHeader();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadHeader();
       _loadTransactions();
-      _assignAutoTicketNumber();
+      await _assignAutoTicketNumber();
+      _applyDemoDefaults();
+      if (!mounted) return;
       context.read<PrinterConnectionNotifier>().refresh();
     });
+  }
+
+  void _setControllerText(TextEditingController ctrl, String text) {
+    ctrl.removeListener(_onFormChanged);
+    ctrl.text = text;
+    ctrl.addListener(_onFormChanged);
+  }
+
+  void _applyDemoDefaults() {
+    if (!ExpressCashierDemoDefaults.enabled) return;
+    _setControllerText(_plateCtrl, ExpressCashierDemoDefaults.plateNumber);
+    _setControllerText(_vrCtrl, ExpressCashierDemoDefaults.uniqueVrNo());
+    _setControllerText(_driverInCtrl, ExpressCashierDemoDefaults.driverIn);
+    _setControllerText(_driverOutCtrl, ExpressCashierDemoDefaults.driverOut);
+    _setControllerText(_amountCtrl, ExpressCashierDemoDefaults.amountText);
+    if (mounted) setState(() {});
   }
 
   Future<void> _assignAutoTicketNumber() async {
@@ -269,16 +288,36 @@ class _ExpressCashierScreenState extends State<ExpressCashierScreen> {
   }
 
   Future<void> _loadHeader() async {
+    final auth = context.read<AuthBloc>().state;
     final repo = context.read<AuthRepository>();
+    var firstName = '';
     final prefs = await SharedPreferences.getInstance();
-    final dateLine = DateFormat('EEEE, MMMM d, y').format(DateTime.now());
+    final dateLine = DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now());
     final siteSub = await repo.dateAndSiteLine(prefs, dateLine);
-    final hasInternet = await InternetReachability.hasInternet();
+    if (auth is AuthAuthenticated && auth.userId != null) {
+      final id = int.tryParse(auth.userId!);
+      if (id != null) {
+        final acct = await repo.offlineAccountById(id);
+        if (acct != null) {
+          firstName = _firstNameFromFullName(acct.fullName);
+        }
+      }
+    }
     if (!mounted) return;
     setState(() {
+      _firstName = firstName;
       _headerSubtitle = siteSub;
-      _online = hasInternet;
     });
+  }
+
+  String get _greetingTitle {
+    final name = _firstName.isEmpty ? '…' : _firstName;
+    return '${DashboardScreen.greetingWord()}, $name';
+  }
+
+  String get _expressHeaderSubtitle {
+    final site = _headerSubtitle.isEmpty ? '— : —' : _headerSubtitle;
+    return 'Express Cashier · $site';
   }
 
   void _loadTransactions() {
@@ -294,6 +333,7 @@ class _ExpressCashierScreenState extends State<ExpressCashierScreen> {
     _driverOutCtrl.clear();
     _amountCtrl.clear();
     await _assignAutoTicketNumber();
+    _applyDemoDefaults();
   }
 
   Future<void> _save() async {
@@ -431,10 +471,14 @@ class _ExpressCashierScreenState extends State<ExpressCashierScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      CashPageHeader(
-                        title: 'Manual Ticketing',
-                        subtitle: _headerSubtitle,
-                        online: _online,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                        child: CashierGreetingHeader(
+                          title: _greetingTitle,
+                          subtitle: _expressHeaderSubtitle,
+                          showRates: false,
+                          showSlots: false,
+                        ),
                       ),
                       Expanded(
                         child: state is ExpressCashierLoading
@@ -504,7 +548,6 @@ class _ExpressCashierScreenState extends State<ExpressCashierScreen> {
     );
   }
 }
-
 class _InputPane extends StatelessWidget {
   const _InputPane({
     super.key,
@@ -689,7 +732,6 @@ class _InputPane extends StatelessWidget {
     );
   }
 }
-
 class _TransactionsPane extends StatelessWidget {
   const _TransactionsPane({
     required this.transactions,
@@ -728,7 +770,7 @@ class _TransactionsPane extends StatelessWidget {
           Row(
             children: [
               Icon(
-                LucideIcons.receipt,
+                LucideIcons.scrollText,
                 size: 14,
                 color: theme.textSecondary,
               ),
@@ -868,7 +910,6 @@ class _TransactionsPane extends StatelessWidget {
     );
   }
 }
-
 class _HeaderIconButton extends StatelessWidget {
   const _HeaderIconButton({
     required this.tooltip,
@@ -901,7 +942,6 @@ class _HeaderIconButton extends StatelessWidget {
     );
   }
 }
-
 class _EmptyTransactions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -930,7 +970,6 @@ class _EmptyTransactions extends StatelessWidget {
     );
   }
 }
-
 class _TransactionTableHeader extends StatelessWidget {
   const _TransactionTableHeader({required this.theme});
 
@@ -968,7 +1007,6 @@ class _TransactionTableHeader extends StatelessWidget {
     );
   }
 }
-
 class _TransactionTableCell extends StatelessWidget {
   const _TransactionTableCell({
     required this.flex,
@@ -993,7 +1031,6 @@ class _TransactionTableCell extends StatelessWidget {
     );
   }
 }
-
 class _TransactionTableRow extends StatelessWidget {
   const _TransactionTableRow({
     required this.theme,
@@ -1030,13 +1067,10 @@ class _TransactionTableRow extends StatelessWidget {
           child: Row(
             children: [
               if (!isSynced) ...[
-                Tooltip(
-                  message: 'Pending sync',
-                  child: Icon(
-                    LucideIcons.cloudOff,
-                    size: 13,
-                    color: theme.textSecondary.withValues(alpha: 0.7),
-                  ),
+                Icon(
+                  LucideIcons.cloudOff,
+                  size: 13,
+                  color: theme.textSecondary.withValues(alpha: 0.7),
                 ),
                 const SizedBox(width: 5),
               ],
@@ -1095,7 +1129,6 @@ class _TransactionTableRow extends StatelessWidget {
     );
   }
 }
-
 class _PlateBadge extends StatelessWidget {
   const _PlateBadge({required this.label, required this.theme});
 
@@ -1127,7 +1160,6 @@ class _PlateBadge extends StatelessWidget {
     );
   }
 }
-
 class _BottomBar extends StatelessWidget {
   const _BottomBar({
     required this.isSaving,
@@ -1261,4 +1293,10 @@ class _BottomBar extends StatelessWidget {
       ),
     );
   }
+}
+
+String _firstNameFromFullName(String fullName) {
+  final t = fullName.trim();
+  if (t.isEmpty) return '';
+  return t.split(RegExp(r'\s+')).first;
 }

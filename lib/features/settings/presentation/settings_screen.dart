@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/connectivity/internet_reachability.dart';
 import '../../../core/printing/print_flow.dart';
 import '../../../core/printing/printer_connection_notifier.dart';
 import '../../../core/printing/valet_print_service.dart';
@@ -23,7 +25,7 @@ import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../../sync/state/sync_cubit.dart';
 import '../../sync/state/sync_state.dart';
 
-const _kAutoSyncKey = 'spid_auto_sync_on_connect';
+import '../../../core/storage/prefs_keys.dart';
 const _kLastSyncKey = 'spid_last_sync_at_ms';
 const _kAppVersion = 'Valet Master v1.0.0';
 
@@ -34,7 +36,8 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen>
+    with WidgetsBindingObserver {
   String _firstName = '';
   String _siteSubtitle = '';
   String _fullName = '';
@@ -42,14 +45,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _roleSubtitle = 'Valet Staff';
   bool _autoSyncEnabled = true;
   int _pendingCount = 0;
+  int _failedCount = 0;
   String _lastSyncLabel = 'Never';
   bool _syncing = false;
   bool _isExpressCashier = false;
+  bool _isOnline = true;
+  StreamSubscription<List<ConnectivityResult>>? _connSub;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _connSub = Connectivity().onConnectivityChanged.listen((_) {
+      unawaited(_refreshOnline());
+    });
     unawaited(_load());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _connSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshOnline());
+    }
+  }
+
+  Future<void> _refreshOnline() async {
+    final online = await InternetReachability.hasInternet();
+    if (!mounted) return;
+    setState(() => _isOnline = online);
   }
 
   Future<void> _load() async {
@@ -57,6 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _loadUserInfo(),
       _loadSyncInfo(),
       _loadPrefs(),
+      _refreshOnline(),
     ]);
   }
 
@@ -105,11 +136,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSyncInfo() async {
     final cubit = context.read<SyncCubit>();
     final count = await cubit.pendingCount();
+    final failed = await cubit.failedCount();
     final prefs = await SharedPreferences.getInstance();
     final ms = prefs.getInt(_kLastSyncKey);
     if (!mounted) return;
     setState(() {
       _pendingCount = count;
+      _failedCount = failed;
       _lastSyncLabel = _fmtLastSync(ms);
     });
   }
@@ -118,34 +151,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     setState(() {
-      _autoSyncEnabled = prefs.getBool(_kAutoSyncKey) ?? true;
+      _autoSyncEnabled = prefs.getBool(PrefsKeys.autoSyncOnConnect) ?? true;
     });
   }
 
   Future<void> _triggerSync() async {
     if (_syncing) return;
+    if (!_isOnline) {
+      _showOfflineSyncMessage();
+      return;
+    }
     setState(() => _syncing = true);
     try {
-      await context.read<SyncCubit>().flush();
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(
-          _kLastSyncKey, DateTime.now().millisecondsSinceEpoch);
+      await context.read<SyncCubit>().retryFailed();
       if (!mounted) return;
-      final count = await context.read<SyncCubit>().pendingCount();
+      final cubit = context.read<SyncCubit>();
+      final count = await cubit.pendingCount();
+      final failed = await cubit.failedCount();
+      if (!mounted) return;
+      final fullySynced = count == 0 && failed == 0;
+      if (fullySynced) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(
+          _kLastSyncKey,
+          DateTime.now().millisecondsSinceEpoch,
+        );
+      }
       if (!mounted) return;
       setState(() {
         _pendingCount = count;
-        _lastSyncLabel =
-            _fmtLastSync(DateTime.now().millisecondsSinceEpoch);
+        _failedCount = failed;
+        if (fullySynced) {
+          _lastSyncLabel =
+              _fmtLastSync(DateTime.now().millisecondsSinceEpoch);
+        }
       });
     } finally {
       if (mounted) setState(() => _syncing = false);
     }
   }
 
+  void _showOfflineSyncMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          "You're offline — connect to the internet to sync.",
+          style: GoogleFonts.poppins(fontSize: 13),
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _toggleAutoSync(bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_kAutoSyncKey, value);
+    await prefs.setBool(PrefsKeys.autoSyncOnConnect, value);
     if (!mounted) return;
     setState(() => _autoSyncEnabled = value);
   }
@@ -240,9 +300,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         if (wide)
                           _WideLayout(
                             pendingCount: _pendingCount,
+                            failedCount: _failedCount,
                             lastSyncLabel: _lastSyncLabel,
                             autoSyncEnabled: _autoSyncEnabled,
                             isSyncing: isSyncing,
+                            isOnline: _isOnline,
                             printer: printer,
                             fullName: _fullName,
                             roleBadge: _roleBadge,
@@ -255,9 +317,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         else
                           _NarrowLayout(
                             pendingCount: _pendingCount,
+                            failedCount: _failedCount,
                             lastSyncLabel: _lastSyncLabel,
                             autoSyncEnabled: _autoSyncEnabled,
                             isSyncing: isSyncing,
+                            isOnline: _isOnline,
                             printer: printer,
                             fullName: _fullName,
                             roleBadge: _roleBadge,
@@ -333,9 +397,11 @@ class _SettingsHeader extends StatelessWidget {
 class _WideLayout extends StatelessWidget {
   const _WideLayout({
     required this.pendingCount,
+    required this.failedCount,
     required this.lastSyncLabel,
     required this.autoSyncEnabled,
     required this.isSyncing,
+    required this.isOnline,
     required this.printer,
     required this.fullName,
     required this.roleBadge,
@@ -347,9 +413,11 @@ class _WideLayout extends StatelessWidget {
   });
 
   final int pendingCount;
+  final int failedCount;
   final String lastSyncLabel;
   final bool autoSyncEnabled;
   final bool isSyncing;
+  final bool isOnline;
   final PrinterConnectionNotifier printer;
   final String fullName;
   final String roleBadge;
@@ -370,9 +438,11 @@ class _WideLayout extends StatelessWidget {
             children: [
               _DataSyncCard(
                 pendingCount: pendingCount,
+                failedCount: failedCount,
                 lastSyncLabel: lastSyncLabel,
                 autoSyncEnabled: autoSyncEnabled,
                 isSyncing: isSyncing,
+                isOnline: isOnline,
                 onSyncNow: onSyncNow,
                 onToggleAutoSync: onToggleAutoSync,
               ),
@@ -410,9 +480,11 @@ class _WideLayout extends StatelessWidget {
 class _NarrowLayout extends StatelessWidget {
   const _NarrowLayout({
     required this.pendingCount,
+    required this.failedCount,
     required this.lastSyncLabel,
     required this.autoSyncEnabled,
     required this.isSyncing,
+    required this.isOnline,
     required this.printer,
     required this.fullName,
     required this.roleBadge,
@@ -424,9 +496,11 @@ class _NarrowLayout extends StatelessWidget {
   });
 
   final int pendingCount;
+  final int failedCount;
   final String lastSyncLabel;
   final bool autoSyncEnabled;
   final bool isSyncing;
+  final bool isOnline;
   final PrinterConnectionNotifier printer;
   final String fullName;
   final String roleBadge;
@@ -443,9 +517,11 @@ class _NarrowLayout extends StatelessWidget {
       children: [
         _DataSyncCard(
           pendingCount: pendingCount,
+          failedCount: failedCount,
           lastSyncLabel: lastSyncLabel,
           autoSyncEnabled: autoSyncEnabled,
           isSyncing: isSyncing,
+          isOnline: isOnline,
           onSyncNow: onSyncNow,
           onToggleAutoSync: onToggleAutoSync,
         ),
@@ -514,21 +590,51 @@ class _SettingsIconTone {
 class _DataSyncCard extends StatelessWidget {
   const _DataSyncCard({
     required this.pendingCount,
+    required this.failedCount,
     required this.lastSyncLabel,
     required this.autoSyncEnabled,
     required this.isSyncing,
+    required this.isOnline,
     required this.onSyncNow,
     required this.onToggleAutoSync,
   });
 
   final int pendingCount;
+  final int failedCount;
   final String lastSyncLabel;
   final bool autoSyncEnabled;
   final bool isSyncing;
+  final bool isOnline;
   final VoidCallback onSyncNow;
   final ValueChanged<bool> onToggleAutoSync;
 
   static const _green = Color(0xFF27AE60);
+
+  bool get _isFullySynced => pendingCount == 0 && failedCount == 0;
+
+  String? get _syncSubtitle {
+    if (!isOnline) {
+      if (pendingCount > 0 || failedCount > 0) {
+        final parts = <String>[];
+        if (pendingCount > 0) {
+          parts.add('$pendingCount pending');
+        }
+        if (failedCount > 0) {
+          parts.add('$failedCount failed');
+        }
+        return "You're offline — connect to sync (${parts.join(' · ')})";
+      }
+      return "You're offline — connect to the internet to sync";
+    }
+    if (pendingCount > 0 && failedCount > 0) {
+      return '$pendingCount pending · $failedCount failed';
+    }
+    if (failedCount > 0) {
+      return '$failedCount failed — tap Sync Now to retry';
+    }
+    if (_isFullySynced) return 'All transactions synced';
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -546,10 +652,11 @@ class _DataSyncCard extends StatelessWidget {
           subtitleWidget: pendingCount > 0
               ? _PendingBadge(count: pendingCount)
               : null,
-          subtitle: pendingCount == 0 ? 'All transactions synced' : null,
+          subtitle: _syncSubtitle,
+          onTap: (!isOnline && !isSyncing) ? onSyncNow : null,
           trailing: _GreenFilledButton(
             label: isSyncing ? 'Syncing…' : 'Sync Now',
-            onPressed: isSyncing ? null : onSyncNow,
+            onPressed: (isSyncing || !isOnline) ? null : onSyncNow,
           ),
         ),
         const _RowDivider(),
@@ -559,7 +666,7 @@ class _DataSyncCard extends StatelessWidget {
           icon: Icons.history_rounded,
           title: 'Last Sync',
           subtitle: lastSyncLabel,
-          trailing: lastSyncLabel != 'Never'
+          trailing: lastSyncLabel != 'Never' && _isFullySynced
               ? _OutlinePill(label: 'Up to date')
               : null,
         ),

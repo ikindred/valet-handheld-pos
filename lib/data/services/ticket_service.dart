@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/formatting/plate_number.dart';
 import '../../core/formatting/vr_number.dart';
 import '../../core/formatting/valet_type_format.dart';
 import '../../core/api/transaction_payment_fields.dart';
@@ -28,6 +29,7 @@ import '../local/db/app_database.dart';
 import '../remote/dashboard_api.dart';
 import 'parking_layout_service.dart';
 import '../remote/transactions_api.dart';
+import 'check_in_sync_payload.dart';
 import 'rate_fetch_service.dart';
 import 'rate_service.dart';
 
@@ -539,6 +541,137 @@ class TicketService {
         );
   }
 
+  /// Pending tickets with no outstanding `sync_queue` row (manual sync had nothing to send).
+  Future<int> countOrphanPendingTickets() async {
+    final row = await _db.customSelect(
+      _orphanPendingTicketsSql,
+      readsFrom: {_db.tickets, _db.syncQueue},
+    ).getSingle();
+    return (row.data['c'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Re-enqueues orphan pending tickets so [SyncCubit.flush] can upload them.
+  Future<int> reconcileOrphanPendingTickets() async {
+    final rows = await _db.customSelect(
+      '''
+SELECT t.id FROM tickets t
+WHERE t.sync_status = 'pending'
+  AND t.status != 'draft'
+  AND t.id NOT IN (
+    SELECT q.record_id FROM sync_queue q
+    WHERE q.table_name = 'tickets'
+      AND q.sync_status IN ('pending', 'failed')
+  )
+''',
+      readsFrom: {_db.tickets, _db.syncQueue},
+    ).get();
+
+    var enqueued = 0;
+    for (final row in rows) {
+      final tid = row.read<String>('id');
+      final ticket = await ticketById(tid);
+      if (ticket == null) continue;
+
+      final serverId = ticket.serverTicketId?.trim() ?? '';
+      if (serverId.isNotEmpty) {
+        continue;
+      }
+
+      if (!ticket.isExpressCashier) continue;
+
+      final vr = ticket.vrNo?.trim() ?? '';
+      final plate = ticket.plateNumber.trim();
+      final amount = ticket.fee ?? 0;
+      if (vr.isEmpty || plate.isEmpty || amount <= 0) {
+        ValetLog.warning(
+          'TicketService.reconcileOrphanPendingTickets',
+          'skip express ticketId=$tid — missing vr/plate/amount',
+        );
+        continue;
+      }
+
+      await enqueueCheckInSync(
+        localTicketId: tid,
+        payload: expressCheckInSyncQueuePayload(
+          localTicketId: tid,
+          ticketNumber: tid,
+          plateNumber: plate,
+          amount: amount,
+          vrNo: vr,
+          driverIn: ticket.driverIn,
+          driverOut: ticket.driverOut,
+        ),
+      );
+      enqueued++;
+      ValetLog.debug(
+        'TicketService.reconcileOrphanPendingTickets',
+        're-enqueued express check-in ticketId=$tid',
+      );
+    }
+    return enqueued;
+  }
+
+  static const _orphanPendingTicketsSql = '''
+SELECT COUNT(*) AS c FROM tickets t
+WHERE t.sync_status = 'pending'
+  AND t.status != 'draft'
+  AND t.id NOT IN (
+    SELECT q.record_id FROM sync_queue q
+    WHERE q.table_name = 'tickets'
+      AND q.sync_status IN ('pending', 'failed')
+  )
+''';
+
+  /// Marks pending tickets `synced` only after GET confirms they exist on the server.
+  Future<int> reconcilePendingServerBackedTickets(String token) async {
+    final rows = await (_db.select(_db.tickets)
+          ..where(
+            (t) =>
+                t.syncStatus.equals('pending') &
+                t.serverTicketId.isNotNull(),
+          ))
+        .get();
+
+    var verified = 0;
+    for (final ticket in rows) {
+      final sid = ticket.serverTicketId?.trim() ?? '';
+      if (sid.isEmpty) continue;
+      try {
+        final exists = await _verifyServerTransactionExists(
+          token: token,
+          serverId: sid,
+        );
+        if (!exists) continue;
+        await (_db.update(_db.tickets)..where((t) => t.id.equals(ticket.id)))
+            .write(
+          const TicketsCompanion(syncStatus: Value('synced')),
+        );
+        verified++;
+      } catch (e, st) {
+        ValetLog.error(
+          'TicketService.reconcilePendingServerBackedTickets',
+          'verify failed ticketId=${ticket.id} serverId=$sid',
+          e,
+          st,
+        );
+      }
+    }
+    return verified;
+  }
+
+  Future<bool> _verifyServerTransactionExists({
+    required String token,
+    required String serverId,
+  }) async {
+    try {
+      await _transactionsApi.getTransactionById(token: token, id: serverId);
+      return true;
+    } on TransactionsApiException catch (e) {
+      if (e.statusCode == 404) return false;
+      rethrow;
+    }
+  }
+
   /// Processes a queued check-in row via `POST /transactions/check-in`.
   Future<CheckInResponse> syncQueuedCheckIn(
     Map<String, dynamic> body,
@@ -671,21 +804,258 @@ class TicketService {
       throw StateError('Queued express check-in missing vr_no');
     }
 
-    final response = await _transactionsApi.submitExpressCheckIn(
-      token: token,
-      ticketNumber: ticketNumber,
-      plateNumber: plate,
-      amount: amount,
-      vrNo: vrNo,
-      driverIn: body['driver_in']?.toString(),
-      driverOut: body['driver_out']?.toString(),
-    );
+    try {
+      final response = await _transactionsApi.submitExpressCheckIn(
+        token: token,
+        ticketNumber: ticketNumber,
+        plateNumber: plate,
+        amount: amount,
+        vrNo: vrNo,
+        driverIn: body['driver_in']?.toString(),
+        driverOut: body['driver_out']?.toString(),
+      );
 
-    await updateServerTicketId(localId, response.id);
-    await (_db.update(_db.tickets)..where((t) => t.id.equals(localId))).write(
-      const TicketsCompanion(syncStatus: Value('synced')),
-    );
-    return response;
+      await updateServerTicketId(localId, response.id);
+      await (_db.update(_db.tickets)..where((t) => t.id.equals(localId))).write(
+        const TicketsCompanion(syncStatus: Value('synced')),
+      );
+      return response;
+    } on VrNumberConflictOnServerException catch (e, st) {
+      final serverId = await resolveServerTransactionIdByVr(
+        token: token,
+        vrNo: vrNo,
+        plateNumber: plate,
+        ticketNumber: ticketNumber,
+      );
+      if (serverId == null) {
+        ValetLog.error(
+          'TicketService.syncQueuedExpressCheckIn',
+          'VR conflict but no server match vr=$vrNo localId=$localId',
+          e,
+          st,
+        );
+        rethrow;
+      }
+      ValetLog.info(
+        'TicketService.syncQueuedExpressCheckIn',
+        'linked existing server ticket $serverId for localId=$localId vr=$vrNo',
+      );
+      await updateServerTicketId(localId, serverId);
+      await (_db.update(_db.tickets)..where((t) => t.id.equals(localId))).write(
+        const TicketsCompanion(syncStatus: Value('synced')),
+      );
+      return CheckInResponse(
+        id: serverId,
+        ticketNumber: ticketNumber,
+        qrCode: ticketNumber,
+      );
+    }
+  }
+
+  /// Finds a server transaction UUID when check-in returns 409 (VR already exists).
+  ///
+  /// Reports `search` only matches plate or ticket number — not VR — so we try
+  /// `GET /transactions/:id` and dated list endpoints before reports fallbacks.
+  Future<String?> resolveServerTransactionIdByVr({
+    required String token,
+    required String vrNo,
+    String? plateNumber,
+    String? ticketNumber,
+  }) async {
+    final vr = normalizeVrNumber(vrNo);
+    final ticket = ticketNumber?.trim() ?? '';
+    final plate = normalizePlateNumber(plateNumber ?? '').toUpperCase();
+    final today = _reportsDateIsoForToday();
+
+    if (ticket.isNotEmpty) {
+      final byGet = await _tryServerIdFromTransactionGet(
+        token: token,
+        lookupKey: ticket,
+      );
+      if (byGet != null) {
+        ValetLog.debug(
+          'TicketService.resolveServerTransactionIdByVr',
+          'matched via GET /transactions/$ticket',
+        );
+        return byGet;
+      }
+
+      final byTicketReports = await _tryServerIdFromReports(
+        token: token,
+        search: ticket,
+        vrNo: vr,
+        dateFrom: today,
+        dateTo: today,
+      );
+      if (byTicketReports != null) {
+        ValetLog.debug(
+          'TicketService.resolveServerTransactionIdByVr',
+          'matched via reports ticket=$ticket',
+        );
+        return byTicketReports;
+      }
+    }
+
+    if (vr.isNotEmpty) {
+      final byList = await _tryServerIdFromTransactionsList(
+        token: token,
+        vrNo: vr,
+        ticketNumber: ticket,
+      );
+      if (byList != null) {
+        ValetLog.debug(
+          'TicketService.resolveServerTransactionIdByVr',
+          'matched via GET /transactions list vr=$vr',
+        );
+        return byList;
+      }
+    }
+
+    if (plate.isNotEmpty) {
+      final byPlateReports = await _tryServerIdFromReports(
+        token: token,
+        search: plate,
+        vrNo: vr,
+        dateFrom: today,
+        dateTo: today,
+      );
+      if (byPlateReports != null) {
+        ValetLog.debug(
+          'TicketService.resolveServerTransactionIdByVr',
+          'matched via reports plate=$plate',
+        );
+        return byPlateReports;
+      }
+    }
+
+    return null;
+  }
+
+  String _reportsDateIsoForToday() {
+    final now = PhilippineTime.now();
+    final m = now.month.toString().padLeft(2, '0');
+    final d = now.day.toString().padLeft(2, '0');
+    return '${now.year}-$m-$d';
+  }
+
+  Future<String?> _tryServerIdFromTransactionGet({
+    required String token,
+    required String lookupKey,
+  }) async {
+    try {
+      final map = await _transactionsApi.getTransactionById(
+        token: token,
+        id: lookupKey,
+      );
+      final id = map['id']?.toString().trim() ?? '';
+      return id.isEmpty ? null : id;
+    } on TransactionsApiException catch (e) {
+      if (e.statusCode == 404) return null;
+      ValetLog.error(
+        'TicketService._tryServerIdFromTransactionGet',
+        'lookupKey=$lookupKey',
+        e,
+      );
+      return null;
+    } catch (e, st) {
+      ValetLog.error(
+        'TicketService._tryServerIdFromTransactionGet',
+        'lookupKey=$lookupKey',
+        e,
+        st,
+      );
+      return null;
+    }
+  }
+
+  Future<String?> _tryServerIdFromReports({
+    required String token,
+    required String search,
+    required String vrNo,
+    String? dateFrom,
+    String? dateTo,
+  }) async {
+    try {
+      final page = await _transactionsApi.fetchReportsTransactions(
+        token: token,
+        search: search,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        limit: 50,
+        page: 1,
+      );
+      for (final row in page.rows) {
+        if (vrNo.isNotEmpty) {
+          final rowVr = normalizeVrNumber(row.vrNo == '—' ? '' : row.vrNo);
+          if (rowVr.isNotEmpty && rowVr != vrNo) continue;
+        }
+        final sid = row.serverTransactionId?.trim() ?? '';
+        if (sid.isNotEmpty) return sid;
+      }
+    } catch (e, st) {
+      ValetLog.error(
+        'TicketService._tryServerIdFromReports',
+        'search=$search',
+        e,
+        st,
+      );
+    }
+    return null;
+  }
+
+  Future<String?> _tryServerIdFromTransactionsList({
+    required String token,
+    required String vrNo,
+    String? ticketNumber,
+  }) async {
+    final now = PhilippineTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    final fromUnix = start.millisecondsSinceEpoch ~/ 1000;
+    final toUnix = end.millisecondsSinceEpoch ~/ 1000;
+    final ticket = ticketNumber?.trim() ?? '';
+
+    try {
+      final rows = await _transactionsApi.fetchTransactions(
+        token: token,
+        dateFromUnix: fromUnix,
+        dateToUnix: toUnix,
+        limit: 200,
+        page: 1,
+      );
+      for (final row in rows) {
+        final rowVr = normalizeVrNumber(_vrNoFromTransactionJson(row));
+        if (vrNo.isNotEmpty && rowVr != vrNo) continue;
+        if (ticket.isNotEmpty) {
+          final rowTicket =
+              row['ticket_number']?.toString().trim() ??
+              row['ticketNumber']?.toString().trim() ??
+              '';
+          if (rowTicket != ticket) continue;
+        }
+        final id = row['id']?.toString().trim() ?? '';
+        if (id.isNotEmpty) return id;
+      }
+    } catch (e, st) {
+      ValetLog.error(
+        'TicketService._tryServerIdFromTransactionsList',
+        'vr=$vrNo ticket=$ticket',
+        e,
+        st,
+      );
+    }
+    return null;
+  }
+
+  static String _vrNoFromTransactionJson(Map<String, dynamic> json) {
+    final top = json['vr_no']?.toString().trim() ?? json['vrNo']?.toString().trim();
+    if (top != null && top.isNotEmpty) return top;
+    final vehicle = json['vehicle'];
+    if (vehicle is Map) {
+      final m = Map<String, dynamic>.from(vehicle);
+      return m['vr_no']?.toString().trim() ?? m['vrNo']?.toString().trim() ?? '';
+    }
+    return '';
   }
 
   static String? _encodeParkingInfoColumn({

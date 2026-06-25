@@ -18,6 +18,7 @@ import 'package:valet_handheld_pos/features/sync/state/sync_state.dart';
 void main() {
   late AppDatabase db;
   late SyncCubit syncCubit;
+  late TicketService ticketService;
 
   const shiftId = 'shift-1';
   const ticketId = 'TKT-1';
@@ -38,6 +39,7 @@ void main() {
       rateFetch,
       parkingLayout,
     );
+    ticketService = tickets;
     final shifts = ShiftService(db, dio, ticketService: tickets);
     final auth = AuthRepository(
       db,
@@ -200,5 +202,57 @@ void main() {
           ..where((s) => s.id.equals(shiftId)))
         .getSingle();
     expect(shift.syncStatus, 'synced');
+  });
+
+  test('reconcileOrphanPendingTickets enqueues express check-in', () async {
+    await db.into(db.shifts).insert(
+          ShiftsCompanion.insert(
+            id: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            openedAt: now,
+            openingFloat: 100,
+            status: 'open',
+            syncStatus: 'synced',
+            createdAt: now,
+          ),
+        );
+    await db.into(db.tickets).insert(
+          TicketsCompanion.insert(
+            id: ticketId,
+            shiftId: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            plateNumber: 'DNV3170',
+            vehicleBrand: '',
+            vehicleColor: '',
+            vehicleType: '',
+            cellphoneNumber: '',
+            damageMarkers: '[]',
+            personalBelongings: '[]',
+            checkInAt: now,
+            checkOutAt: Value(now),
+            fee: const Value(120.0),
+            status: 'completed',
+            syncStatus: 'pending',
+            createdAt: now,
+            isExpressCashier: const Value(true),
+            vrNo: const Value('EP432624'),
+          ),
+        );
+
+    expect(await ticketService.countOrphanPendingTickets(), 1);
+    expect(await syncCubit.pendingCount(), 1);
+
+    final enqueued = await ticketService.reconcileOrphanPendingTickets();
+    expect(enqueued, 1);
+    expect(await ticketService.countOrphanPendingTickets(), 0);
+
+    final queueRows = await (db.select(db.syncQueue)
+          ..where((q) => q.recordId.equals(ticketId)))
+        .get();
+    expect(queueRows, hasLength(1));
+    expect(queueRows.first.operation, 'checkin');
+    expect(queueRows.first.syncStatus, 'pending');
   });
 }
