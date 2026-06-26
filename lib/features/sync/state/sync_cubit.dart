@@ -131,12 +131,15 @@ ORDER BY t.check_in_at ASC
 
   /// Marks queue rows `synced` when their shift/ticket entity is already synced
   /// (e.g. direct HTTP path updated the entity but left the queue row pending).
+  /// Checkout uploads are excluded — a synced check-in does not mean checkout
+  /// reached the server.
   Future<void> _reconcileOrphanQueueEntries() async {
     await _db.customStatement(
       '''
 UPDATE sync_queue
 SET sync_status = 'synced'
 WHERE sync_status IN ('pending', 'failed')
+  AND operation != 'checkout/finalize'
   AND (
     (table_name = 'tickets' AND record_id IN (
       SELECT id FROM tickets WHERE sync_status = 'synced'
@@ -196,6 +199,39 @@ WHERE table_name = 'shifts'
     );
   }
 
+  /// Clears phantom pending counts when the queue is empty but local tickets
+  /// still show `pending` after a successful server upload.
+  Future<void> _reconcileIdlePendingState({String? token}) async {
+    if (AppConfig.useStubApi) {
+      await _reconcileServerBackedTicketsStub();
+      await _reconcileOrphanQueueEntries();
+      return;
+    }
+
+    final clearedActive =
+        await _ticketService.reconcileActiveServerBackedOrphans();
+    if (clearedActive > 0) {
+      ValetLog.debug(
+        'SyncCubit.flush',
+        'cleared $clearedActive active server-backed orphan(s)',
+      );
+    }
+
+    final tok = token ?? (await _auth.getActiveSession())?.authToken;
+    if (tok != null && tok.isNotEmpty) {
+      final verified =
+          await _ticketService.reconcilePendingServerBackedTickets(tok);
+      if (verified > 0) {
+        ValetLog.debug(
+          'SyncCubit.flush',
+          'verified $verified server-backed ticket(s)',
+        );
+      }
+    }
+
+    await _reconcileOrphanQueueEntries();
+  }
+
   Future<void>? _flushFuture;
 
   Future<void> flush() {
@@ -228,22 +264,23 @@ WHERE table_name = 'shifts'
           're-enqueued $reEnqueued orphan pending ticket(s)',
         );
       }
-      final pending = await (_db.select(_db.syncQueue)
+      await _reconcileIdlePendingState();
+      var queuePending = await (_db.select(_db.syncQueue)
             ..where((q) => q.syncStatus.equals('pending'))
             ..orderBy([(q) => OrderingTerm.asc(q.createdAt)]))
           .get();
 
-      if (pending.isEmpty) {
+      if (queuePending.isEmpty) {
         emit(SyncComplete(
           synced: 0,
           failed: await failedCount(),
-          pending: 0,
+          pending: await pendingCount(),
         ));
         return;
       }
 
       if (AppConfig.useStubApi) {
-        for (final row in pending) {
+        for (final row in queuePending) {
           await _markQueueSynced(row);
           await _markEntitySynced(row);
           syncedThisRun++;
@@ -254,6 +291,20 @@ WHERE table_name = 'shifts'
         if (token == null || token.isEmpty) {
           ValetLog.debug('SyncCubit.flush', 'skip HTTP — no bearer token');
         } else {
+          final reopened = await _ticketService.reconcileStaleCheckoutUploads(
+            token,
+          );
+          if (reopened > 0) {
+            ValetLog.debug(
+              'SyncCubit.flush',
+              'reopened $reopened stale checkout upload(s)',
+            );
+            queuePending = await (_db.select(_db.syncQueue)
+                  ..where((q) => q.syncStatus.equals('pending'))
+                  ..orderBy([(q) => OrderingTerm.asc(q.createdAt)]))
+                .get();
+          }
+
           final verified =
               await _ticketService.reconcilePendingServerBackedTickets(token);
           if (verified > 0) {
@@ -264,16 +315,25 @@ WHERE table_name = 'shifts'
             await _reconcileOrphanQueueEntries();
           }
 
-          final checkInRows = pending
+          final checkInRows = queuePending
               .where(
                 (r) =>
                     r.queueTableName == 'tickets' && r.operation == 'checkin',
               )
               .toList();
-          final otherRows = pending
+          final checkOutRows = queuePending
               .where(
                 (r) =>
-                    r.queueTableName != 'tickets' || r.operation != 'checkin',
+                    r.queueTableName == 'tickets' &&
+                    r.operation == 'checkout/finalize',
+              )
+              .toList();
+          final otherRows = queuePending
+              .where(
+                (r) =>
+                    r.queueTableName != 'tickets' ||
+                    (r.operation != 'checkin' &&
+                        r.operation != 'checkout/finalize'),
               )
               .toList();
 
@@ -314,6 +374,43 @@ WHERE table_name = 'shifts'
             }
           }
 
+          if (checkOutRows.isNotEmpty) {
+            try {
+              syncedThisRun += await _ticketService.syncPendingCheckoutsBatch(
+                checkOutRows,
+                token,
+              );
+            } on DioException catch (e, st) {
+              if (e.type == DioExceptionType.connectionError ||
+                  e.error is SocketException) {
+                ValetLog.debug(
+                  'SyncCubit.flush',
+                  'batch checkout skipped — network',
+                );
+              } else {
+                ValetLog.error(
+                  'SyncCubit.flush',
+                  'batch checkout request failed',
+                  e,
+                  st,
+                );
+                for (final row in checkOutRows) {
+                  await _markQueueFailed(row);
+                }
+              }
+            } catch (e, st) {
+              ValetLog.error(
+                'SyncCubit.flush',
+                'batch checkout failed',
+                e,
+                st,
+              );
+              for (final row in checkOutRows) {
+                await _markQueueFailed(row);
+              }
+            }
+          }
+
           for (final row in otherRows) {
             try {
               await _syncQueueRow(
@@ -331,6 +428,8 @@ WHERE table_name = 'shifts'
               await _markQueueFailed(row);
             }
           }
+
+          await _reconcileIdlePendingState(token: token);
         }
       }
 
@@ -416,43 +515,7 @@ WHERE table_name = 'shifts'
       return;
     }
 
-    if (row.queueTableName == 'tickets' &&
-        row.operation == 'checkout/finalize') {
-      try {
-        await _ticketService.syncQueuedCheckoutFinalize(payloadMap, token);
-        await _markQueueSynced(row);
-        await _markEntitySynced(row);
-        onSynced();
-      } on DioException catch (e, st) {
-        final status = e.response?.statusCode;
-        if (status != null && status >= 400 && status < 500) {
-          ValetLog.error(
-            'SyncCubit.flush',
-            'checkout/finalize client error $status recordId=${row.recordId}',
-            e,
-            st,
-          );
-          await _markQueueFailed(row);
-        } else {
-          ValetLog.error(
-            'SyncCubit.flush',
-            'checkout/finalize retry recordId=${row.recordId}',
-            e,
-            st,
-          );
-          await _incrementRetry(row);
-        }
-      } catch (e, st) {
-        ValetLog.error(
-          'SyncCubit.flush',
-          'checkout/finalize failed recordId=${row.recordId}',
-          e,
-          st,
-        );
-        await _markQueueFailed(row);
-      }
-      return;
-    }
+    // checkout/finalize rows are flushed via syncPendingCheckoutsBatch in flush().
 
     final hops = _syncHopsForRow(row, payloadMap);
     if (hops == null) {

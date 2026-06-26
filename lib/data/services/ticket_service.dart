@@ -17,6 +17,7 @@ import '../../features/check_out/models/checkout_preview_rates.dart';
 import '../../core/pricing/transaction_payment_calculator.dart';
 import '../../core/config/app_config.dart';
 import '../../core/services/device_id_service.dart';
+import '../../core/time/check_in_time_resolution.dart';
 import '../../core/time/philippine_time.dart';
 import '../../features/check_out/domain/checkout_ticket_display.dart';
 import '../../features/check_out/models/check_out_response.dart';
@@ -32,6 +33,7 @@ import '../remote/dashboard_api.dart';
 import 'parking_layout_service.dart';
 import '../remote/transactions_api.dart';
 import 'batch_check_in_payload.dart';
+import 'batch_check_out_payload.dart';
 import 'check_in_sync_payload.dart';
 import 'rate_fetch_service.dart';
 import 'rate_service.dart';
@@ -524,10 +526,368 @@ class TicketService {
     await (_db.update(_db.tickets)..where((t) => t.id.equals(tid))).write(
       TicketsCompanion(
         serverTicketId: Value(sid),
-        syncStatus: const Value('synced'),
+        syncStatus: Value(await _resolvedSyncStatusForTicket(tid)),
       ),
     );
     _notifyLocalSyncQueueChanged();
+  }
+
+  Future<bool> _hasUnsyncedQueueForTicket(String ticketId) async {
+    final tid = ticketId.trim();
+    if (tid.isEmpty) return false;
+    final row = await _db.customSelect(
+      '''
+SELECT COUNT(*) AS c FROM sync_queue
+WHERE record_id = ? AND sync_status IN ('pending', 'failed')
+''',
+      variables: [Variable.withString(tid)],
+      readsFrom: {_db.syncQueue},
+    ).getSingle();
+    return ((row.data['c'] as num?)?.toInt() ?? 0) > 0;
+  }
+
+  Future<String> _resolvedSyncStatusForTicket(String ticketId) async {
+    if (await _hasUnsyncedQueueForTicket(ticketId)) return 'pending';
+    final ticket = await ticketById(ticketId);
+    if (ticket == null) return 'synced';
+    if (ticket.status == 'completed' || ticket.status == 'lost') {
+      final checkoutRows =
+          await (_db.select(_db.syncQueue)..where(
+                (q) =>
+                    q.recordId.equals(ticketId) &
+                    q.operation.equals('checkout/finalize'),
+              ))
+              .get();
+      if (checkoutRows.any(
+        (r) => r.syncStatus == 'pending' || r.syncStatus == 'failed',
+      )) {
+        return 'pending';
+      }
+      if (checkoutRows.isNotEmpty) return 'synced';
+      if (ticket.checkOutAt?.trim().isNotEmpty ?? false) return 'synced';
+    }
+    return 'synced';
+  }
+
+  bool _localCheckoutAwaitingServerUpload(Ticket ticket) {
+    if (ticket.status != 'completed' && ticket.status != 'lost') return false;
+    return ticket.checkOutAt?.trim().isNotEmpty ?? false;
+  }
+
+  static bool _serverTransactionStillCheckedIn(Map<String, dynamic> txn) {
+    final status = txn['status']?.toString().trim().toLowerCase() ?? '';
+    if (status == 'completed' || status == 'lost' || status == 'void') {
+      return false;
+    }
+    final timeOut = txn['time_out'] ?? txn['timeOut'];
+    if (timeOut != null && '$timeOut'.trim().isNotEmpty) return false;
+    return true;
+  }
+
+  /// Reopens checkout uploads that were cleared locally while the server still
+  /// shows the vehicle checked in (e.g. after check-in sync swallowed checkout).
+  Future<int> reconcileStaleCheckoutUploads(String token) async {
+    final rows = await _db.customSelect(
+      '''
+SELECT DISTINCT t.id AS ticket_id
+FROM tickets t
+WHERE t.status IN ('completed', 'lost')
+  AND t.check_out_at IS NOT NULL
+  AND TRIM(t.check_out_at) != ''
+  AND t.server_ticket_id IS NOT NULL
+  AND TRIM(t.server_ticket_id) != ''
+''',
+      readsFrom: {_db.tickets, _db.syncQueue},
+    ).get();
+
+    var reopened = 0;
+    for (final row in rows) {
+      final ticketId = row.read<String>('ticket_id');
+      final ticket = await ticketById(ticketId);
+      final serverId = ticket?.serverTicketId?.trim() ?? '';
+      if (ticket == null || serverId.isEmpty) continue;
+
+      try {
+        final txn = await _transactionsApi.getTransactionById(
+          token: token,
+          id: serverId,
+        );
+        if (!_serverTransactionStillCheckedIn(txn)) continue;
+
+        final pendingCheckout = await (_db.select(_db.syncQueue)
+              ..where(
+                (q) =>
+                    q.recordId.equals(ticketId) &
+                    q.operation.equals('checkout/finalize') &
+                    q.syncStatus.isIn(['pending', 'failed']),
+              )
+              ..limit(1))
+            .getSingleOrNull();
+        if (pendingCheckout != null) {
+          await (_db.update(_db.tickets)..where((t) => t.id.equals(ticketId)))
+              .write(const TicketsCompanion(syncStatus: Value('pending')));
+          reopened++;
+          continue;
+        }
+
+        final syncedCheckout = await (_db.select(_db.syncQueue)
+              ..where(
+                (q) =>
+                    q.recordId.equals(ticketId) &
+                    q.operation.equals('checkout/finalize') &
+                    q.syncStatus.equals('synced'),
+              )
+              ..orderBy([(q) => OrderingTerm.desc(q.createdAt)])
+              ..limit(1))
+            .getSingleOrNull();
+        if (syncedCheckout != null) {
+          await (_db.update(_db.syncQueue)
+                ..where((q) => q.id.equals(syncedCheckout.id)))
+              .write(
+            const SyncQueueCompanion(
+              syncStatus: Value('pending'),
+              retryCount: Value(0),
+            ),
+          );
+          await (_db.update(_db.tickets)..where((t) => t.id.equals(ticketId)))
+              .write(const TicketsCompanion(syncStatus: Value('pending')));
+          reopened++;
+          continue;
+        }
+
+        if (await _reenqueueCheckoutFromTicket(ticket)) {
+          reopened++;
+        }
+      } catch (e, st) {
+        ValetLog.error(
+          'TicketService.reconcileStaleCheckoutUploads',
+          'verify failed ticketId=$ticketId serverId=$serverId',
+          e,
+          st,
+        );
+      }
+    }
+
+    if (reopened > 0) {
+      _notifyLocalSyncQueueChanged();
+    }
+    return reopened;
+  }
+
+  /// True when checkout finished locally but still needs a server upload.
+  Future<bool> needsCheckoutServerUpload(Ticket ticket) async {
+    if (ticket.status != 'completed' && ticket.status != 'lost') return false;
+    final checkOut = ticket.checkOutAt?.trim() ?? '';
+    if (checkOut.isEmpty) return false;
+    if (await _hasUnsyncedQueueForTicket(ticket.id)) return true;
+    if (ticket.syncStatus != 'synced') return true;
+    final checkoutRows =
+        await (_db.select(_db.syncQueue)..where(
+              (q) =>
+                  q.recordId.equals(ticket.id) &
+                  q.operation.equals('checkout/finalize'),
+            ))
+            .get();
+    if (checkoutRows.isEmpty) return true;
+    return checkoutRows.any(
+      (r) => r.syncStatus == 'pending' || r.syncStatus == 'failed',
+    );
+  }
+
+  /// Reopens and uploads a single locally completed checkout when the server
+  /// still shows the vehicle checked in.
+  Future<int> retryCheckoutUploadForTicket(String ticketId, String token) async {
+    final ticket = await ticketById(ticketId.trim());
+    if (ticket == null) return 0;
+    if (!await needsCheckoutServerUpload(ticket)) return 0;
+
+    final serverId = ticket.serverTicketId?.trim() ?? '';
+    if (serverId.isNotEmpty) {
+      try {
+        final txn = await _transactionsApi.getTransactionById(
+          token: token,
+          id: serverId,
+        );
+        if (!_serverTransactionStillCheckedIn(txn)) {
+          await _markLocalCheckoutFullySynced(ticket.id);
+          return 1;
+        }
+        await _reconcileStaleCheckoutForTicket(ticket, token);
+      } catch (e, st) {
+        ValetLog.error(
+          'TicketService.retryCheckoutUploadForTicket',
+          'verify failed ticketId=${ticket.id} serverId=$serverId',
+          e,
+          st,
+        );
+        return 0;
+      }
+    } else {
+      await _reconcileStaleCheckoutForTicket(ticket, token);
+    }
+
+    final rows =
+        await (_db.select(_db.syncQueue)..where(
+              (q) =>
+                  q.recordId.equals(ticket.id) &
+                  q.operation.equals('checkout/finalize') &
+                  q.syncStatus.isIn(['pending', 'failed']),
+            ))
+            .get();
+    if (rows.isEmpty) {
+      final updated = await ticketById(ticket.id);
+      if (updated == null) return 0;
+      return await needsCheckoutServerUpload(updated) ? 0 : 1;
+    }
+    return syncPendingCheckoutsBatch(rows, token);
+  }
+
+  Future<int> _reconcileStaleCheckoutForTicket(
+    Ticket ticket,
+    String token,
+  ) async {
+    final ticketId = ticket.id;
+    final serverId = ticket.serverTicketId?.trim() ?? '';
+    if (serverId.isEmpty) return 0;
+
+    try {
+      final txn = await _transactionsApi.getTransactionById(
+        token: token,
+        id: serverId,
+      );
+      if (!_serverTransactionStillCheckedIn(txn)) return 0;
+
+      final pendingCheckout = await (_db.select(_db.syncQueue)
+            ..where(
+              (q) =>
+                  q.recordId.equals(ticketId) &
+                  q.operation.equals('checkout/finalize') &
+                  q.syncStatus.isIn(['pending', 'failed']),
+            )
+            ..limit(1))
+          .getSingleOrNull();
+      if (pendingCheckout != null) {
+        await (_db.update(_db.tickets)..where((t) => t.id.equals(ticketId)))
+            .write(const TicketsCompanion(syncStatus: Value('pending')));
+        _notifyLocalSyncQueueChanged();
+        return 1;
+      }
+
+      final syncedCheckout = await (_db.select(_db.syncQueue)
+            ..where(
+              (q) =>
+                  q.recordId.equals(ticketId) &
+                  q.operation.equals('checkout/finalize') &
+                  q.syncStatus.equals('synced'),
+            )
+            ..orderBy([(q) => OrderingTerm.desc(q.createdAt)])
+            ..limit(1))
+          .getSingleOrNull();
+      if (syncedCheckout != null) {
+        await (_db.update(_db.syncQueue)
+              ..where((q) => q.id.equals(syncedCheckout.id)))
+            .write(
+          const SyncQueueCompanion(
+            syncStatus: Value('pending'),
+            retryCount: Value(0),
+          ),
+        );
+        await (_db.update(_db.tickets)..where((t) => t.id.equals(ticketId)))
+            .write(const TicketsCompanion(syncStatus: Value('pending')));
+        _notifyLocalSyncQueueChanged();
+        return 1;
+      }
+
+      if (await _reenqueueCheckoutFromTicket(ticket)) {
+        _notifyLocalSyncQueueChanged();
+        return 1;
+      }
+    } catch (e, st) {
+      ValetLog.error(
+        'TicketService._reconcileStaleCheckoutForTicket',
+        'verify failed ticketId=$ticketId serverId=$serverId',
+        e,
+        st,
+      );
+    }
+    return 0;
+  }
+
+  Future<void> _markLocalCheckoutFullySynced(String ticketId) async {
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(ticketId))).write(
+      const TicketsCompanion(syncStatus: Value('synced')),
+    );
+    await (_db.update(_db.syncQueue)..where(
+          (q) =>
+              q.recordId.equals(ticketId) &
+              q.queueTableName.equals('tickets') &
+              q.operation.equals('checkout/finalize') &
+              q.syncStatus.isIn(['pending', 'failed']),
+        ))
+        .write(const SyncQueueCompanion(syncStatus: Value('synced')));
+    _notifyLocalSyncQueueChanged();
+  }
+
+  Future<bool> _reenqueueCheckoutFromTicket(Ticket ticket) async {
+    final amount = ticket.fee;
+    final checkOutAt = ticket.checkOutAt?.trim() ?? '';
+    if (amount == null || amount <= 0 || checkOutAt.isEmpty) return false;
+
+    Map<String, dynamic>? appliedRate;
+    final rateRaw = ticket.appliedRateJson?.trim() ?? '';
+    if (rateRaw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rateRaw);
+        if (decoded is Map) {
+          appliedRate = Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {}
+    }
+    if (appliedRate == null || appliedRate.isEmpty) return false;
+
+    double? cashTendered;
+    final paymentRaw = ticket.paymentSummaryJson?.trim() ?? '';
+    if (paymentRaw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(paymentRaw);
+        if (decoded is Map) {
+          cashTendered = TransactionPaymentFields.optionalMoney(
+            decoded['cash_tendered'] ?? decoded['cashTendered'],
+          );
+        }
+      } catch (_) {}
+    }
+
+    final conditionCheckout = <Map<String, dynamic>>[];
+    try {
+      final decoded = jsonDecode(ticket.damageMarkers);
+      if (decoded is List) {
+        for (final entry in decoded) {
+          if (entry is Map) {
+            conditionCheckout.add(Map<String, dynamic>.from(entry));
+          }
+        }
+      }
+    } catch (_) {}
+
+    await enqueueCheckoutFinalize(
+      ticketId: ticket.id,
+      serverTicketId: ticket.serverTicketId,
+      amount: amount,
+      timeOut: PhilippineTime.apiIsoInstant(
+        PhilippineTime.wallComponentsToUtc(PhilippineTime.fromApiIso(checkOutAt)),
+      ),
+      isOvernight: ticket.isOvernight ?? false,
+      ticketLost: ticket.ticketLost ?? false,
+      conditionCheckout: conditionCheckout,
+      driverOut: ticket.driverOut,
+      cashTendered: cashTendered,
+      appliedRate: appliedRate,
+    );
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(ticket.id))).write(
+      const TicketsCompanion(syncStatus: Value('pending')),
+    );
+    return true;
   }
 
   /// Enqueues multipart check-in for [SyncCubit] when offline.
@@ -638,6 +998,30 @@ WHERE t.sync_status = 'pending'
   )
 ''';
 
+  /// Clears orphan `pending` active tickets that already have a server UUID and
+  /// no outstanding queue row (check-in reached the server; queue row was synced).
+  Future<int> reconcileActiveServerBackedOrphans() async {
+    final cleared = await _db.customUpdate(
+      '''
+UPDATE tickets SET sync_status = 'synced'
+WHERE sync_status = 'pending'
+  AND status = 'active'
+  AND server_ticket_id IS NOT NULL
+  AND TRIM(server_ticket_id) != ''
+  AND id NOT IN (
+    SELECT record_id FROM sync_queue
+    WHERE table_name = 'tickets'
+      AND sync_status IN ('pending', 'failed')
+  )
+''',
+      updates: {_db.tickets},
+    );
+    if (cleared > 0) {
+      _notifyLocalSyncQueueChanged();
+    }
+    return cleared;
+  }
+
   /// Marks pending tickets `synced` only after GET confirms they exist on the server.
   Future<int> reconcilePendingServerBackedTickets(String token) async {
     final rows = await (_db.select(_db.tickets)
@@ -658,6 +1042,23 @@ WHERE t.sync_status = 'pending'
           serverId: sid,
         );
         if (!exists) continue;
+        if (_localCheckoutAwaitingServerUpload(ticket)) {
+          try {
+            final txn = await _transactionsApi.getTransactionById(
+              token: token,
+              id: sid,
+            );
+            if (_serverTransactionStillCheckedIn(txn)) continue;
+          } catch (e, st) {
+            ValetLog.error(
+              'TicketService.reconcilePendingServerBackedTickets',
+              'checkout verify failed ticketId=${ticket.id} serverId=$sid',
+              e,
+              st,
+            );
+            continue;
+          }
+        }
         await (_db.update(_db.tickets)..where((t) => t.id.equals(ticket.id)))
             .write(
           const TicketsCompanion(syncStatus: Value('synced')),
@@ -753,8 +1154,10 @@ WHERE t.sync_status = 'pending'
       matchedQueueIds.add(entry.row.id);
 
       if (result.isSuccess) {
-        await _applyBatchCheckInSuccess(entry, result);
+        // Clear the queue row before resolving ticket sync_status — otherwise
+        // _resolvedSyncStatusForTicket still sees this pending check-in row.
         await _markSyncQueueSyncedById(entry.row.id);
+        await _applyBatchCheckInSuccess(entry, result);
         synced++;
         continue;
       }
@@ -787,6 +1190,181 @@ WHERE t.sync_status = 'pending'
     }
 
     return synced;
+  }
+
+  /// Uploads pending checkout/finalize queue rows in one batch JSON request.
+  Future<int> syncPendingCheckoutsBatch(
+    List<SyncQueueData> rows,
+    String token,
+  ) async {
+    if (rows.isEmpty) return 0;
+
+    final entries = <_BatchCheckInEntry>[];
+    for (final row in rows) {
+      try {
+        final raw = jsonDecode(row.payload);
+        if (raw is! Map) {
+          await _markSyncQueueFailedById(row.id);
+          continue;
+        }
+        final map = Map<String, dynamic>.from(raw);
+        final ticket = await ticketById(row.recordId);
+        final serverTimeInRaw = await _serverTimeInInstantForCheckout(
+          token: token,
+          serverTicketId: ticket?.serverTicketId,
+        );
+        final item = checkoutQueuePayloadToApiItem(
+          map,
+          serverTicketIdOverride: ticket?.serverTicketId,
+          checkInAtIso: ticket?.checkInAt,
+          serverTimeInRaw: serverTimeInRaw,
+        );
+        entries.add(_BatchCheckInEntry(row: row, item: item, ticket: ticket));
+      } catch (e, st) {
+        ValetLog.error(
+          'TicketService.syncPendingCheckoutsBatch',
+          'build item failed queueId=${row.id} recordId=${row.recordId}',
+          e,
+          st,
+        );
+        await _markSyncQueueFailedById(row.id);
+      }
+    }
+
+    if (entries.isEmpty) return 0;
+
+    final batch = await _transactionsApi.submitBatchCheckOut(
+      token: token,
+      checkOuts: [for (final e in entries) e.item],
+      localTicketNumbers: [for (final e in entries) e.row.recordId],
+    );
+
+    var synced = 0;
+    final matchedQueueIds = <String>{};
+
+    for (final result in batch.results) {
+      final entry = _matchBatchCheckoutEntry(
+        entries,
+        result,
+        matchedQueueIds,
+      );
+      if (entry == null) {
+        ValetLog.warning(
+          'TicketService.syncPendingCheckoutsBatch',
+          'no local match for batch result index=${result.index} '
+              'ticket=${result.ticketNumber}',
+        );
+        continue;
+      }
+      matchedQueueIds.add(entry.row.id);
+
+      if (result.isSuccess) {
+        await _applyBatchCheckoutSuccess(entry, result);
+        await _markSyncQueueSyncedById(entry.row.id);
+        synced++;
+        continue;
+      }
+
+      if (await _tryReconcileBatchCheckoutConflict(entry, result)) {
+        await _markSyncQueueSyncedById(entry.row.id);
+        synced++;
+        continue;
+      }
+
+      await _markSyncQueueFailedById(entry.row.id);
+    }
+
+    for (final entry in entries) {
+      if (!matchedQueueIds.contains(entry.row.id)) {
+        ValetLog.warning(
+          'TicketService.syncPendingCheckoutsBatch',
+          'missing batch result for queueId=${entry.row.id} '
+              'ticket=${entry.row.recordId}',
+        );
+        await _markSyncQueueFailedById(entry.row.id);
+      }
+    }
+
+    return synced;
+  }
+
+  _BatchCheckInEntry? _matchBatchCheckoutEntry(
+    List<_BatchCheckInEntry> entries,
+    BatchCheckInResultItem result,
+    Set<String> alreadyMatched,
+  ) {
+    final ticketNo = result.ticketNumber.trim();
+    if (ticketNo.isNotEmpty) {
+      for (final e in entries) {
+        if (alreadyMatched.contains(e.row.id)) continue;
+        if (e.row.recordId.trim() == ticketNo) return e;
+      }
+    }
+
+    if (result.index >= 0 && result.index < entries.length) {
+      final e = entries[result.index];
+      if (!alreadyMatched.contains(e.row.id)) return e;
+    }
+    return null;
+  }
+
+  Future<void> _applyBatchCheckoutSuccess(
+    _BatchCheckInEntry entry,
+    BatchCheckInResultItem result,
+  ) async {
+    final localId = entry.row.recordId.trim();
+    if (localId.isEmpty) return;
+
+    final serverId = result.serverTransactionId?.trim() ?? '';
+    if (serverId.isNotEmpty) {
+      await updateServerTicketId(localId, serverId);
+    }
+
+    final txn = result.transaction ?? const <String, dynamic>{};
+    final txnStatus = txn['status']?.toString().trim().toLowerCase() ?? '';
+    final statusUpdate = txnStatus == 'lost'
+        ? 'lost'
+        : txnStatus == 'completed'
+            ? 'completed'
+            : null;
+
+    final checkOutRaw = txn['time_out'] ??
+        txn['timeOut'] ??
+        txn['check_out_at'] ??
+        txn['checkOutAt'];
+    final checkOutAt = checkOutRaw?.toString().trim();
+
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(localId))).write(
+      TicketsCompanion(
+        syncStatus: const Value('synced'),
+        status: statusUpdate != null ? Value(statusUpdate) : const Value.absent(),
+        checkOutAt: checkOutAt != null && checkOutAt.isNotEmpty
+            ? Value(checkOutAt)
+            : const Value.absent(),
+      ),
+    );
+    await _markLocalCheckoutFullySynced(localId);
+  }
+
+  Future<bool> _tryReconcileBatchCheckoutConflict(
+    _BatchCheckInEntry entry,
+    BatchCheckInResultItem result,
+  ) async {
+    if (result.error?.isCheckoutReconcileConflict != true) return false;
+    final localId = entry.row.recordId.trim();
+    if (localId.isEmpty) return false;
+
+    final serverId = result.serverTransactionId?.trim() ?? '';
+    if (serverId.isNotEmpty) {
+      await updateServerTicketId(localId, serverId);
+    }
+
+    await _markLocalCheckoutFullySynced(localId);
+    ValetLog.info(
+      'TicketService.syncPendingCheckoutsBatch',
+      'reconciled already-checked-out ticket=$localId',
+    );
+    return true;
   }
 
   Future<void> _markSyncQueueSyncedById(String queueId) async {
@@ -857,7 +1435,9 @@ WHERE t.sync_status = 'pending'
 
     if (isExpress) {
       await (_db.update(_db.tickets)..where((t) => t.id.equals(localId))).write(
-        const TicketsCompanion(syncStatus: Value('synced')),
+        TicketsCompanion(
+          syncStatus: Value(await _resolvedSyncStatusForTicket(localId)),
+        ),
       );
       return;
     }
@@ -869,6 +1449,10 @@ WHERE t.sync_status = 'pending'
     final voidMeta = _voidAuditCompanion(txn);
     final voidStatus = _resolveVoidStatus(txn);
     final queuedSlotId = body['slot_id']?.toString().trim() ?? '';
+    final serverCheckIn = CheckInTimeResolution.resolveWallIsoFromTransaction(
+      txn,
+      localFallback: entry.ticket?.checkInAt,
+    );
     await (_db.update(_db.tickets)..where((t) => t.id.equals(localId))).write(
       TicketsCompanion(
         syncStatus: const Value('synced'),
@@ -882,8 +1466,46 @@ WHERE t.sync_status = 'pending'
             ? Value(queuedSlotId)
             : const Value.absent(),
         vrNo: vrNo.isNotEmpty ? Value(vrNo) : const Value.absent(),
+        checkInAt: Value(PhilippineTime.normalizeCheckInStorage(serverCheckIn)),
       ),
     );
+  }
+
+  /// Server `time_in` / `created_at` (UTC) for checkout batch clamping.
+  Future<String?> _serverTimeInInstantForCheckout({
+    required String token,
+    String? serverTicketId,
+  }) async {
+    final serverId = serverTicketId?.trim() ?? '';
+    if (serverId.isEmpty) return null;
+    try {
+      final txn = await _transactionsApi.getTransactionById(
+        token: token,
+        id: serverId,
+      );
+      for (final key in const [
+        'time_in',
+        'check_in_at',
+        'checkInAt',
+        'created_at',
+        'createdAt',
+      ]) {
+        final raw = txn[key];
+        if (raw == null) continue;
+        final s = raw.toString().trim();
+        if (s.isEmpty) continue;
+        final parsed = DateTime.tryParse(s)?.toUtc();
+        if (parsed != null) return parsed.toIso8601String();
+      }
+    } catch (e, st) {
+      ValetLog.error(
+        'TicketService._serverTimeInInstantForCheckout',
+        'GET $serverId failed — using local check-in only',
+        e,
+        st,
+      );
+    }
+    return null;
   }
 
   Future<bool> _tryLinkBatchExistingTransaction(
@@ -1497,6 +2119,31 @@ LIMIT 1
     }
   }
 
+  /// Most recent ticket for [plate] regardless of status (offline lookup).
+  Future<Ticket?> ticketByPlateAnyStatus(String plate) async {
+    final normalized = plate
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '')
+        .toUpperCase();
+    if (normalized.isEmpty) return null;
+    final row = await _db
+        .customSelect(
+          '''
+SELECT id FROM tickets
+WHERE status != 'draft'
+  AND REPLACE(UPPER(plate_number), ' ', '') = ?
+ORDER BY check_in_at DESC
+LIMIT 1
+''',
+          variables: <Variable<Object>>[Variable.withString(normalized)],
+          readsFrom: {_db.tickets},
+        )
+        .getSingleOrNull();
+    if (row == null) return null;
+    final tid = row.read<String>('id');
+    return ticketById(tid);
+  }
+
   /// Most recent open ticket for [plate] (spaces ignored, case-insensitive).
   Future<Ticket?> activeTicketByPlate(String plate) async {
     final normalized = plate
@@ -1887,11 +2534,11 @@ WHERE shift_id = ? AND status = 'completed'
         .get();
   }
 
-  /// All tickets attributed to [shiftId] (any status), newest check-in first.
+  /// All non-draft tickets for [shiftId], newest check-in first.
   Future<List<Ticket>> ticketsForShift(String shiftId) {
     final sid = shiftId.trim();
     return (_db.select(_db.tickets)
-          ..where((t) => t.shiftId.equals(sid))
+          ..where((t) => t.shiftId.equals(sid) & t.status.equals('draft').not())
           ..orderBy([(t) => OrderingTerm.desc(t.checkInAt)]))
         .get();
   }
@@ -1908,7 +2555,8 @@ WHERE shift_id = ? AND status = 'completed'
           ..where(
             (t) =>
                 t.checkInAt.isBiggerOrEqualValue(from) &
-                t.checkInAt.isSmallerThanValue(to),
+                t.checkInAt.isSmallerThanValue(to) &
+                t.status.equals('draft').not(),
           )
           ..orderBy([(t) => OrderingTerm.desc(t.checkInAt)])
           ..limit(limit))
@@ -2738,18 +3386,7 @@ WHERE shift_id = ? AND status = 'completed'
   }
 
   static String _parseCheckInTime(Map<String, dynamic> json) {
-    final raw =
-        json['time_in'] ??
-        json['check_in_time'] ??
-        json['checkInTime'] ??
-        json['check_in_at'] ??
-        json['checkInAt'] ??
-        json['created_at'] ??
-        json['createdAt'];
-    if (raw == null) return PhilippineTime.iso8601Now();
-    final s = raw.toString().trim();
-    if (s.isEmpty) return PhilippineTime.iso8601Now();
-    return PhilippineTime.normalizeCheckInStorage(s);
+    return CheckInTimeResolution.resolveWallIsoFromTransaction(json);
   }
 
   static String? _parseCheckOutTime(Map<String, dynamic> json) {

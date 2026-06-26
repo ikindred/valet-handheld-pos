@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/printing/check_in_receipt_data.dart';
 import '../../../core/printing/print_flow.dart';
 import '../../../core/printing/receipt_print_format.dart';
@@ -470,9 +471,8 @@ class _PrintReceiptPanel extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(height: 16),
-        // TODO: Remove temporary skip-print bypass before production release.
-        if (!loadingReceipt && !allDone)
+        if (AppConfig.debugToolsEnabled && !loadingReceipt && !allDone) ...[
+          const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: SizedBox(
@@ -495,6 +495,8 @@ class _PrintReceiptPanel extends StatelessWidget {
               ),
             ),
           ),
+        ] else
+          const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
           height: 52,

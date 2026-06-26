@@ -91,6 +91,7 @@ final class DashboardRecentTx extends Equatable {
     this.vrNo = '—',
     this.hasPendingVoid = false,
     this.isVoided = false,
+    this.isSynced = true,
   });
 
   final String ticketId;
@@ -116,6 +117,9 @@ final class DashboardRecentTx extends Equatable {
 
   /// True when the transaction is voided.
   final bool isVoided;
+
+  /// False when the row is still queued for server upload.
+  final bool isSynced;
 
   factory DashboardRecentTx.fromSummaryRow(DashboardRecentRow row) {
     return DashboardRecentTx(
@@ -201,6 +205,7 @@ final class DashboardRecentTx extends Equatable {
         vrNo,
         hasPendingVoid,
         isVoided,
+        isSynced,
       ];
 }
 
@@ -237,6 +242,11 @@ class DashboardCubit extends Cubit<DashboardState> {
         return;
       }
 
+      final openShift = await _auth.getOpenShiftForUser(session.userId);
+      if (openShift != null) {
+        await _tickets.purgeOrphanedDrafts(openShift.id);
+      }
+
       final token = session.authToken?.trim() ?? '';
       final hasInternet = await InternetReachability.hasInternet();
 
@@ -250,11 +260,27 @@ class DashboardCubit extends Cubit<DashboardState> {
             final areaSlots = await _slotCountsFromArea();
             final serverUserId =
                 await _auth.serverUserIdForLocalAccount(session.userId);
+            List<DashboardRecentTx> localRecent = const [];
+            int? localVehiclesIn;
+            int? localCheckedOut;
+            if (openShift != null) {
+              final shiftId = openShift.id;
+              localVehiclesIn =
+                  await _tickets.countActiveTicketsForShift(shiftId);
+              localCheckedOut =
+                  await _tickets.countCompletedCheckoutsForShift(shiftId);
+              final rawRecent =
+                  await _tickets.recentTicketsForShift(shiftId, limit: 20);
+              localRecent = rawRecent.map(_recentFromTicket).toList();
+            }
             emit(_readyFromSummary(
               summary,
               checkInsLastHour,
               areaSlots: areaSlots,
               serverUserId: serverUserId,
+              localRecent: localRecent,
+              localVehiclesIn: localVehiclesIn,
+              localCheckedOut: localCheckedOut,
             ));
             return;
           }
@@ -279,6 +305,9 @@ class DashboardCubit extends Cubit<DashboardState> {
     int checkInsLastHour, {
     AreaSlotCounts? areaSlots,
     String? serverUserId,
+    List<DashboardRecentTx> localRecent = const [],
+    int? localVehiclesIn,
+    int? localCheckedOut,
   }) {
     var remaining = summary.remainingCount;
     var total = summary.totalSlots;
@@ -293,18 +322,120 @@ class DashboardCubit extends Cubit<DashboardState> {
               r.cashierId == serverUserId,
         )
         .toList();
+    final serverRecent =
+        filteredRecent.map((r) => DashboardRecentTx.fromSummaryRecent(r)).toList();
+    final vehiclesIn = localVehiclesIn == null
+        ? summary.totalVehiclesIn
+        : summary.totalVehiclesIn > localVehiclesIn
+            ? summary.totalVehiclesIn
+            : localVehiclesIn;
+    final checkedOut = localCheckedOut == null
+        ? summary.checkedOutTotal
+        : summary.checkedOutTotal > localCheckedOut
+            ? summary.checkedOutTotal
+            : localCheckedOut;
     return DashboardReady(
-      vehiclesIn: summary.totalVehiclesIn,
-      checkedOut: summary.checkedOutTotal,
+      vehiclesIn: vehiclesIn,
+      checkedOut: checkedOut,
       checkInsLastHour: checkInsLastHour,
       remainingSlots: remaining,
       totalSlots: total,
       recent: _sortRecentParkedFirst(
-        filteredRecent
-            .map((r) => DashboardRecentTx.fromSummaryRecent(r))
-            .toList(),
+        _mergeDashboardRecentWithLocal(
+          server: serverRecent,
+          local: localRecent,
+        ),
       ),
     );
+  }
+
+  static List<DashboardRecentTx> _mergeDashboardRecentWithLocal({
+    required List<DashboardRecentTx> server,
+    required List<DashboardRecentTx> local,
+    int limit = 10,
+  }) {
+    bool normEq(String? a, String? b) {
+      final x = a?.trim().toLowerCase() ?? '';
+      final y = b?.trim().toLowerCase() ?? '';
+      return x.isNotEmpty && x == y;
+    }
+
+    bool rowsMatch(DashboardRecentTx localRow, DashboardRecentTx serverRow) {
+      if (normEq(localRow.ticketNumber, serverRow.ticketNumber)) return true;
+      if (normEq(localRow.ticketId, serverRow.ticketNumber)) return true;
+      if (normEq(localRow.ticketNumber, serverRow.ticketId)) return true;
+      if (normEq(localRow.ticketId, serverRow.ticketId)) return true;
+      return false;
+    }
+
+    final extras = <DashboardRecentTx>[];
+    final suppressServerKeys = <String>{};
+    for (final row in local) {
+      DashboardRecentTx? serverRow;
+      for (final s in server) {
+        if (rowsMatch(row, s)) {
+          serverRow = s;
+          break;
+        }
+      }
+
+      if (row.isSynced) {
+        // Keep shift tickets visible until server summary includes them.
+        if (serverRow == null) {
+          extras.add(row);
+          continue;
+        }
+        // Server summary can lag after checkout sync — prefer local checkout.
+        if (row.status == DashboardRecentStatus.checkedOut &&
+            serverRow.status == DashboardRecentStatus.parked) {
+          extras.add(row);
+          for (final key in [row.ticketId, row.ticketNumber]) {
+            final trimmed = key.trim();
+            if (trimmed.isNotEmpty) suppressServerKeys.add(trimmed);
+          }
+        }
+        continue;
+      }
+
+      // Server already checked out — drop stale unsynced local overlay.
+      if (serverRow != null &&
+          serverRow.status == DashboardRecentStatus.checkedOut) {
+        continue;
+      }
+
+      if (serverRow == null) {
+        extras.add(row);
+        continue;
+      }
+      if (row.status == DashboardRecentStatus.checkedOut &&
+          serverRow.status == DashboardRecentStatus.parked) {
+        extras.add(row);
+        for (final key in [row.ticketId, row.ticketNumber]) {
+          final trimmed = key.trim();
+          if (trimmed.isNotEmpty) suppressServerKeys.add(trimmed);
+        }
+      }
+    }
+    bool suppressServer(DashboardRecentTx s) {
+      for (final key in suppressServerKeys) {
+        if (normEq(key, s.ticketId) || normEq(key, s.ticketNumber)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    final merged = [
+      ...extras,
+      ...server.where((s) => !suppressServer(s)),
+    ];
+    merged.sort((a, b) {
+      final at = a.timeIn ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bt = b.timeIn ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bt.compareTo(at);
+    });
+    if (merged.length <= limit) return merged;
+    return merged.sublist(0, limit);
   }
 
   /// Parked rows first; checked-out order preserved within each group.
@@ -444,6 +575,7 @@ class DashboardCubit extends Cubit<DashboardState> {
         vrNo: vrNo,
         hasPendingVoid: t.pendingVoidRequest,
         isVoided: t.status == 'void',
+        isSynced: t.syncStatus == 'synced',
       );
     }
     return DashboardRecentTx(
@@ -462,6 +594,7 @@ class DashboardCubit extends Cubit<DashboardState> {
       vrNo: vrNo,
       hasPendingVoid: t.pendingVoidRequest,
       isVoided: t.status == 'void',
+      isSynced: t.syncStatus == 'synced',
     );
   }
 

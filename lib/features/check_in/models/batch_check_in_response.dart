@@ -1,4 +1,4 @@
-/// Per-item outcome from `POST /transactions/check-in` batch JSON API.
+/// Per-item outcome from batch sync APIs (`check-in` / `check-out`).
 class BatchCheckInResultItem {
   const BatchCheckInResultItem({
     required this.index,
@@ -20,7 +20,10 @@ class BatchCheckInResultItem {
   final Map<String, dynamic>? transaction;
   final BatchCheckInResultError? error;
 
-  bool get isSuccess => status.toLowerCase() == 'success';
+  bool get isSuccess {
+    final s = status.toLowerCase();
+    return s == 'success';
+  }
 
   bool get isFailed => !isSuccess;
 
@@ -35,7 +38,11 @@ class BatchCheckInResultItem {
       error = BatchCheckInResultError.fromJson(Map<String, dynamic>.from(errRaw));
     }
 
-    final ticketNumber = json['ticket_number']?.toString() ?? '';
+    var ticketNumber = json['ticket_number']?.toString().trim() ?? '';
+    if (ticketNumber.isEmpty) {
+      final idField = json['id']?.toString().trim() ?? '';
+      if (idField.startsWith('TKT-')) ticketNumber = idField;
+    }
     var plateNumber = json['plate_number']?.toString() ?? '';
     var vrNo = json['vr_no']?.toString() ?? '';
     if (transaction != null) {
@@ -125,7 +132,7 @@ class BatchCheckInResultError {
     return BatchCheckInResultError(
       statusCode: codeRaw is num ? codeRaw.toInt() : int.tryParse('$codeRaw'),
       code: json['code']?.toString(),
-      message: json['message']?.toString() ?? 'Check-in failed',
+      message: json['message']?.toString() ?? 'Request failed',
     );
   }
 
@@ -141,9 +148,20 @@ class BatchCheckInResultError {
           message.toLowerCase().contains('ticket number') &&
           message.toLowerCase().contains('already exists'));
 
+  bool get isAlreadyCheckedOutConflict =>
+      code == 'ALREADY_CHECKED_OUT' ||
+      (statusCode == 409 &&
+          message.toLowerCase().contains('already') &&
+          (message.toLowerCase().contains('completed') ||
+              message.toLowerCase().contains('checked out')));
+
   /// Server already has this check-in — link local row instead of retrying POST.
   bool get isAlreadyOnServerConflict =>
       isVrConflict || isTicketNumberConflict;
+
+  /// Checkout already finalized on server — reconcile as synced.
+  bool get isCheckoutReconcileConflict =>
+      isAlreadyCheckedOutConflict;
 }
 
 class BatchCheckInSummary {
@@ -241,6 +259,47 @@ class BatchCheckInResponse {
             'vr_no': vrNo,
             if (plate.isNotEmpty)
               'vehicle': <String, dynamic>{'plate_number': plate},
+          },
+        ),
+      );
+    }
+    return BatchCheckInResponse(
+      results: results,
+      summary: BatchCheckInSummary(
+        total: results.length,
+        succeeded: results.length,
+        failed: 0,
+      ),
+    );
+  }
+
+  /// Stub success for batch checkout sync (offline / tests).
+  factory BatchCheckInResponse.stubForCheckOuts({
+    required List<Map<String, dynamic>> checkOuts,
+    required List<String> localTicketNumbers,
+  }) {
+    assert(checkOuts.length == localTicketNumbers.length);
+    final results = <BatchCheckInResultItem>[];
+    for (var i = 0; i < checkOuts.length; i++) {
+      final item = checkOuts[i];
+      final ticketNumber = localTicketNumbers[i].trim().isNotEmpty
+          ? localTicketNumbers[i].trim()
+          : 'TKT-STUB-$i';
+      final id = item['id']?.toString() ?? '';
+      const serverId = '00000000-0000-4000-8000-000000000098';
+      final resolvedServerId = id.startsWith('TKT-') ? serverId : id;
+      results.add(
+        BatchCheckInResultItem(
+          index: i,
+          status: 'success',
+          ticketNumber: ticketNumber,
+          plateNumber: '',
+          vrNo: '',
+          serverTransactionId:
+              resolvedServerId.isNotEmpty ? resolvedServerId : serverId,
+          transaction: <String, dynamic>{
+            'id': resolvedServerId.isNotEmpty ? resolvedServerId : serverId,
+            'status': item['ticket_lost'] == true ? 'lost' : 'completed',
           },
         ),
       );

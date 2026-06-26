@@ -7,7 +7,7 @@ abstract final class OfflineDataBannerTokens {
   static const Color foreground = Color(0xFFE8831A);
 }
 
-/// Thin banner: offline vs server fetch error (mutually styled; may stack if both apply).
+/// Thin banner: offline vs server fetch error (one line when offline).
 class OfflineDataBanner extends StatelessWidget {
   const OfflineDataBanner({
     super.key,
@@ -27,26 +27,22 @@ class OfflineDataBanner extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final children = <Widget>[];
     if (isOffline) {
-      children.add(
-        _BannerLine(
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: _BannerLine(
           icon: LucideIcons.wifiOff,
           text: "You're offline — showing local records only",
         ),
       );
     }
-    if (errText != null && errText.isNotEmpty) {
-      if (children.isNotEmpty) {
-        children.add(const SizedBox(height: 8));
-      }
-      children.add(
-        _BannerLine(
-          icon: LucideIcons.alertTriangle,
-          text: errText,
-        ),
-      );
-    }
+
+    final children = <Widget>[
+      _BannerLine(
+        icon: LucideIcons.alertTriangle,
+        text: errText!,
+      ),
+    ];
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),

@@ -233,6 +233,14 @@ class CheckInCubit extends Cubit<CheckInState> {
 
   bool _draftReservationInFlight = false;
   Completer<void>? _draftReservationCompleter;
+  bool _exitingToDashboard = false;
+
+  /// True while navigating away after print/skip — suppresses step guard redirects.
+  bool get isExitingToDashboard => _exitingToDashboard;
+
+  void beginExitToDashboard() => _exitingToDashboard = true;
+
+  void endExitToDashboard() => _exitingToDashboard = false;
 
   int get nextPartToPrint {
     final next = state.receiptParts.firstWhere(
@@ -300,7 +308,7 @@ class CheckInCubit extends Cubit<CheckInState> {
 
   /// Clears session state and awaits a new draft ticket id before check-in UI opens.
   Future<bool> prepareNewCheckInSession() async {
-    resetSession();
+    await abandonCheckInSession(applyDemoPrefill: CheckInDemoDefaults.enabled);
     return _reserveDraftWithRetry();
   }
 
@@ -678,16 +686,27 @@ class CheckInCubit extends Cubit<CheckInState> {
           },
       ]);
 
-  void resetSession({bool applyDemoPrefill = true}) {
+  /// Deletes the reserved draft row and clears wizard state (cancel / leave flow).
+  Future<void> abandonCheckInSession({bool applyDemoPrefill = false}) async {
     final id = state.ticketNumber.trim();
-    if (id.isNotEmpty) {
-      unawaited(_ticketService?.deleteDraftTicket(id) ?? Future.value());
+    final ts = _ticketService;
+    if (id.isNotEmpty && ts != null) {
+      await ts.deleteDraftTicket(id);
     }
     emit(
       applyDemoPrefill && CheckInDemoDefaults.enabled
           ? CheckInDemoDefaults.initial()
           : const CheckInState(receiptParts: initialReceiptParts),
     );
+  }
+
+  /// Clears wizard state after a successful check-in (does not delete the ticket).
+  void resetWizardAfterCompletedCheckIn() {
+    emit(const CheckInState(receiptParts: initialReceiptParts));
+  }
+
+  void resetSession({bool applyDemoPrefill = true}) {
+    unawaited(abandonCheckInSession(applyDemoPrefill: applyDemoPrefill));
   }
 
   void updateCustomerStep({

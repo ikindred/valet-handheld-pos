@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/sync/local_sync_notifier.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/branch_config_service.dart';
 import '../../../shared/widgets/branch_rates_slots_header_actions.dart';
@@ -15,6 +16,8 @@ import '../../check_in/state/check_in_cubit.dart';
 import '../../reports/domain/reports_format.dart';
 import '../../reports/domain/reports_models.dart';
 import '../../reports/presentation/widgets/reports_widgets.dart';
+import '../../sync/state/sync_cubit.dart';
+import '../../sync/state/sync_state.dart';
 import '../state/dashboard_cubit.dart';
 import 'widgets/dashboard_widgets.dart';
 
@@ -35,68 +38,89 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  LocalSyncNotifier? _localSyncNotifier;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _localSyncNotifier = context.read<LocalSyncNotifier>();
+      _localSyncNotifier!.addListener(_onLocalSyncChanged);
       unawaited(context.read<BranchConfigService>().syncFromServerForDeviceBranch());
       unawaited(context.read<DashboardCubit>().refresh());
     });
   }
 
   @override
+  void dispose() {
+    _localSyncNotifier?.removeListener(_onLocalSyncChanged);
+    super.dispose();
+  }
+
+  void _onLocalSyncChanged() {
+    if (!mounted) return;
+    unawaited(context.read<DashboardCubit>().refresh());
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return BlocListener<AuthBloc, AuthState>(
-      listenWhen: (prev, next) {
-        if (prev is AuthAuthenticated && next is AuthAuthenticated) {
-          return prev.cashSessionStatus != next.cashSessionStatus ||
-              prev.userId != next.userId;
-        }
-        return prev.runtimeType != next.runtimeType;
-      },
+    return BlocListener<SyncCubit, SyncState>(
+      listenWhen: (_, current) => current is SyncComplete,
       listener: (context, _) {
-        final c = context.read<DashboardCubit>();
-        if (c.state is! DashboardInitial) {
-          unawaited(c.refresh());
-        }
+        unawaited(context.read<DashboardCubit>().refresh());
       },
-      child: Scaffold(
-        backgroundColor: null,
-        body: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const DashboardLeftRail(),
-            Expanded(
-              child: SafeArea(
-                left: false,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final wide = constraints.maxWidth >= 720;
-                    return BlocBuilder<DashboardCubit, DashboardState>(
-                      builder: (context, dash) {
-                        return SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              const _DashboardHeaderRow(),
-                              const SizedBox(height: 12),
-                              _StatsRow(wide: wide, dashboard: dash),
-                              const SizedBox(height: 12),
-                              _ActionRow(wide: wide),
-                              const SizedBox(height: 12),
-                              _RecentTransactionsCard(dashboard: dash),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  },
+      child: BlocListener<AuthBloc, AuthState>(
+        listenWhen: (prev, next) {
+          if (prev is AuthAuthenticated && next is AuthAuthenticated) {
+            return prev.cashSessionStatus != next.cashSessionStatus ||
+                prev.userId != next.userId;
+          }
+          return prev.runtimeType != next.runtimeType;
+        },
+        listener: (context, _) {
+          final c = context.read<DashboardCubit>();
+          if (c.state is! DashboardInitial) {
+            unawaited(c.refresh());
+          }
+        },
+        child: Scaffold(
+          backgroundColor: null,
+          body: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const DashboardLeftRail(),
+              Expanded(
+                child: SafeArea(
+                  left: false,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final wide = constraints.maxWidth >= 720;
+                      return BlocBuilder<DashboardCubit, DashboardState>(
+                        builder: (context, dash) {
+                          return SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const _DashboardHeaderRow(),
+                                const SizedBox(height: 12),
+                                _StatsRow(wide: wide, dashboard: dash),
+                                const SizedBox(height: 12),
+                                _ActionRow(wide: wide),
+                                const SizedBox(height: 12),
+                                _RecentTransactionsCard(dashboard: dash),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -432,6 +456,7 @@ class _RecentTransactionsCardState extends State<_RecentTransactionsCard> {
       hasPendingVoid: tx.hasPendingVoid,
       isVoided: tx.isVoided,
       status: reportsStatus,
+      isSynced: tx.isSynced,
     );
   }
 

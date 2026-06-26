@@ -130,7 +130,7 @@ class _CheckInCustomerValetScreenState
           label: 'FULL NAME',
           child: CheckInTextField(
             controller: _fullNameCtrl,
-            hint: 'Juan dela Cruz',
+            hint: 'Enter customer name',
           ),
         ),
         const SizedBox(height: CheckInCompactTokens.fieldGap),
@@ -139,7 +139,7 @@ class _CheckInCustomerValetScreenState
           child: CheckInTextField(
             controller: _contactCtrl,
             keyboardType: TextInputType.phone,
-            hint: '09171234567',
+            hint: '09XX XXX XXXX',
           ),
         ),
         const SizedBox(height: CheckInCompactTokens.blockGap),
@@ -165,7 +165,7 @@ class _CheckInCustomerValetScreenState
           label: 'DRIVER IN (OPTIONAL)',
           child: CheckInTextField(
             controller: _valetCtrl,
-            hint: selfPark ? 'Not applicable for self-park' : 'Carlos Mendoza',
+            hint: selfPark ? 'Not applicable for self-park' : 'Enter driver name',
             enabled: !selfPark,
           ),
         );
@@ -200,7 +200,7 @@ class _CheckInCustomerValetScreenState
           label: 'FULL NAME',
           child: CheckInTextField(
             controller: _fullNameCtrl,
-            hint: 'Juan dela Cruz',
+            hint: 'Enter customer name',
           ),
         ),
         const SizedBox(height: CheckInCompactTokens.fieldGap),
@@ -209,7 +209,7 @@ class _CheckInCustomerValetScreenState
           child: CheckInTextField(
             controller: _contactCtrl,
             keyboardType: TextInputType.phone,
-            hint: '09171234567',
+            hint: '09XX XXX XXXX',
           ),
         ),
         const SizedBox(height: CheckInCompactTokens.blockGap),

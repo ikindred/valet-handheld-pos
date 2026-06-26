@@ -102,4 +102,31 @@ class PhilippineTime {
     final elapsed = (clock ?? now()).difference(checkIn);
     return elapsed.isNegative ? Duration.zero : elapsed;
   }
+
+  /// Manila wall components → UTC instant (inverse of [fromUtc]).
+  static DateTime wallComponentsToUtc(DateTime phWall) {
+    return DateTime.utc(
+      phWall.year,
+      phWall.month,
+      phWall.day,
+      phWall.hour,
+      phWall.minute,
+      phWall.second,
+      phWall.millisecond,
+    ).subtract(_utcOffset);
+  }
+
+  /// Epoch seconds for PH midnight on the check-in calendar day (API `start_date`).
+  static int parkingDateUnixSeconds(DateTime phWall) {
+    return DateTime.utc(phWall.year, phWall.month, phWall.day)
+        .subtract(_utcOffset)
+        .millisecondsSinceEpoch ~/
+        1000;
+  }
+
+  static int? parkingDateUnixFromCheckInRaw(String? checkInRaw) {
+    final s = checkInRaw?.trim() ?? '';
+    if (s.isEmpty) return null;
+    return parkingDateUnixSeconds(fromApiIso(s));
+  }
 }

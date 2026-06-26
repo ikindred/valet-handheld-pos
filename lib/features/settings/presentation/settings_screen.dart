@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import '../../../core/config/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -227,7 +227,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Future<void> _confirmClearLocalTransactions() async {
-    if (_clearingLocalTransactions) return;
+    if (!AppConfig.debugToolsEnabled || _clearingLocalTransactions) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) {
@@ -422,7 +422,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                             onTestPrint: _testPrint,
                             onReconnect: _reconnectPrinter,
                           ),
-                        if (kDebugMode) ...[
+                        if (AppConfig.debugToolsEnabled) ...[
                           const SizedBox(height: 10),
                           _DebugToolsCard(
                             clearing: _clearingLocalTransactions,

@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/connectivity/internet_reachability.dart';
 import '../../../core/pricing/transaction_payment_calculator.dart';
 import '../../../core/formatting/valet_type_format.dart';
+import '../../../core/time/check_in_time_resolution.dart';
 import '../../../core/time/philippine_time.dart';
 import '../../../core/formatting/plate_number.dart';
 import '../../../core/logging/valet_log.dart';
@@ -462,6 +463,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         flatBlockHours: previewFlatHours > 0
             ? previewFlatHours
             : state.flatBlockHours,
+        clearCheckoutBlockMessage: true,
       ),
     );
     if (hasPreviewRates) {
@@ -477,6 +479,169 @@ class CheckOutCubit extends Cubit<CheckOutState> {
     } else {
       unawaited(hydrateRatesFromDrift());
     }
+  }
+
+  Future<Ticket?> _resolveOnlinePreviewTicket({
+    required CheckoutPreviewResponse preview,
+    required String lookupKey,
+    required String rawCode,
+  }) async {
+    final ticketNumber = preview.ticket.ticketNumber.isNotEmpty
+        ? preview.ticket.ticketNumber
+        : lookupKey;
+    final drift = await _tickets.ticketById(ticketNumber);
+    if (drift != null) return _mergeTicketWithPreview(drift, preview);
+
+    final active =
+        await _tickets.activeTicketByTicketNumber(ticketNumber) ??
+        await _tickets.activeTicketByTicketNumber(lookupKey) ??
+        await _tickets.activeTicketByTicketNumber(rawCode);
+    if (active != null) return _mergeTicketWithPreview(active, preview);
+    return _minimalTicketFromPreview(preview);
+  }
+
+  bool _serverPreviewStillCheckedIn(CheckoutPreviewResponse? preview) {
+    if (preview == null) return false;
+    final txn = preview.transactionJson;
+    if (txn != null) {
+      final status = txn['status']?.toString().trim().toLowerCase() ?? '';
+      if (status == 'completed' || status == 'lost' || status == 'void') {
+        return false;
+      }
+      final timeOut = txn['time_out'] ?? txn['timeOut'];
+      if (timeOut != null && '$timeOut'.trim().isNotEmpty) return false;
+      return true;
+    }
+    final out = preview.ticket.timeOut?.trim() ?? '';
+    return out.isEmpty;
+  }
+
+  String? _offlineLookupScanError(Ticket ticket) {
+    if (ticket.status == 'completed' || ticket.status == 'lost') {
+      return 'This ticket is already checked out.';
+    }
+    return null;
+  }
+
+  Future<String?> _tryFinalizePendingLocalCheckout({
+    required BuildContext context,
+    required Ticket fresh,
+    required double tendered,
+    required double change,
+  }) async {
+    if (fresh.status != 'completed' && fresh.status != 'lost') return null;
+    if (!await _tickets.needsCheckoutServerUpload(fresh)) {
+      return await _finishReceiptAfterLocalCheckoutSync(
+        context: context,
+        ticket: fresh,
+        tendered: tendered,
+        change: change,
+      );
+    }
+
+    final session = await _auth.getActiveSession();
+    final token = session?.authToken;
+    if (token == null || token.isEmpty) {
+      return 'Sign in to sync this checkout to the server.';
+    }
+    if (!await InternetReachability.hasInternet()) {
+      return 'Connect to the internet to sync this checkout to the server.';
+    }
+
+    final synced = await _tickets.retryCheckoutUploadForTicket(fresh.id, token);
+    final updated = await _tickets.ticketById(fresh.id);
+    if (updated == null) {
+      return 'Ticket not found.';
+    }
+    if (synced > 0 || !await _tickets.needsCheckoutServerUpload(updated)) {
+      return _finishReceiptAfterLocalCheckoutSync(
+        context: context,
+        ticket: updated,
+        tendered: tendered,
+        change: change,
+      );
+    }
+    return 'Checkout is saved on this device but could not sync. Try Sync in Settings.';
+  }
+
+  Future<String?> _finishReceiptAfterLocalCheckoutSync({
+    required BuildContext context,
+    required Ticket ticket,
+    required double tendered,
+    required double change,
+  }) async {
+    final preview = state.preview;
+    final total = ticket.fee ?? state.authoritativeTotal ?? 0.0;
+    final timeOutUnix = DateTime.tryParse(ticket.checkOutAt ?? '') != null
+        ? (DateTime.tryParse(ticket.checkOutAt!)!.millisecondsSinceEpoch ~/ 1000)
+        : PhilippineTime.unixSecondsUtc();
+    final breakdown = _breakdownForFinalize(ticket, timeOutUnix);
+    final ratesRow = _ratesResolvedForReceipt();
+    final snap = CheckoutReceiptSnapshot.fromCheckoutFinalize(
+      localTicketId: ticket.id,
+      ticket: ticket,
+      breakdown: breakdown,
+      flatBlockHours: ratesRow.flatBlockHours,
+      totalPesos: total,
+      tendered: tendered,
+      change: change,
+      timeOutUnix: timeOutUnix,
+      invoiceNumber: state.invoiceNumber,
+      branchName: state.branchName,
+      plateNumber: preview?.ticket.plate.isNotEmpty == true
+          ? preview!.ticket.plate
+          : null,
+      vehicleReceiptLine: preview?.ticket.vehicleReceiptLine,
+      slotLine: preview?.ticket.parkingLocationLine.isNotEmpty == true
+          ? preview!.ticket.parkingLocationLine
+          : null,
+      valetIn: state.isSelfPark ? null : (preview?.ticket.valetIn ?? state.driverIn),
+      valetOut: state.isSelfPark ? null : state.driverOut,
+      valetTypeLabel: ValetTypeFormat.labelIfPresent(
+        preview?.valetType ??
+            ValetTypeFormat.fromDriverOutMeta(ticket.driverOut),
+      ),
+      overnightStart: ratesRow.overnightStart,
+      overnightEnd: ratesRow.overnightEnd,
+    );
+
+    emit(
+      state.copyWith(
+        isSubmitting: false,
+        serverTotal: total,
+        receiptTicket: ticket.id,
+        receiptTotalPesos: total,
+        receiptChangePesos: change,
+        receiptSnapshot: snap,
+        clearCheckoutBlockMessage: true,
+      ),
+    );
+    if (context.mounted) {
+      context.go('/check-out/step-5');
+    }
+    return null;
+  }
+
+  String _resolvedCheckInAt({
+    required String local,
+    required CheckoutPreviewResponse preview,
+    String? previewTimeIn,
+  }) {
+    final localTrim = local.trim();
+    if (localTrim.isNotEmpty) return localTrim;
+
+    final txn = preview.transactionJson;
+    final fallback = (previewTimeIn ?? preview.ticket.timeIn).trim();
+    if (txn != null && txn.isNotEmpty) {
+      return CheckInTimeResolution.resolveWallIsoFromTransaction(
+        txn,
+        localFallback: fallback.isEmpty ? null : fallback,
+      );
+    }
+    if (fallback.isNotEmpty) {
+      return PhilippineTime.normalizeCheckInStorage(fallback);
+    }
+    return PhilippineTime.iso8601Now();
   }
 
   Ticket _mergeTicketWithPreview(Ticket base, CheckoutPreviewResponse preview) {
@@ -503,7 +668,10 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       damageMarkers: base.damageMarkers,
       personalBelongings: belongingsJson,
       signaturePng: base.signaturePng,
-      checkInAt: pt.timeIn.isNotEmpty ? pt.timeIn : base.checkInAt,
+      checkInAt: _resolvedCheckInAt(
+        local: base.checkInAt,
+        preview: preview,
+      ),
       checkOutAt: base.checkOutAt,
       fee: base.fee,
       status: base.status,
@@ -551,9 +719,11 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       cellphoneNumber: preview.customerContact ?? '',
       damageMarkers: '[]',
       personalBelongings: jsonEncode(preview.belongings),
-      checkInAt: pt.timeIn.isNotEmpty
-          ? pt.timeIn
-          : DateTime.now().toIso8601String(),
+      checkInAt: _resolvedCheckInAt(
+        local: '',
+        preview: preview,
+        previewTimeIn: pt.timeIn,
+      ),
       status: 'active',
       syncStatus: 'synced',
       createdAt: DateTime.now().toIso8601String(),
@@ -710,15 +880,13 @@ class CheckOutCubit extends Cubit<CheckOutState> {
           final preview = await _fetchCheckoutPreview(lookupKey);
           if (isClosed) return;
 
-          final ticketNumber = preview.ticket.ticketNumber.isNotEmpty
-              ? preview.ticket.ticketNumber
-              : lookupKey;
-          final local =
-              await _tickets.activeTicketByTicketNumber(ticketNumber) ??
-              await _tickets.activeTicketByTicketNumber(lookupKey);
-          final ticket = local != null
-              ? _mergeTicketWithPreview(local, preview)
-              : await _minimalTicketFromPreview(preview);
+          final ticket = await _resolveOnlinePreviewTicket(
+            preview: preview,
+            lookupKey: preview.ticket.ticketNumber.isNotEmpty
+                ? preview.ticket.ticketNumber
+                : lookupKey,
+            rawCode: code,
+          );
           if (ticket == null) {
             emit(
               state.copyWith(
@@ -797,9 +965,22 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       }
 
       final vt =
+          await _tickets.ticketById(lookupKey) ??
+          await _tickets.ticketById(code) ??
           await _tickets.activeTicketByTicketNumber(lookupKey) ??
           await _tickets.activeTicketByTicketNumber(code);
       if (vt != null) {
+        final offlineErr = _offlineLookupScanError(vt);
+        if (offlineErr != null) {
+          emit(
+            state.copyWith(
+              scanError: offlineErr,
+              isLookupBusy: false,
+              isLoadingPreview: false,
+            ),
+          );
+          return;
+        }
         _beginDriftCheckout(vt, previewError: _offlinePreviewMessage);
         return;
       }
@@ -862,13 +1043,11 @@ class CheckOutCubit extends Cubit<CheckOutState> {
           if (preview != null) {
             if (isClosed) return;
             final tn = preview.ticket.ticketNumber;
-            final byTicket = tn.isNotEmpty
-                ? await _tickets.activeTicketByTicketNumber(tn)
-                : null;
-            final base = local ?? byTicket;
-            final ticket = base != null
-                ? _mergeTicketWithPreview(base, preview)
-                : await _minimalTicketFromPreview(preview);
+            final ticket = await _resolveOnlinePreviewTicket(
+              preview: preview,
+              lookupKey: tn.isNotEmpty ? tn : plate,
+              rawCode: plate,
+            );
             if (ticket == null) {
               emit(
                 state.copyWith(
@@ -950,8 +1129,22 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         }
       }
 
-      if (local != null) {
-        _beginDriftCheckout(local, previewError: _offlinePreviewMessage);
+      final drift =
+          await _tickets.ticketByPlateAnyStatus(plate) ??
+          await _tickets.activeTicketByPlate(plate);
+      if (drift != null) {
+        final offlineErr = _offlineLookupScanError(drift);
+        if (offlineErr != null) {
+          emit(
+            state.copyWith(
+              scanError: offlineErr,
+              isLookupBusy: false,
+              isLoadingPreview: false,
+            ),
+          );
+          return;
+        }
+        _beginDriftCheckout(drift, previewError: _offlinePreviewMessage);
         return;
       }
 
@@ -1263,7 +1456,16 @@ class CheckOutCubit extends Cubit<CheckOutState> {
         emit(state.copyWith(isSubmitting: false));
         return 'Ticket not found.';
       }
-      if (fresh.status != 'active') {
+      if (fresh.status != 'active' && !_serverPreviewStillCheckedIn(state.preview)) {
+        final pendingUpload = await _tryFinalizePendingLocalCheckout(
+          context: context,
+          fresh: fresh,
+          tendered: receiptTendered,
+          change: receiptChange,
+        );
+        if (pendingUpload != null) {
+          return pendingUpload;
+        }
         emit(state.copyWith(isSubmitting: false));
         return 'This ticket is no longer active.';
       }

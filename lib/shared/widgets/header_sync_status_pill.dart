@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/sync/local_sync_notifier.dart';
@@ -176,7 +175,7 @@ class _HeaderSyncStatusPillState extends State<HeaderSyncStatusPill>
     if (_pending > 0) {
       return _SyncPillPresentation(
         count: _pending,
-        icon: LucideIcons.refreshCw,
+        icon: LucideIcons.cloudOff,
         color: const Color(0xFFD97706),
         bg: const Color(0xFFFFFBEB),
       );
@@ -214,6 +213,17 @@ class _SyncPillChip extends StatelessWidget {
   final AnimationController spinController;
   final VoidCallback? onTap;
 
+  String _label(_SyncPillPresentation p) {
+    if (p.spinning) return 'Syncing';
+    if (p.icon == LucideIcons.xCircle) {
+      return p.showCount && p.count > 1 ? 'Retry (${p.count})' : 'Retry';
+    }
+    if (p.icon == LucideIcons.checkCircle2) {
+      return p.showCount && p.count > 0 ? 'Synced (${p.count})' : 'Synced';
+    }
+    return p.showCount && p.count > 0 ? 'Sync (${p.count})' : 'Sync';
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = presentation;
@@ -221,36 +231,21 @@ class _SyncPillChip extends StatelessWidget {
     final labelStyle = DashboardStyles.headerPillLabel().copyWith(
       color: p.color,
       fontWeight: FontWeight.w600,
-      letterSpacing: 0.15,
+      letterSpacing: 0.1,
       height: 1,
+      fontSize: 11,
     );
 
     final chip = Container(
-      padding: EdgeInsets.fromLTRB(
-        p.showCount ? 4 : 8,
-        4,
-        10,
-        4,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: p.bg,
         borderRadius: BorderRadius.circular(100),
         border: Border.all(color: borderColor),
-        boxShadow: [
-          BoxShadow(
-            color: p.color.withValues(alpha: 0.10),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (p.showCount) ...[
-            _CountBadge(count: p.count, color: p.color),
-            const SizedBox(width: 7),
-          ],
           _SyncIcon(
             icon: p.icon,
             color: p.color,
@@ -258,7 +253,7 @@ class _SyncPillChip extends StatelessWidget {
             spinController: spinController,
           ),
           const SizedBox(width: 6),
-          Text('Sync', style: labelStyle),
+          Text(_label(p), style: labelStyle),
         ],
       ),
     );
@@ -273,37 +268,6 @@ class _SyncPillChip extends StatelessWidget {
         splashColor: p.color.withValues(alpha: 0.12),
         highlightColor: p.color.withValues(alpha: 0.06),
         child: chip,
-      ),
-    );
-  }
-}
-
-class _CountBadge extends StatelessWidget {
-  const _CountBadge({required this.count, required this.color});
-
-  final int count;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
-      padding: const EdgeInsets.symmetric(horizontal: 7),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        '$count',
-        style: GoogleFonts.poppins(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: color,
-          height: 1,
-          fontFeatures: const [FontFeature.tabularFigures()],
-        ),
       ),
     );
   }

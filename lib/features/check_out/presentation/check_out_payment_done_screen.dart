@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/formatting/peso_currency.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/time/philippine_time.dart';
@@ -29,6 +30,7 @@ class CheckOutPaymentDoneScreen extends StatefulWidget {
 
 class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
   bool _printing = false;
+  bool _receiptPrinted = false;
 
   static const _plateBlue = Color(0xFF0068D3);
   static const _green = Color(0xFF27AE60);
@@ -67,8 +69,13 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
       isLostTicket: state.isLostTicket,
       lostTicketFee: state.lostTicketFeePesos,
     );
-    await printCheckOutFromContext(context, data: data);
-    if (mounted) setState(() => _printing = false);
+    final printed = await printCheckOutFromContext(context, data: data);
+    if (mounted) {
+      setState(() {
+        _printing = false;
+        if (printed) _receiptPrinted = true;
+      });
+    }
   }
 
   void _releaseDone(BuildContext context) {
@@ -120,28 +127,62 @@ class _CheckOutPaymentDoneScreenState extends State<CheckOutPaymentDoneScreen> {
             ? 'THANK YOU FOR USING VALET MASTER'
             : 'THANK YOU FOR USING VALET MASTER · $branch';
 
+        final canFinish = _receiptPrinted || AppConfig.debugToolsEnabled;
+
         return CheckOutStepBody(
-          footer: Align(
-            alignment: Alignment.centerRight,
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () => _releaseDone(context),
-                style: FilledButton.styleFrom(
-                  minimumSize: Size(0, CheckInCompactTokens.footerButtonHeight),
-                  backgroundColor: _orange,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+          footer: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (AppConfig.debugToolsEnabled && !_receiptPrinted)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: OutlinedButton(
+                      onPressed: () => _releaseDone(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppThemeColors.of(context).textPrimary,
+                        side: BorderSide(
+                          color: AppThemeColors.of(context).cardBorder,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        textStyle: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      child: const Text('Skip printing'),
+                    ),
                   ),
                 ),
-                child: Text(
-                  'Release Vehicle & Done',
-                  style: CheckInCompactTokens.footerLabel().copyWith(
-                    color: Colors.white,
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: canFinish ? () => _releaseDone(context) : null,
+                  style: FilledButton.styleFrom(
+                    minimumSize:
+                        Size(0, CheckInCompactTokens.footerButtonHeight),
+                    backgroundColor: _orange,
+                    disabledBackgroundColor:
+                        AppThemeColors.of(context).cardBorder,
+                    disabledForegroundColor:
+                        AppThemeColors.of(context).textSecondary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    'Release Vehicle & Done',
+                    style: CheckInCompactTokens.footerLabel().copyWith(
+                      color: canFinish ? Colors.white : null,
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
           child: LayoutBuilder(
             builder: (context, c) {

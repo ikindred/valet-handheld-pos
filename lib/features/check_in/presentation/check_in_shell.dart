@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -62,14 +64,27 @@ class _CheckInShellState extends State<CheckInShell> {
 
   void _applyStepGuard() {
     if (!mounted) return;
+    final cubit = context.read<CheckInCubit>();
+    if (cubit.isExitingToDashboard) return;
     final path = GoRouterState.of(context).uri.path;
     if (!path.startsWith('/check-in')) return;
     final redirect = CheckInValidation.forwardGuardPath(
       path,
-      context.read<CheckInCubit>().state,
+      cubit.state,
     );
     if (redirect == null || redirect == path) return;
     context.go(redirect);
+  }
+
+  @override
+  void deactivate() {
+    super.deactivate();
+    try {
+      final cubit = context.read<CheckInCubit>();
+      if (cubit.isExitingToDashboard) return;
+      if (CheckInValidation.isCheckInSubmitted(cubit.state)) return;
+      unawaited(cubit.abandonCheckInSession());
+    } catch (_) {}
   }
 
   @override

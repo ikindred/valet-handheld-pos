@@ -39,13 +39,18 @@ class AppConfig {
 
   static String get devSeedArea => (_env('DEV_SEED_AREA') ?? 'Area B').trim();
 
-  /// Pre-fill all check-in fields for faster QA (e.g. printer testing).
-  /// On in debug builds; set `CHECK_IN_PREFILL=false` to disable.
+  /// Debug-only UI and QA shortcuts (skip print, clear local data, dummy prefill).
+  /// Always off in release/profile — env cannot enable it.
+  static bool get debugToolsEnabled => kDebugMode;
+
+  /// Pre-fill check-in / express-cashier fields for faster QA (debug builds only).
+  /// On by default in debug; set `CHECK_IN_PREFILL=false` to disable.
+  /// Always off in release/profile — env cannot enable it.
   static bool get checkInPrefillEnabled {
+    if (!debugToolsEnabled) return false;
     final v = (_env('CHECK_IN_PREFILL') ?? '').trim().toLowerCase();
-    if (v == 'true' || v == '1') return true;
     if (v == 'false' || v == '0') return false;
-    return kDebugMode;
+    return true;
   }
 
   // ── AUTH ──────────────────────────────────
@@ -131,6 +136,13 @@ class AppConfig {
     return '$baseUrl/api/v1/transactions/check-in';
   }
 
+  /// POST batch check-in JSON (`check_ins[]`) — offline sync only.
+  static String get batchCheckInUrl {
+    final t = (_env('API_TRANSACTIONS_BATCH_CHECK_IN') ?? '').trim();
+    if (t.isNotEmpty) return baseUrl + t;
+    return '$checkInUrl/batch';
+  }
+
   /// Legacy draft POST (retired from check-in flow).
   static String get ticketsRest =>
       baseUrl + (_env('API_TICKETS_REST') ?? '/api/v1/transactions');
@@ -166,6 +178,13 @@ class AppConfig {
     final t = (_env('API_CHECKOUT_PREVIEW') ?? '').trim();
     if (t.isNotEmpty) return baseUrl + t.replaceAll('{id}', enc);
     return '$baseUrl/api/v1/transactions/$enc/checkout-preview';
+  }
+
+  /// POST `/api/v1/transactions/check-out` — batch checkout sync (JSON array body).
+  static String get batchCheckOutUrl {
+    final t = (_env('API_TRANSACTIONS_BATCH_CHECK_OUT') ?? '').trim();
+    if (t.isNotEmpty) return baseUrl + t;
+    return '$baseUrl/api/v1/transactions/check-out';
   }
 
   /// POST `/api/v1/transactions/{id}/check-out`.

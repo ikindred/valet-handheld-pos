@@ -52,6 +52,7 @@ abstract final class ReportsRowBuilder {
       ),
       status: status,
       fee: t.fee,
+      isSynced: t.syncStatus == 'synced',
     );
   }
 }

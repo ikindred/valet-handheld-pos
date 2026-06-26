@@ -128,7 +128,7 @@ Each result **must** echo the client correlation fields we sent:
 | `plate_number` | yes | Normalized uppercase plate from request |
 | `vr_no` | yes | VR from request |
 | `server_transaction_id` | success only | Server UUID for checkout/PATCH later |
-| `transaction` | success only (recommended) | Full transaction object (same shape as single check-in today) |
+| `transaction` | optional | Minimal when needed: `{ "id", "status" }` (e.g. `void`, `completed`). May be `{}` or omitted when `server_transaction_id` is set. |
 | `error` | failed only | `{ "status_code", "message", "code"? }` |
 
 **Do not** put `error` on success lines.  

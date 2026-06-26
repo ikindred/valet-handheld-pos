@@ -11,6 +11,7 @@ import '../../../core/formatting/peso_currency.dart';
 import '../../../core/formatting/plate_number.dart';
 import '../../../core/formatting/vr_number.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/unsynced_cloud_icon.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../../../core/printing/express_checkout_receipt_data.dart';
 import '../../../core/printing/print_flow.dart';
@@ -1077,11 +1078,7 @@ class _TransactionTableRow extends StatelessWidget {
           child: Row(
             children: [
               if (!isSynced) ...[
-                Icon(
-                  LucideIcons.cloudOff,
-                  size: 13,
-                  color: theme.textSecondary.withValues(alpha: 0.7),
-                ),
+                const UnsyncedCloudIcon(),
                 const SizedBox(width: 5),
               ],
               Expanded(

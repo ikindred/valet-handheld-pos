@@ -93,4 +93,73 @@ void main() {
     expect(item.error?.isTicketNumberConflict, isTrue);
     expect(item.error?.isAlreadyOnServerConflict, isTrue);
   });
+
+  test('parses batch checkout response with minimal transaction', () {
+    final response = BatchCheckInResponse.fromJson(<String, dynamic>{
+      'results': [
+        <String, dynamic>{
+          'index': 0,
+          'status': 'success',
+          'ticket_number': 'TKT-CO-1',
+          'plate_number': 'ABC1234',
+          'vr_no': 'EP432624',
+          'server_transaction_id': 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          'transaction': <String, dynamic>{
+            'id': 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+            'status': 'completed',
+          },
+        },
+        <String, dynamic>{
+          'index': 1,
+          'status': 'failed',
+          'ticket_number': 'TKT-CO-2',
+          'plate_number': 'XYZ9876',
+          'vr_no': 'EP432625',
+          'error': <String, dynamic>{
+            'status_code': 409,
+            'code': 'ALREADY_CHECKED_OUT',
+            'message': 'Transaction is already completed.',
+          },
+        },
+      ],
+      'summary': <String, dynamic>{
+        'total': 2,
+        'succeeded': 1,
+        'failed': 1,
+      },
+    });
+
+    expect(response.results[0].isSuccess, isTrue);
+    expect(response.results[0].transaction?['status'], 'completed');
+    expect(response.results[1].error?.isCheckoutReconcileConflict, isTrue);
+    expect(response.results[1].error?.isAlreadyOnServerConflict, isFalse);
+  });
+
+  test('reads ticket_number from id field when backend omits ticket_number', () {
+    final item = BatchCheckInResultItem.fromJson(<String, dynamic>{
+      'index': 0,
+      'status': 'error',
+      'id': 'TKT-260626-3EF8-092930',
+      'error': <String, dynamic>{
+        'status_code': 400,
+        'message': 'time_out cannot be before time_in',
+      },
+    });
+
+    expect(item.ticketNumber, 'TKT-260626-3EF8-092930');
+    expect(item.isFailed, isTrue);
+  });
+
+  test('treats status error as failed', () {
+    final item = BatchCheckInResultItem.fromJson(<String, dynamic>{
+      'index': 0,
+      'status': 'error',
+      'ticket_number': 'TKT-1',
+      'plate_number': '',
+      'vr_no': '',
+    });
+
+    expect(item.isFailed, isTrue);
+    expect(item.isSuccess, isFalse);
+  });
 }

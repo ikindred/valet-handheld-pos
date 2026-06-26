@@ -23,6 +23,7 @@ class ReportsTicketRow extends Equatable {
     this.isVoided = false,
     this.cashierId,
     this.valetTypeLabel,
+    this.isSynced = true,
   });
 
   /// Display ticket number (e.g. `TKT-0123`).
@@ -67,6 +68,9 @@ class ReportsTicketRow extends Equatable {
   /// Human label: Standard Valet / Self-Park.
   final String? valetTypeLabel;
 
+  /// False when the row is still queued for server upload.
+  final bool isSynced;
+
   /// Route / detail key: server id when available, else local ticket number.
   String get detailId {
     final sid = serverTransactionId?.trim() ?? '';
@@ -109,6 +113,7 @@ class ReportsTicketRow extends Equatable {
         isVoided,
         cashierId,
         valetTypeLabel,
+        isSynced,
       ];
 }
 

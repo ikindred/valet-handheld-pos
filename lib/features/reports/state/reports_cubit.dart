@@ -15,6 +15,7 @@ import '../domain/reports_date_query.dart';
 import '../domain/reports_format.dart';
 import '../domain/reports_models.dart';
 import '../domain/reports_row_builder.dart';
+import '../../../shared/domain/transaction_list_merge.dart';
 
 /// Lightweight shift context for reports (flat-block hours, open-shift gate).
 class ReportsShiftContext extends Equatable {
@@ -255,6 +256,11 @@ class ReportsCubit extends Cubit<ReportsState> {
       return;
     }
 
+    final openShift = await _auth.getOpenShiftForUser(session.userId);
+    if (openShift != null) {
+      await _tickets.purgeOrphanedDrafts(openShift.id);
+    }
+
     final prev = state;
     if (append && prev is ReportsLoaded) {
       emit(prev.copyWith(isLoadingMore: true, serverError: null));
@@ -297,15 +303,29 @@ class ReportsCubit extends Cubit<ReportsState> {
             )
             .toList();
 
-        final merged = append && prev is ReportsLoaded
-            ? [...prev.rows, ...filteredRows]
-            : filteredRows;
+        List<ReportsTicketRow> merged;
+        var adjustedTotal = page.total;
+        if (append && prev is ReportsLoaded) {
+          merged = [...prev.rows, ...filteredRows];
+        } else {
+          final local = await _localRows(
+            session: session,
+            shift: shift,
+            query: query,
+          );
+          merged = TransactionListMerge.mergeReportsRows(
+            server: filteredRows,
+            local: local,
+          );
+          final extras = merged.length - filteredRows.length;
+          if (extras > 0) adjustedTotal = page.total + extras;
+        }
 
         emit(
           ReportsLoaded(
             rows: merged,
             shift: shift,
-            total: page.total,
+            total: adjustedTotal,
             page: page.page,
             totalPages: page.totalPages,
             limit: page.limit,
@@ -330,7 +350,9 @@ class ReportsCubit extends Cubit<ReportsState> {
               totalPages: 1,
               limit: query.limit,
               isOffline: !online,
-              serverError: 'Could not reach server — showing local records.',
+              serverError: online
+                  ? 'Could not reach server — showing local records.'
+                  : null,
               usedLocalFallback: true,
             ),
           );
@@ -363,7 +385,6 @@ class ReportsCubit extends Cubit<ReportsState> {
         limit: query.limit,
         isOffline: !online,
         usedLocalFallback: true,
-        serverError: online ? null : 'Offline — showing local records only.',
       ),
     );
   }

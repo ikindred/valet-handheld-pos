@@ -11,6 +11,7 @@ import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/parking_layout_service.dart';
 import '../../../data/services/rate_fetch_service.dart';
 import '../../../data/services/rate_service.dart';
+import '../domain/check_in_demo_defaults.dart';
 import '../domain/check_in_validation.dart';
 import '../domain/vehicle_body_type.dart';
 import '../state/check_in_cubit.dart';
@@ -151,7 +152,7 @@ class _CheckInVehicleDetailsScreenState
       _areaLevels = levels;
       _areaLevelsLoading = false;
     });
-    if (AppConfig.checkInPrefillEnabled && mounted) {
+    if (CheckInDemoDefaults.enabled && mounted) {
       _applyDemoParking();
     }
   }

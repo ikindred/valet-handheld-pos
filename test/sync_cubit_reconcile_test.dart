@@ -110,17 +110,34 @@ void main() {
         );
   }
 
-  test('flush reconciles orphan pending queue when ticket is already synced', () async {
+  test('reconcile orphan queue does not clear checkout/finalize rows', () async {
     await seedSyncedTicketWithPendingQueue();
 
     expect(await syncCubit.pendingCount(), 1);
 
-    await syncCubit.flush();
+    await db.customStatement(
+      '''
+UPDATE sync_queue
+SET sync_status = 'synced'
+WHERE sync_status IN ('pending', 'failed')
+  AND operation != 'checkout/finalize'
+  AND (
+    (table_name = 'tickets' AND record_id IN (
+      SELECT id FROM tickets WHERE sync_status = 'synced'
+    ))
+    OR (table_name = 'shifts' AND record_id IN (
+      SELECT id FROM shifts WHERE sync_status = 'synced'
+    ))
+  )
+''',
+    );
 
-    expect(await syncCubit.pendingCount(), 0);
-    expect(syncCubit.state, isA<SyncComplete>());
-    final complete = syncCubit.state as SyncComplete;
-    expect(complete.pending, 0);
+    expect(await syncCubit.pendingCount(), 1);
+    final row = await (db.select(db.syncQueue)
+          ..where((q) => q.id.equals('q-orphan-checkout')))
+        .getSingle();
+    expect(row.syncStatus, 'pending');
+    expect(row.operation, 'checkout/finalize');
   });
 
   test('flush reconciles pending ticket that already has server_ticket_id', () async {
@@ -254,5 +271,178 @@ void main() {
     expect(queueRows, hasLength(1));
     expect(queueRows.first.operation, 'checkin');
     expect(queueRows.first.syncStatus, 'pending');
+  });
+
+  test('linking server ticket while check-in queue pending leaves orphan', () async {
+    await db.into(db.shifts).insert(
+          ShiftsCompanion.insert(
+            id: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            openedAt: now,
+            openingFloat: 100,
+            status: 'open',
+            syncStatus: 'synced',
+            createdAt: now,
+          ),
+        );
+    await db.into(db.tickets).insert(
+          TicketsCompanion.insert(
+            id: ticketId,
+            shiftId: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            plateNumber: 'NBS2231',
+            vehicleBrand: 'Mazda 3',
+            vehicleColor: 'Black',
+            vehicleType: 'van',
+            cellphoneNumber: '09358399761',
+            damageMarkers: '[]',
+            personalBelongings: '[]',
+            checkInAt: now,
+            status: 'active',
+            syncStatus: 'pending',
+            createdAt: now,
+            vrNo: const Value('ZSD'),
+          ),
+        );
+    await db.into(db.syncQueue).insert(
+          SyncQueueCompanion.insert(
+            id: 'q-checkin',
+            operation: 'checkin',
+            queueTableName: 'tickets',
+            recordId: ticketId,
+            payload: '{}',
+            syncStatus: 'pending',
+            createdAt: now,
+          ),
+        );
+
+    await ticketService.updateServerTicketId(ticketId, '472e7167-36af-4568-8a47-3868a8442541');
+    await (db.update(db.syncQueue)..where((q) => q.id.equals('q-checkin'))).write(
+          const SyncQueueCompanion(syncStatus: Value('synced')),
+        );
+
+    final ticket = await (db.select(db.tickets)
+          ..where((t) => t.id.equals(ticketId)))
+        .getSingle();
+    expect(ticket.syncStatus, 'pending');
+    expect(await ticketService.countOrphanPendingTickets(), 1);
+    expect(await syncCubit.pendingCount(), 1);
+  });
+
+  test('linking server ticket after check-in queue cleared marks synced', () async {
+    await db.into(db.shifts).insert(
+          ShiftsCompanion.insert(
+            id: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            openedAt: now,
+            openingFloat: 100,
+            status: 'open',
+            syncStatus: 'synced',
+            createdAt: now,
+          ),
+        );
+    await db.into(db.tickets).insert(
+          TicketsCompanion.insert(
+            id: ticketId,
+            shiftId: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            plateNumber: 'NBS2231',
+            vehicleBrand: 'Mazda 3',
+            vehicleColor: 'Black',
+            vehicleType: 'van',
+            cellphoneNumber: '09358399761',
+            damageMarkers: '[]',
+            personalBelongings: '[]',
+            checkInAt: now,
+            status: 'active',
+            syncStatus: 'pending',
+            createdAt: now,
+            vrNo: const Value('ZSD'),
+          ),
+        );
+    await db.into(db.syncQueue).insert(
+          SyncQueueCompanion.insert(
+            id: 'q-checkin',
+            operation: 'checkin',
+            queueTableName: 'tickets',
+            recordId: ticketId,
+            payload: '{}',
+            syncStatus: 'pending',
+            createdAt: now,
+          ),
+        );
+
+    await (db.update(db.syncQueue)..where((q) => q.id.equals('q-checkin'))).write(
+          const SyncQueueCompanion(syncStatus: Value('synced')),
+        );
+    await ticketService.updateServerTicketId(ticketId, '472e7167-36af-4568-8a47-3868a8442541');
+
+    final ticket = await (db.select(db.tickets)
+          ..where((t) => t.id.equals(ticketId)))
+        .getSingle();
+    expect(ticket.syncStatus, 'synced');
+    expect(await ticketService.countOrphanPendingTickets(), 0);
+    expect(await syncCubit.pendingCount(), 0);
+  });
+
+  test('flush clears active server-backed orphan when queue is empty', () async {
+    await db.into(db.shifts).insert(
+          ShiftsCompanion.insert(
+            id: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            openedAt: now,
+            openingFloat: 100,
+            status: 'open',
+            syncStatus: 'synced',
+            createdAt: now,
+          ),
+        );
+    await db.into(db.tickets).insert(
+          TicketsCompanion.insert(
+            id: ticketId,
+            shiftId: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            plateNumber: 'NBS2231',
+            vehicleBrand: 'Mazda 3',
+            vehicleColor: 'Black',
+            vehicleType: 'van',
+            cellphoneNumber: '09358399761',
+            damageMarkers: '[]',
+            personalBelongings: '[]',
+            checkInAt: now,
+            status: 'active',
+            syncStatus: 'pending',
+            createdAt: now,
+            vrNo: const Value('ZSD'),
+            serverTicketId: const Value('472e7167-36af-4568-8a47-3868a8442541'),
+          ),
+        );
+    await db.into(db.syncQueue).insert(
+          SyncQueueCompanion.insert(
+            id: 'q-checkin',
+            operation: 'checkin',
+            queueTableName: 'tickets',
+            recordId: ticketId,
+            payload: '{}',
+            syncStatus: 'synced',
+            createdAt: now,
+          ),
+        );
+
+    expect(await syncCubit.pendingCount(), 1);
+
+    await syncCubit.flush();
+
+    final ticket = await (db.select(db.tickets)
+          ..where((t) => t.id.equals(ticketId)))
+        .getSingle();
+    expect(ticket.syncStatus, 'synced');
+    expect(await syncCubit.pendingCount(), 0);
   });
 }

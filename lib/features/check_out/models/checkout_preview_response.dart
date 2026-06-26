@@ -15,6 +15,7 @@ class CheckoutPreviewResponse extends Equatable {
     required this.ticket,
     this.checkInConditions = const [],
     required this.conditionComparison,
+    this.transactionJson,
   });
 
   final String transactionId;
@@ -35,6 +36,9 @@ class CheckoutPreviewResponse extends Equatable {
 
   /// Rows from `preview.condition_comparison` (check-in vs checkout diff).
   final List<ConditionComparison> conditionComparison;
+
+  /// Raw `transaction` object for check-in date fields (`start_date`, etc.).
+  final Map<String, dynamic>? transactionJson;
 
   /// Parses API body: `{ "transaction": { ... }, "preview": { ... } }`.
   factory CheckoutPreviewResponse.fromJson(Map<String, dynamic> json) {
@@ -68,6 +72,7 @@ class CheckoutPreviewResponse extends Equatable {
       ticket: CheckoutPreviewTicket.fromJson(ticketJson),
       checkInConditions: _parseConditionCheckin(txMap['condition_checkin']),
       conditionComparison: _parseConditionList(condRaw),
+      transactionJson: txMap.isEmpty ? null : Map<String, dynamic>.from(txMap),
     );
   }
 
@@ -231,6 +236,7 @@ class CheckoutPreviewResponse extends Equatable {
         ticket,
         checkInConditions,
         conditionComparison,
+        transactionJson,
       ];
 }
 

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/unsynced_cloud_icon.dart';
 import '../../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../../domain/reports_format.dart';
 import '../../domain/reports_models.dart';
@@ -525,12 +526,7 @@ class _DataRow extends StatelessWidget {
             flex: _flexForColumn(0),
             child: Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: Text(
-                row.ticketId,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: ReportsStyles.ticketIdOf(context),
-              ),
+              child: _TicketIdCell(row: row),
             ),
           ),
           Expanded(
@@ -667,7 +663,7 @@ class _FixedTable extends StatelessWidget {
               _cell(
                 _maybeTap(
                   r,
-                  Text(r.ticketId, style: ReportsStyles.ticketIdOf(context), maxLines: 1),
+                  _TicketIdCell(row: r),
                 ),
               ),
               _cell(_maybeTap(r, _PlateBadge(plate: r.plate))),
@@ -723,6 +719,32 @@ class _FixedTable extends StatelessWidget {
       onTap: () => onRowTap!(r),
       borderRadius: BorderRadius.circular(4),
       child: child,
+    );
+  }
+}
+
+class _TicketIdCell extends StatelessWidget {
+  const _TicketIdCell({required this.row});
+
+  final ReportsTicketRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        if (!row.isSynced) ...[
+          const UnsyncedCloudIcon(),
+          const SizedBox(width: 4),
+        ],
+        Expanded(
+          child: Text(
+            row.ticketId,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: ReportsStyles.ticketIdOf(context),
+          ),
+        ),
+      ],
     );
   }
 }
