@@ -22,13 +22,16 @@ import '../../features/check_out/domain/checkout_ticket_display.dart';
 import '../../features/check_out/models/check_out_response.dart';
 import '../../features/dashboard/domain/ticket_parking_info.dart';
 import '../../features/check_in/domain/check_in_form_data.dart';
+import '../../features/check_in/models/batch_check_in_response.dart';
 import '../../features/check_in/models/check_in_response.dart';
 import '../../core/connectivity/internet_reachability.dart';
 import '../../core/logging/valet_log.dart';
+import '../../core/sync/local_sync_notifier.dart';
 import '../local/db/app_database.dart';
 import '../remote/dashboard_api.dart';
 import 'parking_layout_service.dart';
 import '../remote/transactions_api.dart';
+import 'batch_check_in_payload.dart';
 import 'check_in_sync_payload.dart';
 import 'rate_fetch_service.dart';
 import 'rate_service.dart';
@@ -119,8 +122,10 @@ class TicketService {
     this._dashboardApi,
     RateService rates,
     this._rateFetch,
-    this._parkingLayout,
-  ) : _paymentCalculator = TransactionPaymentCalculator(rates);
+    this._parkingLayout, {
+    LocalSyncNotifier? localSyncNotifier,
+  })  : _paymentCalculator = TransactionPaymentCalculator(rates),
+        _localSyncNotifier = localSyncNotifier;
 
   final AppDatabase _db;
   final Dio _dio;
@@ -129,6 +134,11 @@ class TicketService {
   final RateFetchService _rateFetch;
   final ParkingLayoutService _parkingLayout;
   final TransactionPaymentCalculator _paymentCalculator;
+  final LocalSyncNotifier? _localSyncNotifier;
+
+  void _notifyLocalSyncQueueChanged() {
+    _localSyncNotifier?.notifyLocalQueueChanged();
+  }
 
   static const _uuid = Uuid();
 
@@ -488,6 +498,7 @@ class TicketService {
       return;
     }
     await (_db.delete(_db.tickets)..where((t) => t.id.equals(tid))).go();
+    _notifyLocalSyncQueueChanged();
   }
 
   /// Express cashier tickets on [shiftId], newest first.
@@ -516,6 +527,7 @@ class TicketService {
         syncStatus: const Value('synced'),
       ),
     );
+    _notifyLocalSyncQueueChanged();
   }
 
   /// Enqueues multipart check-in for [SyncCubit] when offline.
@@ -539,6 +551,7 @@ class TicketService {
             createdAt: now,
           ),
         );
+    _notifyLocalSyncQueueChanged();
   }
 
   /// Pending tickets with no outstanding `sync_queue` row (manual sync had nothing to send).
@@ -608,6 +621,9 @@ WHERE t.sync_status = 'pending'
         're-enqueued express check-in ticketId=$tid',
       );
     }
+    if (enqueued > 0) {
+      _notifyLocalSyncQueueChanged();
+    }
     return enqueued;
   }
 
@@ -656,6 +672,10 @@ WHERE t.sync_status = 'pending'
         );
       }
     }
+
+    if (verified > 0) {
+      _notifyLocalSyncQueueChanged();
+    }
     return verified;
   }
 
@@ -670,6 +690,237 @@ WHERE t.sync_status = 'pending'
       if (e.statusCode == 404) return false;
       rethrow;
     }
+  }
+
+  /// Uploads pending check-in queue rows in one batch JSON request.
+  Future<int> syncPendingCheckInsBatch(
+    List<SyncQueueData> rows,
+    String token,
+  ) async {
+    if (rows.isEmpty) return 0;
+
+    final entries = <_BatchCheckInEntry>[];
+    for (final row in rows) {
+      try {
+        final raw = jsonDecode(row.payload);
+        if (raw is! Map) {
+          await _markSyncQueueFailedById(row.id);
+          continue;
+        }
+        final map = Map<String, dynamic>.from(raw);
+        final ticket = await ticketById(row.recordId);
+        final item = await checkInQueuePayloadToApiItem(
+          map,
+          voidRequested: ticket?.pendingVoidRequest ?? false,
+          voidReason: ticket?.pendingVoidReason,
+        );
+        entries.add(_BatchCheckInEntry(row: row, item: item, ticket: ticket));
+      } catch (e, st) {
+        ValetLog.error(
+          'TicketService.syncPendingCheckInsBatch',
+          'build item failed queueId=${row.id} recordId=${row.recordId}',
+          e,
+          st,
+        );
+        await _markSyncQueueFailedById(row.id);
+      }
+    }
+
+    if (entries.isEmpty) return 0;
+
+    final batch = await _transactionsApi.submitBatchCheckIn(
+      token: token,
+      checkIns: [for (final e in entries) e.item],
+    );
+
+    var synced = 0;
+    final matchedQueueIds = <String>{};
+
+    for (final result in batch.results) {
+      final entry = _matchBatchCheckInEntry(
+        entries,
+        result,
+        matchedQueueIds,
+      );
+      if (entry == null) {
+        ValetLog.warning(
+          'TicketService.syncPendingCheckInsBatch',
+          'no local match for batch result index=${result.index} '
+              'ticket=${result.ticketNumber}',
+        );
+        continue;
+      }
+      matchedQueueIds.add(entry.row.id);
+
+      if (result.isSuccess) {
+        await _applyBatchCheckInSuccess(entry, result);
+        await _markSyncQueueSyncedById(entry.row.id);
+        synced++;
+        continue;
+      }
+
+      if (result.error?.isAlreadyOnServerConflict == true) {
+        final linked = await _tryLinkBatchExistingTransaction(
+          entry,
+          result,
+          token,
+        );
+        if (linked) {
+          await _markSyncQueueSyncedById(entry.row.id);
+          synced++;
+          continue;
+        }
+      }
+
+      await _markSyncQueueFailedById(entry.row.id);
+    }
+
+    for (final entry in entries) {
+      if (!matchedQueueIds.contains(entry.row.id)) {
+        ValetLog.warning(
+          'TicketService.syncPendingCheckInsBatch',
+          'missing batch result for queueId=${entry.row.id} '
+              'ticket=${entry.item['ticket_number']}',
+        );
+        await _markSyncQueueFailedById(entry.row.id);
+      }
+    }
+
+    return synced;
+  }
+
+  Future<void> _markSyncQueueSyncedById(String queueId) async {
+    await (_db.update(_db.syncQueue)..where((q) => q.id.equals(queueId))).write(
+          const SyncQueueCompanion(syncStatus: Value('synced')),
+        );
+  }
+
+  Future<void> _markSyncQueueFailedById(String queueId) async {
+    await (_db.update(_db.syncQueue)..where((q) => q.id.equals(queueId))).write(
+          const SyncQueueCompanion(syncStatus: Value('failed')),
+        );
+  }
+
+  _BatchCheckInEntry? _matchBatchCheckInEntry(
+    List<_BatchCheckInEntry> entries,
+    BatchCheckInResultItem result,
+    Set<String> alreadyMatched,
+  ) {
+    final ticketNo = result.ticketNumber.trim();
+    final vr = normalizeVrNumber(result.vrNo);
+    final plate = normalizePlateNumber(result.plateNumber).toUpperCase();
+
+    if (ticketNo.isNotEmpty) {
+      for (final e in entries) {
+        if (alreadyMatched.contains(e.row.id)) continue;
+        final itemTicket = e.item['ticket_number']?.toString().trim() ?? '';
+        if (itemTicket == ticketNo) return e;
+      }
+    }
+
+    if (vr.isNotEmpty && plate.isNotEmpty) {
+      for (final e in entries) {
+        if (alreadyMatched.contains(e.row.id)) continue;
+        final itemVr = normalizeVrNumber(e.item['vr_no']?.toString() ?? '');
+        final vehicle = e.item['vehicle'];
+        var itemPlate = '';
+        if (vehicle is Map) {
+          itemPlate = normalizePlateNumber(
+            vehicle['plate_number']?.toString() ?? '',
+          ).toUpperCase();
+        }
+        if (itemVr == vr && itemPlate == plate) return e;
+      }
+    }
+
+    if (result.index >= 0 && result.index < entries.length) {
+      final e = entries[result.index];
+      if (!alreadyMatched.contains(e.row.id)) return e;
+    }
+    return null;
+  }
+
+  Future<void> _applyBatchCheckInSuccess(
+    _BatchCheckInEntry entry,
+    BatchCheckInResultItem result,
+  ) async {
+    final localId = entry.row.recordId.trim();
+    final serverId = result.serverTransactionId?.trim() ?? '';
+    if (localId.isEmpty || serverId.isEmpty) return;
+
+    await updateServerTicketId(localId, serverId);
+    final txn = result.transaction ?? <String, dynamic>{'id': serverId};
+    final isExpress =
+        entry.ticket?.isExpressCashier == true ||
+        entry.item['is_express_cashier'] == true ||
+        entry.item.containsKey('amount');
+
+    if (isExpress) {
+      await (_db.update(_db.tickets)..where((t) => t.id.equals(localId))).write(
+        const TicketsCompanion(syncStatus: Value('synced')),
+      );
+      return;
+    }
+
+    final body = entry.item;
+    final vrNo = result.vrNo.trim().isNotEmpty
+        ? result.vrNo.trim()
+        : body['vr_no']?.toString().trim() ?? '';
+    final voidMeta = _voidAuditCompanion(txn);
+    final voidStatus = _resolveVoidStatus(txn);
+    final queuedSlotId = body['slot_id']?.toString().trim() ?? '';
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(localId))).write(
+      TicketsCompanion(
+        syncStatus: const Value('synced'),
+        pendingVoidRequest: const Value(false),
+        pendingVoidReason: const Value(null),
+        status: voidStatus != null ? Value(voidStatus) : const Value.absent(),
+        voidReason: voidMeta.voidReason,
+        voidedByJson: voidMeta.voidedByJson,
+        voidedAt: voidMeta.voidedAt,
+        slotId: queuedSlotId.isNotEmpty
+            ? Value(queuedSlotId)
+            : const Value.absent(),
+        vrNo: vrNo.isNotEmpty ? Value(vrNo) : const Value.absent(),
+      ),
+    );
+  }
+
+  Future<bool> _tryLinkBatchExistingTransaction(
+    _BatchCheckInEntry entry,
+    BatchCheckInResultItem result,
+    String token,
+  ) async {
+    final localId = entry.row.recordId.trim();
+    final ticketNumber = result.ticketNumber.trim().isNotEmpty
+        ? result.ticketNumber.trim()
+        : entry.item['ticket_number']?.toString().trim() ?? localId;
+    final plate = result.plateNumber.trim().isNotEmpty
+        ? result.plateNumber.trim()
+        : entry.item['vehicle'] is Map
+            ? (entry.item['vehicle'] as Map)['plate_number']?.toString() ?? ''
+            : '';
+    final vrNo = result.vrNo.trim().isNotEmpty
+        ? result.vrNo.trim()
+        : entry.item['vr_no']?.toString().trim() ?? '';
+
+    final serverId = await resolveServerTransactionIdByVr(
+      token: token,
+      vrNo: vrNo,
+      plateNumber: plate,
+      ticketNumber: ticketNumber,
+    );
+    if (serverId == null) return false;
+
+    await updateServerTicketId(localId, serverId);
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(localId))).write(
+      const TicketsCompanion(syncStatus: Value('synced')),
+    );
+    ValetLog.info(
+      'TicketService.syncPendingCheckInsBatch',
+      'linked existing server ticket $serverId for localId=$localId vr=$vrNo',
+    );
+    return true;
   }
 
   /// Processes a queued check-in row via `POST /transactions/check-in`.
@@ -1485,6 +1736,7 @@ LIMIT 1
       'TicketService.enqueueCheckoutFinalize',
       'queued ticket=$tid',
     );
+    _notifyLocalSyncQueueChanged();
   }
 
   /// Processes a queued checkout/finalize row via `POST /transactions/{id}/check-out`.
@@ -2627,4 +2879,16 @@ class _ServerTicketFields {
   final String? driverIn;
   final String? driverOut;
   final String? parkingInfo;
+}
+
+class _BatchCheckInEntry {
+  const _BatchCheckInEntry({
+    required this.row,
+    required this.item,
+    required this.ticket,
+  });
+
+  final SyncQueueData row;
+  final Map<String, dynamic> item;
+  final Ticket? ticket;
 }

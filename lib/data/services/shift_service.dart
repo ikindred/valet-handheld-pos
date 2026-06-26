@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/logging/valet_log.dart';
+import '../../core/sync/local_sync_notifier.dart';
 import '../local/db/app_database.dart';
 import '../remote/api_error_message.dart';
 import 'cash_session_close_payload.dart';
@@ -39,12 +40,19 @@ class ShiftService {
     this._dio, {
     required TicketService ticketService,
     this.onShiftMutated,
-  }) : _tickets = ticketService;
+    LocalSyncNotifier? localSyncNotifier,
+  })  : _tickets = ticketService,
+        _localSyncNotifier = localSyncNotifier;
 
   final AppDatabase _db;
   final Dio _dio;
   final TicketService _tickets;
   final void Function()? onShiftMutated;
+  final LocalSyncNotifier? _localSyncNotifier;
+
+  void _notifyLocalSyncQueueChanged() {
+    _localSyncNotifier?.notifyLocalQueueChanged();
+  }
 
   static const _uuid = Uuid();
 
@@ -126,6 +134,9 @@ class ShiftService {
     });
 
     onShiftMutated?.call();
+    if (!resumeServerSession) {
+      _notifyLocalSyncQueueChanged();
+    }
     if (resumeServerSession) {
       return (_db.select(_db.shifts)..where((s) => s.id.equals(id))).getSingle();
     }
@@ -180,6 +191,7 @@ class ShiftService {
           );
     });
     onShiftMutated?.call();
+    _notifyLocalSyncQueueChanged();
     final remote = _postShiftClose(
       shiftId: shiftId,
       actualCash: closingCash,

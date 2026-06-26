@@ -15,6 +15,7 @@ Map<String, dynamic> checkInSyncQueuePayload({
 }) {
   return <String, dynamic>{
     'local_ticket_id': localTicketId,
+    'ticket_number': localTicketId.trim(),
     'signature_path': signaturePath,
     'slot_id': slotId.trim(),
     'contact_number': contactNumber,

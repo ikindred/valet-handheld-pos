@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../domain/vehicle_damage.dart';
 import '../state/check_in_cubit.dart';
+import 'check_in_flow_exit.dart';
 import 'widgets/check_in_compact_tokens.dart';
 import 'widgets/check_in_footer_actions.dart';
 import 'widgets/check_in_step_body.dart';
@@ -24,10 +25,7 @@ class CheckInVehicleConditionScreen extends StatelessWidget {
           final signed = state.isCustomerSignatureComplete;
           return CheckInVehicleConditionFooter(
             hasCustomerSignature: signed,
-            onCancel: () {
-              context.read<CheckInCubit>().resetSession();
-              context.go('/dashboard');
-            },
+            onCancel: () => exitCheckInToDashboard(context),
             onSignature: () => showCustomerSignatureModal(context),
             onBack: () => context.go('/check-in/step-3'),
             onNext: () {

@@ -219,6 +219,40 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
     emit(ExpressCashierLoaded(transactions: transactions));
   }
 
+  /// Refreshes the transaction list from local DB without a loading spinner
+  /// (e.g. after background [SyncCubit] marks rows synced).
+  Future<void> reloadTransactionsFromDb(int localUserId) async {
+    final current = state;
+    final ExpressCashierLoaded? loaded = switch (current) {
+      ExpressCashierLoaded() => current,
+      ExpressCashierSaved(:final transactions) =>
+        ExpressCashierLoaded(transactions: transactions),
+      _ => null,
+    };
+    if (loaded == null) return;
+
+    try {
+      final shift = _activeShift ?? await _auth.getOpenShiftForUser(localUserId);
+      if (shift == null) return;
+      _activeShift = shift;
+      final rows = await _tickets.expressTicketsForShift(shift.id);
+      emit(
+        loaded.copyWith(
+          transactions:
+              rows.map(ExpressCashierTransaction.fromTicket).toList(),
+          isSaving: false,
+        ),
+      );
+    } catch (e, st) {
+      ValetLog.error(
+        'ExpressCashierCubit.reloadTransactionsFromDb',
+        'refresh failed',
+        e,
+        st,
+      );
+    }
+  }
+
   void _failValidation(String message, ExpressCashierLoaded? loaded) {
     if (loaded != null) {
       emit(loaded.copyWith(isSaving: false));

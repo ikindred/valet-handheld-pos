@@ -490,7 +490,7 @@ class DashboardStatusPillLive extends StatefulWidget {
 
 class _DashboardStatusPillLiveState extends State<DashboardStatusPillLive>
     with WidgetsBindingObserver {
-  bool _hasInternet = false;
+  bool? _hasInternet;
   StreamSubscription<List<ConnectivityResult>>? _connSub;
 
   @override
@@ -525,7 +525,9 @@ class _DashboardStatusPillLiveState extends State<DashboardStatusPillLive>
 
   @override
   Widget build(BuildContext context) {
-    return DashboardStatusPill(hasInternet: _hasInternet);
+    final hasInternet = _hasInternet;
+    if (hasInternet == null) return const SizedBox.shrink();
+    return DashboardStatusPill(hasInternet: hasInternet);
   }
 }
 

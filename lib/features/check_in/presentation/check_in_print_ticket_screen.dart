@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -18,6 +17,7 @@ import '../../auth/state/auth_bloc.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../models/receipt_part.dart';
 import '../state/check_in_cubit.dart';
+import 'check_in_flow_exit.dart';
 import 'widgets/check_in_compact_tokens.dart';
 import 'widgets/check_in_step_body.dart';
 
@@ -32,6 +32,7 @@ class CheckInPrintTicketScreen extends StatefulWidget {
 
 class _CheckInPrintTicketScreenState extends State<CheckInPrintTicketScreen> {
   Future<CheckInReceiptData?>? _receiptDataFuture;
+  var _exiting = false;
 
   static final _timeFmt = DateFormat('MMM dd, yyyy · hh:mm a');
   static const _wideBreakpoint = 720.0;
@@ -112,8 +113,9 @@ class _CheckInPrintTicketScreenState extends State<CheckInPrintTicketScreen> {
   }
 
   void _onDone(BuildContext context) {
-    context.read<CheckInCubit>().resetSession();
-    context.go('/dashboard');
+    if (_exiting) return;
+    setState(() => _exiting = true);
+    exitCheckInToDashboard(context);
   }
 
   @override
@@ -152,6 +154,7 @@ class _CheckInPrintTicketScreenState extends State<CheckInPrintTicketScreen> {
                     state: state,
                     nextPart: nextPart,
                     allDone: allDone,
+                    exiting: _exiting,
                     onPrint: cubit.printPart,
                     onReprint: cubit.reprintPart,
                     onDone: () => _onDone(context),
@@ -379,6 +382,7 @@ class _PrintReceiptPanel extends StatelessWidget {
     required this.state,
     required this.nextPart,
     required this.allDone,
+    required this.exiting,
     required this.onPrint,
     required this.onReprint,
     required this.onDone,
@@ -389,6 +393,7 @@ class _PrintReceiptPanel extends StatelessWidget {
   final CheckInState state;
   final int? nextPart;
   final bool allDone;
+  final bool exiting;
   final Future<void> Function(
     BuildContext context,
     int part,
@@ -474,7 +479,7 @@ class _PrintReceiptPanel extends StatelessWidget {
               width: double.infinity,
               height: 44,
               child: OutlinedButton(
-                onPressed: onDone,
+                onPressed: exiting ? null : onDone,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: tc.textPrimary,
                   side: BorderSide(color: tc.cardBorder),
@@ -494,7 +499,7 @@ class _PrintReceiptPanel extends StatelessWidget {
           width: double.infinity,
           height: 52,
           child: FilledButton.icon(
-            onPressed: allDone && !loadingReceipt && receiptData != null
+            onPressed: allDone && !loadingReceipt && receiptData != null && !exiting
                 ? onDone
                 : null,
             icon: const Icon(LucideIcons.layoutDashboard, size: 20),

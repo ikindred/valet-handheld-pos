@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -17,6 +18,7 @@ import '../../../core/printing/widgets/printer_pairing_sheet.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_notifier.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/debug_local_data_service.dart';
 import '../../auth/presentation/logout_flow.dart';
 import '../../auth/state/auth_bloc.dart';
 import '../../dashboard/presentation/dashboard_screen.dart';
@@ -51,6 +53,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _syncing = false;
   bool _isExpressCashier = false;
   bool _isOnline = true;
+  bool _clearingLocalTransactions = false;
   StreamSubscription<List<ConnectivityResult>>? _connSub;
 
   @override
@@ -223,6 +226,79 @@ class _SettingsScreenState extends State<SettingsScreen>
     await _loadSyncInfo();
   }
 
+  Future<void> _confirmClearLocalTransactions() async {
+    if (_clearingLocalTransactions) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final tc = AppThemeColors.of(ctx);
+        return AlertDialog(
+          title: Text(
+            'Clear local transactions?',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: tc.textPrimary,
+            ),
+          ),
+          content: Text(
+            'This deletes all tickets and sync queue rows from Drift on this device. '
+            'Shifts, accounts, and device settings are kept. This cannot be undone.',
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              color: tc.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+              ),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+              ),
+              child: Text(
+                'Clear',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _clearingLocalTransactions = true);
+    try {
+      final result =
+          await context.read<DebugLocalDataService>().clearLocalTransactions();
+      if (!mounted) return;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kLastSyncKey);
+      if (!mounted) return;
+      await _loadSyncInfo();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Cleared ${result.deletedTickets} ticket(s) and '
+            '${result.deletedQueueRows} queue row(s).',
+            style: GoogleFonts.poppins(fontSize: 13),
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _clearingLocalTransactions = false);
+    }
+  }
+
   Future<void> _testPrint() async {
     final auth = context.read<AuthRepository>();
     final site = await auth.branchAndAreaFromDb();
@@ -346,6 +422,14 @@ class _SettingsScreenState extends State<SettingsScreen>
                             onTestPrint: _testPrint,
                             onReconnect: _reconnectPrinter,
                           ),
+                        if (kDebugMode) ...[
+                          const SizedBox(height: 10),
+                          _DebugToolsCard(
+                            clearing: _clearingLocalTransactions,
+                            onClearLocalTransactions:
+                                _confirmClearLocalTransactions,
+                          ),
+                        ],
                       ],
                     ),
                   );
@@ -865,6 +949,38 @@ class _AccountCard extends StatelessWidget {
     );
   }
 
+}
+
+class _DebugToolsCard extends StatelessWidget {
+  const _DebugToolsCard({
+    required this.clearing,
+    required this.onClearLocalTransactions,
+  });
+
+  final bool clearing;
+  final VoidCallback onClearLocalTransactions;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = _SettingsIconTone.red(context);
+    return _SettingsCard(
+      sectionLabel: 'DEBUG',
+      children: [
+        _SettingsRow(
+          iconBg: tone.$1,
+          iconColor: tone.$2,
+          icon: Icons.delete_sweep_rounded,
+          title: 'Clear Local Transactions',
+          subtitle: 'Wipe Drift tickets and sync queue (debug only)',
+          trailing: _OutlinedActionButton(
+            label: clearing ? 'Clearing…' : 'Clear',
+            onPressed: clearing ? null : onClearLocalTransactions,
+          ),
+          onTap: clearing ? null : onClearLocalTransactions,
+        ),
+      ],
+    );
+  }
 }
 
 class _SessionCard extends StatelessWidget {

@@ -56,12 +56,14 @@ class _CheckInShellState extends State<CheckInShell> {
     }
     if (mounted) setState(() => _awaitingDraft = false);
     if (mounted) {
-      _applyStepGuard(GoRouterState.of(context).uri.path);
+      _applyStepGuard();
     }
   }
 
-  void _applyStepGuard(String path) {
+  void _applyStepGuard() {
     if (!mounted) return;
+    final path = GoRouterState.of(context).uri.path;
+    if (!path.startsWith('/check-in')) return;
     final redirect = CheckInValidation.forwardGuardPath(
       path,
       context.read<CheckInCubit>().state,
@@ -78,7 +80,7 @@ class _CheckInShellState extends State<CheckInShell> {
     final scaffoldBg = AppThemeColors.of(context).scaffoldBg;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _applyStepGuard(path);
+      _applyStepGuard();
     });
 
     if (_awaitingDraft) {
@@ -116,7 +118,7 @@ class _CheckInShellState extends State<CheckInShell> {
           prev.serverTicketId != next.serverTicketId ||
           prev.qrCode != next.qrCode,
       listener: (context, _) {
-        _applyStepGuard(GoRouterState.of(context).uri.path);
+        _applyStepGuard();
       },
       child: Scaffold(
         backgroundColor: scaffoldBg,

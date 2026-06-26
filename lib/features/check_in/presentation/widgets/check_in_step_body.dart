@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../state/check_in_cubit.dart';
+import '../check_in_flow_exit.dart';
 import 'check_in_compact_tokens.dart';
 import 'check_in_footer_actions.dart';
 
@@ -38,8 +36,7 @@ class CheckInStepBody extends StatelessWidget {
   final Widget? footer;
 
   void _cancel(BuildContext context) {
-    context.read<CheckInCubit>().resetSession();
-    context.go('/dashboard');
+    exitCheckInToDashboard(context);
   }
 
   @override

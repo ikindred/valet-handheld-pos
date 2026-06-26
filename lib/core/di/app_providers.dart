@@ -15,6 +15,7 @@ import '../../core/printing/printer_connection_notifier.dart';
 import '../../core/printing/valet_print_service.dart';
 import '../../data/services/branch_config_service.dart';
 import '../../data/services/close_cash_purge_service.dart';
+import '../../data/services/debug_local_data_service.dart';
 import '../../data/services/parking_layout_service.dart';
 import '../../data/services/rate_fetch_service.dart';
 import '../../data/services/rate_service.dart';
@@ -24,6 +25,7 @@ import '../../services/device_conflict_service.dart';
 import '../../widgets/device_conflict_listener.dart';
 import '../connectivity/connectivity_service.dart';
 import '../routing/router_refresh_notifier.dart';
+import '../sync/local_sync_notifier.dart';
 import '../../features/auth/state/auth_bloc.dart';
 import '../../features/check_in/state/check_in_cubit.dart';
 import '../../features/check_out/state/check_out_cubit.dart';
@@ -42,6 +44,7 @@ class AppProviders extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => RouterRefreshNotifier()),
+        ChangeNotifierProvider(create: (_) => LocalSyncNotifier()),
         Provider<AppDatabase>(create: (_) => AppDatabase(), dispose: (_, db) => db.close()),
         Provider<Dio>(create: (_) => createAppDio()),
         Provider<AuthApi>(create: (c) => AuthApi(c.read<Dio>())),
@@ -69,6 +72,7 @@ class AppProviders extends StatelessWidget {
             c.read<RateService>(),
             c.read<RateFetchService>(),
             c.read<ParkingLayoutService>(),
+            localSyncNotifier: c.read<LocalSyncNotifier>(),
           ),
         ),
         Provider<ShiftService>(
@@ -77,10 +81,17 @@ class AppProviders extends StatelessWidget {
             c.read<Dio>(),
             ticketService: c.read<TicketService>(),
             onShiftMutated: () => c.read<RouterRefreshNotifier>().notifyAuthChanged(),
+            localSyncNotifier: c.read<LocalSyncNotifier>(),
           ),
         ),
         Provider<CloseCashPurgeService>(
           create: (c) => CloseCashPurgeService(c.read<AppDatabase>()),
+        ),
+        Provider<DebugLocalDataService>(
+          create: (c) => DebugLocalDataService(
+            c.read<AppDatabase>(),
+            localSyncNotifier: c.read<LocalSyncNotifier>(),
+          ),
         ),
         Provider<BluetoothPosPrinter>(
           create: (_) => BluetoothPosPrinter(),
@@ -115,6 +126,7 @@ class AppProviders extends StatelessWidget {
             dio: c.read<Dio>(),
             authRepository: c.read<AuthRepository>(),
             ticketService: c.read<TicketService>(),
+            localSyncNotifier: c.read<LocalSyncNotifier>(),
           ),
         ),
         Provider<BranchConfigService>(

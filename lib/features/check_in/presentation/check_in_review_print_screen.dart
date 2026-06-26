@@ -13,6 +13,7 @@ import 'widgets/check_in_footer_actions.dart';
 import '../domain/vehicle_body_type.dart';
 import '../domain/vehicle_damage.dart';
 import '../state/check_in_cubit.dart';
+import 'check_in_flow_exit.dart';
 import 'widgets/check_in_compact_tokens.dart';
 import 'widgets/check_in_step_body.dart';
 
@@ -80,8 +81,7 @@ class _CheckInReviewPrintScreenState extends State<CheckInReviewPrintScreen> {
           footer: CheckInFooterActions(
             onCancel: () {
               if (!submitState.isSubmitting) {
-                context.read<CheckInCubit>().resetSession();
-                context.go('/dashboard');
+                exitCheckInToDashboard(context);
               }
             },
             showBack: true,

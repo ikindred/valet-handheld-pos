@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../core/sync/local_sync_notifier.dart';
 import '../../features/dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../../features/sync/state/sync_cubit.dart';
 import '../../features/sync/state/sync_state.dart';
@@ -24,7 +25,9 @@ class _HeaderSyncStatusPillState extends State<HeaderSyncStatusPill>
   var _lastSyncedCount = 0;
   var _pending = 0;
   var _failed = 0;
+  var _countsReady = false;
   late final AnimationController _spinController;
+  LocalSyncNotifier? _localSyncNotifier;
 
   @override
   void initState() {
@@ -34,12 +37,16 @@ class _HeaderSyncStatusPillState extends State<HeaderSyncStatusPill>
       duration: const Duration(milliseconds: 900),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _localSyncNotifier = context.read<LocalSyncNotifier>();
+      _localSyncNotifier!.addListener(_onLocalQueueChanged);
       unawaited(_refreshCounts());
     });
   }
 
   @override
   void dispose() {
+    _localSyncNotifier?.removeListener(_onLocalQueueChanged);
     _flashTimer?.cancel();
     _spinController.dispose();
     super.dispose();
@@ -54,13 +61,23 @@ class _HeaderSyncStatusPillState extends State<HeaderSyncStatusPill>
     setState(() {
       _pending = p;
       _failed = f;
+      _countsReady = true;
     });
+  }
+
+  void _onLocalQueueChanged() {
+    unawaited(_refreshCounts());
   }
 
   void _onSyncStateChanged(SyncState state) {
     if (state is SyncInProgress) {
       _flashTimer?.cancel();
-      if (mounted) setState(() => _syncedFlash = false);
+      if (mounted) {
+        setState(() {
+          _syncedFlash = false;
+          _countsReady = true;
+        });
+      }
       _spinController.repeat();
       unawaited(_refreshCounts());
       return;
@@ -106,6 +123,8 @@ class _HeaderSyncStatusPillState extends State<HeaderSyncStatusPill>
 
   @override
   Widget build(BuildContext context) {
+    if (!_countsReady) return const SizedBox.shrink();
+
     return BlocConsumer<SyncCubit, SyncState>(
       listenWhen: (_, next) =>
           next is SyncInProgress ||

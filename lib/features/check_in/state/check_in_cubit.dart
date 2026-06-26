@@ -678,13 +678,13 @@ class CheckInCubit extends Cubit<CheckInState> {
           },
       ]);
 
-  void resetSession() {
+  void resetSession({bool applyDemoPrefill = true}) {
     final id = state.ticketNumber.trim();
     if (id.isNotEmpty) {
       unawaited(_ticketService?.deleteDraftTicket(id) ?? Future.value());
     }
     emit(
-      CheckInDemoDefaults.enabled
+      applyDemoPrefill && CheckInDemoDefaults.enabled
           ? CheckInDemoDefaults.initial()
           : const CheckInState(receiptParts: initialReceiptParts),
     );

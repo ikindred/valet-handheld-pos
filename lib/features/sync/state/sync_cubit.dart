@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:bloc/bloc.dart';
 import 'package:dio/dio.dart';
@@ -7,6 +8,7 @@ import 'package:drift/drift.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/connectivity/internet_reachability.dart';
 import '../../../core/logging/valet_log.dart';
+import '../../../core/sync/local_sync_notifier.dart';
 import '../../../data/local/db/app_database.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/cash_session_close_payload.dart';
@@ -30,16 +32,23 @@ class SyncCubit extends Cubit<SyncState> {
     required Dio dio,
     required AuthRepository authRepository,
     required TicketService ticketService,
+    LocalSyncNotifier? localSyncNotifier,
   })  : _db = database,
         _dio = dio,
         _auth = authRepository,
         _ticketService = ticketService,
+        _localSyncNotifier = localSyncNotifier,
         super(const SyncIdle());
 
   final AppDatabase _db;
   final Dio _dio;
   final AuthRepository _auth;
   final TicketService _ticketService;
+  final LocalSyncNotifier? _localSyncNotifier;
+
+  void _notifyLocalSyncQueueChanged() {
+    _localSyncNotifier?.notifyLocalQueueChanged();
+  }
 
   Future<int> pendingCount() async {
     final row = await _db.customSelect(
@@ -197,17 +206,17 @@ WHERE table_name = 'shifts'
 
   Future<void> _flushBody() async {
     emit(const SyncInProgress());
-    if (!AppConfig.useStubApi && !await InternetReachability.hasInternet()) {
-      ValetLog.debug('SyncCubit.flush', 'skip — offline');
-      emit(SyncComplete(
-        synced: 0,
-        failed: await failedCount(),
-        pending: await pendingCount(),
-      ));
-      return;
-    }
-    var syncedThisRun = 0;
     try {
+      if (!AppConfig.useStubApi && !await InternetReachability.hasInternet()) {
+        ValetLog.debug('SyncCubit.flush', 'skip — offline');
+        emit(SyncComplete(
+          synced: 0,
+          failed: await failedCount(),
+          pending: await pendingCount(),
+        ));
+        return;
+      }
+      var syncedThisRun = 0;
       if (AppConfig.useStubApi) {
         await _reconcileServerBackedTicketsStub();
       }
@@ -254,7 +263,58 @@ WHERE table_name = 'shifts'
             );
             await _reconcileOrphanQueueEntries();
           }
-          for (final row in pending) {
+
+          final checkInRows = pending
+              .where(
+                (r) =>
+                    r.queueTableName == 'tickets' && r.operation == 'checkin',
+              )
+              .toList();
+          final otherRows = pending
+              .where(
+                (r) =>
+                    r.queueTableName != 'tickets' || r.operation != 'checkin',
+              )
+              .toList();
+
+          if (checkInRows.isNotEmpty) {
+            try {
+              syncedThisRun += await _ticketService.syncPendingCheckInsBatch(
+                checkInRows,
+                token,
+              );
+            } on DioException catch (e, st) {
+              if (e.type == DioExceptionType.connectionError ||
+                  e.error is SocketException) {
+                ValetLog.debug(
+                  'SyncCubit.flush',
+                  'batch check-in skipped — network',
+                );
+              } else {
+                ValetLog.error(
+                  'SyncCubit.flush',
+                  'batch check-in request failed',
+                  e,
+                  st,
+                );
+                for (final row in checkInRows) {
+                  await _markQueueFailed(row);
+                }
+              }
+            } catch (e, st) {
+              ValetLog.error(
+                'SyncCubit.flush',
+                'batch check-in failed',
+                e,
+                st,
+              );
+              for (final row in checkInRows) {
+                await _markQueueFailed(row);
+              }
+            }
+          }
+
+          for (final row in otherRows) {
             try {
               await _syncQueueRow(
                 row: row,
@@ -282,10 +342,12 @@ WHERE table_name = 'shifts'
     } catch (e, st) {
       ValetLog.error('SyncCubit.flush', 'unexpected', e, st);
       emit(SyncComplete(
-        synced: syncedThisRun,
+        synced: 0,
         failed: await failedCount(),
         pending: await pendingCount(),
       ));
+    } finally {
+      _notifyLocalSyncQueueChanged();
     }
   }
 

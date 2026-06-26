@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../domain/check_in_validation.dart';
 import '../state/check_in_cubit.dart';
+import 'check_in_flow_exit.dart';
 import 'widgets/check_in_compact_tokens.dart';
 import 'widgets/check_in_footer_actions.dart';
 import 'widgets/check_in_form_fields.dart';
@@ -91,8 +92,7 @@ class _CheckInCustomerValetScreenState
   }
 
   void _onCancel() {
-    context.read<CheckInCubit>().resetSession();
-    context.go('/dashboard');
+    exitCheckInToDashboard(context);
   }
 
   Widget _dateTimeField() {

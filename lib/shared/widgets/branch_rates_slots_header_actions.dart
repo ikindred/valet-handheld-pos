@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../core/connectivity/internet_reachability.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/services/parking_layout_service.dart';
 import '../../data/services/rate_fetch_service.dart';
@@ -11,7 +14,7 @@ import 'branch_rates_dialog.dart';
 import 'header_sync_status_pill.dart';
 
 /// Rates + Slots pills for cashier headers (dashboard, check-in, checkout, reports, settings).
-class BranchRatesSlotsHeaderActions extends StatelessWidget {
+class BranchRatesSlotsHeaderActions extends StatefulWidget {
   const BranchRatesSlotsHeaderActions({
     super.key,
     this.leading,
@@ -62,27 +65,57 @@ class BranchRatesSlotsHeaderActions extends StatelessWidget {
   }
 
   @override
+  State<BranchRatesSlotsHeaderActions> createState() =>
+      _BranchRatesSlotsHeaderActionsState();
+}
+
+class _BranchRatesSlotsHeaderActionsState
+    extends State<BranchRatesSlotsHeaderActions> {
+  var _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_bootstrap());
+    });
+  }
+
+  Future<void> _bootstrap() async {
+    await InternetReachability.hasInternet();
+    if (!mounted) return;
+    setState(() => _ready = true);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (leading != null) ...[
-          leading!,
+        if (widget.leading != null) ...[
+          widget.leading!,
           const SizedBox(width: 8),
         ],
-        if (showRates) ...[
-          RatesOutlinePill(onPressed: () => openRatesDialog(context)),
+        if (widget.showRates) ...[
+          RatesOutlinePill(
+            onPressed: () =>
+                BranchRatesSlotsHeaderActions.openRatesDialog(context),
+          ),
           const SizedBox(width: 8),
         ],
-        if (showSlots) ...[
-          ParkingSlotsOutlinePill(onPressed: () => openSlotsDialog(context)),
-          if (trailing != null || showOnlineStatus) const SizedBox(width: 8),
+        if (widget.showSlots) ...[
+          ParkingSlotsOutlinePill(
+            onPressed: () =>
+                BranchRatesSlotsHeaderActions.openSlotsDialog(context),
+          ),
+          if (widget.trailing != null || widget.showOnlineStatus)
+            const SizedBox(width: 8),
         ],
-        if (trailing != null) ...[
-          trailing!,
-          if (showOnlineStatus) const SizedBox(width: 8),
+        if (widget.trailing != null) ...[
+          widget.trailing!,
+          if (widget.showOnlineStatus && _ready) const SizedBox(width: 8),
         ],
-        if (showOnlineStatus) ...[
+        if (widget.showOnlineStatus && _ready) ...[
           const HeaderSyncStatusPill(),
           const SizedBox(width: 8),
           const DashboardStatusPillLive(),

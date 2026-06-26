@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/formatting/plate_number.dart';
+import '../../features/check_in/models/batch_check_in_response.dart';
 import '../../features/check_in/models/check_in_response.dart';
 import '../../features/check_out/models/check_out_response.dart';
 import '../../features/check_out/models/checkout_preview_rates.dart';
@@ -12,6 +14,7 @@ import '../../features/reports/domain/reports_transactions_page.dart';
 import 'api_error_message.dart';
 import 'check_in_http.dart';
 import 'check_in_exceptions.dart';
+import '../services/batch_check_in_payload.dart';
 import 'checkout_exceptions.dart';
 
 /// Thrown by [TransactionsApi] on HTTP errors or bad response bodies.
@@ -276,7 +279,89 @@ class TransactionsApi {
     }
   }
 
-  /// POST [AppConfig.checkInUrl] — full check-in (multipart).
+  /// POST [AppConfig.checkInUrl] — batch JSON check-in (`check_ins[]`).
+  Future<BatchCheckInResponse> submitBatchCheckIn({
+    required String token,
+    required List<Map<String, dynamic>> checkIns,
+  }) async {
+    if (checkIns.isEmpty) {
+      throw CheckInValidationException('check_ins must not be empty.');
+    }
+    if (AppConfig.useStubApi) {
+      return BatchCheckInResponse.stubForCheckIns(checkIns);
+    }
+
+    try {
+      final res = await _dio.post<dynamic>(
+        AppConfig.checkInUrl,
+        data: <String, dynamic>{'check_ins': checkIns},
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (_) => true,
+          contentType: 'application/json',
+        ),
+      );
+
+      final code = res.statusCode ?? 0;
+      if (code == 401) {
+        throw LoginApiFailure(
+          messageFromResponseData(res.data) ?? 'Unauthorized.',
+        );
+      }
+      if (_hasBatchCheckInResults(res.data)) {
+        return BatchCheckInResponse.fromJson(_asJsonMap(res.data));
+      }
+      if (code == 400) {
+        throw CheckInValidationException(
+          messageFromResponseData(res.data) ?? 'Invalid check-in data.',
+        );
+      }
+      if (code != 200 && code != 201 && code != 207) {
+        throw CheckInApiException(
+          messageFromResponseData(res.data) ?? res.statusMessage ?? 'HTTP $code',
+          statusCode: code,
+        );
+      }
+      return BatchCheckInResponse.fromJson(_asJsonMap(res.data));
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionError ||
+          e.error is SocketException) {
+        rethrow;
+      }
+      final code = e.response?.statusCode;
+      if (code == 401) {
+        throw LoginApiFailure(
+          messageFromResponseData(e.response?.data) ?? 'Unauthorized.',
+        );
+      }
+      if (_hasBatchCheckInResults(e.response?.data)) {
+        return BatchCheckInResponse.fromJson(
+          _asJsonMap(e.response!.data),
+        );
+      }
+      if (code == 400) {
+        throw CheckInValidationException(
+          messageFromResponseData(e.response?.data) ?? 'Invalid check-in data.',
+        );
+      }
+      throw CheckInApiException(
+        messageFromResponseData(e.response?.data) ??
+            e.message ??
+            'Check-in failed',
+        statusCode: code,
+      );
+    }
+  }
+
+  static bool _hasBatchCheckInResults(dynamic data) {
+    if (data is Map) {
+      final results = data['results'];
+      return results is List && results.isNotEmpty;
+    }
+    return false;
+  }
+
+  /// POST [AppConfig.checkInUrl] — full check-in (single item in batch JSON).
   Future<CheckInResponse> submitCheckIn({
     required String token,
     required String ticketNumber,
@@ -303,125 +388,50 @@ class TransactionsApi {
       );
     }
 
-    final fields = <MapEntry<String, String>>[
-      MapEntry('ticket_number', ticketNumber.trim()),
-      MapEntry('slot_id', slotId.trim()),
-      MapEntry('contact_number', contactNumber),
-      MapEntry('valet_type', valetType),
-      MapEntry('vehicle', jsonEncode(vehicle)),
-      MapEntry('belongings', jsonEncode(belongings)),
-      MapEntry('damages', jsonEncode(damages)),
-    ];
-
-    final name = customerName?.trim();
-    if (name != null && name.isNotEmpty) {
-      fields.add(MapEntry('customer_name', name));
-    }
-    final driver = driverIn?.trim();
-    if (driver != null && driver.isNotEmpty) {
-      fields.add(MapEntry('driver_in', driver));
-    }
-    final driverOutName = driverOut?.trim();
-    if (driverOutName != null && driverOutName.isNotEmpty) {
-      fields.add(MapEntry('driver_out', driverOutName));
-    }
-    final note = notes?.trim();
-    if (note != null && note.isNotEmpty) {
-      fields.add(MapEntry('notes', note));
-    }
     final vr = vrNo?.trim();
-    if (vr != null && vr.isNotEmpty) {
-      fields.add(MapEntry('vr_no', vr));
-    }
-    if (voidRequested) {
-      fields.add(const MapEntry('void_requested', 'true'));
-      final reason = voidReason?.trim();
-      if (reason != null && reason.isNotEmpty) {
-        fields.add(MapEntry('void_reason', reason));
-      }
+    if (vr == null || vr.isEmpty) {
+      throw CheckInValidationException('vr_no is required.');
     }
 
-    final form = FormData.fromMap({
-      for (final e in fields) e.key: e.value,
-      'signature': await MultipartFile.fromFile(
-        signatureFile.path,
-        filename: 'signature.png',
-        contentType: DioMediaType.parse('image/png'),
-      ),
-    });
-
-    try {
-      final res = await _dio.post<dynamic>(
-        AppConfig.checkInUrl,
-        data: form,
-        options: Options(
-          headers: {'Authorization': 'Bearer $token'},
-          validateStatus: (_) => true,
-          contentType: 'multipart/form-data',
-        ),
-      );
-
-      final code = res.statusCode ?? 0;
-      if (code == 201) {
-        final body = _checkInBodyMap(res.data);
-        return CheckInResponse.fromJson(body);
-      }
-      if (code == 400) {
-        throw CheckInValidationException(
-          messageFromResponseData(res.data) ?? 'Invalid check-in data.',
-        );
-      }
-      if (code == 401) {
-        throw LoginApiFailure(
-          messageFromResponseData(res.data) ?? 'Unauthorized.',
-        );
-      }
-      if (code == 409) {
-        if (isVrNumberAlreadyExistsResponse(code, res.data)) {
-          throw VrNumberConflictOnServerException(
-            messageFromResponseData(res.data),
-          );
-        }
-        throw VehicleAlreadyCheckedInException();
-      }
-      throw CheckInApiException(
-        messageFromResponseData(res.data) ?? res.statusMessage ?? 'HTTP $code',
-        statusCode: code,
-      );
-    } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionError ||
-          e.error is SocketException) {
-        rethrow;
-      }
-      final code = e.response?.statusCode;
-      if (code == 400) {
-        throw CheckInValidationException(
-          messageFromResponseData(e.response?.data) ?? 'Invalid check-in data.',
-        );
-      }
-      if (code == 401) {
-        throw LoginApiFailure(
-          messageFromResponseData(e.response?.data) ?? 'Unauthorized.',
-        );
-      }
-      if (code == 409) {
-        if (isVrNumberAlreadyExistsResponse(code, e.response?.data)) {
-          throw VrNumberConflictOnServerException(
-            messageFromResponseData(e.response?.data),
-          );
-        }
-        throw VehicleAlreadyCheckedInException();
-      }
-      throw CheckInApiException(
-        messageFromResponseData(e.response?.data) ??
-            e.message ??
-            'Check-in failed',
-        statusCode: code,
-      );
+    final vehicleClean = Map<String, dynamic>.from(vehicle);
+    vehicleClean.remove('vr_no');
+    vehicleClean.remove('vrNo');
+    if (vehicleClean['plate_number'] != null) {
+      vehicleClean['plate_number'] =
+          normalizePlateNumber(vehicleClean['plate_number'].toString())
+              .toUpperCase();
     }
+
+    final signatureBase64 = await signatureFileToBase64(signatureFile.path);
+    final item = normalCheckInApiItem(
+      ticketNumber: ticketNumber,
+      slotId: slotId,
+      contactNumber: contactNumber,
+      valetType: valetType,
+      vehicle: vehicleClean,
+      belongings: belongings,
+      damages: damages,
+      vrNo: vr,
+      signatureBase64: signatureBase64,
+      customerName: customerName,
+      driverIn: driverIn,
+      driverOut: driverOut,
+      notes: notes,
+      voidRequested: voidRequested,
+      voidReason: voidReason,
+    );
+
+    final batch = await submitBatchCheckIn(token: token, checkIns: [item]);
+    final result = batch.results.isNotEmpty
+        ? batch.results.first
+        : null;
+    if (result == null || result.isFailed) {
+      _throwFromBatchError(result?.error);
+    }
+    return _checkInResponseFromBatchResult(result);
   }
 
-  /// POST [AppConfig.checkInUrl] — express cashier manual ticketing (minimal multipart).
+  /// POST [AppConfig.checkInUrl] — express cashier (single item in batch JSON).
   Future<CheckInResponse> submitExpressCheckIn({
     required String token,
     required String ticketNumber,
@@ -439,101 +449,59 @@ class TransactionsApi {
       );
     }
 
-    final plate = plateNumber.trim();
-    final fields = <MapEntry<String, String>>[
-      MapEntry('ticket_number', ticketNumber.trim()),
-      // NestJS multipart expects nested keys as vehicle[plate_number], not a
-      // top-level plate_number. Keep JSON vehicle too for the same parser as
-      // full check-in.
-      MapEntry('vehicle[plate_number]', plate),
-      MapEntry(
-        'vehicle',
-        jsonEncode(<String, dynamic>{'plate_number': plate}),
-      ),
-      MapEntry('amount', amount.toStringAsFixed(2)),
-      const MapEntry('express_cashier', 'true'),
-      MapEntry('vr_no', vrNo.trim()),
-    ];
-    final driverInName = driverIn?.trim();
-    if (driverInName != null && driverInName.isNotEmpty) {
-      fields.add(MapEntry('driver_in', driverInName));
-    }
-    final driverOutName = driverOut?.trim();
-    if (driverOutName != null && driverOutName.isNotEmpty) {
-      fields.add(MapEntry('driver_out', driverOutName));
-    }
+    final item = expressCheckInApiItem(
+      ticketNumber: ticketNumber,
+      plateNumber: plateNumber,
+      amount: amount,
+      vrNo: vrNo,
+      driverIn: driverIn,
+      driverOut: driverOut,
+    );
 
-    final form = FormData.fromMap({for (final e in fields) e.key: e.value});
-
-    try {
-      final res = await _dio.post<dynamic>(
-        AppConfig.checkInUrl,
-        data: form,
-        options: Options(
-          headers: {'Authorization': 'Bearer $token'},
-          validateStatus: (_) => true,
-          contentType: 'multipart/form-data',
-        ),
-      );
-
-      final code = res.statusCode ?? 0;
-      if (code == 201) {
-        final body = _checkInBodyMap(res.data);
-        return CheckInResponse.fromJson(body);
-      }
-      if (code == 400) {
-        throw CheckInValidationException(
-          messageFromResponseData(res.data) ?? 'Invalid check-in data.',
-        );
-      }
-      if (code == 401) {
-        throw LoginApiFailure(
-          messageFromResponseData(res.data) ?? 'Unauthorized.',
-        );
-      }
-      if (code == 409) {
-        if (isVrNumberAlreadyExistsResponse(code, res.data)) {
-          throw VrNumberConflictOnServerException(
-            messageFromResponseData(res.data),
-          );
-        }
-        throw VehicleAlreadyCheckedInException();
-      }
-      throw CheckInApiException(
-        messageFromResponseData(res.data) ?? res.statusMessage ?? 'HTTP $code',
-        statusCode: code,
-      );
-    } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionError ||
-          e.error is SocketException) {
-        rethrow;
-      }
-      final code = e.response?.statusCode;
-      if (code == 400) {
-        throw CheckInValidationException(
-          messageFromResponseData(e.response?.data) ?? 'Invalid check-in data.',
-        );
-      }
-      if (code == 401) {
-        throw LoginApiFailure(
-          messageFromResponseData(e.response?.data) ?? 'Unauthorized.',
-        );
-      }
-      if (code == 409) {
-        if (isVrNumberAlreadyExistsResponse(code, e.response?.data)) {
-          throw VrNumberConflictOnServerException(
-            messageFromResponseData(e.response?.data),
-          );
-        }
-        throw VehicleAlreadyCheckedInException();
-      }
-      throw CheckInApiException(
-        messageFromResponseData(e.response?.data) ??
-            e.message ??
-            'Check-in failed',
-        statusCode: code,
-      );
+    final batch = await submitBatchCheckIn(token: token, checkIns: [item]);
+    final result = batch.results.isNotEmpty ? batch.results.first : null;
+    if (result == null || result.isFailed) {
+      _throwFromBatchError(result?.error);
     }
+    return _checkInResponseFromBatchResult(result);
+  }
+
+  static CheckInResponse _checkInResponseFromBatchResult(
+    BatchCheckInResultItem result,
+  ) {
+    final txn = Map<String, dynamic>.from(
+      result.transaction ??
+          <String, dynamic>{
+            if (result.serverTransactionId != null)
+              'id': result.serverTransactionId,
+            'ticket_number': result.ticketNumber,
+          },
+    );
+    if (result.serverTransactionId != null &&
+        (txn['id']?.toString().trim().isEmpty ?? true)) {
+      txn['id'] = result.serverTransactionId;
+    }
+    return CheckInResponse.fromJson(txn);
+  }
+
+  static Never _throwFromBatchError(BatchCheckInResultError? error) {
+    if (error == null) {
+      throw CheckInApiException('Check-in failed');
+    }
+    final code = error.statusCode;
+    if (code == 400) {
+      throw CheckInValidationException(error.message);
+    }
+    if (code == 401) {
+      throw LoginApiFailure(error.message);
+    }
+    if (code == 409) {
+      if (error.isVrConflict) {
+        throw VrNumberConflictOnServerException(error.message);
+      }
+      throw VehicleAlreadyCheckedInException();
+    }
+    throw CheckInApiException(error.message, statusCode: code);
   }
 
   /// PATCH [AppConfig.transactionPatchUrl] — partial update for driver fields.

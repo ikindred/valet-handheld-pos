@@ -22,6 +22,8 @@ import '../../auth/state/auth_bloc.dart';
 import '../../cash/presentation/widgets/cash_figma_text_styles.dart';
 import '../../dashboard/presentation/dashboard_screen.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
+import '../../sync/state/sync_cubit.dart';
+import '../../sync/state/sync_state.dart';
 import '../domain/express_cashier_demo_defaults.dart';
 import '../state/express_cashier_cubit.dart';
 import '../state/express_cashier_state.dart';
@@ -417,7 +419,14 @@ class _ExpressCashierScreenState extends State<ExpressCashierScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<ExpressCashierCubit, ExpressCashierState>(
+    return BlocListener<SyncCubit, SyncState>(
+      listenWhen: (_, current) => current is SyncComplete,
+      listener: (context, state) {
+        final id = _localUserId;
+        if (id == null) return;
+        context.read<ExpressCashierCubit>().reloadTransactionsFromDb(id);
+      },
+      child: BlocConsumer<ExpressCashierCubit, ExpressCashierState>(
       listener: (context, state) async {
         if (state is ExpressCashierSaved) {
           final shouldPrint = _printAfterSave;
@@ -545,6 +554,7 @@ class _ExpressCashierScreenState extends State<ExpressCashierScreen> {
           ),
         );
       },
+    ),
     );
   }
 }

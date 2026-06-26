@@ -14,6 +14,7 @@ import '../../../data/services/rate_service.dart';
 import '../domain/check_in_validation.dart';
 import '../domain/vehicle_body_type.dart';
 import '../state/check_in_cubit.dart';
+import 'check_in_flow_exit.dart';
 import 'widgets/check_in_compact_tokens.dart';
 import 'widgets/check_in_footer_actions.dart';
 import 'widgets/check_in_form_fields.dart';
@@ -238,8 +239,7 @@ class _CheckInVehicleDetailsScreenState
   }
 
   void _onCancel() {
-    context.read<CheckInCubit>().resetSession();
-    context.go('/dashboard');
+    exitCheckInToDashboard(context);
   }
 
 
@@ -292,7 +292,7 @@ class _CheckInVehicleDetailsScreenState
   Widget _brandVrNoRow(BoxConstraints constraints) {
     final stackFields =
         MediaQuery.orientationOf(context) == Orientation.portrait ||
-        constraints.maxWidth < 520;
+        constraints.maxWidth < 360;
 
     if (stackFields) {
       return Column(
@@ -308,9 +308,9 @@ class _CheckInVehicleDetailsScreenState
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: _brandField()),
+        Expanded(flex: 3, child: _brandField()),
         const SizedBox(width: CheckInCompactTokens.fieldGap),
-        Expanded(child: _vrNoField()),
+        Expanded(flex: 2, child: _vrNoField()),
       ],
     );
   }
@@ -325,7 +325,7 @@ class _CheckInVehicleDetailsScreenState
     );
   }
 
-  Widget _parkingDropdowns() {
+  Widget _parkingDropdowns({required bool sideBySide}) {
     if (_areaLevelsLoading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
@@ -354,11 +354,8 @@ class _CheckInVehicleDetailsScreenState
             ? const <AreaParkingSlot>[]
             : _slotsForLevel(levelValue);
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (useAreaLayout)
-              CheckInParkingLevelDropdownField(
+        final levelField = useAreaLayout
+            ? CheckInParkingLevelDropdownField(
                 label: 'LEVEL',
                 levels: _areaLevels,
                 value: levelValue ?? '',
@@ -380,8 +377,7 @@ class _CheckInVehicleDetailsScreenState
                   );
                 },
               )
-            else
-              CheckInDropdownField(
+            : CheckInDropdownField(
                 label: 'LEVEL',
                 value: levelValue ?? '',
                 items: levelItems,
@@ -398,10 +394,10 @@ class _CheckInVehicleDetailsScreenState
                     parkingSlotId: keepSlot ? state.parkingSlotId : '',
                   );
                 },
-              ),
-            const SizedBox(height: CheckInCompactTokens.fieldGap),
-            if (useAreaLayout)
-              CheckInParkingSlotDropdownField(
+              );
+
+        final slotField = useAreaLayout
+            ? CheckInParkingSlotDropdownField(
                 label: 'SLOT',
                 slots: levelSlots,
                 value: slotValue ?? '',
@@ -414,8 +410,7 @@ class _CheckInVehicleDetailsScreenState
                             );
                       },
               )
-            else
-              CheckInDropdownField(
+            : CheckInDropdownField(
                 label: 'SLOT',
                 value: slotValue ?? '',
                 items: slotItems,
@@ -428,13 +423,53 @@ class _CheckInVehicleDetailsScreenState
                               parkingSlotId: '',
                             );
                       },
-              ),
+              );
+
+        if (sideBySide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: levelField),
+              const SizedBox(width: CheckInCompactTokens.fieldGap),
+              Expanded(child: slotField),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            levelField,
+            const SizedBox(height: CheckInCompactTokens.fieldGap),
+            slotField,
           ],
         );
       },
     );
   }
 
+  Widget _columnParkingOnly({required bool sideBySideParking}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const CheckInSectionTitle(text: 'PARKING'),
+        const SizedBox(height: CheckInCompactTokens.sectionGap),
+        _parkingDropdowns(sideBySide: sideBySideParking),
+      ],
+    );
+  }
+
+  Widget _narrowBody(BoxConstraints constraints) {
+    final sideBySideParking = constraints.maxWidth >= 360;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _columnVehicleId(constraints),
+        const SizedBox(height: CheckInCompactTokens.blockGap),
+        _columnParkingOnly(sideBySideParking: sideBySideParking),
+      ],
+    );
+  }
   Widget _columnVehicleId(BoxConstraints constraints) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -454,35 +489,10 @@ class _CheckInVehicleDetailsScreenState
     );
   }
 
-  Widget _columnParkingOnly() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const CheckInSectionTitle(text: 'PARKING'),
-        const SizedBox(height: CheckInCompactTokens.sectionGap),
-        _parkingDropdowns(),
-      ],
-    );
-  }
-
-  Widget _narrowBody(BoxConstraints constraints) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _columnVehicleId(constraints),
-        const SizedBox(height: CheckInCompactTokens.blockGap),
-        _columnParkingOnly(),
-      ],
-    );
-  }
-
   bool _useTwoColumnLayout(BoxConstraints constraints) {
     final isLandscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
-    final shortestSide = MediaQuery.sizeOf(context).shortestSide;
-    return isLandscape &&
-        constraints.maxWidth >= 560 &&
-        shortestSide >= 600;
+    return isLandscape && constraints.maxWidth >= 400;
   }
 
   @override
@@ -518,7 +528,9 @@ class _CheckInVehicleDetailsScreenState
                           thickness: 1,
                           color: AppThemeColors.of(context).cardBorder,
                         ),
-                        Expanded(child: _columnParkingOnly()),
+                        Expanded(
+                          child: _columnParkingOnly(sideBySideParking: true),
+                        ),
                       ],
                     );
                   },
