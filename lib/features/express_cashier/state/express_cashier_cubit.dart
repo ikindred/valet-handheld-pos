@@ -147,19 +147,23 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
             synced = true;
           }
         } on VrNumberConflictOnServerException catch (_) {
-          final serverId = await _tickets.resolveServerTransactionIdByVr(
+          final linked = await _tickets.reconcileLocalTicketFromServerLookup(
+            localTicketId: ticket,
             token: token,
-            vrNo: vr,
-            plateNumber: plate,
-            ticketNumber: ticket,
           );
-          if (serverId != null) {
-            await _tickets.updateServerTicketId(ticket, serverId);
+          if (linked) {
+            synced = true;
+          }
+        } on VehicleAlreadyCheckedInException catch (_) {
+          final linked = await _tickets.reconcileLocalTicketFromServerLookup(
+            localTicketId: ticket,
+            token: token,
+          );
+          if (linked) {
             synced = true;
           }
         } on DioException catch (e) {
-          if (e.type != DioExceptionType.connectionError &&
-              e.error is! SocketException) {
+          if (!_isUncertainNetworkDio(e)) {
             ValetLog.warning(
               'ExpressCashierCubit.save',
               'check-in failed, queueing for sync ticket=$ticket: $e',
@@ -258,5 +262,13 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
       emit(loaded.copyWith(isSaving: false));
     }
     emit(ExpressCashierError(message));
+  }
+
+  static bool _isUncertainNetworkDio(DioException e) {
+    if (e.error is SocketException) return true;
+    return e.type == DioExceptionType.connectionError ||
+        e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.sendTimeout ||
+        e.type == DioExceptionType.receiveTimeout;
   }
 }

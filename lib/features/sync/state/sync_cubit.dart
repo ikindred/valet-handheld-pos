@@ -11,6 +11,7 @@ import '../../../core/logging/valet_log.dart';
 import '../../../core/sync/local_sync_notifier.dart';
 import '../../../data/local/db/app_database.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/remote/check_in_exceptions.dart';
 import '../../../data/services/cash_session_close_payload.dart';
 import '../../../data/services/cash_session_http.dart';
 import '../../../data/services/cash_session_start_payload.dart';
@@ -219,6 +220,15 @@ WHERE table_name = 'shifts'
 
     final tok = token ?? (await _auth.getActiveSession())?.authToken;
     if (tok != null && tok.isNotEmpty) {
+      final listLinked =
+          await _ticketService.reconcileOfflineTicketsFromServerList(tok);
+      if (listLinked > 0) {
+        ValetLog.debug(
+          'SyncCubit.flush',
+          'reconciled $listLinked offline ticket(s) from server list',
+        );
+      }
+
       final verified =
           await _ticketService.reconcilePendingServerBackedTickets(tok);
       if (verified > 0) {
@@ -291,6 +301,19 @@ WHERE table_name = 'shifts'
         if (token == null || token.isEmpty) {
           ValetLog.debug('SyncCubit.flush', 'skip HTTP — no bearer token');
         } else {
+          final listLinked =
+              await _ticketService.reconcileOfflineTicketsFromServerList(token);
+          if (listLinked > 0) {
+            ValetLog.debug(
+              'SyncCubit.flush',
+              'reconciled $listLinked offline ticket(s) from server list',
+            );
+            queuePending = await (_db.select(_db.syncQueue)
+                  ..where((q) => q.syncStatus.equals('pending'))
+                  ..orderBy([(q) => OrderingTerm.asc(q.createdAt)]))
+                .get();
+          }
+
           final reopened = await _ticketService.reconcileStaleCheckoutUploads(
             token,
           );
@@ -486,6 +509,18 @@ WHERE table_name = 'shifts'
         onSynced();
       } on DioException catch (e, st) {
         final status = e.response?.statusCode;
+        if (status == 409) {
+          final reconciled =
+              await _ticketService.reconcileLocalTicketFromServerLookup(
+            localTicketId: row.recordId,
+            token: token,
+          );
+          if (reconciled) {
+            await _markQueueSynced(row);
+            onSynced();
+            return;
+          }
+        }
         if (status != null && status >= 400 && status < 500) {
           ValetLog.error(
             'SyncCubit.flush',
@@ -504,6 +539,19 @@ WHERE table_name = 'shifts'
           await _incrementRetry(row);
         }
       } catch (e, st) {
+        if (e is VrNumberConflictOnServerException ||
+            e is VehicleAlreadyCheckedInException) {
+          final reconciled =
+              await _ticketService.reconcileLocalTicketFromServerLookup(
+            localTicketId: row.recordId,
+            token: token,
+          );
+          if (reconciled) {
+            await _markQueueSynced(row);
+            onSynced();
+            return;
+          }
+        }
         ValetLog.error(
           'SyncCubit.flush',
           'check-in failed recordId=${row.recordId}',

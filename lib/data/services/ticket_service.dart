@@ -950,35 +950,55 @@ WHERE t.sync_status = 'pending'
         continue;
       }
 
-      if (!ticket.isExpressCashier) continue;
+      if (ticket.isExpressCashier) {
+        final vr = ticket.vrNo?.trim() ?? '';
+        final plate = ticket.plateNumber.trim();
+        final amount = ticket.fee ?? 0;
+        if (vr.isEmpty || plate.isEmpty || amount <= 0) {
+          ValetLog.warning(
+            'TicketService.reconcileOrphanPendingTickets',
+            'skip express ticketId=$tid — missing vr/plate/amount',
+          );
+          continue;
+        }
 
-      final vr = ticket.vrNo?.trim() ?? '';
-      final plate = ticket.plateNumber.trim();
-      final amount = ticket.fee ?? 0;
-      if (vr.isEmpty || plate.isEmpty || amount <= 0) {
+        await enqueueCheckInSync(
+          localTicketId: tid,
+          payload: expressCheckInSyncQueuePayload(
+            localTicketId: tid,
+            ticketNumber: tid,
+            plateNumber: plate,
+            amount: amount,
+            vrNo: vr,
+            driverIn: ticket.driverIn,
+            driverOut: ticket.driverOut,
+          ),
+        );
+        enqueued++;
+        ValetLog.debug(
+          'TicketService.reconcileOrphanPendingTickets',
+          're-enqueued express check-in ticketId=$tid',
+        );
+        continue;
+      }
+
+      final standardPayload = standardCheckInSyncQueuePayloadFromTicket(ticket);
+      if (standardPayload == null) {
         ValetLog.warning(
           'TicketService.reconcileOrphanPendingTickets',
-          'skip express ticketId=$tid — missing vr/plate/amount',
+          'skip standard ticketId=$tid — missing signature/slot/vr',
         );
         continue;
       }
 
       await enqueueCheckInSync(
         localTicketId: tid,
-        payload: expressCheckInSyncQueuePayload(
-          localTicketId: tid,
-          ticketNumber: tid,
-          plateNumber: plate,
-          amount: amount,
-          vrNo: vr,
-          driverIn: ticket.driverIn,
-          driverOut: ticket.driverOut,
-        ),
+        payload: standardPayload,
       );
       enqueued++;
       ValetLog.debug(
         'TicketService.reconcileOrphanPendingTickets',
-        're-enqueued express check-in ticketId=$tid',
+        're-enqueued standard check-in ticketId=$tid',
       );
     }
     if (enqueued > 0) {
@@ -1091,6 +1111,292 @@ WHERE sync_status = 'pending'
       if (e.statusCode == 404) return false;
       rethrow;
     }
+  }
+
+  /// When the server already has this check-in (409) or a list fetch finds a
+  /// match, link the local row and mark upload queue rows synced.
+  Future<bool> reconcileLocalTicketFromServerLookup({
+    required String localTicketId,
+    required String token,
+    Map<String, dynamic>? serverTxn,
+    String? serverIdOverride,
+  }) async {
+    final ticket = await ticketById(localTicketId.trim());
+    if (ticket == null) return false;
+
+    final serverId = serverIdOverride?.trim() ??
+        await resolveServerTransactionIdByVr(
+          token: token,
+          vrNo: ticket.vrNo ?? '',
+          plateNumber: ticket.plateNumber,
+          ticketNumber: ticket.id,
+        );
+    if (serverId == null || serverId.isEmpty) return false;
+
+    return _applyServerReconciliationForLocalTicket(
+      ticket: ticket,
+      serverId: serverId,
+      serverTxn: serverTxn,
+      token: token,
+    );
+  }
+
+  /// Fetches today's server transactions and links pending local tickets that
+  /// already exist remotely (standard + express check-in / check-out).
+  Future<int> reconcileOfflineTicketsFromServerList(String token) async {
+    if (AppConfig.useStubApi) return 0;
+
+    final pending = await _pendingTicketsNeedingReconcile();
+    if (pending.isEmpty) return 0;
+
+    final reconciledLocalIds = <String>{};
+    var linked = 0;
+
+    final serverRows = await _fetchTodayServerTransactions(token);
+    for (final ticket in pending) {
+      final match = _findMatchingServerRow(
+        ticket,
+        serverRows,
+        excludeServerIds: const {},
+      );
+      if (match == null) continue;
+      final serverId = _serverUuidFromTransactionJson(match);
+      if (serverId == null) continue;
+      final ok = await _applyServerReconciliationForLocalTicket(
+        ticket: ticket,
+        serverId: serverId,
+        serverTxn: match,
+        token: token,
+      );
+      if (ok) {
+        linked++;
+        reconciledLocalIds.add(ticket.id);
+      }
+    }
+
+    for (final ticket in pending) {
+      if (reconciledLocalIds.contains(ticket.id)) continue;
+      final fresh = await ticketById(ticket.id);
+      if (fresh == null || fresh.syncStatus == 'synced') continue;
+      if (!await _hasUnsyncedQueueForTicket(ticket.id) &&
+          fresh.syncStatus == 'synced') {
+        continue;
+      }
+      if (await reconcileLocalTicketFromServerLookup(
+        localTicketId: ticket.id,
+        token: token,
+      )) {
+        linked++;
+      }
+    }
+
+    if (linked > 0) {
+      ValetLog.info(
+        'TicketService.reconcileOfflineTicketsFromServerList',
+        'linked $linked pending ticket(s) already on server',
+      );
+    }
+    return linked;
+  }
+
+  Future<List<Ticket>> _pendingTicketsNeedingReconcile() async {
+    final rows = await _db.customSelect(
+      '''
+SELECT DISTINCT t.id AS id FROM tickets t
+WHERE t.sync_status = 'pending'
+   OR t.id IN (
+     SELECT q.record_id FROM sync_queue q
+     WHERE q.table_name = 'tickets'
+       AND q.sync_status IN ('pending', 'failed')
+   )
+''',
+      readsFrom: {_db.tickets, _db.syncQueue},
+    ).get();
+
+    final out = <Ticket>[];
+    for (final row in rows) {
+      final ticket = await ticketById(row.read<String>('id'));
+      if (ticket != null) out.add(ticket);
+    }
+    return out;
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchTodayServerTransactions(
+    String token,
+  ) async {
+    final now = PhilippineTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    final fromUnix = start.millisecondsSinceEpoch ~/ 1000;
+    final toUnix = end.millisecondsSinceEpoch ~/ 1000;
+
+    final all = <Map<String, dynamic>>[];
+    for (var page = 1; page <= 5; page++) {
+      try {
+        final rows = await _transactionsApi.fetchTransactions(
+          token: token,
+          dateFromUnix: fromUnix,
+          dateToUnix: toUnix,
+          limit: 200,
+          page: page,
+        );
+        if (rows.isEmpty) break;
+        all.addAll(rows);
+        if (rows.length < 200) break;
+      } catch (e, st) {
+        ValetLog.error(
+          'TicketService._fetchTodayServerTransactions',
+          'page=$page',
+          e,
+          st,
+        );
+        break;
+      }
+    }
+    return all;
+  }
+
+  Map<String, dynamic>? _findMatchingServerRow(
+    Ticket local,
+    List<Map<String, dynamic>> serverRows, {
+    required Set<String> excludeServerIds,
+  }) {
+    for (final row in serverRows) {
+      final serverId = _serverUuidFromTransactionJson(row);
+      if (serverId == null || excludeServerIds.contains(serverId)) continue;
+      if (_serverRowMatchesLocalTicket(local, row)) return row;
+    }
+    return null;
+  }
+
+  bool _serverRowMatchesLocalTicket(
+    Ticket local,
+    Map<String, dynamic> server,
+  ) {
+    final localId = local.id.trim();
+    final serverTicket = server['ticket_number']?.toString().trim() ??
+        server['ticketNumber']?.toString().trim() ??
+        '';
+    if (localId.isNotEmpty && serverTicket == localId) return true;
+
+    final localVr = normalizeVrNumber(local.vrNo ?? '');
+    final serverVr = normalizeVrNumber(_vrNoFromTransactionJson(server));
+    if (localVr.isEmpty || serverVr.isEmpty || localVr != serverVr) {
+      return false;
+    }
+
+    final localPlate = normalizePlateNumber(local.plateNumber).toUpperCase();
+    final serverPlate = _plateFromTransactionJson(server);
+    if (localPlate.isNotEmpty &&
+        serverPlate.isNotEmpty &&
+        localPlate != serverPlate) {
+      return false;
+    }
+    return true;
+  }
+
+  String? _serverUuidFromTransactionJson(Map<String, dynamic> json) {
+    final id = json['id']?.toString().trim() ?? '';
+    if (id.isEmpty || id.startsWith('TKT-')) return null;
+    return id;
+  }
+
+  static String _plateFromTransactionJson(Map<String, dynamic> json) {
+    final top = json['plate_number']?.toString().trim() ??
+        json['plateNumber']?.toString().trim();
+    if (top != null && top.isNotEmpty) {
+      return normalizePlateNumber(top).toUpperCase();
+    }
+    final vehicle = json['vehicle'];
+    if (vehicle is Map) {
+      final m = Map<String, dynamic>.from(vehicle);
+      final plate = m['plate_number']?.toString().trim() ??
+          m['plateNumber']?.toString().trim() ??
+          '';
+      if (plate.isNotEmpty) {
+        return normalizePlateNumber(plate).toUpperCase();
+      }
+    }
+    return '';
+  }
+
+  Future<bool> _applyServerReconciliationForLocalTicket({
+    required Ticket ticket,
+    required String serverId,
+    required String token,
+    Map<String, dynamic>? serverTxn,
+  }) async {
+    await updateServerTicketId(ticket.id, serverId);
+    await _markCheckInQueuesSyncedForTicket(ticket.id);
+
+    Map<String, dynamic>? txn = serverTxn;
+    if (txn == null) {
+      try {
+        txn = await _transactionsApi.getTransactionById(
+          token: token,
+          id: serverId,
+        );
+      } catch (e, st) {
+        ValetLog.error(
+          'TicketService._applyServerReconciliationForLocalTicket',
+          'GET failed ticketId=${ticket.id} serverId=$serverId',
+          e,
+          st,
+        );
+      }
+    }
+
+    if (ticket.status == 'completed' || ticket.status == 'lost') {
+      if (txn != null && !_serverTransactionStillCheckedIn(txn)) {
+        await _markLocalCheckoutFullySynced(ticket.id);
+        return true;
+      }
+      await (_db.update(_db.tickets)..where((t) => t.id.equals(ticket.id)))
+          .write(
+        TicketsCompanion(
+          syncStatus: Value(await _resolvedSyncStatusForTicket(ticket.id)),
+        ),
+      );
+      return true;
+    }
+
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(ticket.id))).write(
+      const TicketsCompanion(syncStatus: Value('synced')),
+    );
+    _notifyLocalSyncQueueChanged();
+    return true;
+  }
+
+  Future<void> _markCheckInQueuesSyncedForTicket(String ticketId) async {
+    final tid = ticketId.trim();
+    if (tid.isEmpty) return;
+    await (_db.update(_db.syncQueue)..where(
+          (q) =>
+              q.recordId.equals(tid) &
+              q.queueTableName.equals('tickets') &
+              q.operation.equals('checkin') &
+              q.syncStatus.isIn(['pending', 'failed']),
+        ))
+        .write(const SyncQueueCompanion(syncStatus: Value('synced')));
+  }
+
+  Future<CheckInResponse?> _reconcileQueuedCheckInConflict({
+    required String localTicketId,
+    required String token,
+  }) async {
+    final linked = await reconcileLocalTicketFromServerLookup(
+      localTicketId: localTicketId,
+      token: token,
+    );
+    if (!linked) return null;
+
+    final serverId = (await ticketById(localTicketId))?.serverTicketId?.trim();
+    if (serverId == null || serverId.isEmpty) return null;
+    return CheckInResponse(
+      id: serverId,
+      ticketNumber: localTicketId,
+      qrCode: localTicketId,
+    );
   }
 
   /// Uploads pending check-in queue rows in one batch JSON request.
@@ -1594,47 +1900,63 @@ WHERE sync_status = 'pending'
       throw StateError('Queued check-in missing vr_no');
     }
 
-    final response = await _transactionsApi.submitCheckIn(
-      token: token,
-      ticketNumber: localId,
-      slotId: slotId,
-      contactNumber: body['contact_number']?.toString() ?? '',
-      valetType: body['valet_type']?.toString() ?? 'standard_valet',
-      signatureFile: file,
-      vehicle: vehicle,
-      belongings: belongings,
-      damages: damages,
-      customerName: body['customer_name']?.toString(),
-      driverIn: body['driver_in']?.toString(),
-      driverOut: body['driver_out']?.toString(),
-      notes: body['notes']?.toString(),
-      vrNo: vrNo,
-      voidRequested: localRow?.pendingVoidRequest ?? false,
-      voidReason: localRow?.pendingVoidReason,
-    );
-
-    if (localId.isNotEmpty) {
-      await updateServerTicketId(localId, response.id);
-      final queuedSlotId = body['slot_id']?.toString().trim() ?? '';
-      final voidMeta = _voidAuditCompanion(response.rawJson);
-      final voidStatus = _resolveVoidStatus(response.rawJson);
-      final companion = TicketsCompanion(
-        syncStatus: const Value('synced'),
-        pendingVoidRequest: const Value(false),
-        pendingVoidReason: const Value(null),
-        status: voidStatus != null ? Value(voidStatus) : const Value.absent(),
-        voidReason: voidMeta.voidReason,
-        voidedByJson: voidMeta.voidedByJson,
-        voidedAt: voidMeta.voidedAt,
-        slotId: queuedSlotId.isNotEmpty
-            ? Value(queuedSlotId)
-            : const Value.absent(),
-        vrNo: Value(vrNo),
+    try {
+      final response = await _transactionsApi.submitCheckIn(
+        token: token,
+        ticketNumber: localId,
+        slotId: slotId,
+        contactNumber: body['contact_number']?.toString() ?? '',
+        valetType: body['valet_type']?.toString() ?? 'standard_valet',
+        signatureFile: file,
+        vehicle: vehicle,
+        belongings: belongings,
+        damages: damages,
+        customerName: body['customer_name']?.toString(),
+        driverIn: body['driver_in']?.toString(),
+        driverOut: body['driver_out']?.toString(),
+        notes: body['notes']?.toString(),
+        vrNo: vrNo,
+        voidRequested: localRow?.pendingVoidRequest ?? false,
+        voidReason: localRow?.pendingVoidReason,
       );
-      await (_db.update(_db.tickets)..where((t) => t.id.equals(localId)))
-          .write(companion);
+
+      if (localId.isNotEmpty) {
+        await updateServerTicketId(localId, response.id);
+        final queuedSlotId = body['slot_id']?.toString().trim() ?? '';
+        final voidMeta = _voidAuditCompanion(response.rawJson);
+        final voidStatus = _resolveVoidStatus(response.rawJson);
+        final companion = TicketsCompanion(
+          syncStatus: const Value('synced'),
+          pendingVoidRequest: const Value(false),
+          pendingVoidReason: const Value(null),
+          status: voidStatus != null ? Value(voidStatus) : const Value.absent(),
+          voidReason: voidMeta.voidReason,
+          voidedByJson: voidMeta.voidedByJson,
+          voidedAt: voidMeta.voidedAt,
+          slotId: queuedSlotId.isNotEmpty
+              ? Value(queuedSlotId)
+              : const Value.absent(),
+          vrNo: Value(vrNo),
+        );
+        await (_db.update(_db.tickets)..where((t) => t.id.equals(localId)))
+            .write(companion);
+      }
+      return response;
+    } on VrNumberConflictOnServerException catch (_) {
+      final reconciled = await _reconcileQueuedCheckInConflict(
+        localTicketId: localId,
+        token: token,
+      );
+      if (reconciled != null) return reconciled;
+      rethrow;
+    } on VehicleAlreadyCheckedInException catch (_) {
+      final reconciled = await _reconcileQueuedCheckInConflict(
+        localTicketId: localId,
+        token: token,
+      );
+      if (reconciled != null) return reconciled;
+      rethrow;
     }
-    return response;
   }
 
   /// Processes a queued express cashier check-in row.
@@ -1694,34 +2016,25 @@ WHERE sync_status = 'pending'
       );
       return response;
     } on VrNumberConflictOnServerException catch (e, st) {
-      final serverId = await resolveServerTransactionIdByVr(
+      final reconciled = await _reconcileQueuedCheckInConflict(
+        localTicketId: localId,
         token: token,
-        vrNo: vrNo,
-        plateNumber: plate,
-        ticketNumber: ticketNumber,
       );
-      if (serverId == null) {
-        ValetLog.error(
-          'TicketService.syncQueuedExpressCheckIn',
-          'VR conflict but no server match vr=$vrNo localId=$localId',
-          e,
-          st,
-        );
-        rethrow;
-      }
-      ValetLog.info(
+      if (reconciled != null) return reconciled;
+      ValetLog.error(
         'TicketService.syncQueuedExpressCheckIn',
-        'linked existing server ticket $serverId for localId=$localId vr=$vrNo',
+        'VR conflict but no server match vr=$vrNo localId=$localId',
+        e,
+        st,
       );
-      await updateServerTicketId(localId, serverId);
-      await (_db.update(_db.tickets)..where((t) => t.id.equals(localId))).write(
-        const TicketsCompanion(syncStatus: Value('synced')),
+      rethrow;
+    } on VehicleAlreadyCheckedInException catch (_) {
+      final reconciled = await _reconcileQueuedCheckInConflict(
+        localTicketId: localId,
+        token: token,
       );
-      return CheckInResponse(
-        id: serverId,
-        ticketNumber: ticketNumber,
-        qrCode: ticketNumber,
-      );
+      if (reconciled != null) return reconciled;
+      rethrow;
     }
   }
 

@@ -273,6 +273,56 @@ WHERE sync_status IN ('pending', 'failed')
     expect(queueRows.first.syncStatus, 'pending');
   });
 
+  test('reconcileOrphanPendingTickets enqueues standard check-in', () async {
+    await db.into(db.shifts).insert(
+          ShiftsCompanion.insert(
+            id: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            openedAt: now,
+            openingFloat: 100,
+            status: 'open',
+            syncStatus: 'synced',
+            createdAt: now,
+          ),
+        );
+    await db.into(db.tickets).insert(
+          TicketsCompanion.insert(
+            id: ticketId,
+            shiftId: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            plateNumber: 'ABC123',
+            vehicleBrand: 'Toyota',
+            vehicleColor: 'Black',
+            vehicleType: 'sedan',
+            cellphoneNumber: '09171234567',
+            damageMarkers: '[]',
+            personalBelongings: '[]',
+            checkInAt: now,
+            status: 'active',
+            syncStatus: 'pending',
+            createdAt: now,
+            vrNo: const Value('VR123'),
+            signaturePng: const Value('/tmp/sig.png'),
+            slotId: const Value('slot-uuid-1'),
+          ),
+        );
+
+    expect(await ticketService.countOrphanPendingTickets(), 1);
+
+    final enqueued = await ticketService.reconcileOrphanPendingTickets();
+    expect(enqueued, 1);
+    expect(await ticketService.countOrphanPendingTickets(), 0);
+
+    final queueRows = await (db.select(db.syncQueue)
+          ..where((q) => q.recordId.equals(ticketId)))
+        .get();
+    expect(queueRows, hasLength(1));
+    expect(queueRows.first.operation, 'checkin');
+    expect(queueRows.first.syncStatus, 'pending');
+  });
+
   test('linking server ticket while check-in queue pending leaves orphan', () async {
     await db.into(db.shifts).insert(
           ShiftsCompanion.insert(

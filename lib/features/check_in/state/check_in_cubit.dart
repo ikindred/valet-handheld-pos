@@ -511,8 +511,7 @@ class CheckInCubit extends Cubit<CheckInState> {
 
       if (context.mounted) context.go('/check-in/print');
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionError ||
-          e.error is SocketException) {
+      if (_isOfflineDio(e)) {
         await _enqueueCheckIn(
           ts: ts,
           ticketId: ticketId,
@@ -533,7 +532,48 @@ class CheckInCubit extends Cubit<CheckInState> {
           SnackBar(content: Text(e.toString())),
         );
       }
+    } on VrNumberConflictOnServerException catch (_) {
+      final linked = await _tryReconcileLiveCheckIn(
+        ts: ts,
+        auth: auth,
+        ticketId: ticketId,
+      );
+      if (linked != null) {
+        emit(
+          state.copyWith(
+            isSubmitting: false,
+            serverTicketId: linked,
+            qrCode: ticketId,
+          ),
+        );
+        if (context.mounted) context.go('/check-in/print');
+        return;
+      }
+      emit(state.copyWith(isSubmitting: false));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This VR number already exists on the server.'),
+          ),
+        );
+      }
     } on VehicleAlreadyCheckedInException catch (_) {
+      final linked = await _tryReconcileLiveCheckIn(
+        ts: ts,
+        auth: auth,
+        ticketId: ticketId,
+      );
+      if (linked != null) {
+        emit(
+          state.copyWith(
+            isSubmitting: false,
+            serverTicketId: linked,
+            qrCode: ticketId,
+          ),
+        );
+        if (context.mounted) context.go('/check-in/print');
+        return;
+      }
       emit(state.copyWith(isSubmitting: false));
       if (!context.mounted) return;
       await showAppAlertDialog(
@@ -597,6 +637,30 @@ class CheckInCubit extends Cubit<CheckInState> {
       vrNo: state.vehicleVrNo.trim(),
     );
     await ts.enqueueCheckInSync(localTicketId: ticketId, payload: payload);
+  }
+
+  Future<String?> _tryReconcileLiveCheckIn({
+    required TicketService ts,
+    required AuthRepository auth,
+    required String ticketId,
+  }) async {
+    final session = await auth.getActiveSession();
+    final token = session?.authToken?.trim() ?? '';
+    if (token.isEmpty) return null;
+    final linked = await ts.reconcileLocalTicketFromServerLookup(
+      localTicketId: ticketId,
+      token: token,
+    );
+    if (!linked) return null;
+    return (await ts.ticketById(ticketId))?.serverTicketId?.trim();
+  }
+
+  static bool _isOfflineDio(DioException e) {
+    if (e.error is SocketException) return true;
+    return e.type == DioExceptionType.connectionError ||
+        e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.sendTimeout ||
+        e.type == DioExceptionType.receiveTimeout;
   }
 
   /// Vehicle JSON for check-in API (`vr_no` is a separate top-level field).
