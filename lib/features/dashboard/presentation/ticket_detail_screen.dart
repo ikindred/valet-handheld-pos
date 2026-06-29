@@ -138,33 +138,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     setState(() => _voidLoading = true);
     try {
       final tickets = context.read<TicketService>();
-      if (isOnline) {
-        final serverId = t.serverTicketId?.trim();
-        if (serverId == null || serverId.isEmpty) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Ticket is not synced to the server yet. Try again when online.',
-              ),
-            ),
-          );
-          return;
-        }
-        await tickets.requestTicketVoid(
-          serverTicketId: serverId,
-          reason: reason,
-        );
-      } else if (t.syncStatus == 'pending') {
+      final pendingLocalOnly =
+          t.syncStatus == 'pending' &&
+          (t.serverTicketId?.trim().isEmpty ?? true);
+
+      if (!isOnline && pendingLocalOnly) {
         await tickets.storeOfflineVoidRequest(t.id, reason);
       } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Connect to the internet to request a void.'),
-          ),
-        );
-        return;
+        await tickets.voidCachedTicket(localTicketId: t.id, reason: reason);
       }
       if (!mounted) return;
       _reloadDetail();
@@ -172,9 +153,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            isOnline
-                ? 'Ticket voided.'
-                : 'Void queued — will apply when check-in syncs.',
+            !isOnline && pendingLocalOnly
+                ? 'Void queued — will apply when check-in syncs.'
+                : isOnline
+                    ? 'Ticket voided.'
+                    : 'Void queued — will sync to server when online.',
           ),
         ),
       );
@@ -247,9 +230,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     if (t.status != 'active') return false;
     if (detail.isVoided) return false;
     if (detail.hasPendingVoid) return false;
-    final isOnline = _isOnline ?? false;
-    if (isOnline) return true;
-    return t.syncStatus == 'pending';
+    return true;
   }
 
   static List<String> _belongingsList(String raw) {

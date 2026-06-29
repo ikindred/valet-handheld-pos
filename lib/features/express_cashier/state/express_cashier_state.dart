@@ -8,7 +8,13 @@ class ExpressCashierTransaction extends Equatable {
     required this.plateNumber,
     required this.amount,
     required this.syncStatus,
+    required this.status,
+    required this.checkInAt,
     this.vrNo,
+    this.serverTicketId,
+    this.driverIn,
+    this.driverOut,
+    this.voidReason,
   });
 
   factory ExpressCashierTransaction.fromTicket(Ticket ticket) {
@@ -17,7 +23,13 @@ class ExpressCashierTransaction extends Equatable {
       plateNumber: ticket.plateNumber,
       amount: ticket.fee ?? 0,
       syncStatus: ticket.syncStatus,
+      status: ticket.status,
+      checkInAt: ticket.checkInAt,
       vrNo: ticket.vrNo,
+      serverTicketId: ticket.serverTicketId,
+      driverIn: ticket.driverIn,
+      driverOut: ticket.driverOut,
+      voidReason: ticket.voidReason,
     );
   }
 
@@ -25,12 +37,36 @@ class ExpressCashierTransaction extends Equatable {
   final String plateNumber;
   final double amount;
   final String syncStatus;
+  final String status;
+  final String checkInAt;
   final String? vrNo;
+  final String? serverTicketId;
+  final String? driverIn;
+  final String? driverOut;
+  final String? voidReason;
 
   bool get isSynced => syncStatus == 'synced';
 
+  bool get isVoided => status == 'void';
+
+  bool get hasServerId => serverTicketId?.trim().isNotEmpty == true;
+
+  bool get canVoid => !isVoided;
+
   @override
-  List<Object?> get props => [ticketId, plateNumber, amount, syncStatus, vrNo];
+  List<Object?> get props => [
+        ticketId,
+        plateNumber,
+        amount,
+        syncStatus,
+        status,
+        checkInAt,
+        vrNo,
+        serverTicketId,
+        driverIn,
+        driverOut,
+        voidReason,
+      ];
 }
 
 sealed class ExpressCashierState extends Equatable {

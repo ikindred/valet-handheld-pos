@@ -124,6 +124,10 @@ class PendingSyncItem {
           return 'Check-in';
         case 'checkout/finalize':
           return 'Check-out';
+        case 'void':
+          return 'Void ticket';
+        case 'patch/plate':
+          return 'Plate update';
         case 'update':
           return 'Ticket update';
         default:

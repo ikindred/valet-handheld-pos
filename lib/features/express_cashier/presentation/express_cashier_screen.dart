@@ -16,6 +16,7 @@ import '../../../core/ui/app_text_field.dart';
 import '../../../core/printing/express_checkout_receipt_data.dart';
 import '../../../core/printing/print_flow.dart';
 import '../../../core/printing/printer_connection_notifier.dart';
+import '../../../data/remote/transactions_api.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/ticket_service.dart';
 import '../../../shared/widgets/cashier_greeting_header.dart';
@@ -28,6 +29,7 @@ import '../../sync/state/sync_state.dart';
 import '../domain/express_cashier_demo_defaults.dart';
 import '../state/express_cashier_cubit.dart';
 import '../state/express_cashier_state.dart';
+import 'widgets/express_transaction_detail_dialog.dart';
 
 /// Adaptive palette aligned with [DashboardStyles] / [AppThemeColors].
 final class _ExpressTheme {
@@ -329,6 +331,50 @@ class _ExpressCashierScreenState extends State<ExpressCashierScreen> {
     context.read<ExpressCashierCubit>().loadTransactions(id);
   }
 
+  Future<void> _openTransactionDetail(ExpressCashierTransaction tx) async {
+    final userId = _localUserId;
+    if (userId == null || !mounted) return;
+
+    final cubit = context.read<ExpressCashierCubit>();
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (!context.mounted) return;
+    await showExpressTransactionDetailDialog(
+      context: context,
+      transaction: tx,
+      formatPlateDisplay: _formatPlateDisplay,
+      formatAmount: _formatAmount,
+      onVoid: (reason) async {
+        try {
+          final result = await cubit.voidTransaction(
+            localUserId: userId,
+            ticketId: tx.ticketId,
+            reason: reason,
+          );
+          if (!mounted) return;
+          final message = switch (result) {
+            ExpressVoidResult.applied => 'Transaction voided on server.',
+            ExpressVoidResult.queuedForSync =>
+              'Void queued — will sync to server when online.',
+          };
+          messenger.showSnackBar(SnackBar(content: Text(message)));
+        } on TransactionsApiException catch (e) {
+          if (!mounted) return;
+          messenger.showSnackBar(
+            SnackBar(content: Text(e.message)),
+          );
+          rethrow;
+        } catch (e) {
+          if (!mounted) return;
+          messenger.showSnackBar(
+            SnackBar(content: Text('Could not void transaction: $e')),
+          );
+          rethrow;
+        }
+      },
+    );
+  }
+
   Future<void> _clearForm() async {
     _plateCtrl.clear();
     _vrCtrl.clear();
@@ -533,6 +579,7 @@ class _ExpressCashierScreenState extends State<ExpressCashierScreen> {
                                             _formatPlateDisplay,
                                         formatAmount: _formatAmount,
                                         pesoMoneyStyle: _pesoMoneyStyle,
+                                        onTransactionTap: _openTransactionDetail,
                                       ),
                                     ),
                                   ],
@@ -749,6 +796,7 @@ class _TransactionsPane extends StatelessWidget {
     required this.formatPlateDisplay,
     required this.formatAmount,
     required this.pesoMoneyStyle,
+    required this.onTransactionTap,
   });
 
   final List<ExpressCashierTransaction> transactions;
@@ -759,6 +807,7 @@ class _TransactionsPane extends StatelessWidget {
     FontWeight fontWeight,
     Color color,
   }) pesoMoneyStyle;
+  final ValueChanged<ExpressCashierTransaction> onTransactionTap;
 
   static const _colGap = 10.0;
   static const _ticketFlex = 5;
@@ -766,8 +815,12 @@ class _TransactionsPane extends StatelessWidget {
   static const _vrFlex = 2;
   static const _amountFlex = 2;
 
-  double get _shiftTotal =>
-      transactions.fold(0.0, (sum, tx) => sum + tx.amount);
+  double get _shiftTotal => transactions
+      .where((tx) => !tx.isVoided)
+      .fold(0.0, (sum, tx) => sum + tx.amount);
+
+  int get _activeTicketCount =>
+      transactions.where((tx) => !tx.isVoided).length;
 
   @override
   Widget build(BuildContext context) {
@@ -849,28 +902,32 @@ class _TransactionsPane extends StatelessWidget {
                               ),
                               itemBuilder: (context, index) {
                                 final tx = transactions[index];
-                                return ColoredBox(
+                                return Material(
                                   color: index.isEven
                                       ? theme.tableSurfaceBg
                                       : theme.rowAltBg,
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 11,
-                                    ),
-                                    child: _TransactionTableRow(
-                                      theme: theme,
-                                      ticketId: tx.ticketId,
-                                      plateLabel:
-                                          formatPlateDisplay(tx.plateNumber),
-                                      vrNo: tx.vrNo?.trim().isNotEmpty == true
-                                          ? tx.vrNo!.trim()
-                                          : '—',
-                                      vrNoMissing:
-                                          tx.vrNo?.trim().isNotEmpty != true,
-                                      amountLabel: formatAmount(tx.amount),
-                                      isSynced: tx.isSynced,
-                                      pesoMoneyStyle: pesoMoneyStyle,
+                                  child: InkWell(
+                                    onTap: () => onTransactionTap(tx),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 11,
+                                      ),
+                                      child: _TransactionTableRow(
+                                        theme: theme,
+                                        ticketId: tx.ticketId,
+                                        plateLabel:
+                                            formatPlateDisplay(tx.plateNumber),
+                                        vrNo: tx.vrNo?.trim().isNotEmpty == true
+                                            ? tx.vrNo!.trim()
+                                            : '—',
+                                        vrNoMissing:
+                                            tx.vrNo?.trim().isNotEmpty != true,
+                                        amountLabel: formatAmount(tx.amount),
+                                        isSynced: tx.isSynced,
+                                        isVoided: tx.isVoided,
+                                        pesoMoneyStyle: pesoMoneyStyle,
+                                      ),
                                     ),
                                   ),
                                 );
@@ -892,7 +949,7 @@ class _TransactionsPane extends StatelessWidget {
                           child: Row(
                             children: [
                               Text(
-                                '${transactions.length} ticket${transactions.length == 1 ? '' : 's'}',
+                                '$_activeTicketCount ticket${_activeTicketCount == 1 ? '' : 's'}',
                                 style: theme.fieldLabel(),
                               ),
                               const Spacer(),
@@ -1051,6 +1108,7 @@ class _TransactionTableRow extends StatelessWidget {
     required this.vrNoMissing,
     required this.amountLabel,
     required this.isSynced,
+    required this.isVoided,
     required this.pesoMoneyStyle,
   });
 
@@ -1061,6 +1119,7 @@ class _TransactionTableRow extends StatelessWidget {
   final bool vrNoMissing;
   final String amountLabel;
   final bool isSynced;
+  final bool isVoided;
   final TextStyle Function({
     double fontSize,
     FontWeight fontWeight,
@@ -1069,6 +1128,15 @@ class _TransactionTableRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final muted = isVoided ? theme.textSecondary : theme.textPrimary;
+    final valueStyle = theme.fieldValue().copyWith(
+      fontSize: 11,
+      fontWeight: FontWeight.w500,
+      color: muted,
+      decoration: isVoided ? TextDecoration.lineThrough : null,
+      decorationColor: theme.textSecondary,
+    );
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -1077,17 +1145,18 @@ class _TransactionTableRow extends StatelessWidget {
           isLast: false,
           child: Row(
             children: [
-              if (!isSynced) ...[
+              if (!isSynced && !isVoided) ...[
                 const UnsyncedCloudIcon(),
+                const SizedBox(width: 5),
+              ],
+              if (isVoided) ...[
+                const _VoidedBadge(),
                 const SizedBox(width: 5),
               ],
               Expanded(
                 child: Text(
                   ticketId,
-                  style: theme.fieldValue().copyWith(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: valueStyle,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
@@ -1100,7 +1169,10 @@ class _TransactionTableRow extends StatelessWidget {
           isLast: false,
           child: Align(
             alignment: Alignment.centerLeft,
-            child: _PlateBadge(label: plateLabel, theme: theme),
+            child: Opacity(
+              opacity: isVoided ? 0.55 : 1,
+              child: _PlateBadge(label: plateLabel, theme: theme),
+            ),
           ),
         ),
         _TransactionTableCell(
@@ -1108,10 +1180,8 @@ class _TransactionTableRow extends StatelessWidget {
           isLast: false,
           child: Text(
             vrNo,
-            style: theme.fieldValue().copyWith(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: vrNoMissing ? theme.textSecondary : theme.textPrimary,
+            style: valueStyle.copyWith(
+              color: vrNoMissing ? theme.textSecondary : muted,
             ),
             overflow: TextOverflow.ellipsis,
             maxLines: 1,
@@ -1125,7 +1195,10 @@ class _TransactionTableRow extends StatelessWidget {
             style: pesoMoneyStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: theme.textPrimary,
+              color: muted,
+            ).copyWith(
+              decoration: isVoided ? TextDecoration.lineThrough : null,
+              decorationColor: theme.textSecondary,
             ),
             textAlign: TextAlign.end,
             overflow: TextOverflow.ellipsis,
@@ -1133,6 +1206,31 @@ class _TransactionTableRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _VoidedBadge extends StatelessWidget {
+  const _VoidedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(color: const Color(0xFFFCA5A5)),
+      ),
+      child: Text(
+        'Voided',
+        style: GoogleFonts.poppins(
+          fontSize: 8,
+          fontWeight: FontWeight.w600,
+          color: const Color(0xFFDC2626),
+          height: 1.1,
+        ),
+      ),
     );
   }
 }

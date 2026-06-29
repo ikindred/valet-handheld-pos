@@ -12,6 +12,7 @@ import '../../../core/sync/local_sync_notifier.dart';
 import '../../../data/local/db/app_database.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/remote/check_in_exceptions.dart';
+import '../../../data/remote/transactions_api.dart';
 import '../../../data/services/cash_session_close_payload.dart';
 import '../../../data/services/cash_session_http.dart';
 import '../../../data/services/cash_session_start_payload.dart';
@@ -499,6 +500,61 @@ WHERE table_name = 'shifts'
         StateError('SYNC_PAYLOAD'),
       );
       await _markQueueFailed(row);
+      return;
+    }
+
+    if (row.queueTableName == 'tickets' && row.operation == 'patch/plate') {
+      try {
+        await _ticketService.syncQueuedPlatePatch(payloadMap, token);
+        await _markQueueSynced(row);
+        onSynced();
+      } on TransactionsApiException catch (e, st) {
+        ValetLog.error(
+          'SyncCubit.flush',
+          'plate patch client error recordId=${row.recordId}',
+          e,
+          st,
+        );
+        await _markQueueFailed(row);
+      } catch (e, st) {
+        ValetLog.error(
+          'SyncCubit.flush',
+          'plate patch failed recordId=${row.recordId}',
+          e,
+          st,
+        );
+        await _markQueueFailed(row);
+      }
+      return;
+    }
+
+    if (row.queueTableName == 'tickets' && row.operation == 'void') {
+      try {
+        await _ticketService.syncQueuedTicketVoid(payloadMap, token);
+        await _markQueueSynced(row);
+        onSynced();
+      } on TransactionsApiException catch (e, st) {
+        if (e.statusCode == 409) {
+          await _markQueueSynced(row);
+          onSynced();
+          return;
+        }
+        ValetLog.error(
+          'SyncCubit.flush',
+          'void client error recordId=${row.recordId}',
+          e,
+          st,
+        );
+        await _markQueueFailed(row);
+      } catch (e, st) {
+        ValetLog.error(
+          'SyncCubit.flush',
+          'void failed recordId=${row.recordId}',
+          e,
+          st,
+        );
+        await _markQueueFailed(row);
+      }
       return;
     }
 

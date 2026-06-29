@@ -43,7 +43,7 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
         return;
       }
       _activeShift = shift;
-      final rows = await _tickets.expressTicketsForShift(shift.id);
+      final rows = await _loadExpressTransactionsForShift(shift.id);
       emit(
         ExpressCashierLoaded(
           transactions: rows.map(ExpressCashierTransaction.fromTicket).toList(),
@@ -52,6 +52,18 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
     } catch (e) {
       emit(ExpressCashierError(e.toString()));
     }
+  }
+
+  Future<List<Ticket>> _loadExpressTransactionsForShift(String shiftId) async {
+    final session = await _auth.getActiveSession();
+    final token = session?.authToken?.trim() ?? '';
+    if (token.isNotEmpty) {
+      await _tickets.syncExpressTransactionsForToday(
+        token: token,
+        shiftId: shiftId,
+      );
+    }
+    return _tickets.expressTicketsForShift(shiftId);
   }
 
   Future<void> save({
@@ -223,6 +235,19 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
     emit(ExpressCashierLoaded(transactions: transactions));
   }
 
+  Future<ExpressVoidResult> voidTransaction({
+    required int localUserId,
+    required String ticketId,
+    String? reason,
+  }) async {
+    final result = await _tickets.voidExpressTicket(
+      localTicketId: ticketId,
+      reason: reason,
+    );
+    await reloadTransactionsFromDb(localUserId);
+    return result;
+  }
+
   /// Refreshes the transaction list from local DB without a loading spinner
   /// (e.g. after background [SyncCubit] marks rows synced).
   Future<void> reloadTransactionsFromDb(int localUserId) async {
@@ -239,7 +264,7 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
       final shift = _activeShift ?? await _auth.getOpenShiftForUser(localUserId);
       if (shift == null) return;
       _activeShift = shift;
-      final rows = await _tickets.expressTicketsForShift(shift.id);
+      final rows = await _loadExpressTransactionsForShift(shift.id);
       emit(
         loaded.copyWith(
           transactions:

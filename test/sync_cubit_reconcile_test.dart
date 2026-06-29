@@ -439,6 +439,125 @@ WHERE sync_status IN ('pending', 'failed')
     expect(await syncCubit.pendingCount(), 0);
   });
 
+  test('voidExpressTicket removes unsynced express ticket', () async {
+    await db.into(db.shifts).insert(
+          ShiftsCompanion.insert(
+            id: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            openedAt: now,
+            openingFloat: 100,
+            status: 'open',
+            syncStatus: 'synced',
+            createdAt: now,
+          ),
+        );
+    await db.into(db.tickets).insert(
+          TicketsCompanion.insert(
+            id: ticketId,
+            shiftId: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            plateNumber: 'DNV3170',
+            vehicleBrand: '',
+            vehicleColor: '',
+            vehicleType: '',
+            cellphoneNumber: '',
+            damageMarkers: '[]',
+            personalBelongings: '[]',
+            checkInAt: now,
+            checkOutAt: Value(now),
+            fee: const Value(120.0),
+            status: 'completed',
+            syncStatus: 'pending',
+            createdAt: now,
+            isExpressCashier: const Value(true),
+            vrNo: const Value('EP432624'),
+          ),
+        );
+    await db.into(db.syncQueue).insert(
+          SyncQueueCompanion.insert(
+            id: 'q-express',
+            operation: 'checkin',
+            queueTableName: 'tickets',
+            recordId: ticketId,
+            payload: '{}',
+            syncStatus: 'pending',
+            createdAt: now,
+          ),
+        );
+
+    final result = await ticketService.voidExpressTicket(localTicketId: ticketId);
+    expect(result, ExpressVoidResult.queuedForSync);
+
+    final ticket = await (db.select(db.tickets)
+          ..where((t) => t.id.equals(ticketId)))
+        .getSingle();
+    expect(ticket.status, 'void');
+    final voidRows = (await (db.select(db.syncQueue)
+              ..where((q) => q.recordId.equals(ticketId)))
+            .get())
+        .where((q) => q.operation == 'void')
+        .toList();
+    expect(voidRows, hasLength(1));
+    expect(voidRows.first.syncStatus, 'pending');
+    final expressRows = await ticketService.expressTicketsForShift(shiftId);
+    expect(expressRows, hasLength(1));
+    expect(expressRows.single.status, 'void');
+  });
+
+  test('enqueueTicketVoid stores pending void sync row', () async {
+    await db.into(db.shifts).insert(
+          ShiftsCompanion.insert(
+            id: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            openedAt: now,
+            openingFloat: 100,
+            status: 'open',
+            syncStatus: 'synced',
+            createdAt: now,
+          ),
+        );
+    await db.into(db.tickets).insert(
+          TicketsCompanion.insert(
+            id: ticketId,
+            shiftId: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            plateNumber: 'DNV3170',
+            vehicleBrand: '',
+            vehicleColor: '',
+            vehicleType: '',
+            cellphoneNumber: '',
+            damageMarkers: '[]',
+            personalBelongings: '[]',
+            checkInAt: now,
+            checkOutAt: Value(now),
+            fee: const Value(120.0),
+            status: 'void',
+            syncStatus: 'synced',
+            createdAt: now,
+            isExpressCashier: const Value(true),
+            vrNo: const Value('EP432624'),
+            serverTicketId: const Value('server-uuid-1'),
+          ),
+        );
+
+    await ticketService.enqueueTicketVoid(
+      localTicketId: ticketId,
+      serverTicketId: 'server-uuid-1',
+      reason: 'Wrong amount',
+    );
+
+    final queueRows = await (db.select(db.syncQueue)
+          ..where((q) => q.recordId.equals(ticketId)))
+        .get();
+    expect(queueRows, hasLength(1));
+    expect(queueRows.first.operation, 'void');
+    expect(queueRows.first.syncStatus, 'pending');
+  });
+
   test('flush clears active server-backed orphan when queue is empty', () async {
     await db.into(db.shifts).insert(
           ShiftsCompanion.insert(

@@ -272,6 +272,19 @@ class DashboardCubit extends Cubit<DashboardState> {
               final rawRecent =
                   await _tickets.recentTicketsForShift(shiftId, limit: 20);
               localRecent = rawRecent.map(_recentFromTicket).toList();
+
+              final recentJson = _filteredSummaryRecent(summary, serverUserId)
+                  .map((r) => r.toTransactionJson())
+                  .toList();
+              await _tickets.cacheDashboardRecentTransactions(
+                transactionJsonRows: recentJson,
+                shiftId: shiftId,
+              );
+              await _tickets.cacheTodayServerTransactionsForShift(
+                token: token,
+                shiftId: shiftId,
+                standardOnly: true,
+              );
             }
             emit(_readyFromSummary(
               summary,
@@ -300,6 +313,20 @@ class DashboardCubit extends Cubit<DashboardState> {
     }
   }
 
+  static List<DashboardSummaryRecent> _filteredSummaryRecent(
+    DashboardSummary summary,
+    String? serverUserId,
+  ) {
+    return summary.recent
+        .where(
+          (r) =>
+              r.cashierId == null ||
+              serverUserId == null ||
+              r.cashierId == serverUserId,
+        )
+        .toList();
+  }
+
   DashboardReady _readyFromSummary(
     DashboardSummary summary,
     int checkInsLastHour, {
@@ -314,14 +341,7 @@ class DashboardCubit extends Cubit<DashboardState> {
     if (areaSlots != null && areaSlots.total > 0) {
       total = areaSlots.total;
     }
-    final filteredRecent = summary.recent
-        .where(
-          (r) =>
-              r.cashierId == null ||
-              serverUserId == null ||
-              r.cashierId == serverUserId,
-        )
-        .toList();
+    final filteredRecent = _filteredSummaryRecent(summary, serverUserId);
     final serverRecent =
         filteredRecent.map((r) => DashboardRecentTx.fromSummaryRecent(r)).toList();
     final vehiclesIn = localVehiclesIn == null

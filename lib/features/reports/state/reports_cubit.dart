@@ -303,6 +303,19 @@ class ReportsCubit extends Cubit<ReportsState> {
             )
             .toList();
 
+        if (openShift != null) {
+          final cacheRows = filteredRows
+              .map(_reportsRowCacheJson)
+              .where((m) => (m['id']?.toString().trim().isNotEmpty ?? false))
+              .toList();
+          if (cacheRows.isNotEmpty) {
+            await _tickets.cacheTransactionsFromServerJsonList(
+              rows: cacheRows,
+              shiftId: openShift.id,
+            );
+          }
+        }
+
         List<ReportsTicketRow> merged;
         var adjustedTotal = page.total;
         if (append && prev is ReportsLoaded) {
@@ -398,6 +411,29 @@ class ReportsCubit extends Cubit<ReportsState> {
       query.copyWithPage(s.page + 1),
       append: true,
     );
+  }
+
+  static Map<String, dynamic> _reportsRowCacheJson(ReportsTicketRow row) {
+    final serverId = row.serverTransactionId?.trim() ?? '';
+    final status = switch (row.status) {
+      ReportsTicketRowStatus.parked => 'parked',
+      ReportsTicketRowStatus.longStay => 'long_stay',
+      ReportsTicketRowStatus.checkedOut => 'completed',
+    };
+    return <String, dynamic>{
+      'id': serverId,
+      'ticket_number': row.ticketId,
+      'status': status,
+      if (row.fee != null) 'amount': row.fee,
+      'time_in': row.timeIn.toIso8601String(),
+      if (row.timeOut != null) 'time_out': row.timeOut!.toIso8601String(),
+      'vehicle': <String, dynamic>{
+        'plate_number': row.plate,
+        if (row.vehicle.trim().isNotEmpty) 'brand': row.vehicle.trim(),
+      },
+      if (row.vrNo.trim().isNotEmpty && row.vrNo != '—') 'vr_no': row.vrNo,
+      'parking': <String, dynamic>{'slot': row.slot},
+    };
   }
 }
 

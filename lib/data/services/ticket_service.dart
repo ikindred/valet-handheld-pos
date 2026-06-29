@@ -38,6 +38,15 @@ import 'check_in_sync_payload.dart';
 import 'rate_fetch_service.dart';
 import 'rate_service.dart';
 
+/// Result of [TicketService.voidCachedTicket] / [TicketService.voidExpressTicket].
+enum ExpressVoidResult {
+  /// Void applied on the server (or already void there).
+  applied,
+
+  /// Void saved locally; `sync_queue` will POST void when online.
+  queuedForSync,
+}
+
 Map<String, dynamic>? _asStringKeyedMap(dynamic data) {
   if (data is Map<String, dynamic>) return data;
   if (data is Map) return Map<String, dynamic>.from(data);
@@ -503,7 +512,7 @@ class TicketService {
     _notifyLocalSyncQueueChanged();
   }
 
-  /// Express cashier tickets on [shiftId], newest first.
+  /// Express cashier tickets on [shiftId], newest first (includes voided).
   Future<List<Ticket>> expressTicketsForShift(String shiftId) {
     final sid = shiftId.trim();
     return (_db.select(_db.tickets)
@@ -514,6 +523,383 @@ class TicketService {
           )
           ..orderBy([(t) => OrderingTerm.desc(t.checkInAt)]))
         .get();
+  }
+
+  /// GET `/transactions` for today, upserts express rows into Drift for [shiftId].
+  Future<void> syncExpressTransactionsForToday({
+    required String token,
+    required String shiftId,
+  }) async {
+    await cacheTodayServerTransactionsForShift(
+      token: token,
+      shiftId: shiftId,
+      expressOnly: true,
+    );
+  }
+
+  /// Upserts today's server transactions into Drift for offline void/edit.
+  Future<int> cacheTodayServerTransactionsForShift({
+    required String token,
+    required String shiftId,
+    bool expressOnly = false,
+    bool standardOnly = false,
+  }) async {
+    if (AppConfig.useStubApi) return 0;
+    if (!await InternetReachability.hasInternet()) return 0;
+
+    final rows = await _fetchTodayServerTransactions(token);
+    return cacheTransactionsFromServerJsonList(
+      rows: rows,
+      shiftId: shiftId,
+      expressOnly: expressOnly,
+      standardOnly: standardOnly,
+    );
+  }
+
+  /// Upserts server transaction JSON rows into Drift (no sync_queue).
+  Future<int> cacheTransactionsFromServerJsonList({
+    required List<Map<String, dynamic>> rows,
+    required String shiftId,
+    bool expressOnly = false,
+    bool standardOnly = false,
+  }) async {
+    if (rows.isEmpty) return 0;
+    var cached = 0;
+    for (final row in rows) {
+      final isExpress = _isExpressServerTransactionJson(row);
+      if (expressOnly && !isExpress) continue;
+      if (standardOnly && isExpress) continue;
+      if (!_isTransactionToday(row)) continue;
+      try {
+        await _upsertFromServerTransactionJson(
+          row,
+          shiftIdOverride: shiftId,
+          markExpressCashier: isExpress,
+        );
+        cached++;
+      } catch (e, st) {
+        ValetLog.error(
+          'TicketService.cacheTransactionsFromServerJsonList',
+          'upsert failed serverId=${row['id']}',
+          e,
+          st,
+        );
+      }
+    }
+    if (cached > 0) {
+      _notifyLocalSyncQueueChanged();
+    }
+    return cached;
+  }
+
+  /// Caches dashboard `recent_transactions` into Drift for the open shift.
+  Future<int> cacheDashboardRecentTransactions({
+    required List<Map<String, dynamic>> transactionJsonRows,
+    required String shiftId,
+    bool standardOnly = true,
+  }) {
+    return cacheTransactionsFromServerJsonList(
+      rows: transactionJsonRows,
+      shiftId: shiftId,
+      standardOnly: standardOnly,
+      expressOnly: !standardOnly,
+    );
+  }
+
+  /// Voids a locally cached ticket and syncs void to the server when applicable.
+  Future<ExpressVoidResult> voidCachedTicket({
+    required String localTicketId,
+    String? reason,
+  }) async {
+    final tid = localTicketId.trim();
+    final row = await ticketById(tid);
+    if (row == null) {
+      throw TransactionsApiException('Ticket not found.');
+    }
+    if (row.status == 'void') {
+      await _ensureVoidQueuedForTicket(tid, row.serverTicketId, reason);
+      return ExpressVoidResult.queuedForSync;
+    }
+
+    await _cancelPendingCheckInQueueForTicket(tid);
+    await _markTicketVoidLocally(tid, reason);
+
+    var serverId = row.serverTicketId?.trim() ?? '';
+    if (serverId.isEmpty && await InternetReachability.hasInternet()) {
+      final token = await _activeBearer();
+      if (token != null && token.isNotEmpty) {
+        final linked = await reconcileLocalTicketFromServerLookup(
+          localTicketId: tid,
+          token: token,
+        );
+        if (linked) {
+          serverId = (await ticketById(tid))?.serverTicketId?.trim() ?? '';
+        }
+      }
+    }
+
+    if (serverId.isNotEmpty && await InternetReachability.hasInternet()) {
+      try {
+        await requestTicketVoid(serverTicketId: serverId, reason: reason);
+        await _markVoidQueuesSyncedForTicket(tid);
+        return ExpressVoidResult.applied;
+      } on TransactionsApiException catch (e) {
+        if (e.statusCode == 409) {
+          await _markVoidQueuesSyncedForTicket(tid);
+          return ExpressVoidResult.applied;
+        }
+        rethrow;
+      } on DioException catch (e) {
+        if (!_isUncertainNetworkDio(e)) rethrow;
+      }
+    }
+
+    await enqueueTicketVoid(
+      localTicketId: tid,
+      serverTicketId: serverId.isNotEmpty ? serverId : null,
+      reason: reason,
+    );
+    return ExpressVoidResult.queuedForSync;
+  }
+
+  /// Voids an express ticket locally and syncs void to the server when a record
+  /// exists (or may exist after a lost check-in response).
+  Future<ExpressVoidResult> voidExpressTicket({
+    required String localTicketId,
+    String? reason,
+  }) async {
+    final tid = localTicketId.trim();
+    final row = await ticketById(tid);
+    if (row == null || !row.isExpressCashier) {
+      throw TransactionsApiException('Express ticket not found.');
+    }
+    return voidCachedTicket(localTicketId: tid, reason: reason);
+  }
+
+  Future<void> _ensureVoidQueuedForTicket(
+    String localTicketId,
+    String? serverTicketId,
+    String? reason,
+  ) async {
+    final tid = localTicketId.trim();
+    if (tid.isEmpty) return;
+    final hasPendingVoidQueue = await (_db.select(_db.syncQueue)..where(
+          (q) =>
+              q.recordId.equals(tid) &
+              q.operation.equals('void') &
+              q.syncStatus.isIn(['pending', 'failed']),
+        ))
+        .get();
+    if (hasPendingVoidQueue.isNotEmpty) return;
+
+    final sid = serverTicketId?.trim() ?? '';
+    if (sid.isEmpty &&
+        !await InternetReachability.hasInternet()) {
+      await enqueueTicketVoid(
+        localTicketId: tid,
+        reason: reason,
+      );
+      return;
+    }
+    if (sid.isNotEmpty && await InternetReachability.hasInternet()) {
+      try {
+        await requestTicketVoid(serverTicketId: sid, reason: reason);
+        await _markVoidQueuesSyncedForTicket(tid);
+      } on TransactionsApiException catch (e) {
+        if (e.statusCode == 409) {
+          await _markVoidQueuesSyncedForTicket(tid);
+        } else {
+          await enqueueTicketVoid(
+            localTicketId: tid,
+            serverTicketId: sid,
+            reason: reason,
+          );
+        }
+      }
+      return;
+    }
+    await enqueueTicketVoid(
+      localTicketId: tid,
+      serverTicketId: sid.isNotEmpty ? sid : null,
+      reason: reason,
+    );
+  }
+
+  static bool _isUncertainNetworkDio(DioException e) {
+    if (e.error is SocketException) return true;
+    return e.type == DioExceptionType.connectionError ||
+        e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.sendTimeout ||
+        e.type == DioExceptionType.receiveTimeout;
+  }
+
+  Future<void> _cancelPendingCheckInQueueForTicket(String localTicketId) async {
+    final tid = localTicketId.trim();
+    if (tid.isEmpty) return;
+    await (_db.update(_db.syncQueue)..where(
+          (q) =>
+              q.recordId.equals(tid) &
+              q.queueTableName.equals('tickets') &
+              q.operation.equals('checkin') &
+              q.syncStatus.isIn(['pending', 'failed']),
+        ))
+        .write(const SyncQueueCompanion(syncStatus: Value('synced')));
+  }
+
+  Future<void> _markVoidQueuesSyncedForTicket(String ticketId) async {
+    final tid = ticketId.trim();
+    if (tid.isEmpty) return;
+    await (_db.update(_db.syncQueue)..where(
+          (q) =>
+              q.recordId.equals(tid) &
+              q.queueTableName.equals('tickets') &
+              q.operation.equals('void') &
+              q.syncStatus.isIn(['pending', 'failed']),
+        ))
+        .write(const SyncQueueCompanion(syncStatus: Value('synced')));
+  }
+
+  Future<void> _markTicketVoidLocally(
+    String localTicketId,
+    String? reason,
+  ) async {
+    final tid = localTicketId.trim();
+    if (tid.isEmpty) return;
+    final trimmedReason = reason?.trim();
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(tid))).write(
+      TicketsCompanion(
+        status: const Value('void'),
+        voidReason: trimmedReason != null && trimmedReason.isNotEmpty
+            ? Value(trimmedReason)
+            : const Value.absent(),
+        pendingVoidRequest: const Value(false),
+        pendingVoidReason: const Value(null),
+      ),
+    );
+    _notifyLocalSyncQueueChanged();
+  }
+
+  /// Queues `POST /tickets/:id/void` for when the device is back online.
+  ///
+  /// When [serverTicketId] is omitted, sync resolves the server UUID from the
+  /// local ticket / today's transaction list before calling void.
+  Future<void> enqueueTicketVoid({
+    required String localTicketId,
+    String? serverTicketId,
+    String? reason,
+  }) async {
+    final tid = localTicketId.trim();
+    if (tid.isEmpty) return;
+    final sid = serverTicketId?.trim() ?? '';
+
+    final existing = await (_db.select(_db.syncQueue)..where(
+          (q) =>
+              q.recordId.equals(tid) &
+              q.queueTableName.equals('tickets') &
+              q.operation.equals('void') &
+              q.syncStatus.isIn(['pending', 'failed']),
+        ))
+        .get();
+    if (existing.isNotEmpty) return;
+
+    final now = DateTime.now().toIso8601String();
+    final payload = jsonEncode(<String, dynamic>{
+      'local_ticket_id': tid,
+      'ticket_number': tid,
+      if (sid.isNotEmpty) 'server_ticket_id': sid,
+      if (reason?.trim().isNotEmpty == true) 'reason': reason!.trim(),
+    });
+    await _db.into(_db.syncQueue).insert(
+          SyncQueueCompanion.insert(
+            id: _uuid.v4(),
+            operation: 'void',
+            queueTableName: 'tickets',
+            recordId: tid,
+            payload: payload,
+            syncStatus: 'pending',
+            createdAt: now,
+          ),
+        );
+    _notifyLocalSyncQueueChanged();
+  }
+
+  /// Processes a queued ticket void row.
+  Future<void> syncQueuedTicketVoid(
+    Map<String, dynamic> body,
+    String token,
+  ) async {
+    final localId =
+        body['local_ticket_id']?.toString().trim() ??
+        body['ticket_number']?.toString().trim() ??
+        '';
+    final reason = body['reason']?.toString();
+
+    final serverId = await _resolveServerIdForQueuedVoid(
+      body: body,
+      localId: localId,
+      token: token,
+    );
+    if (serverId == null || serverId.isEmpty) {
+      ValetLog.info(
+        'TicketService.syncQueuedTicketVoid',
+        'no server record for localId=$localId — local void only',
+      );
+      return;
+    }
+
+    if (localId.isNotEmpty) {
+      await updateServerTicketId(localId, serverId);
+    }
+
+    try {
+      final voidBody = await _transactionsApi.requestVoid(
+        token: token,
+        ticketId: serverId,
+        reason: reason,
+      );
+      if (localId.isNotEmpty) {
+        final voidMeta = _voidAuditCompanion(voidBody);
+        await (_db.update(_db.tickets)..where((t) => t.id.equals(localId))).write(
+          TicketsCompanion(
+            status: const Value('void'),
+            pendingVoidRequest: const Value(false),
+            pendingVoidReason: const Value(null),
+            voidReason: voidMeta.voidReason,
+            voidedByJson: voidMeta.voidedByJson,
+            voidedAt: voidMeta.voidedAt,
+          ),
+        );
+      }
+    } on TransactionsApiException catch (e) {
+      if (e.statusCode == 409 && localId.isNotEmpty) {
+        await _markTicketVoidLocally(localId, reason);
+        return;
+      }
+      rethrow;
+    }
+  }
+
+  Future<String?> _resolveServerIdForQueuedVoid({
+    required Map<String, dynamic> body,
+    required String localId,
+    required String token,
+  }) async {
+    final fromPayload = body['server_ticket_id']?.toString().trim() ?? '';
+    if (fromPayload.isNotEmpty) return fromPayload;
+
+    if (localId.isEmpty) return null;
+    final ticket = await ticketById(localId);
+    if (ticket == null) return null;
+
+    final fromRow = ticket.serverTicketId?.trim() ?? '';
+    if (fromRow.isNotEmpty) return fromRow;
+
+    return resolveServerTransactionIdByVr(
+      token: token,
+      vrNo: ticket.vrNo ?? '',
+      plateNumber: ticket.plateNumber,
+      ticketNumber: ticket.id,
+    );
   }
 
   Future<void> updateServerTicketId(
@@ -2592,6 +2978,7 @@ LIMIT 1
           voidedAt: voidMeta.voidedAt,
         ),
       );
+      await _markVoidQueuesSyncedForTicket(row.id);
     }
   }
 
@@ -2614,9 +3001,15 @@ LIMIT 1
     final serverId = row.serverTicketId?.trim() ?? '';
     if (serverId.isNotEmpty) {
       if (!await InternetReachability.hasInternet()) {
-        throw TransactionsApiException(
-          'Device is offline. Connect to update the plate number.',
+        await (_db.update(_db.tickets)..where((t) => t.id.equals(tid))).write(
+          TicketsCompanion(plateNumber: Value(plate)),
         );
+        await enqueuePlatePatch(
+          localTicketId: tid,
+          serverTicketId: serverId,
+          plateNumber: plate,
+        );
+        return;
       }
       final token = await _activeBearer();
       if (token == null || token.isEmpty) {
@@ -2627,11 +3020,108 @@ LIMIT 1
         ticketId: serverId,
         plateNumber: plate,
       );
+      await _markPlatePatchQueuesSyncedForTicket(tid);
     }
 
     await (_db.update(_db.tickets)..where((t) => t.id.equals(tid))).write(
       TicketsCompanion(plateNumber: Value(plate)),
     );
+  }
+
+  Future<void> enqueuePlatePatch({
+    required String localTicketId,
+    required String serverTicketId,
+    required String plateNumber,
+  }) async {
+    final tid = localTicketId.trim();
+    final sid = serverTicketId.trim();
+    final plate = plateNumber.trim().toUpperCase();
+    if (tid.isEmpty || sid.isEmpty || plate.isEmpty) return;
+
+    final existing = await (_db.select(_db.syncQueue)..where(
+          (q) =>
+              q.recordId.equals(tid) &
+              q.queueTableName.equals('tickets') &
+              q.operation.equals('patch/plate') &
+              q.syncStatus.isIn(['pending', 'failed']),
+        ))
+        .get();
+    if (existing.isNotEmpty) {
+      await (_db.update(_db.syncQueue)..where((q) => q.id.equals(existing.first.id)))
+          .write(
+        SyncQueueCompanion(
+          payload: Value(
+            jsonEncode(<String, dynamic>{
+              'local_ticket_id': tid,
+              'server_ticket_id': sid,
+              'plate_number': plate,
+            }),
+          ),
+          syncStatus: const Value('pending'),
+        ),
+      );
+      _notifyLocalSyncQueueChanged();
+      return;
+    }
+
+    final now = DateTime.now().toIso8601String();
+    await _db.into(_db.syncQueue).insert(
+          SyncQueueCompanion.insert(
+            id: _uuid.v4(),
+            operation: 'patch/plate',
+            queueTableName: 'tickets',
+            recordId: tid,
+            payload: jsonEncode(<String, dynamic>{
+              'local_ticket_id': tid,
+              'server_ticket_id': sid,
+              'plate_number': plate,
+            }),
+            syncStatus: 'pending',
+            createdAt: now,
+          ),
+        );
+    _notifyLocalSyncQueueChanged();
+  }
+
+  Future<void> syncQueuedPlatePatch(
+    Map<String, dynamic> body,
+    String token,
+  ) async {
+    var serverId = body['server_ticket_id']?.toString().trim() ?? '';
+    final localId = body['local_ticket_id']?.toString().trim() ?? '';
+    final plate = body['plate_number']?.toString().trim().toUpperCase() ?? '';
+    if (plate.isEmpty) {
+      throw StateError('Queued plate patch missing plate_number');
+    }
+    if (serverId.isEmpty && localId.isNotEmpty) {
+      serverId = (await ticketById(localId))?.serverTicketId?.trim() ?? '';
+    }
+    if (serverId.isEmpty) {
+      throw StateError('Queued plate patch missing server_ticket_id');
+    }
+    await _transactionsApi.patchVehiclePlate(
+      token: token,
+      ticketId: serverId,
+      plateNumber: plate,
+    );
+    if (localId.isNotEmpty) {
+      await (_db.update(_db.tickets)..where((t) => t.id.equals(localId))).write(
+        TicketsCompanion(plateNumber: Value(plate)),
+      );
+    }
+  }
+
+  Future<void> _markPlatePatchQueuesSyncedForTicket(String ticketId) async {
+    final tid = ticketId.trim();
+    if (tid.isEmpty) return;
+    await (_db.update(_db.syncQueue)..where(
+          (q) =>
+              q.recordId.equals(tid) &
+              q.queueTableName.equals('tickets') &
+              q.operation.equals('patch/plate') &
+              q.syncStatus.isIn(['pending', 'failed']),
+        ))
+        .write(const SyncQueueCompanion(syncStatus: Value('synced')));
   }
 
   /// Stores offline void intent until check-in sync sends `void_requested`.
@@ -3523,6 +4013,8 @@ WHERE shift_id = ? AND status = 'completed'
   Future<Ticket> _upsertFromServerTransactionJson(
     Map<String, dynamic> json, {
     TransactionPaymentSummary? paymentSummary,
+    String? shiftIdOverride,
+    bool? markExpressCashier,
   }) async {
     final serverUuid = json['id']?.toString().trim() ?? '';
     if (serverUuid.isEmpty) {
@@ -3542,6 +4034,8 @@ WHERE shift_id = ? AND status = 'completed'
     final paymentJson = paymentSummary != null
         ? jsonEncode(paymentSummary.toJson())
         : null;
+    final isExpress =
+        markExpressCashier ?? _isExpressServerTransactionJson(json);
 
     final existing =
         await _ticketByServerId(serverUuid) ?? await ticketById(ticketNum);
@@ -3583,6 +4077,8 @@ WHERE shift_id = ? AND status = 'completed'
           appliedRateJson: meta.appliedRateJson,
           isOvernight: meta.isOvernight,
           ticketLost: meta.ticketLost,
+          isExpressCashier:
+              isExpress ? const Value(true) : const Value.absent(),
         ),
       );
       final out = await ticketById(existing.id);
@@ -3598,13 +4094,14 @@ WHERE shift_id = ? AND status = 'completed'
         'Open a cash shift before saving a ticket from the server.',
       );
     }
+    final resolvedShiftId = shiftIdOverride?.trim() ?? ctx.shiftId;
     final now = DateTime.now().toIso8601String();
     await _db
         .into(_db.tickets)
         .insert(
           TicketsCompanion.insert(
             id: ticketNum,
-            shiftId: ctx.shiftId,
+            shiftId: resolvedShiftId,
             userId: ctx.userId,
             branchId: ctx.branchId,
             plateNumber: fields.plateNumber,
@@ -3635,6 +4132,7 @@ WHERE shift_id = ? AND status = 'completed'
             appliedRateJson: meta.appliedRateJson,
             isOvernight: meta.isOvernight,
             ticketLost: meta.ticketLost,
+            isExpressCashier: Value(isExpress),
           ),
         );
     final out = await ticketById(ticketNum);
@@ -3642,6 +4140,35 @@ WHERE shift_id = ? AND status = 'completed'
       throw TransactionsApiException('Upsert failed after insert.');
     }
     return out;
+  }
+
+  static bool _isExpressServerTransactionJson(Map<String, dynamic> json) {
+    for (final key in const [
+      'express_cashier',
+      'expressCashier',
+      'is_express_cashier',
+      'isExpressCashier',
+    ]) {
+      final value = json[key];
+      if (value == true || value == 1 || value == 'true' || value == '1') {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static bool _isTransactionToday(Map<String, dynamic> json) {
+    final raw = json['time_in'] ??
+        json['check_in_at'] ??
+        json['checkInAt'] ??
+        json['created_at'] ??
+        json['createdAt'];
+    if (raw == null) return true;
+    final text = raw.toString().trim();
+    if (text.isEmpty) return true;
+    final ph = PhilippineTime.fromApiIso(text);
+    final now = PhilippineTime.now();
+    return ph.year == now.year && ph.month == now.month && ph.day == now.day;
   }
 
   static _ServerTicketFields _fieldsFromServerTransactionJson(

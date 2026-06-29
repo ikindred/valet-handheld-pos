@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/connectivity/internet_reachability.dart';
+import '../../../core/sync/local_sync_notifier.dart';
 import '../../../core/printing/print_flow.dart';
 import '../../../core/printing/printer_connection_notifier.dart';
 import '../../../core/printing/valet_print_service.dart';
@@ -55,6 +56,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _isOnline = true;
   bool _clearingLocalTransactions = false;
   StreamSubscription<List<ConnectivityResult>>? _connSub;
+  LocalSyncNotifier? _localSyncNotifier;
 
   @override
   void initState() {
@@ -63,14 +65,37 @@ class _SettingsScreenState extends State<SettingsScreen>
     _connSub = Connectivity().onConnectivityChanged.listen((_) {
       unawaited(_refreshOnline());
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _localSyncNotifier = context.read<LocalSyncNotifier>();
+      _localSyncNotifier!.addListener(_onLocalSyncQueueChanged);
+    });
     unawaited(_load());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _localSyncNotifier?.removeListener(_onLocalSyncQueueChanged);
     _connSub?.cancel();
     super.dispose();
+  }
+
+  void _onLocalSyncQueueChanged() {
+    unawaited(_loadSyncInfo());
+  }
+
+  Future<void> _onSyncComplete(SyncComplete state) async {
+    final fullySynced = state.pending == 0 && state.failed == 0;
+    if (fullySynced) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(
+        _kLastSyncKey,
+        DateTime.now().millisecondsSinceEpoch,
+      );
+    }
+    if (!mounted) return;
+    await _loadSyncInfo();
   }
 
   @override
@@ -360,7 +385,14 @@ class _SettingsScreenState extends State<SettingsScreen>
     final isExpressCashier = _isExpressCashier ||
         (auth is AuthAuthenticated && auth.isExpressCashier);
 
-    return Scaffold(
+    return BlocListener<SyncCubit, SyncState>(
+      listenWhen: (_, current) => current is SyncComplete,
+      listener: (context, state) {
+        if (state is SyncComplete) {
+          unawaited(_onSyncComplete(state));
+        }
+      },
+      child: Scaffold(
       backgroundColor: null,
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -439,6 +471,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
         ],
       ),
+    ),
     );
   }
 }
