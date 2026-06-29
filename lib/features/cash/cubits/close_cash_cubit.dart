@@ -99,6 +99,7 @@ class CloseCashCubit extends Cubit<CloseCashState> {
   }
 
   Future<void> attemptCloseShift(int localUserId) async {
+    if (state is CloseCashSuccess) return;
     final cur = _loaded;
     if (cur == null) return;
     final blocked = await _blockingReasonForClose(
@@ -167,11 +168,8 @@ class CloseCashCubit extends Cubit<CloseCashState> {
         actualCash: cur.actualCash,
         isExpressCashier: cur.shift.isExpressCashier,
       );
-      await _auth.confirmCloseCash(
-        localUserId: localUserId,
-        closingFloat: cur.actualCash,
-      );
-      await _purge.purgeEndedSessions();
+      // Session ends when the cashier taps Logout — not here — so they can
+      // stay on this screen and reprint the close-cash receipt.
       emit(CloseCashSuccess(receipt: receipt));
     } catch (e) {
       emit(CloseCashError(e.toString()));

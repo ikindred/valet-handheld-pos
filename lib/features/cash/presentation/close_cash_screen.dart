@@ -14,6 +14,7 @@ import '../../../core/storage/offline_mode_prefs.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/close_cash_purge_service.dart';
 import '../../../data/services/shift_service.dart';
+import '../../auth/presentation/logout_flow.dart';
 import '../../auth/state/auth_bloc.dart';
 import '../../sync/state/sync_cubit.dart';
 import '../../sync/state/sync_state.dart';
@@ -37,6 +38,7 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
   int _pendingSyncCount = 0;
   int _failedSyncCount = 0;
   bool _amountSyncedFromCubit = false;
+  bool _closeSuccessHandled = false;
 
   static const _orange = Color(0xFFF68D00);
 
@@ -170,6 +172,7 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
 
   CloseCashLoaded? _resolveLoaded(CloseCashState state, CloseCashCubit cubit) {
     if (state is CloseCashLoaded) return state;
+    if (state is CloseCashSuccess) return cubit.lastLoaded;
     if (state is CloseCashConfirming) return cubit.lastLoaded;
     if (state is CloseCashError) return cubit.lastLoaded;
     if (state is CloseCashBlocked) return cubit.lastLoaded;
@@ -206,6 +209,7 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
         listener: (context, state) async {
           if (state is CloseCashLoading) {
             _amountSyncedFromCubit = false;
+            _closeSuccessHandled = false;
           }
           if (state is CloseCashLoaded) {
             if (!_amountSyncedFromCubit) {
@@ -217,19 +221,15 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
               });
             }
           }
-          if (state is CloseCashSuccess) {
+          if (state is CloseCashSuccess && !_closeSuccessHandled) {
+            _closeSuccessHandled = true;
+            context.read<AuthBloc>().add(
+                  const AuthCashSessionUpdated(CashSessionStatus.closed),
+                );
             await printCloseCashFromContext(
               context,
               data: state.receipt,
             );
-            if (!context.mounted) return;
-            final authBloc = context.read<AuthBloc>();
-            if (authBloc.state is! AuthUnauthenticated) {
-              authBloc.add(const AuthLoggedOut());
-              await authBloc.stream.firstWhere((s) => s is AuthUnauthenticated);
-            }
-            if (!context.mounted) return;
-            context.go('/login');
           }
           if (state is CloseCashError) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -268,6 +268,11 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
               ? DateFormat('EEEE, MMMM d, y').format(DateTime.now())
               : _headerSubtitle;
           final confirming = state is CloseCashConfirming;
+          final closeSuccess = state is CloseCashSuccess;
+          final successReceipt = switch (state) {
+            CloseCashSuccess(:final receipt) => receipt,
+            _ => null,
+          };
           final tc = AppThemeColors.of(context);
 
           return Scaffold(
@@ -301,6 +306,7 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
                                   amountText: _displayPeso(_parsedAmount),
                                   accentColor: _orange,
                                   onKey: (k) => _onKey(cubit, k),
+                                  readOnly: closeSuccess,
                                 );
 
                                 if (sideBySide) {
@@ -343,7 +349,32 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
                             ),
                           ),
                         ),
-                        if (_closeBlockedMessage != null)
+                        if (closeSuccess)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF16A34A).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: const Color(0xFF16A34A).withValues(alpha: 0.35),
+                                ),
+                              ),
+                              child: Text(
+                                'Shift closed successfully. You can reprint the receipt or logout when ready.',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: const Color(0xFF166534),
+                                      height: 1.4,
+                                    ),
+                              ),
+                            ),
+                          ),
+                        if (!closeSuccess && _closeBlockedMessage != null)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                             child: Text(
@@ -356,55 +387,90 @@ class _CloseCashScreenState extends State<CloseCashScreen> {
                           ),
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                          child: Row(
-                                children: [
-                                  Expanded(
-                                    child: SizedBox(
-                                      height: 54,
-                                      child: OutlinedButton(
-                                        onPressed: confirming
-                                            ? null
-                                            : () => context.go(
-                                                  auth.isExpressCashier
-                                                      ? '/express-cashier'
-                                                      : '/dashboard',
-                                                ),
-                                        child: const Text('Cancel'),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    flex: 2,
-                                    child: SizedBox(
-                                      height: 54,
-                                      child: FilledButton(
-                                        style: FilledButton.styleFrom(
-                                          backgroundColor: _orange,
-                                          foregroundColor: Colors.white,
+                          child: closeSuccess
+                              ? Row(
+                                  children: [
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 54,
+                                        child: OutlinedButton(
+                                          onPressed: successReceipt == null
+                                              ? null
+                                              : () => printCloseCashFromContext(
+                                                    context,
+                                                    data: successReceipt,
+                                                  ),
+                                          child: const Text('Reprint Receipt'),
                                         ),
-                                        onPressed: confirming || _closeBlocked
-                                            ? null
-                                            : () =>
-                                                cubit.attemptCloseShift(uid),
-                                        child: confirming
-                                            ? const SizedBox(
-                                                width: 22,
-                                                height: 22,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  color: Colors.white,
-                                                ),
-                                              )
-                                            : const Text(
-                                                'Close Cash & End Shift',
-                                              ),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      flex: 2,
+                                      child: SizedBox(
+                                        height: 54,
+                                        child: FilledButton(
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor: _orange,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                          onPressed: () =>
+                                              logoutAfterCloseCash(context),
+                                          child: const Text('Logout'),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Row(
+                                  children: [
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 54,
+                                        child: OutlinedButton(
+                                          onPressed: confirming
+                                              ? null
+                                              : () => context.go(
+                                                    auth.isExpressCashier
+                                                        ? '/express-cashier'
+                                                        : '/dashboard',
+                                                  ),
+                                          child: const Text('Cancel'),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      flex: 2,
+                                      child: SizedBox(
+                                        height: 54,
+                                        child: FilledButton(
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor: _orange,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                          onPressed: confirming || _closeBlocked
+                                              ? null
+                                              : () =>
+                                                  cubit.attemptCloseShift(uid),
+                                          child: confirming
+                                              ? const SizedBox(
+                                                  width: 22,
+                                                  height: 22,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    color: Colors.white,
+                                                  ),
+                                                )
+                                              : const Text(
+                                                  'Close Cash & End Shift',
+                                                ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                         ),
                       ],
                     ),
@@ -425,16 +491,18 @@ class _CloseCashCountPane extends StatelessWidget {
     required this.amountText,
     required this.accentColor,
     required this.onKey,
+    this.readOnly = false,
   });
 
   final String amountText;
   final Color accentColor;
   final void Function(String key) onKey;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
     final tc = AppThemeColors.of(context);
-    return Column(
+    final pane = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
@@ -446,7 +514,9 @@ class _CloseCashCountPane extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Enter the total cash sales you are turning in for this shift.',
+          readOnly
+              ? 'Cash count submitted for this shift.'
+              : 'Enter the total cash sales you are turning in for this shift.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: tc.textSecondary,
                 height: 1.4,
@@ -454,9 +524,15 @@ class _CloseCashCountPane extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         CashAmountBox(text: amountText, color: accentColor),
-        const SizedBox(height: 10),
-        CashKeypad(onKey: onKey),
+        if (!readOnly) ...[
+          const SizedBox(height: 10),
+          CashKeypad(onKey: onKey),
+        ],
       ],
     );
+    if (readOnly) {
+      return Opacity(opacity: 0.72, child: pane);
+    }
+    return pane;
   }
 }

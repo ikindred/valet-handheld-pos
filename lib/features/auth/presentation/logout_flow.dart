@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../../../core/services/device_id_service.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/close_cash_purge_service.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../state/auth_bloc.dart';
 
@@ -171,16 +172,20 @@ class _LogoutOptionCard extends StatelessWidget {
   }
 }
 
-/// Simple "Are you sure?" used when there is no open cash session.
-Future<void> _logoutWithSimpleConfirm(BuildContext context) async {
+/// Branded logout confirmation. Returns `true` when the user confirms.
+Future<bool> showLogoutConfirmDialog(
+  BuildContext context, {
+  String title = 'Logout',
+  required String message,
+}) async {
   final tc = AppThemeColors.of(context);
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => _LogoutDialogShell(
-      title: 'Logout',
+      title: title,
       icon: LucideIcons.logOut,
       content: Text(
-        'You have no open cash session. Are you sure you want to logout?',
+        message,
         style: GoogleFonts.poppins(
           fontSize: 14,
           fontWeight: FontWeight.w400,
@@ -210,14 +215,45 @@ Future<void> _logoutWithSimpleConfirm(BuildContext context) async {
       ),
     ),
   );
-  if (!context.mounted || confirmed != true) return;
+  return confirmed == true;
+}
+
+Future<void> navigateAfterLogout(BuildContext context) async {
+  context.read<AuthBloc>().add(const AuthLoggedOut());
+  await context.read<AuthBloc>().stream.firstWhere((s) => s is AuthUnauthenticated);
+  if (context.mounted) context.go('/login');
+}
+
+/// After close cash — end session, purge ended rows, then return to login.
+Future<void> logoutAfterCloseCash(BuildContext context) async {
+  final confirmed = await showLogoutConfirmDialog(
+    context,
+    message: 'Your shift is closed. Are you sure you want to logout?',
+  );
+  if (!context.mounted || !confirmed) return;
+  final deviceId = await DeviceIdService.getOrCreate();
+  if (!context.mounted) return;
+  final repo = context.read<AuthRepository>();
+  final purge = context.read<CloseCashPurgeService>();
+  await repo.logoutOnly(deviceId: deviceId);
+  await purge.purgeEndedSessions();
+  if (!context.mounted) return;
+  await navigateAfterLogout(context);
+}
+
+/// Simple "Are you sure?" used when there is no open cash session.
+Future<void> _logoutWithSimpleConfirm(BuildContext context) async {
+  final confirmed = await showLogoutConfirmDialog(
+    context,
+    message:
+        'You have no open cash session. Are you sure you want to logout?',
+  );
+  if (!context.mounted || !confirmed) return;
   final deviceId = await DeviceIdService.getOrCreate();
   if (!context.mounted) return;
   await context.read<AuthRepository>().logoutOnly(deviceId: deviceId);
   if (!context.mounted) return;
-  context.read<AuthBloc>().add(const AuthLoggedOut());
-  await context.read<AuthBloc>().stream.firstWhere((s) => s is AuthUnauthenticated);
-  if (context.mounted) context.go('/login');
+  await navigateAfterLogout(context);
 }
 
 /// Shared logout UX from Dashboard, Open Cash, and Settings.
@@ -294,9 +330,7 @@ Future<void> showLogoutFlow(BuildContext context) async {
     if (!context.mounted) return;
     await context.read<AuthRepository>().logoutOnly(deviceId: deviceId);
     if (!context.mounted) return;
-    context.read<AuthBloc>().add(const AuthLoggedOut());
-    await context.read<AuthBloc>().stream.firstWhere((s) => s is AuthUnauthenticated);
-    if (context.mounted) context.go('/login');
+    await navigateAfterLogout(context);
     return;
   }
 

@@ -1,0 +1,1364 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Standard Valet · App Mirror</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap");
+
+    :root {
+      color-scheme: light;
+      --bg: #f4f5f7;
+      --card: #ffffff;
+      --card-border: rgba(10, 27, 57, 0.13);
+      --rail-bg: #fafafa;
+      --rail-border: rgba(10, 27, 57, 0.13);
+      --rail-accent: #ffeed8;
+      --ink: #0a1b39;
+      --muted: #5b6577;
+      --faint: #8b93a3;
+      --field-bg: #ffffff;
+      --field-fill: #f6f7f9;
+      --orange: #f68d00;
+      --orange-dark: #c76f00;
+      --orange-soft: #fff4e1;
+      --green: #27ae60;
+      --green-soft: #e7f7ee;
+      --red: #ec2231;
+      --blue: #0068d3;
+      --radius: 14px;
+      --radius-sm: 10px;
+      --rail-w: 72px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 24px 16px;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #eef0f4, transparent),
+        #e6e8ec;
+      color: var(--ink);
+      font-family: Poppins, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
+    }
+
+    button, input, textarea, select { font: inherit; color: inherit; }
+    button { border: 0; cursor: pointer; background: none; }
+
+    /* Tablet device frame */
+    .device {
+      width: min(1160px, 100%);
+      background: #0d1118;
+      border-radius: 30px;
+      padding: 14px;
+      box-shadow: 0 40px 90px rgba(13, 17, 24, 0.4), inset 0 0 0 2px #20262f;
+      position: relative;
+    }
+
+    .device::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 6px;
+      width: 6px;
+      height: 46px;
+      transform: translateY(-50%);
+      border-radius: 4px;
+      background: #20262f;
+    }
+
+    .device-screen {
+      position: relative;
+      height: 712px;
+      border-radius: 18px;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: none;
+    }
+
+    .screen.active { display: block; }
+
+    .screen.app {
+      display: none;
+      grid-template-columns: var(--rail-w) 1fr;
+    }
+
+    .screen.app.active { display: grid; }
+
+    /* Rail */
+    .rail {
+      background: var(--rail-bg);
+      border-right: 1px solid var(--rail-border);
+      padding: 14px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .rail-top {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .rail-logo {
+      width: 44px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+
+    .rail-logo img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+
+    .rail-logo .fallback {
+      font-weight: 800;
+      font-size: 13px;
+      color: var(--orange);
+      letter-spacing: 0.04em;
+    }
+
+    .rail-icon {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--radius-sm);
+      color: var(--muted);
+      transition: 140ms ease;
+    }
+
+    .rail-icon svg { width: 22px; height: 22px; }
+    .rail-icon:hover { background: rgba(10, 27, 57, 0.06); color: var(--ink); }
+    .rail-icon.active { background: var(--rail-accent); color: var(--orange); }
+    .rail-spacer { margin-top: auto; }
+
+    .content {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Headers */
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .header h2 { margin: 0; font-size: 22px; line-height: 1.1; }
+    .header p, .muted { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .kicker {
+      color: var(--faint);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .cash-header {
+      min-height: 68px;
+      padding: 12px 16px;
+      background: var(--rail-bg);
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .cash-header .title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .cash-header .sub {
+      margin-top: 3px;
+      color: var(--faint);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .flow-header {
+      padding: 12px 16px;
+      background: var(--rail-bg);
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .flow-header .flow-title { font-size: 14px; font-weight: 700; }
+    .flow-steps { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+
+    .flow-step {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--card-border);
+      background: var(--card);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .flow-step .dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--field-fill);
+      color: var(--faint);
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .flow-step.active { border-color: rgba(246, 141, 0, 0.4); background: var(--orange-soft); color: var(--orange-dark); }
+    .flow-step.active .dot { background: var(--orange); color: #fff; }
+    .flow-step.done .dot { background: var(--green); color: #fff; }
+
+    /* Pills */
+    .status-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 28px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--card-border);
+      background: var(--card);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .pill::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--faint);
+    }
+
+    .pill.good { color: #167544; border-color: rgba(39, 174, 96, 0.3); background: var(--green-soft); }
+    .pill.good::before { background: var(--green); }
+    .pill.warn { color: var(--orange-dark); border-color: rgba(246, 141, 0, 0.3); background: var(--orange-soft); }
+    .pill.warn::before { background: var(--orange); }
+    .pill.plain::before { display: none; }
+
+    /* Cards & layout */
+    .card { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 16px; }
+    .split { display: grid; grid-template-columns: 1fr 340px; gap: 14px; align-items: start; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+
+    .stat { min-height: 92px; display: flex; flex-direction: column; gap: 6px; }
+    .stat .label { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+    .stat .value { color: var(--orange); font-size: 32px; font-weight: 800; line-height: 1; }
+    .stat .value.ink { color: var(--ink); }
+    .stat .hint { color: var(--faint); font-size: 11px; }
+
+    .action-tile {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 14px;
+      align-items: center;
+      min-height: 116px;
+      padding: 18px;
+      border-radius: var(--radius);
+      border: 1px solid var(--card-border);
+      background: var(--card);
+      text-align: left;
+      transition: 140ms ease;
+    }
+
+    .action-tile:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(10, 27, 57, 0.1); }
+    .action-tile.primary { background: var(--orange); border-color: transparent; color: #fff; }
+    .action-tile .tile-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: var(--orange-soft);
+      color: var(--orange-dark);
+    }
+    .action-tile.primary .tile-icon { background: rgba(255, 255, 255, 0.2); color: #fff; }
+    .action-tile .tile-icon svg { width: 22px; height: 22px; }
+    .action-tile strong { font-size: 17px; }
+    .action-tile span { display: block; margin-top: 3px; font-size: 12px; opacity: 0.78; }
+
+    .table { display: grid; }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 14px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .row:last-child { border-bottom: 0; }
+    .row strong { display: block; font-size: 13px; }
+    .row span { color: var(--muted); font-size: 11px; }
+
+    /* Fields */
+    .field { display: grid; gap: 6px; }
+    label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    input, textarea, select {
+      width: 100%;
+      min-height: 42px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+      background: var(--field-bg);
+      outline: none;
+      transition: 120ms ease;
+    }
+    textarea { min-height: 64px; resize: vertical; }
+    input:focus, textarea:focus, select:focus {
+      border-color: rgba(246, 141, 0, 0.7);
+      box-shadow: 0 0 0 3px rgba(246, 141, 0, 0.14);
+    }
+
+    .summary-item { padding: 11px 12px; border: 1px solid var(--card-border); border-radius: 10px; background: var(--card); }
+    .summary-item span { display: block; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
+    .summary-item strong { display: block; margin-top: 3px; font-size: 13px; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 10px 16px;
+      border-radius: 11px;
+      font-weight: 600;
+      transition: 140ms ease;
+    }
+    .btn svg { width: 18px; height: 18px; }
+    .btn.primary { background: var(--orange); color: #fff; }
+    .btn.primary:hover { background: var(--orange-dark); }
+    .btn.secondary { background: var(--card); color: var(--ink); border: 1px solid var(--card-border); }
+    .btn.secondary:hover { border-color: var(--faint); }
+    .btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--card-border); }
+    .btn.danger { background: var(--red); color: #fff; }
+    .btn.danger:hover { filter: brightness(0.95); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn.block { width: 100%; }
+
+    .footer {
+      margin-top: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 14px;
+      border-top: 1px solid var(--card-border);
+    }
+    .footer .right { display: flex; gap: 8px; }
+
+    /* Login */
+    .screen.login { display: none; place-items: center; padding: 24px; }
+    .screen.login.active { display: grid; }
+    .login-card {
+      width: min(420px, 100%);
+      padding: 34px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(10, 27, 57, 0.08);
+    }
+    .login-title { text-align: center; margin-bottom: 22px; }
+    .login-title h2 { margin: 0; color: var(--orange); font-size: 28px; }
+    .login-title p { margin: 4px 0 0; color: var(--faint); font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+
+    /* Belongings */
+    .checkbox-list { display: grid; gap: 8px; }
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      background: var(--card);
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .check-row:has(input:checked) { background: var(--orange-soft); border-color: rgba(246, 141, 0, 0.32); }
+    .check-row input { width: 18px; min-height: 18px; accent-color: var(--orange); }
+
+    /* Condition diagram */
+    .condition-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.85fr); gap: 12px; }
+    .car-wrap {
+      position: relative;
+      width: 100%;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      background: var(--card);
+      overflow: hidden;
+      cursor: crosshair;
+    }
+    .car-wrap img { width: 100%; display: block; user-select: none; }
+    .damage-dot {
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      margin: -11px 0 0 -11px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      border: 2px solid #fff;
+      box-shadow: 0 3px 10px rgba(10, 27, 57, 0.3);
+      pointer-events: none;
+    }
+    .damage-dot.crack { background: var(--blue); }
+    .damage-dot.scratch { background: var(--orange); }
+    .damage-dot.dent { background: var(--red); }
+
+    .segmented { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .segmented button {
+      min-height: 42px;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      background: var(--card);
+      font-weight: 700;
+    }
+    .seg-scratch.active { border-color: var(--orange); background: var(--orange-soft); color: var(--orange-dark); }
+    .seg-dent.active { border-color: var(--red); background: #fdecec; color: var(--red); }
+    .seg-crack.active { border-color: var(--blue); background: #eaf2fc; color: var(--blue); }
+
+    /* Checkout scan */
+    .scan-box {
+      display: grid;
+      place-items: center;
+      min-height: 320px;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      background: var(--card);
+    }
+    .qr-frame {
+      width: 210px;
+      height: 210px;
+      display: grid;
+      place-items: center;
+      gap: 10px;
+      border: 3px dashed var(--orange);
+      border-radius: 22px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      padding: 16px;
+    }
+    .qr-frame svg { width: 48px; height: 48px; color: var(--orange); }
+
+    /* Keypad */
+    .amount-display {
+      padding: 16px;
+      border-radius: 12px;
+      background: var(--ink);
+      color: #fff;
+      text-align: right;
+    }
+    .amount-display span { display: block; color: rgba(255, 255, 255, 0.6); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+    .amount-display strong { display: block; margin-top: 4px; font-size: 28px; line-height: 1; }
+    .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .key {
+      min-height: 48px;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      background: var(--card);
+      font-size: 17px;
+      font-weight: 700;
+      transition: 100ms ease;
+    }
+    .key:active { background: var(--field-fill); transform: scale(0.97); }
+
+    /* Toast */
+    .toast {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      z-index: 30;
+      max-width: min(440px, calc(100% - 40px));
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: var(--ink);
+      color: #fff;
+      box-shadow: 0 16px 38px rgba(10, 27, 57, 0.28);
+      opacity: 0;
+      transform: translate(-50%, 12px);
+      transition: 180ms ease;
+      pointer-events: none;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    .caption {
+      margin-top: 14px;
+      text-align: center;
+      color: #6b7280;
+      font-size: 12px;
+    }
+
+    @media (max-width: 820px) {
+      .device-screen { height: auto; min-height: 620px; }
+      .screen { position: relative; }
+      .screen.app.active { grid-template-columns: 56px 1fr; }
+      .split, .grid-2, .grid-3, .form-grid, .condition-layout, .summary-grid { grid-template-columns: 1fr; }
+      .rail-icon, .rail-logo { width: 40px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="device">
+    <div class="device-screen">
+
+      <!-- 01 · LOGIN -->
+      <section class="screen login active" id="login">
+        <div class="login-card">
+          <div class="login-title">
+            <h2>Valet Master</h2>
+            <p>Smart Parking Technologies</p>
+          </div>
+          <div class="field" style="margin-bottom:12px;">
+            <label for="login-email">Email Address</label>
+            <input id="login-email" type="email" value="cashier@meraki.test">
+          </div>
+          <div class="field" style="margin-bottom:16px;">
+            <label for="login-password">Password</label>
+            <input id="login-password" type="password" value="password">
+          </div>
+          <div class="status-row" style="margin-bottom:18px;">
+            <span class="pill good">Online</span>
+            <span class="pill">Branch 1 : A-Deck</span>
+          </div>
+          <div class="grid-2">
+            <button class="btn primary" data-go="open-cash">Sign In</button>
+            <button class="btn secondary" data-go="open-cash">Offline Mode</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 02 · OPEN CASH -->
+      <section class="screen app" id="open-cash">
+        <aside class="rail">
+          <div class="rail-top">
+            <div class="rail-logo"><img src="../assets/images/spid_logo1.png" alt="SPID" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fallback',textContent:'VM'}))"></div>
+          </div>
+          <button class="rail-icon rail-spacer" data-icon="logout" data-go="login" data-toast="Logged out." title="Logout"></button>
+        </aside>
+        <div class="content">
+          <div class="cash-header">
+            <div>
+              <div class="title">Open Cash</div>
+              <div class="sub">Saturday, June 27, 2026 · Branch 1 : A-Deck</div>
+            </div>
+            <div class="status-row">
+              <span class="pill good">Synced</span>
+              <span class="pill good">Online</span>
+            </div>
+          </div>
+          <div class="scroll">
+            <div class="split">
+              <div class="card">
+                <span class="kicker">Cashier shift</span>
+                <h3 style="margin:8px 0 12px;">Starting Float</h3>
+                <div class="summary-grid">
+                  <div class="summary-item"><span>Staff</span><strong>Kindred Inocencio</strong></div>
+                  <div class="summary-item"><span>Shift</span><strong>Morning Shift</strong></div>
+                  <div class="summary-item"><span>Branch</span><strong>Branch 1</strong></div>
+                  <div class="summary-item"><span>Area</span><strong>A-Deck</strong></div>
+                </div>
+                <div class="field" style="margin-top:14px;">
+                  <label for="open-notes">Opening Notes</label>
+                  <textarea id="open-notes" rows="3" placeholder="Optional notes for the starting cash count"></textarea>
+                </div>
+              </div>
+              <div class="card">
+                <div class="amount-display">
+                  <span>Opening Float</span>
+                  <strong id="open-amount">PHP 0.00</strong>
+                </div>
+                <div class="keypad" data-keypad="open" style="margin-top:12px;">
+                  <button class="key">1</button><button class="key">2</button><button class="key">3</button>
+                  <button class="key">4</button><button class="key">5</button><button class="key">6</button>
+                  <button class="key">7</button><button class="key">8</button><button class="key">9</button>
+                  <button class="key">.</button><button class="key">0</button><button class="key">&#9003;</button>
+                </div>
+                <button class="btn primary block" style="margin-top:12px;" data-go="dashboard" data-toast="Cash shift opened.">Open Shift</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 03 · DASHBOARD -->
+      <section class="screen app" id="dashboard">
+        <aside class="rail">
+          <div class="rail-top">
+            <div class="rail-logo"><img src="../assets/images/spid_logo1.png" alt="SPID" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fallback',textContent:'VM'}))"></div>
+            <button class="rail-icon active" data-icon="dashboard" data-go="dashboard" title="Dashboard"></button>
+            <button class="rail-icon" data-icon="reports" data-rail-info="Reports" title="Reports"></button>
+            <button class="rail-icon" data-icon="settings" data-rail-info="Settings" title="Settings"></button>
+          </div>
+          <button class="rail-icon rail-spacer" data-icon="logout" data-go="login" data-toast="Logged out." title="Logout"></button>
+        </aside>
+        <div class="content">
+          <div class="scroll">
+            <div class="header">
+              <div>
+                <h2>Good morning, Kindred</h2>
+                <p>Saturday, June 27, 2026 · Branch 1 : A-Deck</p>
+              </div>
+              <div class="status-row">
+                <button class="btn secondary" data-go="close-cash">Close Cash</button>
+                <span class="pill good">Synced</span>
+              </div>
+            </div>
+
+            <div class="grid-3">
+              <div class="card stat"><span class="label">Vehicles In</span><span class="value" id="vehicles-in">12</span><span class="hint">+2 this hour</span></div>
+              <div class="card stat"><span class="label">Checked Out</span><span class="value ink" id="checked-out">7</span><span class="hint">This shift</span></div>
+              <div class="card stat"><span class="label">Remaining Slots</span><span class="value ink" id="remaining-slots">31</span><span class="hint">of 50 slots</span></div>
+            </div>
+
+            <div class="grid-2">
+              <button class="action-tile primary" data-go="checkin-details">
+                <span class="tile-icon" data-icon="car"></span>
+                <span><strong>Check In Vehicle</strong><span>Create a standard valet ticket: details, belongings, condition, signature.</span></span>
+              </button>
+              <button class="action-tile" data-go="checkout-scan">
+                <span class="tile-icon" data-icon="scan"></span>
+                <span><strong>Checkout Vehicle</strong><span>Scan QR code or enter plate / ticket number.</span></span>
+              </button>
+            </div>
+
+            <div class="card">
+              <span class="kicker">Recent Transactions</span>
+              <div class="table" style="margin-top:8px;">
+                <div class="row"><div><strong>ABC 1234 · Toyota Vios</strong><span>Ticket VM-1042 · Standard Valet · Slot #12</span></div><span class="pill warn">In</span></div>
+                <div class="row"><div><strong>NQA 8891 · Honda City</strong><span>Ticket VM-1041 · Paid PHP 180.00</span></div><span class="pill good">Out</span></div>
+                <div class="row"><div><strong>MER 2026 · Mitsubishi Xpander</strong><span>Ticket VM-1040 · Standard Valet · Slot #08</span></div><span class="pill warn">In</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 04a · CHECK IN · VEHICLE -->
+      <section class="screen app" id="checkin-details">
+        <aside class="rail">
+          <div class="rail-top">
+            <div class="rail-logo"><img src="../assets/images/spid_logo1.png" alt="SPID" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fallback',textContent:'VM'}))"></div>
+            <button class="rail-icon" data-icon="dashboard" data-go="dashboard" title="Dashboard"></button>
+            <button class="rail-icon" data-icon="reports" data-rail-info="Reports" title="Reports"></button>
+            <button class="rail-icon" data-icon="settings" data-rail-info="Settings" title="Settings"></button>
+          </div>
+          <button class="rail-icon rail-spacer" data-icon="logout" data-go="login" data-toast="Logged out." title="Logout"></button>
+        </aside>
+        <div class="content">
+          <div class="flow-header">
+            <div class="flow-title">Check In Vehicle</div>
+            <div class="flow-steps">
+              <span class="flow-step active"><span class="dot">1</span>Vehicle</span>
+              <span class="flow-step"><span class="dot">2</span>Belongings</span>
+              <span class="flow-step"><span class="dot">3</span>Condition</span>
+              <span class="flow-step"><span class="dot">4</span>Review</span>
+            </div>
+          </div>
+          <div class="scroll">
+            <div class="card">
+              <div class="form-grid">
+                <div class="field"><label for="plate">Plate Number</label><input id="plate" value="ABC 1234"></div>
+                <div class="field"><label for="vr">VR No.</label><input id="vr" value="VR-12345"></div>
+                <div class="field"><label for="brand">Brand / Model</label><input id="brand" value="Toyota Vios"></div>
+                <div class="field"><label for="color">Color</label><input id="color" value="Silver"></div>
+                <div class="field"><label for="body-type">Vehicle Type</label>
+                  <select id="body-type"><option>Sedan</option><option>SUV</option><option>Van</option><option>Motorcycle</option></select>
+                </div>
+                <div class="field"><label for="driver-in">Valet In</label><input id="driver-in" value="Ramon Dela Cruz"></div>
+                <div class="field"><label for="level">Parking Level</label>
+                  <select id="level"><option>Level 1</option><option>Level 2</option><option>Level 3</option><option>Basement</option></select>
+                </div>
+                <div class="field"><label for="slot">Parking Slot</label>
+                  <select id="slot"><option>Slot #12</option><option>Slot #13</option><option>Slot #14</option><option>Slot #15</option></select>
+                </div>
+              </div>
+            </div>
+            <div class="footer">
+              <button class="btn ghost" data-go="dashboard">Cancel</button>
+              <div class="right"><button class="btn primary" data-go="checkin-belongings">Next: Belongings</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 04b · CHECK IN · BELONGINGS -->
+      <section class="screen app" id="checkin-belongings">
+        <aside class="rail">
+          <div class="rail-top">
+            <div class="rail-logo"><img src="../assets/images/spid_logo1.png" alt="SPID" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fallback',textContent:'VM'}))"></div>
+            <button class="rail-icon" data-icon="dashboard" data-go="dashboard" title="Dashboard"></button>
+            <button class="rail-icon" data-icon="reports" data-rail-info="Reports" title="Reports"></button>
+            <button class="rail-icon" data-icon="settings" data-rail-info="Settings" title="Settings"></button>
+          </div>
+          <button class="rail-icon rail-spacer" data-icon="logout" data-go="login" data-toast="Logged out." title="Logout"></button>
+        </aside>
+        <div class="content">
+          <div class="flow-header">
+            <div class="flow-title">Check In Vehicle</div>
+            <div class="flow-steps">
+              <span class="flow-step done"><span class="dot">&#10003;</span>Vehicle</span>
+              <span class="flow-step active"><span class="dot">2</span>Belongings</span>
+              <span class="flow-step"><span class="dot">3</span>Condition</span>
+              <span class="flow-step"><span class="dot">4</span>Review</span>
+            </div>
+          </div>
+          <div class="scroll">
+            <div class="card">
+              <p class="muted" style="margin:0 0 12px;">Select any items the customer left in the vehicle. This is optional.</p>
+              <div class="checkbox-list" id="belongings-list">
+                <label class="check-row"><input type="checkbox" value="iPad"> iPad</label>
+                <label class="check-row"><input type="checkbox" value="Cellphone / Charger" checked> Cellphone / Charger</label>
+                <label class="check-row"><input type="checkbox" value="Laptop / Notebook"> Laptop / Notebook</label>
+                <label class="check-row"><input type="checkbox" value="Sunglasses" checked> Sunglasses</label>
+                <label class="check-row"><input type="checkbox" value="Other Valuables" id="other-belongings-toggle"> Other Valuables</label>
+              </div>
+              <div class="field" id="other-belongings-field" style="display:none;margin-top:12px;">
+                <label for="other-belongings">Other (Specify)</label>
+                <textarea id="other-belongings" rows="2" placeholder="e.g. wallet, documents, jewelry"></textarea>
+              </div>
+            </div>
+            <div class="footer">
+              <button class="btn secondary" data-go="checkin-details">Back</button>
+              <div class="right">
+                <button class="btn ghost" data-go="dashboard">Cancel</button>
+                <button class="btn primary" data-go="checkin-condition">Next: Condition</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 04c · CHECK IN · CONDITION -->
+      <section class="screen app" id="checkin-condition">
+        <aside class="rail">
+          <div class="rail-top">
+            <div class="rail-logo"><img src="../assets/images/spid_logo1.png" alt="SPID" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fallback',textContent:'VM'}))"></div>
+            <button class="rail-icon" data-icon="dashboard" data-go="dashboard" title="Dashboard"></button>
+            <button class="rail-icon" data-icon="reports" data-rail-info="Reports" title="Reports"></button>
+            <button class="rail-icon" data-icon="settings" data-rail-info="Settings" title="Settings"></button>
+          </div>
+          <button class="rail-icon rail-spacer" data-icon="logout" data-go="login" data-toast="Logged out." title="Logout"></button>
+        </aside>
+        <div class="content">
+          <div class="flow-header">
+            <div class="flow-title">Check In Vehicle</div>
+            <div class="flow-steps">
+              <span class="flow-step done"><span class="dot">&#10003;</span>Vehicle</span>
+              <span class="flow-step done"><span class="dot">&#10003;</span>Belongings</span>
+              <span class="flow-step active"><span class="dot">3</span>Condition</span>
+              <span class="flow-step"><span class="dot">4</span>Review</span>
+            </div>
+          </div>
+          <div class="scroll">
+            <div class="condition-layout">
+              <div>
+                <span class="kicker">Tap diagram to mark damage</span>
+                <div class="car-wrap" id="car-panel" style="margin-top:8px;">
+                  <img src="../assets/images/vehicle_condition_car_top.png" alt="Vehicle top view" draggable="false"
+                       onerror="this.parentElement.style.minHeight='240px';this.parentElement.style.display='grid';this.parentElement.style.placeItems='center';this.replaceWith(Object.assign(document.createElement('span'),{className:'muted',textContent:'Vehicle diagram (tap to mark damage)'}))">
+                </div>
+              </div>
+              <div class="card">
+                <label>Mark Damage Type</label>
+                <div class="segmented" id="damage-types" style="margin:8px 0 16px;">
+                  <button class="seg-scratch active" data-damage="scratch">Scratch</button>
+                  <button class="seg-dent" data-damage="dent">Dent</button>
+                  <button class="seg-crack" data-damage="crack">Crack</button>
+                </div>
+                <div class="summary-item"><span>Customer Signature</span><strong id="signature-state">Not captured</strong></div>
+                <button class="btn secondary block" id="signature-btn" style="margin-top:10px;">Capture Signature</button>
+                <div style="height:14px;"></div>
+                <span class="kicker">Logged Damage</span>
+                <div class="table" id="damage-log" style="margin-top:6px;">
+                  <div class="row"><div><strong>No damage marked</strong><span>Tap the vehicle diagram to add one.</span></div></div>
+                </div>
+              </div>
+            </div>
+            <div class="footer">
+              <button class="btn secondary" data-go="checkin-belongings">Back</button>
+              <div class="right">
+                <button class="btn ghost" data-go="dashboard">Cancel</button>
+                <button class="btn primary" id="condition-next">Next: Review</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 04d · CHECK IN · REVIEW -->
+      <section class="screen app" id="checkin-review">
+        <aside class="rail">
+          <div class="rail-top">
+            <div class="rail-logo"><img src="../assets/images/spid_logo1.png" alt="SPID" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fallback',textContent:'VM'}))"></div>
+            <button class="rail-icon" data-icon="dashboard" data-go="dashboard" title="Dashboard"></button>
+            <button class="rail-icon" data-icon="reports" data-rail-info="Reports" title="Reports"></button>
+            <button class="rail-icon" data-icon="settings" data-rail-info="Settings" title="Settings"></button>
+          </div>
+          <button class="rail-icon rail-spacer" data-icon="logout" data-go="login" data-toast="Logged out." title="Logout"></button>
+        </aside>
+        <div class="content">
+          <div class="flow-header">
+            <div class="flow-title">Review &amp; Print</div>
+            <div class="flow-steps">
+              <span class="flow-step done"><span class="dot">&#10003;</span>Vehicle</span>
+              <span class="flow-step done"><span class="dot">&#10003;</span>Belongings</span>
+              <span class="flow-step done"><span class="dot">&#10003;</span>Condition</span>
+              <span class="flow-step active"><span class="dot">4</span>Review</span>
+            </div>
+          </div>
+          <div class="scroll">
+            <div class="grid-2">
+              <div class="card">
+                <span class="kicker">Vehicle</span>
+                <div class="summary-grid" style="margin-top:10px;">
+                  <div class="summary-item"><span>Plate</span><strong data-summary="plate">ABC 1234</strong></div>
+                  <div class="summary-item"><span>VR No.</span><strong data-summary="vr">VR-12345</strong></div>
+                  <div class="summary-item"><span>Brand</span><strong data-summary="brand">Toyota Vios</strong></div>
+                  <div class="summary-item"><span>Color</span><strong data-summary="color">Silver</strong></div>
+                  <div class="summary-item"><span>Type</span><strong data-summary="type">Sedan</strong></div>
+                  <div class="summary-item"><span>Parking</span><strong data-summary="parking">Level 1 · Slot #12</strong></div>
+                </div>
+              </div>
+              <div class="card">
+                <span class="kicker">Ticket</span>
+                <div class="summary-grid" style="margin-top:10px;">
+                  <div class="summary-item"><span>Service</span><strong>Standard Valet</strong></div>
+                  <div class="summary-item"><span>Ticket No.</span><strong>VM-1043</strong></div>
+                  <div class="summary-item"><span>Valet In</span><strong data-summary="driver">Ramon Dela Cruz</strong></div>
+                  <div class="summary-item"><span>Time In</span><strong>10:20 AM</strong></div>
+                  <div class="summary-item"><span>Belongings</span><strong data-summary="belongings">Cellphone / Charger, Sunglasses</strong></div>
+                  <div class="summary-item"><span>Damage</span><strong data-summary="damage">None logged</strong></div>
+                </div>
+              </div>
+            </div>
+            <div class="footer">
+              <button class="btn secondary" data-go="checkin-condition">Back</button>
+              <div class="right">
+                <button class="btn ghost" data-go="dashboard">Cancel</button>
+                <button class="btn primary" id="confirm-checkin">Confirm &amp; Print Ticket</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 05a · CHECK OUT · SCAN -->
+      <section class="screen app" id="checkout-scan">
+        <aside class="rail">
+          <div class="rail-top">
+            <div class="rail-logo"><img src="../assets/images/spid_logo1.png" alt="SPID" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fallback',textContent:'VM'}))"></div>
+            <button class="rail-icon" data-icon="dashboard" data-go="dashboard" title="Dashboard"></button>
+            <button class="rail-icon" data-icon="reports" data-rail-info="Reports" title="Reports"></button>
+            <button class="rail-icon" data-icon="settings" data-rail-info="Settings" title="Settings"></button>
+          </div>
+          <button class="rail-icon rail-spacer" data-icon="logout" data-go="login" data-toast="Logged out." title="Logout"></button>
+        </aside>
+        <div class="content">
+          <div class="flow-header">
+            <div class="flow-title">Checkout Vehicle</div>
+            <div class="flow-steps">
+              <span class="flow-step active"><span class="dot">1</span>Lookup</span>
+              <span class="flow-step"><span class="dot">2</span>Review</span>
+              <span class="flow-step"><span class="dot">3</span>Payment</span>
+            </div>
+          </div>
+          <div class="scroll">
+            <div class="split">
+              <div class="scan-box">
+                <button class="qr-frame" data-go="checkout-info" data-toast="QR ticket found: VM-1042.">
+                  <span data-icon="scan"></span>
+                  Point camera at the customer's QR ticket<br>(tap to simulate scan)
+                </button>
+              </div>
+              <div class="card">
+                <span class="kicker">Enter Ticket / Plate Manually</span>
+                <div class="field" style="margin-top:14px;"><label for="ticket-search">Ticket Number</label><input id="ticket-search" value="VM-1042"></div>
+                <div class="field" style="margin-top:12px;"><label for="plate-search">Plate Number</label><input id="plate-search" value="ABC 1234"></div>
+                <button class="btn primary block" style="margin-top:14px;" data-go="checkout-info" data-toast="Ticket VM-1042 loaded.">Search</button>
+              </div>
+            </div>
+            <div class="footer">
+              <button class="btn secondary" data-go="dashboard">Back to Dashboard</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 05b · CHECK OUT · REVIEW -->
+      <section class="screen app" id="checkout-info">
+        <aside class="rail">
+          <div class="rail-top">
+            <div class="rail-logo"><img src="../assets/images/spid_logo1.png" alt="SPID" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fallback',textContent:'VM'}))"></div>
+            <button class="rail-icon" data-icon="dashboard" data-go="dashboard" title="Dashboard"></button>
+            <button class="rail-icon" data-icon="reports" data-rail-info="Reports" title="Reports"></button>
+            <button class="rail-icon" data-icon="settings" data-rail-info="Settings" title="Settings"></button>
+          </div>
+          <button class="rail-icon rail-spacer" data-icon="logout" data-go="login" data-toast="Logged out." title="Logout"></button>
+        </aside>
+        <div class="content">
+          <div class="flow-header">
+            <div class="flow-title">Vehicle Review</div>
+            <div class="flow-steps">
+              <span class="flow-step done"><span class="dot">&#10003;</span>Lookup</span>
+              <span class="flow-step active"><span class="dot">2</span>Review</span>
+              <span class="flow-step"><span class="dot">3</span>Payment</span>
+            </div>
+          </div>
+          <div class="scroll">
+            <div class="grid-2">
+              <div class="card">
+                <span class="kicker">Customer &amp; Time</span>
+                <div class="summary-grid" style="margin-top:10px;">
+                  <div class="summary-item"><span>Customer</span><strong>Maria Santos</strong></div>
+                  <div class="summary-item"><span>Contact</span><strong>0917 555 0123</strong></div>
+                  <div class="summary-item"><span>Check In</span><strong>8:10 AM</strong></div>
+                  <div class="summary-item"><span>Duration</span><strong>2 hrs 10 mins</strong></div>
+                </div>
+              </div>
+              <div class="card">
+                <span class="kicker">Vehicle</span>
+                <div class="summary-grid" style="margin-top:10px;">
+                  <div class="summary-item"><span>Plate</span><strong>ABC 1234</strong></div>
+                  <div class="summary-item"><span>VR No.</span><strong>VR-12345</strong></div>
+                  <div class="summary-item"><span>Brand</span><strong>Toyota Vios</strong></div>
+                  <div class="summary-item"><span>Parking</span><strong>Level 1 · Slot #12</strong></div>
+                  <div class="summary-item"><span>Valet In</span><strong>Ramon Dela Cruz</strong></div>
+                  <div class="summary-item"><span>Belongings</span><strong>Cellphone, Sunglasses</strong></div>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="kicker">Condition Log</span>
+              <div class="table" style="margin-top:8px;">
+                <div class="row"><div><strong>No checkout issues added</strong><span>Vehicle condition matches check-in record.</span></div><span class="pill good">Clear</span></div>
+              </div>
+            </div>
+            <div class="footer">
+              <button class="btn secondary" data-go="checkout-scan">Back</button>
+              <div class="right">
+                <button class="btn ghost" data-toast="Issue entry simulated.">Add Issue</button>
+                <button class="btn primary" data-go="checkout-payment">Next: Payment</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 05c · CHECK OUT · PAYMENT -->
+      <section class="screen app" id="checkout-payment">
+        <aside class="rail">
+          <div class="rail-top">
+            <div class="rail-logo"><img src="../assets/images/spid_logo1.png" alt="SPID" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fallback',textContent:'VM'}))"></div>
+            <button class="rail-icon" data-icon="dashboard" data-go="dashboard" title="Dashboard"></button>
+            <button class="rail-icon" data-icon="reports" data-rail-info="Reports" title="Reports"></button>
+            <button class="rail-icon" data-icon="settings" data-rail-info="Settings" title="Settings"></button>
+          </div>
+          <button class="rail-icon rail-spacer" data-icon="logout" data-go="login" data-toast="Logged out." title="Logout"></button>
+        </aside>
+        <div class="content">
+          <div class="flow-header">
+            <div class="flow-title">Payment Summary</div>
+            <div class="flow-steps">
+              <span class="flow-step done"><span class="dot">&#10003;</span>Lookup</span>
+              <span class="flow-step done"><span class="dot">&#10003;</span>Review</span>
+              <span class="flow-step active"><span class="dot">3</span>Payment</span>
+            </div>
+          </div>
+          <div class="scroll">
+            <div class="split">
+              <div class="card">
+                <span class="kicker">Amount Due</span>
+                <div class="summary-grid" style="margin-top:10px;">
+                  <div class="summary-item"><span>Plate</span><strong>ABC 1234</strong></div>
+                  <div class="summary-item"><span>Service</span><strong>Standard Valet</strong></div>
+                  <div class="summary-item"><span>Time In</span><strong>8:10 AM</strong></div>
+                  <div class="summary-item"><span>Time Out</span><strong>10:20 AM</strong></div>
+                  <div class="summary-item"><span>Duration</span><strong>2 hrs 10 mins</strong></div>
+                  <div class="summary-item"><span>Total Due</span><strong id="amount-due">PHP 150.00</strong></div>
+                </div>
+                <div class="field" style="margin-top:14px;"><label for="driver-out">Valet Out</label><input id="driver-out" value="Jose Reyes"></div>
+                <p class="muted">Flat rate PHP 150 + succeeding PHP 30/hr.</p>
+              </div>
+              <div class="card">
+                <div class="amount-display"><span>Cash Tendered</span><strong id="tender-display">PHP 0.00</strong></div>
+                <div class="summary-item" style="margin:10px 0;"><span>Change</span><strong id="change-display">PHP 0.00</strong></div>
+                <div class="grid-3" style="margin-bottom:8px;">
+                  <button class="btn secondary quick-cash" data-cash="150">150</button>
+                  <button class="btn secondary quick-cash" data-cash="200">200</button>
+                  <button class="btn secondary quick-cash" data-cash="500">500</button>
+                </div>
+                <div class="keypad" data-keypad="pay">
+                  <button class="key">1</button><button class="key">2</button><button class="key">3</button>
+                  <button class="key">4</button><button class="key">5</button><button class="key">6</button>
+                  <button class="key">7</button><button class="key">8</button><button class="key">9</button>
+                  <button class="key">00</button><button class="key">0</button><button class="key">&#9003;</button>
+                </div>
+              </div>
+            </div>
+            <div class="footer">
+              <button class="btn secondary" data-go="checkout-info">Back</button>
+              <div class="right">
+                <button class="btn ghost" data-go="dashboard">Cancel</button>
+                <button class="btn primary" id="confirm-checkout" disabled>Confirm Payment &amp; Print</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 06 · CLOSE CASH -->
+      <section class="screen app" id="close-cash">
+        <aside class="rail">
+          <div class="rail-top">
+            <div class="rail-logo"><img src="../assets/images/spid_logo1.png" alt="SPID" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fallback',textContent:'VM'}))"></div>
+          </div>
+          <button class="rail-icon rail-spacer" data-icon="logout" data-go="login" data-toast="Logged out." title="Logout"></button>
+        </aside>
+        <div class="content">
+          <div class="cash-header">
+            <div>
+              <div class="title">Close Cash</div>
+              <div class="sub">Saturday, June 27, 2026 · Branch 1 : A-Deck</div>
+            </div>
+            <div class="status-row">
+              <span class="pill good">0 pending sync</span>
+              <span class="pill good">Online</span>
+            </div>
+          </div>
+          <div class="scroll">
+            <div class="split">
+              <div class="card">
+                <span class="kicker">Shift Stats</span>
+                <div class="summary-grid" style="margin-top:10px;">
+                  <div class="summary-item"><span>Opening Float</span><strong id="close-opening">PHP 0.00</strong></div>
+                  <div class="summary-item"><span>Collections</span><strong id="close-collections">PHP 1,260.00</strong></div>
+                  <div class="summary-item"><span>Vehicles In</span><strong id="close-in">12</strong></div>
+                  <div class="summary-item"><span>Checked Out</span><strong id="close-out">7</strong></div>
+                  <div class="summary-item"><span>Expected Cash</span><strong id="expected-cash">PHP 1,260.00</strong></div>
+                  <div class="summary-item"><span>Variance</span><strong id="variance">PHP -1,260.00</strong></div>
+                </div>
+                <div class="field" style="margin-top:14px;"><label for="close-notes">Closing Notes</label><textarea id="close-notes" rows="2" placeholder="Optional notes before closing cash"></textarea></div>
+              </div>
+              <div class="card">
+                <div class="amount-display"><span>Actual Cash Count</span><strong id="close-amount">PHP 0.00</strong></div>
+                <div class="keypad" data-keypad="close" style="margin-top:12px;">
+                  <button class="key">1</button><button class="key">2</button><button class="key">3</button>
+                  <button class="key">4</button><button class="key">5</button><button class="key">6</button>
+                  <button class="key">7</button><button class="key">8</button><button class="key">9</button>
+                  <button class="key">.</button><button class="key">0</button><button class="key">&#9003;</button>
+                </div>
+                <button class="btn danger block" style="margin-top:12px;" id="close-shift">Close Cash &amp; Logout</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+  </div>
+  <p class="caption">Interactive mirror of the Standard Valet flow · tap rail icons, buttons, keypads, checkboxes, and the vehicle diagram.</p>
+
+  <script>
+    const ICONS = {
+      dashboard: '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
+      reports: '<path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6" rx="1"/><rect x="12" y="7" width="3" height="10" rx="1"/><rect x="17" y="13" width="3" height="4" rx="1"/>',
+      settings: '<path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/>',
+      logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
+      car: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.6 3.3A3 3 0 0 0 2 13v3c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+      scan: '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>'
+    };
+
+    function svg(name) {
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || '') + '</svg>';
+    }
+
+    document.querySelectorAll('[data-icon]').forEach((el) => {
+      el.innerHTML = svg(el.dataset.icon);
+    });
+
+    const state = {
+      openInput: '0',
+      payInput: '',
+      closeInput: '0',
+      selectedDamage: 'scratch',
+      damages: [],
+      signed: false,
+      vehiclesIn: 12,
+      checkedOut: 7,
+      remainingSlots: 31,
+      collections: 1260,
+      amountDue: 150
+    };
+
+    const money = (v) => 'PHP ' + Number(v || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const screens = [...document.querySelectorAll('.screen')];
+    const toast = document.getElementById('toast');
+
+    function showToast(message) {
+      if (!message) return;
+      toast.textContent = message;
+      toast.classList.add('show');
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    function go(id, message) {
+      const target = document.getElementById(id);
+      if (!target) return;
+      screens.forEach((s) => s.classList.remove('active'));
+      target.classList.add('active');
+      target.querySelector('.scroll')?.scrollTo(0, 0);
+      if (id === 'checkin-review') syncReview();
+      if (id === 'dashboard') syncStats();
+      if (id === 'close-cash') syncCloseCash();
+      showToast(message);
+    }
+
+    document.addEventListener('click', (event) => {
+      const goBtn = event.target.closest('[data-go]');
+      if (goBtn) { go(goBtn.dataset.go, goBtn.dataset.toast); return; }
+      const info = event.target.closest('[data-rail-info]');
+      if (info) showToast(info.dataset.railInfo + ' is outside this standard valet prototype.');
+    });
+
+    function normalizeDecimal(current, key) {
+      let v = current;
+      if (key === '\u232b' || key === '⌫') v = v.slice(0, -1) || '0';
+      else if (key === '.') { if (!v.includes('.')) v = v === '0' ? '0.' : v + '.'; }
+      else v = v === '0' ? key : v + key;
+      if (v.includes('.')) { const [w, d] = v.split('.'); v = w + '.' + d.slice(0, 2); }
+      v = v.replace(/^0+(?=\d)/, '') || '0';
+      return v;
+    }
+
+    function normalizeWhole(current, key) {
+      let v = current || '';
+      if (key === '\u232b' || key === '⌫') return v.slice(0, -1);
+      if (key === '00') return (v || '0') + '00';
+      return v === '0' ? key : v + key;
+    }
+
+    function updateOpen() {
+      const amt = parseFloat(state.openInput || '0');
+      document.getElementById('open-amount').textContent = money(amt);
+      document.getElementById('close-opening').textContent = money(amt);
+    }
+
+    function updatePay() {
+      const tendered = parseInt(state.payInput || '0', 10);
+      const change = Math.max(0, tendered - state.amountDue);
+      document.getElementById('tender-display').textContent = money(tendered);
+      document.getElementById('change-display').textContent = money(change);
+      document.getElementById('confirm-checkout').disabled = tendered < state.amountDue;
+    }
+
+    function updateClose() {
+      const actual = parseFloat(state.closeInput || '0');
+      const expected = state.collections + parseFloat(state.openInput || '0');
+      document.getElementById('close-amount').textContent = money(actual);
+      document.getElementById('expected-cash').textContent = money(expected);
+      document.getElementById('variance').textContent = money(actual - expected);
+    }
+
+    document.querySelectorAll('[data-keypad]').forEach((pad) => {
+      pad.addEventListener('click', (event) => {
+        const key = event.target.closest('.key');
+        if (!key) return;
+        const value = key.textContent.trim();
+        const mode = pad.dataset.keypad;
+        if (mode === 'open') { state.openInput = normalizeDecimal(state.openInput, value); updateOpen(); }
+        if (mode === 'pay') { state.payInput = normalizeWhole(state.payInput, value); updatePay(); }
+        if (mode === 'close') { state.closeInput = normalizeDecimal(state.closeInput, value); updateClose(); }
+      });
+    });
+
+    document.querySelectorAll('.quick-cash').forEach((btn) => {
+      btn.addEventListener('click', () => { state.payInput = btn.dataset.cash; updatePay(); });
+    });
+
+    document.getElementById('other-belongings-toggle').addEventListener('change', (e) => {
+      document.getElementById('other-belongings-field').style.display = e.target.checked ? 'grid' : 'none';
+    });
+
+    document.querySelectorAll('#damage-types button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.selectedDamage = btn.dataset.damage;
+        document.querySelectorAll('#damage-types button').forEach((b) => b.classList.toggle('active', b === btn));
+      });
+    });
+
+    const carPanel = document.getElementById('car-panel');
+    carPanel.addEventListener('click', (event) => {
+      const rect = carPanel.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / rect.width) * 100;
+      const y = ((event.clientY - rect.top) / rect.height) * 100;
+      state.damages.push({ type: state.selectedDamage, x, y });
+      renderDamages();
+    });
+
+    function renderDamages() {
+      carPanel.querySelectorAll('.damage-dot').forEach((d) => d.remove());
+      state.damages.forEach((d, i) => {
+        const dot = document.createElement('span');
+        dot.className = 'damage-dot ' + d.type;
+        dot.style.left = d.x + '%';
+        dot.style.top = d.y + '%';
+        dot.textContent = String(i + 1);
+        carPanel.appendChild(dot);
+      });
+      const log = document.getElementById('damage-log');
+      if (!state.damages.length) {
+        log.innerHTML = '<div class="row"><div><strong>No damage marked</strong><span>Tap the vehicle diagram to add one.</span></div></div>';
+        return;
+      }
+      log.innerHTML = state.damages.map((d, i) =>
+        '<div class="row"><div><strong>' + (i + 1) + '. ' + d.type[0].toUpperCase() + d.type.slice(1) +
+        '</strong><span>Marked on vehicle diagram</span></div><span class="pill plain">' +
+        Math.round(d.x) + '%, ' + Math.round(d.y) + '%</span></div>'
+      ).join('');
+    }
+
+    document.getElementById('signature-btn').addEventListener('click', () => {
+      state.signed = true;
+      const el = document.getElementById('signature-state');
+      el.textContent = 'Captured';
+      el.style.color = 'var(--green)';
+      showToast('Customer signature captured.');
+    });
+
+    document.getElementById('condition-next').addEventListener('click', () => {
+      if (!state.signed) { showToast('Customer signature is required before continuing.'); return; }
+      go('checkin-review');
+    });
+
+    function selectedBelongings() {
+      const values = [...document.querySelectorAll('#belongings-list input:checked')].map((i) => i.value);
+      const other = document.getElementById('other-belongings').value.trim();
+      if (other) values.push(other);
+      return values.length ? values.join(', ') : 'None declared';
+    }
+
+    function syncReview() {
+      const values = {
+        plate: document.getElementById('plate').value || 'ABC 1234',
+        vr: document.getElementById('vr').value || 'VR-12345',
+        brand: document.getElementById('brand').value || 'Toyota Vios',
+        color: document.getElementById('color').value || 'Silver',
+        type: document.getElementById('body-type').value,
+        parking: document.getElementById('level').value + ' · ' + document.getElementById('slot').value,
+        driver: document.getElementById('driver-in').value || 'Ramon Dela Cruz',
+        belongings: selectedBelongings(),
+        damage: state.damages.length ? state.damages.length + ' item(s) logged' : 'None logged'
+      };
+      Object.entries(values).forEach(([key, value]) => {
+        const node = document.querySelector('[data-summary="' + key + '"]');
+        if (node) node.textContent = value;
+      });
+    }
+
+    function syncStats() {
+      document.getElementById('vehicles-in').textContent = state.vehiclesIn;
+      document.getElementById('checked-out').textContent = state.checkedOut;
+      document.getElementById('remaining-slots').textContent = state.remainingSlots;
+    }
+
+    function syncCloseCash() {
+      document.getElementById('close-in').textContent = state.vehiclesIn;
+      document.getElementById('close-out').textContent = state.checkedOut;
+      document.getElementById('close-collections').textContent = money(state.collections);
+      updateOpen();
+      updateClose();
+    }
+
+    document.getElementById('confirm-checkin').addEventListener('click', () => {
+      state.vehiclesIn += 1;
+      state.remainingSlots = Math.max(0, state.remainingSlots - 1);
+      go('dashboard', 'Ticket VM-1043 saved and sent to printer.');
+    });
+
+    document.getElementById('confirm-checkout').addEventListener('click', () => {
+      state.vehiclesIn = Math.max(0, state.vehiclesIn - 1);
+      state.checkedOut += 1;
+      state.remainingSlots += 1;
+      state.collections += state.amountDue;
+      go('dashboard', 'Payment confirmed. Checkout receipt sent to printer.');
+    });
+
+    document.getElementById('close-shift').addEventListener('click', () => {
+      go('login', 'Cash shift closed. User logged out.');
+    });
+
+    updateOpen();
+    updatePay();
+    updateClose();
+    syncStats();
+  </script>
+</body>
+</html>
