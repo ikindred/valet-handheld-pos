@@ -352,12 +352,19 @@ WHERE table_name = 'shifts'
                     r.operation == 'checkout/finalize',
               )
               .toList();
+          final voidRows = queuePending
+              .where(
+                (r) =>
+                    r.queueTableName == 'tickets' && r.operation == 'void',
+              )
+              .toList();
           final otherRows = queuePending
               .where(
                 (r) =>
                     r.queueTableName != 'tickets' ||
                     (r.operation != 'checkin' &&
-                        r.operation != 'checkout/finalize'),
+                        r.operation != 'checkout/finalize' &&
+                        r.operation != 'void'),
               )
               .toList();
 
@@ -430,6 +437,43 @@ WHERE table_name = 'shifts'
                 st,
               );
               for (final row in checkOutRows) {
+                await _markQueueFailed(row);
+              }
+            }
+          }
+
+          if (voidRows.isNotEmpty) {
+            try {
+              syncedThisRun += await _ticketService.syncPendingVoidsBatch(
+                voidRows,
+                token,
+              );
+            } on DioException catch (e, st) {
+              if (e.type == DioExceptionType.connectionError ||
+                  e.error is SocketException) {
+                ValetLog.debug(
+                  'SyncCubit.flush',
+                  'batch void skipped — network',
+                );
+              } else {
+                ValetLog.error(
+                  'SyncCubit.flush',
+                  'batch void request failed',
+                  e,
+                  st,
+                );
+                for (final row in voidRows) {
+                  await _markQueueFailed(row);
+                }
+              }
+            } catch (e, st) {
+              ValetLog.error(
+                'SyncCubit.flush',
+                'batch void failed',
+                e,
+                st,
+              );
+              for (final row in voidRows) {
                 await _markQueueFailed(row);
               }
             }

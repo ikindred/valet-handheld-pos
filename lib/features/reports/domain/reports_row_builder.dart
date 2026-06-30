@@ -29,6 +29,7 @@ abstract final class ReportsRowBuilder {
         ? TicketParkingInfo.fromJsonString(t.parkingInfo!)
         : TicketParkingInfo.fromDriverOutMeta(t.driverOut);
 
+    final isVoided = t.status == 'void';
     final status = t.status == 'completed'
         ? ReportsTicketRowStatus.checkedOut
         : isLongStay
@@ -52,6 +53,8 @@ abstract final class ReportsRowBuilder {
       ),
       status: status,
       fee: t.fee,
+      hasPendingVoid: t.pendingVoidRequest,
+      isVoided: isVoided,
       isSynced: t.syncStatus == 'synced',
     );
   }

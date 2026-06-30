@@ -1,3 +1,4 @@
+import '../../features/reports/domain/reports_format.dart';
 import '../../features/reports/domain/reports_models.dart';
 
 /// Merges local Drift rows with server lists without duplicates.
@@ -18,18 +19,64 @@ abstract final class TransactionListMerge {
     return false;
   }
 
-  /// Prepends unsynced local rows that are not already on [server].
+  /// True when a local row should replace the matching server row (offline edits).
+  static bool localOverridesServer(
+    ReportsTicketRow local,
+    ReportsTicketRow server,
+  ) {
+    if (local.isVoided && !server.isVoided) return true;
+    if (local.hasPendingVoid && !server.isVoided) return true;
+    if (local.status == ReportsTicketRowStatus.checkedOut &&
+        server.status == ReportsTicketRowStatus.parked) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Merges local Drift rows with server lists; offline mutations win on conflict.
   static List<ReportsTicketRow> mergeReportsRows({
     required List<ReportsTicketRow> server,
     required List<ReportsTicketRow> local,
   }) {
     final extras = <ReportsTicketRow>[];
+    final suppressServerKeys = <String>{};
+
     for (final row in local) {
+      ReportsTicketRow? serverRow;
+      for (final s in server) {
+        if (reportsRowsMatch(row, s)) {
+          serverRow = s;
+          break;
+        }
+      }
+
+      if (serverRow != null && localOverridesServer(row, serverRow)) {
+        extras.add(row);
+        for (final key in [row.ticketId, row.serverTransactionId]) {
+          final trimmed = key?.trim() ?? '';
+          if (trimmed.isNotEmpty) suppressServerKeys.add(trimmed);
+        }
+        continue;
+      }
+
       if (row.isSynced) continue;
-      if (server.any((s) => reportsRowsMatch(row, s))) continue;
+      if (serverRow != null) continue;
       extras.add(row);
     }
-    final merged = [...extras, ...server];
+
+    bool suppressServer(ReportsTicketRow s) {
+      for (final key in suppressServerKeys) {
+        if (_normEq(key, s.ticketId) || _normEq(key, s.serverTransactionId)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    final merged = [
+      ...extras,
+      ...server.where((s) => !suppressServer(s)),
+    ];
     merged.sort((a, b) => b.timeIn.compareTo(a.timeIn));
     return merged;
   }

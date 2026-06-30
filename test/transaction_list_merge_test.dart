@@ -39,7 +39,7 @@ void main() {
       expect(merged.last.ticketId, 'TKT-260626-AAAA');
     });
 
-    test('skips synced local rows and server duplicates', () {
+      test('skips synced local rows and server duplicates', () {
       final syncedLocal = ReportsTicketRow(
         ticketId: 'TKT-260626-AAAA',
         serverTransactionId: 'uuid-server-1',
@@ -69,6 +69,53 @@ void main() {
 
       expect(merged, hasLength(1));
       expect(merged.single.ticketId, 'TKT-260626-AAAA');
+    });
+
+    test('prefers local void over active server row', () {
+      final voidedLocal = ReportsTicketRow(
+        ticketId: 'TKT-260626-AAAA',
+        serverTransactionId: 'uuid-server-1',
+        plate: 'ABC1234',
+        vehicle: 'Toyota Vios · White',
+        timeIn: DateTime(2026, 6, 26, 9, 0),
+        duration: const Duration(minutes: 5),
+        slot: 'L01',
+        status: ReportsTicketRowStatus.parked,
+        isVoided: true,
+        isSynced: false,
+      );
+
+      final merged = TransactionListMerge.mergeReportsRows(
+        server: [serverRow],
+        local: [voidedLocal],
+      );
+
+      expect(merged, hasLength(1));
+      expect(merged.single.isVoided, isTrue);
+      expect(merged.single.ticketId, 'TKT-260626-AAAA');
+    });
+
+    test('prefers local checkout over parked server row', () {
+      final checkedOutLocal = ReportsTicketRow(
+        ticketId: 'TKT-260626-AAAA',
+        serverTransactionId: 'uuid-server-1',
+        plate: 'ABC1234',
+        vehicle: 'Toyota Vios · White',
+        timeIn: DateTime(2026, 6, 26, 9, 0),
+        timeOut: DateTime(2026, 6, 26, 10, 0),
+        duration: const Duration(hours: 1),
+        slot: 'L01',
+        status: ReportsTicketRowStatus.checkedOut,
+        isSynced: false,
+      );
+
+      final merged = TransactionListMerge.mergeReportsRows(
+        server: [serverRow],
+        local: [checkedOutLocal],
+      );
+
+      expect(merged, hasLength(1));
+      expect(merged.single.status, ReportsTicketRowStatus.checkedOut);
     });
   });
 }

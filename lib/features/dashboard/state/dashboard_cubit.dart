@@ -414,6 +414,14 @@ class DashboardCubit extends Cubit<DashboardState> {
             if (trimmed.isNotEmpty) suppressServerKeys.add(trimmed);
           }
         }
+        // Server list can lag after offline void — prefer local void.
+        if (row.isVoided && !serverRow.isVoided) {
+          extras.add(row);
+          for (final key in [row.ticketId, row.ticketNumber]) {
+            final trimmed = key.trim();
+            if (trimmed.isNotEmpty) suppressServerKeys.add(trimmed);
+          }
+        }
         continue;
       }
 
@@ -429,6 +437,13 @@ class DashboardCubit extends Cubit<DashboardState> {
       }
       if (row.status == DashboardRecentStatus.checkedOut &&
           serverRow.status == DashboardRecentStatus.parked) {
+        extras.add(row);
+        for (final key in [row.ticketId, row.ticketNumber]) {
+          final trimmed = key.trim();
+          if (trimmed.isNotEmpty) suppressServerKeys.add(trimmed);
+        }
+      }
+      if (row.isVoided && !serverRow.isVoided) {
         extras.add(row);
         for (final key in [row.ticketId, row.ticketNumber]) {
           final trimmed = key.trim();

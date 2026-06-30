@@ -11,6 +11,8 @@ import '../../features/check_out/models/check_out_response.dart';
 import '../../features/check_out/models/checkout_preview_rates.dart';
 import '../../features/check_out/models/checkout_preview_response.dart';
 import '../../features/reports/domain/reports_transactions_page.dart';
+import '../../features/reports/domain/reports_today_response.dart';
+import '../../features/reports/domain/reports_models.dart';
 import 'api_error_message.dart';
 import 'check_in_http.dart';
 import 'check_in_exceptions.dart';
@@ -35,6 +37,34 @@ class TransactionsApi {
 
   final Dio _dio;
 
+  /// GET [AppConfig.reportsToday] — Today tab shift summary + transaction rows.
+  ///
+  /// Server filters by JWT `express_cashier` (`is_express` true/false).
+  Future<ReportsTodayResponse> fetchReportsToday({
+    required String token,
+  }) async {
+    if (AppConfig.useStubApi) {
+      return ReportsTodayResponse(
+        shiftId: '00000000-0000-4000-8000-000000000099',
+        totalTransactions: 0,
+        currentlyParked: const [],
+      );
+    }
+    try {
+      final res = await _dio.get<dynamic>(
+        AppConfig.reportsToday,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (_) => true,
+        ),
+      );
+      _throwIfBadResponse(res, 'GET reports/today');
+      return ReportsTodayResponse.fromJson(res.data);
+    } on DioException catch (e) {
+      throw _fromDio(e, 'GET reports/today');
+    }
+  }
+
   /// GET [AppConfig.transactionsList] — `date_from` / `date_to` as `YYYY-MM-DD` (local range).
   ///
   /// [dateFromUnix] / [dateToUnix] are **seconds** since epoch (e.g. from `DateTime.millisecondsSinceEpoch ~/ 1000`).
@@ -50,14 +80,42 @@ class TransactionsApi {
     }
     final dateFrom = _isoDateFromUnixSeconds(dateFromUnix);
     final dateTo = _isoDateFromUnixSeconds(dateToUnix);
-    final res = await _dio.get<dynamic>(
-      AppConfig.transactionsList,
+    return _fetchTransactionsList(
+      token: token,
       queryParameters: <String, dynamic>{
         'date_from': dateFrom,
         'date_to': dateTo,
         'limit': limit,
         'page': page,
       },
+    );
+  }
+
+  /// GET [AppConfig.transactionsList] without date filters — shift-scoped via JWT.
+  Future<List<Map<String, dynamic>>> fetchTransactionsForOpenShift({
+    required String token,
+    int limit = 200,
+    int page = 1,
+  }) async {
+    if (AppConfig.useStubApi) {
+      return const [];
+    }
+    return _fetchTransactionsList(
+      token: token,
+      queryParameters: <String, dynamic>{
+        'limit': limit,
+        'page': page,
+      },
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchTransactionsList({
+    required String token,
+    required Map<String, dynamic> queryParameters,
+  }) async {
+    final res = await _dio.get<dynamic>(
+      AppConfig.transactionsList,
+      queryParameters: queryParameters,
       options: Options(headers: {'Authorization': 'Bearer $token'}),
     );
     return _parseList(res.data);
@@ -66,13 +124,14 @@ class TransactionsApi {
   /// GET [AppConfig.reportsTransactions] — mobile Reports tab (paginated, filtered).
   ///
   /// Requires open shift (Bearer token). Query: `search`, `status`, `date_from`,
-  /// `date_to` (`YYYY-MM-DD`, inclusive range), `sort`, `limit`, `page`.
+  /// `date_to` (`YYYY-MM-DD`, inclusive range), `shift_id`, `sort`, `limit`, `page`.
   Future<ReportsTransactionsPage> fetchReportsTransactions({
     required String token,
     String? search,
     String? status,
     String? dateFrom,
     String? dateTo,
+    String? shiftId,
     String sort = 'desc',
     int limit = 20,
     int page = 1,
@@ -113,6 +172,8 @@ class TransactionsApi {
     if (from != null && from.isNotEmpty) params['date_from'] = from;
     final to = dateTo?.trim();
     if (to != null && to.isNotEmpty) params['date_to'] = to;
+    final sid = shiftId?.trim();
+    if (sid != null && sid.isNotEmpty) params['shift_id'] = sid;
 
     try {
       final res = await _dio.get<dynamic>(
@@ -128,6 +189,61 @@ class TransactionsApi {
     } on DioException catch (e) {
       throw _fromDio(e, 'GET reports/transactions');
     }
+  }
+
+  /// Fetches every page of `GET /reports/transactions`.
+  Future<List<ReportsTicketRow>> fetchAllReportsTransactions({
+    required String token,
+    String? dateFrom,
+    String? dateTo,
+    String? status,
+    String? shiftId,
+    int limit = 200,
+  }) async {
+    if (AppConfig.useStubApi) {
+      final page = await fetchReportsTransactions(
+        token: token,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        status: status,
+        shiftId: shiftId,
+        limit: limit,
+        page: 1,
+      );
+      return page.rows;
+    }
+
+    final all = <ReportsTicketRow>[];
+    for (var page = 1; page <= 20; page++) {
+      final res = await fetchReportsTransactions(
+        token: token,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        status: status,
+        shiftId: shiftId,
+        limit: limit,
+        page: page,
+      );
+      if (res.rows.isEmpty) break;
+      all.addAll(res.rows);
+      if (!res.hasMore) break;
+    }
+    return all;
+  }
+
+  /// Fetches every page of `GET /reports/transactions` for an inclusive date range.
+  Future<List<ReportsTicketRow>> fetchAllReportsTransactionsForDay({
+    required String token,
+    required String dateFrom,
+    required String dateTo,
+    int limit = 200,
+  }) {
+    return fetchAllReportsTransactions(
+      token: token,
+      dateFrom: dateFrom,
+      dateTo: dateTo,
+      limit: limit,
+    );
   }
 
   /// GET [AppConfig.transactionGetUrl] — single transaction by server UUID.
@@ -346,6 +462,85 @@ class TransactionsApi {
         statusCode: code,
       );
     }
+  }
+
+  /// POST [AppConfig.batchVoidUrl] — batch JSON void (`voids[]`).
+  Future<BatchCheckInResponse> submitBatchVoid({
+    required String token,
+    required List<Map<String, dynamic>> voids,
+  }) async {
+    if (voids.isEmpty) {
+      throw TransactionsApiException('voids must not be empty.');
+    }
+    if (AppConfig.useStubApi) {
+      return BatchCheckInResponse.stubForVoids(voids);
+    }
+
+    try {
+      final res = await _dio.post<dynamic>(
+        AppConfig.batchVoidUrl,
+        data: <String, dynamic>{'voids': voids},
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (_) => true,
+          contentType: 'application/json',
+        ),
+      );
+
+      return _parseBatchVoidResponse(res.data, res.statusCode ?? 0);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionError ||
+          e.error is SocketException) {
+        rethrow;
+      }
+      final code = e.response?.statusCode;
+      if (code == 401) {
+        throw LoginApiFailure(
+          messageFromResponseData(e.response?.data) ?? 'Unauthorized.',
+        );
+      }
+      if (_hasBatchSyncResults(e.response?.data)) {
+        return BatchCheckInResponse.fromJson(
+          _asJsonMap(e.response!.data),
+        );
+      }
+      if (code == 400) {
+        throw TransactionsApiException(
+          messageFromResponseData(e.response?.data) ?? 'Invalid void batch data.',
+          statusCode: code,
+        );
+      }
+      throw TransactionsApiException(
+        messageFromResponseData(e.response?.data) ??
+            e.message ??
+            'Void batch failed',
+        statusCode: code,
+      );
+    }
+  }
+
+  BatchCheckInResponse _parseBatchVoidResponse(dynamic data, int code) {
+    if (code == 401) {
+      throw LoginApiFailure(
+        messageFromResponseData(data) ?? 'Unauthorized.',
+      );
+    }
+    if (_hasBatchSyncResults(data)) {
+      return BatchCheckInResponse.fromJson(_asJsonMap(data));
+    }
+    if (code == 400) {
+      throw TransactionsApiException(
+        messageFromResponseData(data) ?? 'Invalid void batch data.',
+        statusCode: code,
+      );
+    }
+    if (code != 200 && code != 207) {
+      throw TransactionsApiException(
+        messageFromResponseData(data) ?? 'Void batch failed',
+        statusCode: code,
+      );
+    }
+    return BatchCheckInResponse.fromJson(_asJsonMap(data));
   }
 
   /// POST `…/transactions/check-in/batch` — batch JSON check-in (`check_ins[]`).

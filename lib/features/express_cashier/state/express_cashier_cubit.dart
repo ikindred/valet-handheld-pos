@@ -43,7 +43,7 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
         return;
       }
       _activeShift = shift;
-      final rows = await _loadExpressTransactionsForShift(shift.id);
+      final rows = await _loadExpressTransactionsForShift(shift);
       emit(
         ExpressCashierLoaded(
           transactions: rows.map(ExpressCashierTransaction.fromTicket).toList(),
@@ -54,16 +54,20 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
     }
   }
 
-  Future<List<Ticket>> _loadExpressTransactionsForShift(String shiftId) async {
+  Future<List<Ticket>> _loadExpressTransactionsForShift(Shift shift) async {
     final session = await _auth.getActiveSession();
     final token = session?.authToken?.trim() ?? '';
     if (token.isNotEmpty) {
       await _tickets.syncExpressTransactionsForToday(
         token: token,
-        shiftId: shiftId,
+        shiftId: shift.id,
+        userId: shift.userId,
       );
     }
-    return _tickets.expressTicketsForShift(shiftId);
+    return _tickets.expressTicketsForShift(
+      shift.id,
+      userId: shift.userId,
+    );
   }
 
   Future<void> save({
@@ -209,7 +213,10 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
         );
       }
 
-      final rows = await _tickets.expressTicketsForShift(shift.id);
+      final rows = await _tickets.expressTicketsForShift(
+        shift.id,
+        userId: shift.userId,
+      );
       final transactions =
           rows.map(ExpressCashierTransaction.fromTicket).toList();
       emit(ExpressCashierSaved(ticketId: ticket, transactions: transactions));
@@ -264,7 +271,7 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
       final shift = _activeShift ?? await _auth.getOpenShiftForUser(localUserId);
       if (shift == null) return;
       _activeShift = shift;
-      final rows = await _loadExpressTransactionsForShift(shift.id);
+      final rows = await _loadExpressTransactionsForShift(shift);
       emit(
         loaded.copyWith(
           transactions:

@@ -187,6 +187,13 @@ class AppConfig {
     return '$baseUrl/api/v1/transactions/check-out';
   }
 
+  /// POST `/api/v1/transactions/void` — batch void sync (`voids[]` body).
+  static String get batchVoidUrl {
+    final t = (_env('API_TRANSACTIONS_BATCH_VOID') ?? '').trim();
+    if (t.isNotEmpty) return baseUrl + t;
+    return '$baseUrl/api/v1/transactions/void';
+  }
+
   /// POST `/api/v1/transactions/{id}/check-out`.
   static String checkOutUrl(String id) {
     final enc = Uri.encodeComponent(id.trim());
@@ -303,6 +310,10 @@ class AppConfig {
   static String get reportsTransactions =>
       baseUrl +
       (_env('API_REPORTS_TRANSACTIONS') ?? '/api/v1/reports/transactions');
+
+  /// GET `/api/v1/reports/today` — Today tab shift KPIs + transaction rows.
+  static String get reportsToday =>
+      baseUrl + (_env('API_REPORTS_TODAY') ?? '/api/v1/reports/today');
 
   /// GET historical transactions (Tier 2 background sync).
   static String get transactionsList =>

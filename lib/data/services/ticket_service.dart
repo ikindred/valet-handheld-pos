@@ -25,6 +25,9 @@ import '../../features/dashboard/domain/ticket_parking_info.dart';
 import '../../features/check_in/domain/check_in_form_data.dart';
 import '../../features/check_in/models/batch_check_in_response.dart';
 import '../../features/check_in/models/check_in_response.dart';
+import '../../features/reports/domain/reports_date_query.dart';
+import '../../features/reports/domain/reports_models.dart';
+import '../../features/reports/domain/reports_today_response.dart';
 import '../../core/connectivity/internet_reachability.dart';
 import '../../core/logging/valet_log.dart';
 import '../../core/sync/local_sync_notifier.dart';
@@ -33,6 +36,9 @@ import '../remote/dashboard_api.dart';
 import 'parking_layout_service.dart';
 import '../remote/transactions_api.dart';
 import 'batch_check_in_payload.dart';
+import 'batch_void_payload.dart';
+import 'reports_today_row_mapper.dart';
+import 'reports_row_cache_mapper.dart';
 import 'batch_check_out_payload.dart';
 import 'check_in_sync_payload.dart';
 import 'rate_fetch_service.dart';
@@ -512,10 +518,16 @@ class TicketService {
     _notifyLocalSyncQueueChanged();
   }
 
-  /// Express cashier tickets on [shiftId], newest first (includes voided).
-  Future<List<Ticket>> expressTicketsForShift(String shiftId) {
+  /// Express cashier tickets for [shiftId], newest first (includes voided).
+  ///
+  /// When the shift-scoped query is empty, also includes today's express rows for
+  /// [userId] (e.g. after resume cash or server sync with a prior local shift id).
+  Future<List<Ticket>> expressTicketsForShift(
+    String shiftId, {
+    String? userId,
+  }) async {
     final sid = shiftId.trim();
-    return (_db.select(_db.tickets)
+    final shiftRows = await (_db.select(_db.tickets)
           ..where(
             (t) =>
                 t.shiftId.equals(sid) &
@@ -523,18 +535,262 @@ class TicketService {
           )
           ..orderBy([(t) => OrderingTerm.desc(t.checkInAt)]))
         .get();
+    if (shiftRows.isNotEmpty) return shiftRows;
+
+    final uid = userId?.trim() ?? '';
+    if (uid.isEmpty) return shiftRows;
+
+    final ph = PhilippineTime.now();
+    final start = DateTime(ph.year, ph.month, ph.day).toIso8601String();
+    final end = DateTime(ph.year, ph.month, ph.day + 1).toIso8601String();
+    return (_db.select(_db.tickets)
+          ..where(
+            (t) =>
+                t.userId.equals(uid) &
+                t.isExpressCashier.equals(true) &
+                t.checkInAt.isBiggerOrEqualValue(start) &
+                t.checkInAt.isSmallerThanValue(end),
+          )
+          ..orderBy([(t) => OrderingTerm.desc(t.checkInAt)]))
+        .get();
   }
 
-  /// GET `/transactions` for today, upserts express rows into Drift for [shiftId].
+  /// Syncs express shift rows from server (multi-source fallback chain).
   Future<void> syncExpressTransactionsForToday({
     required String token,
     required String shiftId,
+    String? userId,
   }) async {
-    await cacheTodayServerTransactionsForShift(
+    ReportsTodayResponse? today;
+    if (!AppConfig.useStubApi && await InternetReachability.hasInternet()) {
+      try {
+        today = await _transactionsApi.fetchReportsToday(token: token);
+      } catch (e, st) {
+        ValetLog.error(
+          'TicketService.syncExpressTransactionsForToday',
+          'reports/today prefetch failed',
+          e,
+          st,
+        );
+      }
+    }
+
+    var cached = 0;
+    cached += await cacheReportsTodayForShift(
+      token: token,
+      shiftId: shiftId,
+      expressOnly: true,
+      prefetched: today,
+    );
+    cached += await cacheTodayReportsTransactionsForShift(
+      token: token,
+      shiftId: shiftId,
+      expressOnly: true,
+      serverShiftId: today?.shiftId,
+    );
+    cached += await cacheTodayServerTransactionsForShift(
       token: token,
       shiftId: shiftId,
       expressOnly: true,
     );
+    cached += await cacheTodayDashboardRecentForShift(
+      token: token,
+      shiftId: shiftId,
+      expressOnly: true,
+    );
+
+    final driftCount = (await expressTicketsForShift(
+      shiftId,
+      userId: userId,
+    ))
+        .length;
+    final serverTotal = today?.totalTransactions;
+    ValetLog.debug(
+      'TicketService.syncExpressTransactionsForToday',
+      'cached $cached express row(s) for shift=$shiftId; '
+      'drift=$driftCount'
+      '${serverTotal != null ? '; server total_transactions=$serverTotal' : ''}',
+    );
+    if ((serverTotal ?? 0) > 0 && driftCount == 0) {
+      ValetLog.warning(
+        'TicketService.syncExpressTransactionsForToday',
+        'server reports $serverTotal transaction(s) but list APIs returned '
+        'no rows — backend may not expose express completed sales on '
+        'reports/transactions, /transactions, or dashboard/summary',
+      );
+    }
+  }
+
+  /// GET `/reports/today` — upserts transaction rows from the payload.
+  Future<int> cacheReportsTodayForShift({
+    required String token,
+    required String shiftId,
+    bool expressOnly = false,
+    bool standardOnly = false,
+    ReportsTodayResponse? prefetched,
+  }) async {
+    if (AppConfig.useStubApi) return 0;
+    if (!await InternetReachability.hasInternet()) return 0;
+
+    try {
+      final response =
+          prefetched ?? await _transactionsApi.fetchReportsToday(token: token);
+      final sourceRows = response.transactionRows;
+      if (sourceRows.isEmpty) {
+        final total = response.totalTransactions ?? 0;
+        if (total > 0) {
+          ValetLog.debug(
+            'TicketService.cacheReportsTodayForShift',
+            'no transaction rows in reports/today but total_transactions=$total',
+          );
+        }
+        return 0;
+      }
+
+      final rows = [
+        for (final raw in sourceRows)
+          ReportsTodayRowMapper.toServerCacheJson(
+            raw,
+            markExpress: expressOnly,
+          ),
+      ];
+      final cached = await cacheTransactionsFromServerJsonList(
+        rows: rows,
+        shiftId: shiftId,
+        expressOnly: expressOnly,
+        standardOnly: standardOnly,
+        trustServerDateScope: true,
+      );
+      if (cached > 0) {
+        ValetLog.debug(
+          'TicketService.cacheReportsTodayForShift',
+          'cached $cached row(s) from reports/today',
+        );
+      }
+      return cached;
+    } catch (e, st) {
+      ValetLog.error(
+        'TicketService.cacheReportsTodayForShift',
+        'reports/today failed',
+        e,
+        st,
+      );
+      return 0;
+    }
+  }
+
+  /// GET `/reports/transactions` — upserts shift/day list (incl. completed).
+  Future<int> cacheTodayReportsTransactionsForShift({
+    required String token,
+    required String shiftId,
+    bool expressOnly = false,
+    bool standardOnly = false,
+    String? serverShiftId,
+  }) async {
+    if (AppConfig.useStubApi) return 0;
+    if (!await InternetReachability.hasInternet()) return 0;
+
+    try {
+      final rows = await _fetchReportsTransactionsWithFallbacks(
+        token: token,
+        serverShiftId: serverShiftId,
+      );
+      if (rows.isEmpty) {
+        ValetLog.debug(
+          'TicketService.cacheTodayReportsTransactionsForShift',
+          'reports/transactions returned no rows after all fallback strategies',
+        );
+        return 0;
+      }
+
+      final cacheRows = [
+        for (final row in rows)
+          ReportsRowCacheMapper.fromReportsRow(
+            row,
+            markExpress: expressOnly,
+          ),
+      ];
+      final cached = await cacheTransactionsFromServerJsonList(
+        rows: cacheRows,
+        shiftId: shiftId,
+        expressOnly: expressOnly,
+        standardOnly: standardOnly,
+        trustServerDateScope: true,
+      );
+      if (cached > 0) {
+        ValetLog.debug(
+          'TicketService.cacheTodayReportsTransactionsForShift',
+          'cached $cached row(s) from reports/transactions',
+        );
+      }
+      return cached;
+    } catch (e, st) {
+      ValetLog.error(
+        'TicketService.cacheTodayReportsTransactionsForShift',
+        'reports/transactions failed',
+        e,
+        st,
+      );
+      return 0;
+    }
+  }
+
+  /// Tries `GET /reports/transactions` with several query shapes (shift JWT first).
+  Future<List<ReportsTicketRow>> _fetchReportsTransactionsWithFallbacks({
+    required String token,
+    String? serverShiftId,
+  }) async {
+    final today = ReportsDateQuery.isoDate(PhilippineTime.now());
+    final sid = serverShiftId?.trim() ?? '';
+
+    final attempts = <({String label, Future<List<ReportsTicketRow>> Function() run})>[
+      (
+        label: 'shift-scoped (no date)',
+        run: () => _transactionsApi.fetchAllReportsTransactions(token: token),
+      ),
+      if (sid.isNotEmpty)
+        (
+          label: 'shift_id=$sid',
+          run: () => _transactionsApi.fetchAllReportsTransactions(
+            token: token,
+            shiftId: sid,
+          ),
+        ),
+      (
+        label: 'date=$today',
+        run: () => _transactionsApi.fetchAllReportsTransactions(
+          token: token,
+          dateFrom: today,
+          dateTo: today,
+        ),
+      ),
+      (
+        label: 'date=$today status=completed',
+        run: () => _transactionsApi.fetchAllReportsTransactions(
+          token: token,
+          dateFrom: today,
+          dateTo: today,
+          status: 'completed',
+        ),
+      ),
+      (
+        label: 'status=completed',
+        run: () => _transactionsApi.fetchAllReportsTransactions(
+          token: token,
+          status: 'completed',
+        ),
+      ),
+    ];
+
+    for (final attempt in attempts) {
+      final rows = await attempt.run();
+      ValetLog.debug(
+        'TicketService._fetchReportsTransactionsWithFallbacks',
+        '${attempt.label}: ${rows.length} row(s)',
+      );
+      if (rows.isNotEmpty) return rows;
+    }
+    return const [];
   }
 
   /// Upserts today's server transactions into Drift for offline void/edit.
@@ -548,12 +804,67 @@ class TicketService {
     if (!await InternetReachability.hasInternet()) return 0;
 
     final rows = await _fetchTodayServerTransactions(token);
-    return cacheTransactionsFromServerJsonList(
+    if (rows.isEmpty) return 0;
+    final cached = await cacheTransactionsFromServerJsonList(
       rows: rows,
       shiftId: shiftId,
       expressOnly: expressOnly,
       standardOnly: standardOnly,
+      trustServerDateScope: true,
     );
+    if (cached > 0) {
+      ValetLog.debug(
+        'TicketService.cacheTodayServerTransactionsForShift',
+        'cached $cached row(s) from GET /transactions',
+      );
+    }
+    return cached;
+  }
+
+  /// `GET /dashboard/summary` recent rows for the open shift.
+  Future<int> cacheTodayDashboardRecentForShift({
+    required String token,
+    required String shiftId,
+    bool expressOnly = false,
+    bool standardOnly = false,
+  }) async {
+    if (AppConfig.useStubApi) return 0;
+    if (!await InternetReachability.hasInternet()) return 0;
+
+    try {
+      final summary = await _dashboardApi.fetchSummary(bearerToken: token);
+      if (summary == null || summary.recent.isEmpty) return 0;
+
+      final cacheRows = [
+        for (final row in summary.recent)
+          ReportsTodayRowMapper.toServerCacheJson(
+            row.toTransactionJson(),
+            markExpress: expressOnly,
+          ),
+      ];
+      final cached = await cacheTransactionsFromServerJsonList(
+        rows: cacheRows,
+        shiftId: shiftId,
+        expressOnly: expressOnly,
+        standardOnly: standardOnly,
+        trustServerDateScope: true,
+      );
+      if (cached > 0) {
+        ValetLog.debug(
+          'TicketService.cacheTodayDashboardRecentForShift',
+          'cached $cached row(s) from dashboard/summary',
+        );
+      }
+      return cached;
+    } catch (e, st) {
+      ValetLog.error(
+        'TicketService.cacheTodayDashboardRecentForShift',
+        'dashboard/summary failed',
+        e,
+        st,
+      );
+      return 0;
+    }
   }
 
   /// Upserts server transaction JSON rows into Drift (no sync_queue).
@@ -562,14 +873,16 @@ class TicketService {
     required String shiftId,
     bool expressOnly = false,
     bool standardOnly = false,
+    bool trustServerDateScope = false,
   }) async {
     if (rows.isEmpty) return 0;
     var cached = 0;
     for (final row in rows) {
-      final isExpress = _isExpressServerTransactionJson(row);
+      final isExpress =
+          expressOnly || _isExpressServerTransactionJson(row);
       if (expressOnly && !isExpress) continue;
       if (standardOnly && isExpress) continue;
-      if (!_isTransactionToday(row)) continue;
+      if (!trustServerDateScope && !_isTransactionToday(row)) continue;
       try {
         await _upsertFromServerTransactionJson(
           row,
@@ -823,7 +1136,7 @@ class TicketService {
     _notifyLocalSyncQueueChanged();
   }
 
-  /// Processes a queued ticket void row.
+  /// Processes a queued ticket void row (single-item batch).
   Future<void> syncQueuedTicketVoid(
     Map<String, dynamic> body,
     String token,
@@ -832,51 +1145,18 @@ class TicketService {
         body['local_ticket_id']?.toString().trim() ??
         body['ticket_number']?.toString().trim() ??
         '';
-    final reason = body['reason']?.toString();
+    if (localId.isEmpty) return;
 
-    final serverId = await _resolveServerIdForQueuedVoid(
-      body: body,
-      localId: localId,
-      token: token,
-    );
-    if (serverId == null || serverId.isEmpty) {
-      ValetLog.info(
-        'TicketService.syncQueuedTicketVoid',
-        'no server record for localId=$localId — local void only',
-      );
-      return;
-    }
-
-    if (localId.isNotEmpty) {
-      await updateServerTicketId(localId, serverId);
-    }
-
-    try {
-      final voidBody = await _transactionsApi.requestVoid(
-        token: token,
-        ticketId: serverId,
-        reason: reason,
-      );
-      if (localId.isNotEmpty) {
-        final voidMeta = _voidAuditCompanion(voidBody);
-        await (_db.update(_db.tickets)..where((t) => t.id.equals(localId))).write(
-          TicketsCompanion(
-            status: const Value('void'),
-            pendingVoidRequest: const Value(false),
-            pendingVoidReason: const Value(null),
-            voidReason: voidMeta.voidReason,
-            voidedByJson: voidMeta.voidedByJson,
-            voidedAt: voidMeta.voidedAt,
-          ),
-        );
-      }
-    } on TransactionsApiException catch (e) {
-      if (e.statusCode == 409 && localId.isNotEmpty) {
-        await _markTicketVoidLocally(localId, reason);
-        return;
-      }
-      rethrow;
-    }
+    final row = await (_db.select(_db.syncQueue)..where(
+          (q) =>
+              q.recordId.equals(localId) &
+              q.queueTableName.equals('tickets') &
+              q.operation.equals('void') &
+              q.syncStatus.isIn(['pending', 'failed']),
+        ))
+        .get();
+    if (row.isEmpty) return;
+    await syncPendingVoidsBatch(row, token);
   }
 
   Future<String?> _resolveServerIdForQueuedVoid({
@@ -958,6 +1238,39 @@ WHERE record_id = ? AND sync_status IN ('pending', 'failed')
   bool _localCheckoutAwaitingServerUpload(Ticket ticket) {
     if (ticket.status != 'completed' && ticket.status != 'lost') return false;
     return ticket.checkOutAt?.trim().isNotEmpty ?? false;
+  }
+
+  /// Local void wins until the server transaction reflects void.
+  bool _shouldPreserveLocalVoid(
+    Ticket existing,
+    Map<String, dynamic> serverJson,
+  ) {
+    if (existing.status != 'void') return false;
+    final serverStatus = serverJson['status']?.toString() ?? '';
+    return !VoidAuditInfo.isVoidStatus(serverStatus);
+  }
+
+  /// Local checkout wins while the server still shows the vehicle checked in.
+  bool _shouldPreserveLocalCheckout(
+    Ticket existing,
+    Map<String, dynamic> serverJson,
+  ) {
+    if (!_localCheckoutAwaitingServerUpload(existing)) return false;
+    return _serverTransactionStillCheckedIn(serverJson);
+  }
+
+  Future<bool> _hasPendingPlatePatch(String ticketId) async {
+    final tid = ticketId.trim();
+    if (tid.isEmpty) return false;
+    final rows = await (_db.select(_db.syncQueue)..where(
+          (q) =>
+              q.recordId.equals(tid) &
+              q.queueTableName.equals('tickets') &
+              q.operation.equals('patch/plate') &
+              q.syncStatus.isIn(['pending', 'failed']),
+        ))
+        .get();
+    return rows.isNotEmpty;
   }
 
   static bool _serverTransactionStillCheckedIn(Map<String, dynamic> txn) {
@@ -1610,13 +1923,42 @@ WHERE t.sync_status = 'pending'
   Future<List<Map<String, dynamic>>> _fetchTodayServerTransactions(
     String token,
   ) async {
+    final all = <Map<String, dynamic>>[];
+
+    for (var page = 1; page <= 5; page++) {
+      try {
+        final rows = await _transactionsApi.fetchTransactionsForOpenShift(
+          token: token,
+          limit: 200,
+          page: page,
+        );
+        if (rows.isEmpty) break;
+        all.addAll(rows);
+        if (rows.length < 200) break;
+      } catch (e, st) {
+        ValetLog.error(
+          'TicketService._fetchTodayServerTransactions',
+          'shift-scoped page=$page',
+          e,
+          st,
+        );
+        break;
+      }
+    }
+    if (all.isNotEmpty) {
+      ValetLog.debug(
+        'TicketService._fetchTodayServerTransactions',
+        'shift-scoped GET /transactions: ${all.length} row(s)',
+      );
+      return all;
+    }
+
     final now = PhilippineTime.now();
     final start = DateTime(now.year, now.month, now.day);
     final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
     final fromUnix = start.millisecondsSinceEpoch ~/ 1000;
     final toUnix = end.millisecondsSinceEpoch ~/ 1000;
 
-    final all = <Map<String, dynamic>>[];
     for (var page = 1; page <= 5; page++) {
       try {
         final rows = await _transactionsApi.fetchTransactions(
@@ -1632,12 +1974,18 @@ WHERE t.sync_status = 'pending'
       } catch (e, st) {
         ValetLog.error(
           'TicketService._fetchTodayServerTransactions',
-          'page=$page',
+          'dated page=$page',
           e,
           st,
         );
         break;
       }
+    }
+    if (all.isNotEmpty) {
+      ValetLog.debug(
+        'TicketService._fetchTodayServerTransactions',
+        'dated GET /transactions: ${all.length} row(s)',
+      );
     }
     return all;
   }
@@ -1978,6 +2326,195 @@ WHERE t.sync_status = 'pending'
     }
 
     return synced;
+  }
+
+  /// Uploads pending void queue rows in one batch JSON request.
+  Future<int> syncPendingVoidsBatch(
+    List<SyncQueueData> rows,
+    String token,
+  ) async {
+    if (rows.isEmpty) return 0;
+
+    final entries = <_BatchVoidEntry>[];
+    for (final row in rows) {
+      try {
+        final raw = jsonDecode(row.payload);
+        if (raw is! Map) {
+          await _markSyncQueueFailedById(row.id);
+          continue;
+        }
+        final map = Map<String, dynamic>.from(raw);
+        final localId = row.recordId.trim();
+        final reason = map['reason']?.toString();
+
+        final serverId = await _resolveServerIdForQueuedVoid(
+          body: map,
+          localId: localId,
+          token: token,
+        );
+        if (serverId == null || serverId.isEmpty) {
+          ValetLog.info(
+            'TicketService.syncPendingVoidsBatch',
+            'no server record for localId=$localId — local void only',
+          );
+          await _markSyncQueueSyncedById(row.id);
+          continue;
+        }
+
+        if (localId.isNotEmpty) {
+          await updateServerTicketId(localId, serverId);
+        }
+
+        final item = voidApiItem(id: serverId, voidReason: reason);
+        entries.add(
+          _BatchVoidEntry(
+            row: row,
+            item: item,
+            requestId: serverId,
+          ),
+        );
+      } catch (e, st) {
+        ValetLog.error(
+          'TicketService.syncPendingVoidsBatch',
+          'build item failed queueId=${row.id} recordId=${row.recordId}',
+          e,
+          st,
+        );
+        await _markSyncQueueFailedById(row.id);
+      }
+    }
+
+    if (entries.isEmpty) return 0;
+
+    final batch = await _transactionsApi.submitBatchVoid(
+      token: token,
+      voids: [for (final e in entries) e.item],
+    );
+
+    var synced = 0;
+    final matchedQueueIds = <String>{};
+
+    for (final result in batch.results) {
+      final entry = _matchBatchVoidEntry(
+        entries,
+        result,
+        matchedQueueIds,
+      );
+      if (entry == null) {
+        ValetLog.warning(
+          'TicketService.syncPendingVoidsBatch',
+          'no local match for batch result index=${result.index} '
+              'id=${result.ticketNumber}',
+        );
+        continue;
+      }
+      matchedQueueIds.add(entry.row.id);
+
+      if (result.isSuccess) {
+        await _applyVoidBatchSuccess(entry, result);
+        await _markSyncQueueSyncedById(entry.row.id);
+        synced++;
+        continue;
+      }
+
+      if (await _tryReconcileBatchVoidConflict(entry, result)) {
+        await _markSyncQueueSyncedById(entry.row.id);
+        synced++;
+        continue;
+      }
+
+      await _markSyncQueueFailedById(entry.row.id);
+    }
+
+    for (final entry in entries) {
+      if (!matchedQueueIds.contains(entry.row.id)) {
+        ValetLog.warning(
+          'TicketService.syncPendingVoidsBatch',
+          'missing batch result for queueId=${entry.row.id} '
+              'id=${entry.item['id']}',
+        );
+        await _markSyncQueueFailedById(entry.row.id);
+      }
+    }
+
+    return synced;
+  }
+
+  _BatchVoidEntry? _matchBatchVoidEntry(
+    List<_BatchVoidEntry> entries,
+    BatchCheckInResultItem result,
+    Set<String> alreadyMatched,
+  ) {
+    final echoedId = result.ticketNumber.trim();
+    final serverId = result.serverTransactionId?.trim() ?? '';
+
+    for (final e in entries) {
+      if (alreadyMatched.contains(e.row.id)) continue;
+      final localId = e.row.recordId.trim();
+      final requestId = e.requestId.trim();
+      if (echoedId.isNotEmpty &&
+          (echoedId == localId ||
+              echoedId == requestId ||
+              echoedId == e.item['id']?.toString().trim())) {
+        return e;
+      }
+      if (serverId.isNotEmpty && requestId == serverId) return e;
+    }
+
+    if (result.index >= 0 && result.index < entries.length) {
+      final e = entries[result.index];
+      if (!alreadyMatched.contains(e.row.id)) return e;
+    }
+    return null;
+  }
+
+  Future<void> _applyVoidBatchSuccess(
+    _BatchVoidEntry entry,
+    BatchCheckInResultItem result,
+  ) async {
+    final localId = entry.row.recordId.trim();
+    if (localId.isEmpty) return;
+
+    final serverId = result.serverTransactionId?.trim() ?? '';
+    if (serverId.isNotEmpty) {
+      await updateServerTicketId(localId, serverId);
+    }
+
+    final txn = result.transaction ?? const <String, dynamic>{};
+    final voidMeta = _voidAuditCompanion(txn);
+    final fallbackReason = entry.item['void_reason']?.toString();
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(localId))).write(
+      TicketsCompanion(
+        status: const Value('void'),
+        pendingVoidRequest: const Value(false),
+        pendingVoidReason: const Value(null),
+        voidReason: voidMeta.voidReason.present
+            ? voidMeta.voidReason
+            : (fallbackReason != null && fallbackReason.isNotEmpty
+                ? Value(fallbackReason)
+                : const Value.absent()),
+        voidedByJson: voidMeta.voidedByJson,
+        voidedAt: voidMeta.voidedAt,
+      ),
+    );
+    await _markVoidQueuesSyncedForTicket(localId);
+  }
+
+  Future<bool> _tryReconcileBatchVoidConflict(
+    _BatchVoidEntry entry,
+    BatchCheckInResultItem result,
+  ) async {
+    if (result.error?.isAlreadyVoidedConflict != true) return false;
+    final localId = entry.row.recordId.trim();
+    if (localId.isEmpty) return false;
+    final reason = entry.item['void_reason']?.toString();
+    await _markTicketVoidLocally(localId, reason);
+    await _markVoidQueuesSyncedForTicket(localId);
+    ValetLog.info(
+      'TicketService.syncPendingVoidsBatch',
+      'reconciled already-voided ticket=$localId',
+    );
+    return true;
   }
 
   _BatchCheckInEntry? _matchBatchCheckoutEntry(
@@ -2945,7 +3482,7 @@ LIMIT 1
     );
   }
 
-  /// Online void request (`POST /tickets/:id/void`).
+  /// Online void request (`POST /transactions/void` batch).
   Future<void> requestTicketVoid({
     required String serverTicketId,
     String? reason,
@@ -2960,26 +3497,54 @@ LIMIT 1
     if (token == null || token.isEmpty) {
       throw TransactionsApiException('No active bearer token.');
     }
-    final voidBody = await _transactionsApi.requestVoid(
+    final sid = serverTicketId.trim();
+    final batch = await _transactionsApi.submitBatchVoid(
       token: token,
-      ticketId: serverTicketId,
-      reason: reason,
+      voids: [voidApiItem(id: sid, voidReason: reason)],
     );
-    final row = await _ticketByServerId(serverTicketId.trim());
-    if (row != null) {
-      final voidMeta = _voidAuditCompanion(voidBody);
-      await (_db.update(_db.tickets)..where((t) => t.id.equals(row.id))).write(
-        TicketsCompanion(
-          status: const Value('void'),
-          pendingVoidRequest: const Value(false),
-          pendingVoidReason: const Value(null),
-          voidReason: voidMeta.voidReason,
-          voidedByJson: voidMeta.voidedByJson,
-          voidedAt: voidMeta.voidedAt,
-        ),
-      );
-      await _markVoidQueuesSyncedForTicket(row.id);
+    if (batch.results.isEmpty) {
+      throw TransactionsApiException('Void request returned no results.');
     }
+    final result = batch.results.first;
+    if (result.isSuccess || result.error?.isAlreadyVoidedConflict == true) {
+      await _applyVoidBatchResultForServerTicket(
+        serverTicketId: sid,
+        result: result,
+        fallbackReason: reason,
+      );
+      return;
+    }
+    throw TransactionsApiException(
+      result.error?.message ?? 'Void request failed.',
+      statusCode: result.error?.statusCode,
+    );
+  }
+
+  Future<void> _applyVoidBatchResultForServerTicket({
+    required String serverTicketId,
+    required BatchCheckInResultItem result,
+    String? fallbackReason,
+  }) async {
+    final row = await _ticketByServerId(serverTicketId.trim());
+    if (row == null) return;
+
+    final txn = result.transaction ?? const <String, dynamic>{};
+    final voidMeta = _voidAuditCompanion(txn);
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(row.id))).write(
+      TicketsCompanion(
+        status: const Value('void'),
+        pendingVoidRequest: const Value(false),
+        pendingVoidReason: const Value(null),
+        voidReason: voidMeta.voidReason.present
+            ? voidMeta.voidReason
+            : (fallbackReason?.trim().isNotEmpty == true
+                ? Value(fallbackReason!.trim())
+                : const Value.absent()),
+        voidedByJson: voidMeta.voidedByJson,
+        voidedAt: voidMeta.voidedAt,
+      ),
+    );
+    await _markVoidQueuesSyncedForTicket(row.id);
   }
 
   /// PATCH `vehicle.plate_number` on the server and update local DB.
@@ -4040,12 +4605,19 @@ WHERE shift_id = ? AND status = 'completed'
     final existing =
         await _ticketByServerId(serverUuid) ?? await ticketById(ticketNum);
     if (existing != null) {
+      final preserveVoid = _shouldPreserveLocalVoid(existing, json);
+      final preserveCheckout = _shouldPreserveLocalCheckout(existing, json);
+      final preservePlate = await _hasPendingPlatePatch(existing.id);
+      final resolvedSync = await _resolvedSyncStatusForTicket(existing.id);
+
       await (_db.update(
         _db.tickets,
       )..where((t) => t.id.equals(existing.id))).write(
         TicketsCompanion(
           serverTicketId: Value(serverUuid),
-          plateNumber: Value(fields.plateNumber),
+          plateNumber: preservePlate
+              ? const Value.absent()
+              : Value(fields.plateNumber),
           vehicleBrand: Value(fields.vehicleBrand),
           vehicleColor: Value(fields.vehicleColor),
           vehicleType: Value(fields.vehicleType),
@@ -4060,20 +4632,31 @@ WHERE shift_id = ? AND status = 'completed'
               : Value(
                   PhilippineTime.normalizeCheckInStorage(fields.checkInAt),
                 ),
-          checkOutAt: Value(fields.checkOutAt),
-          fee: Value(fields.fee),
-          status: Value(fields.status),
-          driverIn: Value(fields.driverIn),
-          driverOut: Value(fields.driverOut),
-          parkingInfo: Value(fields.parkingInfo),
-          paymentSummaryJson: paymentJson != null
+          checkOutAt: preserveCheckout
+              ? const Value.absent()
+              : Value(fields.checkOutAt),
+          fee: preserveCheckout ? const Value.absent() : Value(fields.fee),
+          status: preserveVoid
+              ? const Value('void')
+              : preserveCheckout
+                  ? Value(existing.status)
+                  : Value(fields.status),
+          driverIn: preserveVoid ? const Value.absent() : Value(fields.driverIn),
+          driverOut: preserveCheckout
+              ? const Value.absent()
+              : Value(fields.driverOut),
+          parkingInfo: preserveVoid
+              ? const Value.absent()
+              : Value(fields.parkingInfo),
+          paymentSummaryJson: paymentJson != null && !preserveCheckout
               ? Value(paymentJson)
               : const Value.absent(),
-          syncStatus: const Value('synced'),
+          syncStatus: Value(resolvedSync),
           vrNo: meta.vrNo,
-          voidReason: meta.voidReason,
-          voidedByJson: meta.voidedByJson,
-          voidedAt: meta.voidedAt,
+          voidReason: preserveVoid ? const Value.absent() : meta.voidReason,
+          voidedByJson:
+              preserveVoid ? const Value.absent() : meta.voidedByJson,
+          voidedAt: preserveVoid ? const Value.absent() : meta.voidedAt,
           appliedRateJson: meta.appliedRateJson,
           isOvernight: meta.isOvernight,
           ticketLost: meta.ticketLost,
@@ -4144,6 +4727,8 @@ WHERE shift_id = ? AND status = 'completed'
 
   static bool _isExpressServerTransactionJson(Map<String, dynamic> json) {
     for (final key in const [
+      'is_express',
+      'isExpress',
       'express_cashier',
       'expressCashier',
       'is_express_cashier',
@@ -4176,7 +4761,11 @@ WHERE shift_id = ? AND status = 'completed'
   ) {
     final vm = _vehicleMap(json);
     final plate =
-        vm['plate_number']?.toString() ?? vm['plateNumber']?.toString() ?? '';
+        vm['plate_number']?.toString() ??
+        vm['plateNumber']?.toString() ??
+        json['plate_number']?.toString() ??
+        json['plateNumber']?.toString() ??
+        '';
     final brandRaw = vm['brand']?.toString().trim() ?? '';
     final model = vm['model']?.toString().trim() ?? '';
     final brand = model.isEmpty ? brandRaw : '$brandRaw $model'.trim();
@@ -4220,6 +4809,9 @@ WHERE shift_id = ? AND status = 'completed'
 
   static Map<String, dynamic> _vehicleMap(Map<String, dynamic> json) {
     final vehicle = json['vehicle'];
+    if (vehicle is String && vehicle.trim().isNotEmpty) {
+      return <String, dynamic>{'brand': vehicle.trim()};
+    }
     if (vehicle is Map<String, dynamic>) return vehicle;
     if (vehicle is Map) return Map<String, dynamic>.from(vehicle);
     return const <String, dynamic>{};
@@ -4368,4 +4960,16 @@ class _BatchCheckInEntry {
   final SyncQueueData row;
   final Map<String, dynamic> item;
   final Ticket? ticket;
+}
+
+class _BatchVoidEntry {
+  const _BatchVoidEntry({
+    required this.row,
+    required this.item,
+    required this.requestId,
+  });
+
+  final SyncQueueData row;
+  final Map<String, dynamic> item;
+  final String requestId;
 }

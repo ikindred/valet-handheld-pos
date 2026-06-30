@@ -41,7 +41,10 @@ class BatchCheckInResultItem {
     var ticketNumber = json['ticket_number']?.toString().trim() ?? '';
     if (ticketNumber.isEmpty) {
       final idField = json['id']?.toString().trim() ?? '';
-      if (idField.startsWith('TKT-')) ticketNumber = idField;
+      if (idField.isNotEmpty) ticketNumber = idField;
+    }
+    if (ticketNumber.isEmpty && transaction != null) {
+      ticketNumber = transaction['ticket_number']?.toString().trim() ?? '';
     }
     var plateNumber = json['plate_number']?.toString() ?? '';
     var vrNo = json['vr_no']?.toString() ?? '';
@@ -162,6 +165,11 @@ class BatchCheckInResultError {
   /// Checkout already finalized on server — reconcile as synced.
   bool get isCheckoutReconcileConflict =>
       isAlreadyCheckedOutConflict;
+
+  /// Ticket already voided on server — reconcile as synced.
+  bool get isAlreadyVoidedConflict =>
+      statusCode == 409 &&
+      message.toLowerCase().contains('already voided');
 }
 
 class BatchCheckInSummary {
@@ -259,6 +267,51 @@ class BatchCheckInResponse {
             'vr_no': vrNo,
             if (plate.isNotEmpty)
               'vehicle': <String, dynamic>{'plate_number': plate},
+          },
+        ),
+      );
+    }
+    return BatchCheckInResponse(
+      results: results,
+      summary: BatchCheckInSummary(
+        total: results.length,
+        succeeded: results.length,
+        failed: 0,
+      ),
+    );
+  }
+
+  /// Stub success for batch void sync (offline / tests).
+  factory BatchCheckInResponse.stubForVoids(
+    List<Map<String, dynamic>> voids,
+  ) {
+    final results = <BatchCheckInResultItem>[];
+    for (var i = 0; i < voids.length; i++) {
+      final item = voids[i];
+      final id = item['id']?.toString().trim() ?? 'TKT-VOID-STUB-$i';
+      final reason = item['void_reason']?.toString();
+      const serverId = '00000000-0000-4000-8000-000000000097';
+      final resolvedServerId =
+          id.contains('-') && !id.startsWith('TKT-') && !id.startsWith('EXP-')
+              ? id
+              : serverId;
+      results.add(
+        BatchCheckInResultItem(
+          index: i,
+          status: 'success',
+          ticketNumber: id.startsWith('TKT-') || id.startsWith('EXP-')
+              ? id
+              : id,
+          plateNumber: '',
+          vrNo: '',
+          serverTransactionId: resolvedServerId,
+          transaction: <String, dynamic>{
+            'id': resolvedServerId,
+            'ticket_number': id.startsWith('TKT-') || id.startsWith('EXP-')
+                ? id
+                : id,
+            'status': 'void',
+            if (reason != null && reason.isNotEmpty) 'void_reason': reason,
           },
         ),
       );
