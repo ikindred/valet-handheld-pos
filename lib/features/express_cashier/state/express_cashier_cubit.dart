@@ -34,6 +34,33 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
 
   Shift? _activeShift;
 
+  List<ExpressCashierTransaction> _sortedExpressTransactions(List<Ticket> rows) {
+    final list = rows.map(ExpressCashierTransaction.fromTicket).toList();
+    list.sort(_compareExpressNewestFirst);
+    return list;
+  }
+
+  /// Newest express sale first (sale `checkOutAt` / `checkInAt`, not sync `createdAt`).
+  static int _compareExpressNewestFirst(
+    ExpressCashierTransaction a,
+    ExpressCashierTransaction b,
+  ) {
+    final at = _expressSaleInstant(a);
+    final bt = _expressSaleInstant(b);
+    final byTime = bt.compareTo(at);
+    if (byTime != 0) return byTime;
+    return b.ticketId.compareTo(a.ticketId);
+  }
+
+  /// Express sales are completed at intake — `checkOutAt` / `checkInAt` is the sale time.
+  static DateTime _expressSaleInstant(ExpressCashierTransaction tx) {
+    for (final raw in [tx.checkOutAt, tx.checkInAt, tx.createdAt]) {
+      final parsed = DateTime.tryParse(raw.trim());
+      if (parsed != null) return parsed;
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
   Future<void> loadTransactions(int localUserId) async {
     emit(const ExpressCashierLoading());
     try {
@@ -46,7 +73,7 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
       final rows = await _loadExpressTransactionsForShift(shift);
       emit(
         ExpressCashierLoaded(
-          transactions: rows.map(ExpressCashierTransaction.fromTicket).toList(),
+          transactions: _sortedExpressTransactions(rows),
         ),
       );
     } catch (e) {
@@ -217,8 +244,7 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
         shift.id,
         userId: shift.userId,
       );
-      final transactions =
-          rows.map(ExpressCashierTransaction.fromTicket).toList();
+      final transactions = _sortedExpressTransactions(rows);
       emit(ExpressCashierSaved(ticketId: ticket, transactions: transactions));
     } on StateError catch (e) {
       emit(ExpressCashierError(e.message));
@@ -274,8 +300,7 @@ class ExpressCashierCubit extends Cubit<ExpressCashierState> {
       final rows = await _loadExpressTransactionsForShift(shift);
       emit(
         loaded.copyWith(
-          transactions:
-              rows.map(ExpressCashierTransaction.fromTicket).toList(),
+          transactions: _sortedExpressTransactions(rows),
           isSaving: false,
         ),
       );

@@ -150,6 +150,7 @@ class AppProviders extends StatelessWidget {
             ticketService: c.read<TicketService>(),
             dashboardApi: c.read<DashboardApi>(),
             rateFetchService: c.read<RateFetchService>(),
+            syncCubit: c.read<SyncCubit>(),
           ),
         ),
         BlocProvider(
@@ -174,6 +175,7 @@ class AppProviders extends StatelessWidget {
             ticketService: c.read<TicketService>(),
             transactionsApi: c.read<TransactionsApi>(),
             rateService: c.read<RateService>(),
+            syncCubit: c.read<SyncCubit>(),
           ),
         ),
         BlocProvider(create: (_) => SettingsCubit()),

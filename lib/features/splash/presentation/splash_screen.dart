@@ -42,7 +42,9 @@ class _SplashScreenState extends State<SplashScreen> {
     final prefs = await SharedPreferences.getInstance();
     try {
       ValetLog.debug('splash/_bootstrap', 'start');
-      var deviceIdentityKey = prefs.getString(PrefsKeys.deviceIdentityKey)?.trim();
+      var deviceIdentityKey = prefs
+          .getString(PrefsKeys.deviceIdentityKey)
+          ?.trim();
       if (deviceIdentityKey == null || deviceIdentityKey.isEmpty) {
         final db = context.read<AppDatabase>();
         final restored = await DeviceClaimRestore.tryRestoreFromDatabase(db);
@@ -61,9 +63,10 @@ class _SplashScreenState extends State<SplashScreen> {
 
       bool online = false;
       try {
-        online = await InternetConnection()
-            .hasInternetAccess
-            .timeout(const Duration(seconds: 4), onTimeout: () => false);
+        online = await InternetConnection().hasInternetAccess.timeout(
+          const Duration(seconds: 4),
+          onTimeout: () => false,
+        );
       } catch (_) {
         online = false;
       }
@@ -128,8 +131,9 @@ class _SplashScreenState extends State<SplashScreen> {
             return;
           }
           await OfflineModePrefs.write(prefs, false);
-          final email =
-              await repo.emailForOfflineAccountId(sessionAfter.userId);
+          final email = await repo.emailForOfflineAccountId(
+            sessionAfter.userId,
+          );
           if (!mounted) return;
           await syncAuthBlocAndNavigate(
             context,

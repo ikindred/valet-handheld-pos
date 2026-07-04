@@ -16,8 +16,8 @@ class ConnectivityService {
   ConnectivityService({
     required BranchConfigService branchConfig,
     required SyncCubit syncCubit,
-  })  : _branchConfig = branchConfig,
-        _syncCubit = syncCubit;
+  }) : _branchConfig = branchConfig,
+       _syncCubit = syncCubit;
 
   final BranchConfigService _branchConfig;
   final SyncCubit _syncCubit;

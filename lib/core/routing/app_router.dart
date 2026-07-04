@@ -38,10 +38,7 @@ import '../../features/splash/presentation/splash_screen.dart';
 import 'auth_router_guard.dart';
 import 'router_refresh_notifier.dart';
 
-GoRouter createAppRouter(
-  BuildContext context,
-  RouterRefreshNotifier refresh,
-) {
+GoRouter createAppRouter(BuildContext context, RouterRefreshNotifier refresh) {
   final guard = AuthRouterGuard(context);
   return GoRouter(
     initialLocation: '/splash',
@@ -82,7 +79,9 @@ GoRouter createAppRouter(
       GoRoute(
         path: '/dashboard/ticket/:ticketId',
         builder: (context, state) {
-          final id = Uri.decodeComponent(state.pathParameters['ticketId'] ?? '');
+          final id = Uri.decodeComponent(
+            state.pathParameters['ticketId'] ?? '',
+          );
           return TicketDetailScreen(ticketId: id);
         },
       ),
@@ -150,18 +149,15 @@ GoRouter createAppRouter(
               ),
               GoRoute(
                 path: 'step-2',
-                builder: (context, state) =>
-                    const CheckOutVehicleInfoScreen(),
+                builder: (context, state) => const CheckOutVehicleInfoScreen(),
               ),
               GoRoute(
                 path: 'step-3',
-                builder: (context, state) =>
-                    const CheckOutConditionScreen(),
+                builder: (context, state) => const CheckOutConditionScreen(),
               ),
               GoRoute(
                 path: 'add-issue',
-                builder: (context, state) =>
-                    const CheckOutAddIssueScreen(),
+                builder: (context, state) => const CheckOutAddIssueScreen(),
               ),
               GoRoute(
                 path: 'step-4',
@@ -170,8 +166,7 @@ GoRouter createAppRouter(
               ),
               GoRoute(
                 path: 'step-5',
-                builder: (context, state) =>
-                    const CheckOutPaymentDoneScreen(),
+                builder: (context, state) => const CheckOutPaymentDoneScreen(),
               ),
             ],
           ),

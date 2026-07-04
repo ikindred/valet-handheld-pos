@@ -156,11 +156,7 @@ class AuthRepository {
       );
       final b = (result.branch ?? '').trim();
       final a = (result.area ?? '').trim();
-      await _upsertDeviceInfoRow(
-        deviceId: deviceId,
-        branch: b,
-        area: a,
-      );
+      await _upsertDeviceInfoRow(deviceId: deviceId, branch: b, area: a);
     }
     return result;
   }
@@ -172,11 +168,7 @@ class AuthRepository {
     final b = AppConfig.devSeedBranch;
     final a = AppConfig.devSeedArea;
     if (b.isEmpty || a.isEmpty) return;
-    await _db.seedDevDeviceInfoIfNeeded(
-      deviceId: deviceId,
-      branch: b,
-      area: a,
-    );
+    await _db.seedDevDeviceInfoIfNeeded(deviceId: deviceId, branch: b, area: a);
   }
 
   /// Single row keyed by [deviceId]; updated after successful device/register.
@@ -186,13 +178,15 @@ class AuthRepository {
     required String area,
   }) async {
     final now = unixNowSeconds();
-    final existing = await (_db.select(_db.deviceInfo)
-          ..where((d) => d.deviceId.equals(deviceId))
-          ..limit(1))
-        .getSingleOrNull();
+    final existing =
+        await (_db.select(_db.deviceInfo)
+              ..where((d) => d.deviceId.equals(deviceId))
+              ..limit(1))
+            .getSingleOrNull();
     if (existing != null) {
-      await (_db.update(_db.deviceInfo)..where((d) => d.id.equals(existing.id)))
-          .write(
+      await (_db.update(
+        _db.deviceInfo,
+      )..where((d) => d.id.equals(existing.id))).write(
         DeviceInfoCompanion(
           branch: Value(branch),
           area: Value(area),
@@ -201,7 +195,9 @@ class AuthRepository {
       );
       return;
     }
-    await _db.into(_db.deviceInfo).insert(
+    await _db
+        .into(_db.deviceInfo)
+        .insert(
           DeviceInfoCompanion.insert(
             deviceId: deviceId,
             branch: Value(branch),
@@ -217,8 +213,9 @@ class AuthRepository {
     final fromPrefs = prefs.getString(PrefsKeys.deviceAreaId)?.trim() ?? '';
     if (DeviceSiteIds.isUuid(fromPrefs)) return fromPrefs;
 
-    final identity = await (_db.select(_db.deviceIdentity)..limit(1))
-        .getSingleOrNull();
+    final identity = await (_db.select(
+      _db.deviceIdentity,
+    )..limit(1)).getSingleOrNull();
     if (identity != null && DeviceSiteIds.isUuid(identity.areaId)) {
       return identity.areaId.trim();
     }
@@ -231,8 +228,9 @@ class AuthRepository {
     final fromPrefs = prefs.getString(PrefsKeys.deviceBranchId)?.trim() ?? '';
     if (DeviceSiteIds.isUuid(fromPrefs)) return fromPrefs;
 
-    final identity = await (_db.select(_db.deviceIdentity)..limit(1))
-        .getSingleOrNull();
+    final identity = await (_db.select(
+      _db.deviceIdentity,
+    )..limit(1)).getSingleOrNull();
     if (identity != null && DeviceSiteIds.isUuid(identity.branchId)) {
       return identity.branchId.trim();
     }
@@ -247,8 +245,9 @@ class AuthRepository {
       return cached;
     }
 
-    final identity = await (_db.select(_db.deviceIdentity)..limit(1))
-        .getSingleOrNull();
+    final identity = await (_db.select(
+      _db.deviceIdentity,
+    )..limit(1)).getSingleOrNull();
     if (identity != null) {
       final b = SiteDisplayName.sanitizeStored(identity.branch);
       final a = SiteDisplayName.sanitizeStored(identity.area);
@@ -258,10 +257,11 @@ class AuthRepository {
     }
 
     final deviceId = await DeviceIdService.getOrCreate();
-    final row = await (_db.select(_db.deviceInfo)
-          ..where((d) => d.deviceId.equals(deviceId))
-          ..limit(1))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.deviceInfo)
+              ..where((d) => d.deviceId.equals(deviceId))
+              ..limit(1))
+            .getSingleOrNull();
     if (row == null) return (branch: '', area: '');
     return (
       branch: SiteDisplayName.sanitizeStored(row.branch),
@@ -301,7 +301,10 @@ class AuthRepository {
   }
 
   /// `DATE · Branch : Area` for cash/dashboard headers.
-  Future<String> dateAndSiteLine(SharedPreferences prefs, String dateLine) async {
+  Future<String> dateAndSiteLine(
+    SharedPreferences prefs,
+    String dateLine,
+  ) async {
     final p = await branchAndAreaFromDb();
     if (p.branch.isEmpty || p.area.isEmpty) {
       return '$dateLine · — : —';
@@ -310,7 +313,9 @@ class AuthRepository {
   }
 
   /// Weekly shift from login, keyed by local [OfflineAccounts.id].
-  Future<CashierShiftSchedule?> shiftScheduleForLocalUser(int localUserId) async {
+  Future<CashierShiftSchedule?> shiftScheduleForLocalUser(
+    int localUserId,
+  ) async {
     final row = await offlineAccountById(localUserId);
     if (row == null) return null;
     return CashierShiftSchedule.fromJsonString(row.shiftScheduleJson);
@@ -328,9 +333,9 @@ class AuthRepository {
     final now = unixNowSeconds();
     final existing = await offlineAccountByServerId(serverUserId);
     if (existing != null) {
-      await (_db.update(_db.offlineAccounts)
-            ..where((a) => a.id.equals(existing.id)))
-          .write(
+      await (_db.update(
+        _db.offlineAccounts,
+      )..where((a) => a.id.equals(existing.id))).write(
         OfflineAccountsCompanion(
           email: Value(email),
           passwordHash: Value(passwordHash),
@@ -344,7 +349,9 @@ class AuthRepository {
       );
       return existing.id;
     }
-    return _db.into(_db.offlineAccounts).insert(
+    return _db
+        .into(_db.offlineAccounts)
+        .insert(
           OfflineAccountsCompanion.insert(
             serverUserId: serverUserId,
             email: email,
@@ -400,14 +407,17 @@ class AuthRepository {
       passwordHash: hash,
       fullName: res.fullName,
       role: res.role,
-      shiftScheduleJson:
-          CashierShiftSchedule.encodeToJsonString(res.shiftSchedule),
+      shiftScheduleJson: CashierShiftSchedule.encodeToJsonString(
+        res.shiftSchedule,
+      ),
       isExpressCashier: res.expressCashier,
     );
 
     await _db.transaction(() async {
       await _deactivateAllActiveSessions();
-      final sid = await _db.into(_db.sessions).insert(
+      final sid = await _db
+          .into(_db.sessions)
+          .insert(
             SessionsCompanion.insert(
               userId: accountId,
               loginAt: unixNowSeconds(),
@@ -445,7 +455,9 @@ class AuthRepository {
     return res.standardRates;
   }
 
-  Future<void> _syncRatesForCurrentBranch(StandardParkingRates? fromLogin) async {
+  Future<void> _syncRatesForCurrentBranch(
+    StandardParkingRates? fromLogin,
+  ) async {
     final branchUuid = await branchUuidForApi();
     final areaUuid = await areaUuidForApi();
     if (branchUuid.isEmpty) {
@@ -465,10 +477,7 @@ class AuthRepository {
     } else {
       await _rateFetch.syncRatesForBranch(branchUuid);
     }
-    await _rates.syncFromAuthIfEmpty(
-      branchId: branchUuid,
-      rates: fromLogin,
-    );
+    await _rates.syncFromAuthIfEmpty(branchId: branchUuid, rates: fromLogin);
   }
 
   /// `SELECT * FROM offline_accounts WHERE email = ?` then verify bcrypt.
@@ -478,10 +487,11 @@ class AuthRepository {
   }) async {
     await requireDeviceSiteAssigned();
     final normalizedEmail = email.trim().toLowerCase();
-    final row = await (_db.select(_db.offlineAccounts)
-          ..where((a) => a.email.equals(normalizedEmail))
-          ..limit(1))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.offlineAccounts)
+              ..where((a) => a.email.equals(normalizedEmail))
+              ..limit(1))
+            .getSingleOrNull();
     if (row == null) {
       throw StateError('OFFLINE_ACCOUNT_MISSING');
     }
@@ -491,7 +501,9 @@ class AuthRepository {
 
     await _db.transaction(() async {
       await _deactivateAllActiveSessions();
-      await _db.into(_db.sessions).insert(
+      await _db
+          .into(_db.sessions)
+          .insert(
             SessionsCompanion.insert(
               userId: row.id,
               loginAt: unixNowSeconds(),
@@ -531,8 +543,9 @@ class AuthRepository {
     final res = await _api.revalidateToken(token: token, deviceId: deviceId);
 
     if (!res.valid) {
-      await (_db.update(_db.sessions)..where((s) => s.id.equals(session.id)))
-          .write(
+      await (_db.update(
+        _db.sessions,
+      )..where((s) => s.id.equals(session.id))).write(
         SessionsCompanion(
           isActive: const Value(false),
           logoutAt: Value(unixNowSeconds()),
@@ -544,8 +557,9 @@ class AuthRepository {
     }
 
     await _db.transaction(() async {
-      await (_db.update(_db.sessions)..where((s) => s.id.equals(session.id)))
-          .write(
+      await (_db.update(
+        _db.sessions,
+      )..where((s) => s.id.equals(session.id))).write(
         SessionsCompanion(
           lastVerifiedAt: Value(unixNowSeconds()),
           authToken: res.token != null && res.token!.trim().isNotEmpty
@@ -641,9 +655,9 @@ class AuthRepository {
     required String branchId,
     required String areaId,
   }) async {
-    await (_db.update(_db.deviceIdentity)
-          ..where((d) => d.serverDeviceId.equals(serverDeviceId)))
-        .write(
+    await (_db.update(
+      _db.deviceIdentity,
+    )..where((d) => d.serverDeviceId.equals(serverDeviceId))).write(
       DeviceIdentityCompanion(
         branch: Value(branchName.trim()),
         area: Value(areaName.trim()),
@@ -718,23 +732,23 @@ class AuthRepository {
     }
 
     // 1. Local active tickets (normal cashier only — never express).
-    final localTickets = await (_db.select(_db.tickets)
-          ..where(
-            (t) =>
-                t.status.equals('active') &
-                t.checkOutAt.isNull() &
-                t.isExpressCashier.equals(false),
-          )
-          ..orderBy([(t) => OrderingTerm.asc(t.checkInAt)]))
-        .get();
+    final localTickets =
+        await (_db.select(_db.tickets)
+              ..where(
+                (t) =>
+                    t.status.equals('active') &
+                    t.checkOutAt.isNull() &
+                    t.isExpressCashier.equals(false),
+              )
+              ..orderBy([(t) => OrderingTerm.asc(t.checkInAt)]))
+            .get();
 
     final localServerIds = localTickets
         .map((t) => t.serverTicketId)
         .whereType<String>()
         .toSet();
 
-    final localResult =
-        localTickets.map(OpenTransaction.fromTicket).toList();
+    final localResult = localTickets.map(OpenTransaction.fromTicket).toList();
 
     // 2. Remote active tickets (best-effort) via dashboard/summary recent list.
     final remoteExtra = <OpenTransaction>[];
@@ -762,9 +776,7 @@ class AuthRepository {
   /// Active tickets on this shift (close-cash warning).
   Future<List<Ticket>> queryOpenTicketsForShiftClose(String shiftId) {
     return (_db.select(_db.tickets)
-          ..where(
-            (t) => t.shiftId.equals(shiftId) & t.status.equals('active'),
-          )
+          ..where((t) => t.shiftId.equals(shiftId) & t.status.equals('active'))
           ..orderBy([(t) => OrderingTerm.asc(t.checkInAt)]))
         .get();
   }
@@ -786,52 +798,60 @@ class AuthRepository {
 
   /// Sum of completed ticket fees for [shiftId].
   Future<double> sumSalesForCheckoutShift(String shiftId) async {
-    final row = await _db.customSelect(
-      '''
+    final row = await _db
+        .customSelect(
+          '''
 SELECT COALESCE(SUM(fee), 0) AS s FROM tickets
 WHERE shift_id = ? AND status = 'completed'
 ''',
-      variables: [Variable<String>(shiftId)],
-      readsFrom: {_db.tickets},
-    ).getSingle();
+          variables: [Variable<String>(shiftId)],
+          readsFrom: {_db.tickets},
+        )
+        .getSingle();
     return (row.data['s'] as num?)?.toDouble() ?? 0.0;
   }
 
   /// Completed checkouts on [shiftId].
   Future<int> countCompletedForCheckoutShift(String shiftId) async {
-    final row = await _db.customSelect(
-      '''
+    final row = await _db
+        .customSelect(
+          '''
 SELECT COUNT(*) AS c FROM tickets
 WHERE shift_id = ? AND status = 'completed'
 ''',
-      variables: [Variable<String>(shiftId)],
-      readsFrom: {_db.tickets},
-    ).getSingle();
+          variables: [Variable<String>(shiftId)],
+          readsFrom: {_db.tickets},
+        )
+        .getSingle();
     return (row.data['c'] as num?)?.toInt() ?? 0;
   }
 
   /// Express cashier tickets on [shiftId] (matches Manual Ticketing list).
   Future<int> countExpressCompletedForShift(String shiftId) async {
-    final row = await _db.customSelect(
-      '''
+    final row = await _db
+        .customSelect(
+          '''
 SELECT COUNT(*) AS c FROM tickets
 WHERE shift_id = ? AND status = 'completed' AND is_express_cashier = 1
 ''',
-      variables: [Variable<String>(shiftId)],
-      readsFrom: {_db.tickets},
-    ).getSingle();
+          variables: [Variable<String>(shiftId)],
+          readsFrom: {_db.tickets},
+        )
+        .getSingle();
     return (row.data['c'] as num?)?.toInt() ?? 0;
   }
 
   Future<double> sumExpressSalesForShift(String shiftId) async {
-    final row = await _db.customSelect(
-      '''
+    final row = await _db
+        .customSelect(
+          '''
 SELECT COALESCE(SUM(fee), 0) AS s FROM tickets
 WHERE shift_id = ? AND status = 'completed' AND is_express_cashier = 1
 ''',
-      variables: [Variable<String>(shiftId)],
-      readsFrom: {_db.tickets},
-    ).getSingle();
+          variables: [Variable<String>(shiftId)],
+          readsFrom: {_db.tickets},
+        )
+        .getSingle();
     return (row.data['s'] as num?)?.toDouble() ?? 0.0;
   }
 
@@ -887,27 +907,29 @@ WHERE shift_id = ? AND status = 'completed' AND is_express_cashier = 1
         vehiclesIn = remoteVehiclesIn;
       }
 
-      final localTypeTotal =
-          localByVehicleType.values.fold<int>(0, (sum, n) => sum + n);
-      final remoteTypeTotal = remoteByVehicleType?.values.fold<int>(
-            0,
-            (sum, n) => sum + n,
-          ) ??
-          0;
+      final localTypeTotal = localByVehicleType.values.fold<int>(
+        0,
+        (sum, n) => sum + n,
+      );
+      final remoteTypeTotal =
+          remoteByVehicleType?.values.fold<int>(0, (sum, n) => sum + n) ?? 0;
       if (remoteByVehicleType != null &&
           remoteTypeTotal > 0 &&
           (localTypeTotal == 0 || remoteTypeTotal > localTypeTotal)) {
         localByVehicleType = remoteByVehicleType;
       }
 
-      final mergedTypeTotal =
-          localByVehicleType.values.fold<int>(0, (sum, n) => sum + n);
+      final mergedTypeTotal = localByVehicleType.values.fold<int>(
+        0,
+        (sum, n) => sum + n,
+      );
       if (mergedTypeTotal == 0 &&
           localCheckoutCount > 0 &&
           recentCheckouts != null &&
           recentCheckouts.isNotEmpty) {
-        final fromRecent =
-            await _vehicleTypeCountsFromRecentCheckouts(recentCheckouts);
+        final fromRecent = await _vehicleTypeCountsFromRecentCheckouts(
+          recentCheckouts,
+        );
         if (fromRecent.isNotEmpty) {
           localByVehicleType = fromRecent;
         }
@@ -929,14 +951,16 @@ WHERE shift_id = ? AND status = 'completed' AND is_express_cashier = 1
   }
 
   Future<int> _countCheckInsSinceOpen(String sinceIso, String userId) async {
-    final row = await _db.customSelect(
-      '''
+    final row = await _db
+        .customSelect(
+          '''
 SELECT COUNT(*) AS c FROM tickets
 WHERE user_id = ? AND check_in_at >= ? AND status != 'draft'
 ''',
-      variables: [Variable<String>(userId), Variable<String>(sinceIso)],
-      readsFrom: {_db.tickets},
-    ).getSingle();
+          variables: [Variable<String>(userId), Variable<String>(sinceIso)],
+          readsFrom: {_db.tickets},
+        )
+        .getSingle();
     return (row.data['c'] as num?)?.toInt() ?? 0;
   }
 
@@ -945,8 +969,9 @@ WHERE user_id = ? AND check_in_at >= ? AND status != 'draft'
     String userId, {
     required String shiftId,
   }) async {
-    final row = await _db.customSelect(
-      '''
+    final row = await _db
+        .customSelect(
+          '''
 SELECT COUNT(*) AS c FROM tickets
 WHERE user_id = ?
   AND status IN ('completed', 'lost')
@@ -955,25 +980,28 @@ WHERE user_id = ?
     OR (check_out_at IS NOT NULL AND check_out_at >= ?)
   )
 ''',
-      variables: [
-        Variable<String>(userId),
-        Variable<String>(shiftId),
-        Variable<String>(sinceIso),
-      ],
-      readsFrom: {_db.tickets},
-    ).getSingle();
+          variables: [
+            Variable<String>(userId),
+            Variable<String>(shiftId),
+            Variable<String>(sinceIso),
+          ],
+          readsFrom: {_db.tickets},
+        )
+        .getSingle();
     return (row.data['c'] as num?)?.toInt() ?? 0;
   }
 
   Future<int> _countActiveOnShift(String shiftId) async {
-    final row = await _db.customSelect(
-      '''
+    final row = await _db
+        .customSelect(
+          '''
 SELECT COUNT(*) AS c FROM tickets
 WHERE shift_id = ? AND status = 'active'
 ''',
-      variables: [Variable<String>(shiftId)],
-      readsFrom: {_db.tickets},
-    ).getSingle();
+          variables: [Variable<String>(shiftId)],
+          readsFrom: {_db.tickets},
+        )
+        .getSingle();
     return (row.data['c'] as num?)?.toInt() ?? 0;
   }
 
@@ -982,8 +1010,9 @@ WHERE shift_id = ? AND status = 'active'
     String userId, {
     required String shiftId,
   }) async {
-    final row = await _db.customSelect(
-      '''
+    final row = await _db
+        .customSelect(
+          '''
 SELECT COALESCE(SUM(fee), 0) AS s FROM tickets
 WHERE user_id = ?
   AND status IN ('completed', 'lost')
@@ -992,13 +1021,14 @@ WHERE user_id = ?
     OR (check_out_at IS NOT NULL AND check_out_at >= ?)
   )
 ''',
-      variables: [
-        Variable<String>(userId),
-        Variable<String>(shiftId),
-        Variable<String>(sinceIso),
-      ],
-      readsFrom: {_db.tickets},
-    ).getSingle();
+          variables: [
+            Variable<String>(userId),
+            Variable<String>(shiftId),
+            Variable<String>(sinceIso),
+          ],
+          readsFrom: {_db.tickets},
+        )
+        .getSingle();
     return (row.data['s'] as num?)?.toDouble() ?? 0.0;
   }
 
@@ -1007,8 +1037,9 @@ WHERE user_id = ?
     String userId, {
     required String shiftId,
   }) async {
-    final rows = await _db.customSelect(
-      '''
+    final rows = await _db
+        .customSelect(
+          '''
 SELECT vehicle_type AS vt, COUNT(*) AS c FROM tickets
 WHERE user_id = ?
   AND status IN ('completed', 'lost')
@@ -1018,13 +1049,14 @@ WHERE user_id = ?
   )
 GROUP BY vehicle_type
 ''',
-      variables: [
-        Variable<String>(userId),
-        Variable<String>(shiftId),
-        Variable<String>(sinceIso),
-      ],
-      readsFrom: {_db.tickets},
-    ).get();
+          variables: [
+            Variable<String>(userId),
+            Variable<String>(shiftId),
+            Variable<String>(sinceIso),
+          ],
+          readsFrom: {_db.tickets},
+        )
+        .get();
     final counts = <String, int>{};
     for (final row in rows) {
       final raw = (row.data['vt'] as String?)?.trim() ?? '';
@@ -1059,16 +1091,18 @@ GROUP BY vehicle_type
   ) async {
     final serverId = row.id.trim();
     if (serverId.isNotEmpty) {
-      final byServer = await (_db.select(_db.tickets)
-            ..where((t) => t.serverTicketId.equals(serverId))
-            ..limit(1))
-          .getSingleOrNull();
+      final byServer =
+          await (_db.select(_db.tickets)
+                ..where((t) => t.serverTicketId.equals(serverId))
+                ..limit(1))
+              .getSingleOrNull();
       if (byServer != null) return byServer;
 
-      final byLocalId = await (_db.select(_db.tickets)
-            ..where((t) => t.id.equals(serverId))
-            ..limit(1))
-          .getSingleOrNull();
+      final byLocalId =
+          await (_db.select(_db.tickets)
+                ..where((t) => t.id.equals(serverId))
+                ..limit(1))
+              .getSingleOrNull();
       if (byLocalId != null) return byLocalId;
     }
 
@@ -1084,35 +1118,40 @@ GROUP BY vehicle_type
 
   /// Check-ins on [shiftId] (excludes drafts).
   Future<int> countCheckInsForShift(String shiftId) async {
-    final row = await _db.customSelect(
-      '''
+    final row = await _db
+        .customSelect(
+          '''
 SELECT COUNT(*) AS c FROM tickets
 WHERE shift_id = ? AND status != 'draft'
 ''',
-      variables: [Variable<String>(shiftId)],
-      readsFrom: {_db.tickets},
-    ).getSingle();
+          variables: [Variable<String>(shiftId)],
+          readsFrom: {_db.tickets},
+        )
+        .getSingle();
     return (row.data['c'] as num?)?.toInt() ?? 0;
   }
 
   Future<Shift?> getShiftById(String shiftId) {
-    return (_db.select(_db.shifts)..where((s) => s.id.equals(shiftId)))
-        .getSingleOrNull();
+    return (_db.select(
+      _db.shifts,
+    )..where((s) => s.id.equals(shiftId))).getSingleOrNull();
   }
 
   /// Completed checkouts grouped by `vehicle_type` for close-cash summary.
   Future<Map<String, int>> countCompletedByVehicleTypeForShift(
     String shiftId,
   ) async {
-    final rows = await _db.customSelect(
-      '''
+    final rows = await _db
+        .customSelect(
+          '''
 SELECT vehicle_type AS vt, COUNT(*) AS c FROM tickets
 WHERE shift_id = ? AND status = 'completed'
 GROUP BY vehicle_type
 ''',
-      variables: [Variable<String>(shiftId)],
-      readsFrom: {_db.tickets},
-    ).get();
+          variables: [Variable<String>(shiftId)],
+          readsFrom: {_db.tickets},
+        )
+        .get();
     final counts = <String, int>{};
     for (final row in rows) {
       final key = (row.data['vt'] as String?)?.trim() ?? '';
@@ -1126,10 +1165,11 @@ GROUP BY vehicle_type
   /// Already-synced tickets (on the server) only move locally; unsynced rows are
   /// queued for outbound sync. Express-cashier shifts never adopt tickets.
   Future<void> adoptInheritedTicketsForShift(String newShiftId) async {
-    final shift = await (_db.select(_db.shifts)
-          ..where((s) => s.id.equals(newShiftId))
-          ..limit(1))
-        .getSingleOrNull();
+    final shift =
+        await (_db.select(_db.shifts)
+              ..where((s) => s.id.equals(newShiftId))
+              ..limit(1))
+            .getSingleOrNull();
     if (shift?.isExpressCashier == true) return;
 
     final rows = await queryInheritedOpenTickets(newShiftId);
@@ -1138,18 +1178,21 @@ GROUP BY vehicle_type
     await _db.transaction(() async {
       for (final row in rows) {
         final alreadySynced = row.syncStatus == 'synced';
-        await (_db.update(_db.tickets)..where((t) => t.id.equals(row.id)))
-            .write(
+        await (_db.update(
+          _db.tickets,
+        )..where((t) => t.id.equals(row.id))).write(
           TicketsCompanion(
             shiftId: Value(newShiftId),
             syncStatus: Value(alreadySynced ? 'synced' : 'pending'),
           ),
         );
         if (alreadySynced) continue;
-        final updated = await (_db.select(_db.tickets)
-              ..where((t) => t.id.equals(row.id)))
-            .getSingle();
-        await _db.into(_db.syncQueue).insert(
+        final updated = await (_db.select(
+          _db.tickets,
+        )..where((t) => t.id.equals(row.id))).getSingle();
+        await _db
+            .into(_db.syncQueue)
+            .insert(
               SyncQueueCompanion.insert(
                 id: _uuid.v4(),
                 operation: 'update',
@@ -1170,8 +1213,9 @@ GROUP BY vehicle_type
     final session = await getActiveSession();
     if (session == null) return;
     final token = session.authToken;
-    await (_db.update(_db.sessions)..where((s) => s.id.equals(session.id)))
-        .write(
+    await (_db.update(
+      _db.sessions,
+    )..where((s) => s.id.equals(session.id))).write(
       SessionsCompanion(
         isActive: const Value(false),
         logoutAt: Value(unixNowSeconds()),
@@ -1192,8 +1236,9 @@ GROUP BY vehicle_type
     final session = await getActiveSession();
     if (session == null || session.userId != localUserId) return;
 
-    await (_db.update(_db.sessions)..where((s) => s.id.equals(session.id)))
-        .write(
+    await (_db.update(
+      _db.sessions,
+    )..where((s) => s.id.equals(session.id))).write(
       SessionsCompanion(
         isActive: const Value(false),
         logoutAt: Value(unixNowSeconds()),
@@ -1206,12 +1251,10 @@ GROUP BY vehicle_type
   /// Before inserting a new session (online/offline login): end any prior active sessions.
   Future<void> _deactivateAllActiveSessions() async {
     final now = unixNowSeconds();
-    await (_db.update(_db.sessions)..where((s) => s.isActive.equals(true)))
-        .write(
-      SessionsCompanion(
-        isActive: const Value(false),
-        logoutAt: Value(now),
-      ),
+    await (_db.update(
+      _db.sessions,
+    )..where((s) => s.isActive.equals(true))).write(
+      SessionsCompanion(isActive: const Value(false), logoutAt: Value(now)),
     );
   }
 

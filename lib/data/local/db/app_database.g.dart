@@ -1510,6 +1510,12 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("is_offline_session" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _sessionCredentialJsonMeta =
+      const VerificationMeta('sessionCredentialJson');
+  @override
+  late final GeneratedColumn<String> sessionCredentialJson =
+      GeneratedColumn<String>('session_credential_json', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -1519,7 +1525,8 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         loginAt,
         lastVerifiedAt,
         logoutAt,
-        isOfflineSession
+        isOfflineSession,
+        sessionCredentialJson
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1570,6 +1577,12 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
           isOfflineSession.isAcceptableOrUnknown(
               data['is_offline_session']!, _isOfflineSessionMeta));
     }
+    if (data.containsKey('session_credential_json')) {
+      context.handle(
+          _sessionCredentialJsonMeta,
+          sessionCredentialJson.isAcceptableOrUnknown(
+              data['session_credential_json']!, _sessionCredentialJsonMeta));
+    }
     return context;
   }
 
@@ -1595,6 +1608,9 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
           .read(DriftSqlType.int, data['${effectivePrefix}logout_at']),
       isOfflineSession: attachedDatabase.typeMapping.read(
           DriftSqlType.bool, data['${effectivePrefix}is_offline_session'])!,
+      sessionCredentialJson: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}session_credential_json']),
     );
   }
 
@@ -1615,6 +1631,9 @@ class Session extends DataClass implements Insertable<Session> {
   final int? lastVerifiedAt;
   final int? logoutAt;
   final bool isOfflineSession;
+
+  /// JSON `{email,password}` for silent online re-login after offline sessions.
+  final String? sessionCredentialJson;
   const Session(
       {required this.id,
       required this.userId,
@@ -1623,7 +1642,8 @@ class Session extends DataClass implements Insertable<Session> {
       required this.loginAt,
       this.lastVerifiedAt,
       this.logoutAt,
-      required this.isOfflineSession});
+      required this.isOfflineSession,
+      this.sessionCredentialJson});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1641,6 +1661,9 @@ class Session extends DataClass implements Insertable<Session> {
       map['logout_at'] = Variable<int>(logoutAt);
     }
     map['is_offline_session'] = Variable<bool>(isOfflineSession);
+    if (!nullToAbsent || sessionCredentialJson != null) {
+      map['session_credential_json'] = Variable<String>(sessionCredentialJson);
+    }
     return map;
   }
 
@@ -1660,6 +1683,9 @@ class Session extends DataClass implements Insertable<Session> {
           ? const Value.absent()
           : Value(logoutAt),
       isOfflineSession: Value(isOfflineSession),
+      sessionCredentialJson: sessionCredentialJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sessionCredentialJson),
     );
   }
 
@@ -1675,6 +1701,8 @@ class Session extends DataClass implements Insertable<Session> {
       lastVerifiedAt: serializer.fromJson<int?>(json['lastVerifiedAt']),
       logoutAt: serializer.fromJson<int?>(json['logoutAt']),
       isOfflineSession: serializer.fromJson<bool>(json['isOfflineSession']),
+      sessionCredentialJson:
+          serializer.fromJson<String?>(json['sessionCredentialJson']),
     );
   }
   @override
@@ -1689,6 +1717,8 @@ class Session extends DataClass implements Insertable<Session> {
       'lastVerifiedAt': serializer.toJson<int?>(lastVerifiedAt),
       'logoutAt': serializer.toJson<int?>(logoutAt),
       'isOfflineSession': serializer.toJson<bool>(isOfflineSession),
+      'sessionCredentialJson':
+          serializer.toJson<String?>(sessionCredentialJson),
     };
   }
 
@@ -1700,7 +1730,8 @@ class Session extends DataClass implements Insertable<Session> {
           int? loginAt,
           Value<int?> lastVerifiedAt = const Value.absent(),
           Value<int?> logoutAt = const Value.absent(),
-          bool? isOfflineSession}) =>
+          bool? isOfflineSession,
+          Value<String?> sessionCredentialJson = const Value.absent()}) =>
       Session(
         id: id ?? this.id,
         userId: userId ?? this.userId,
@@ -1711,6 +1742,9 @@ class Session extends DataClass implements Insertable<Session> {
             lastVerifiedAt.present ? lastVerifiedAt.value : this.lastVerifiedAt,
         logoutAt: logoutAt.present ? logoutAt.value : this.logoutAt,
         isOfflineSession: isOfflineSession ?? this.isOfflineSession,
+        sessionCredentialJson: sessionCredentialJson.present
+            ? sessionCredentialJson.value
+            : this.sessionCredentialJson,
       );
   Session copyWithCompanion(SessionsCompanion data) {
     return Session(
@@ -1726,6 +1760,9 @@ class Session extends DataClass implements Insertable<Session> {
       isOfflineSession: data.isOfflineSession.present
           ? data.isOfflineSession.value
           : this.isOfflineSession,
+      sessionCredentialJson: data.sessionCredentialJson.present
+          ? data.sessionCredentialJson.value
+          : this.sessionCredentialJson,
     );
   }
 
@@ -1739,14 +1776,15 @@ class Session extends DataClass implements Insertable<Session> {
           ..write('loginAt: $loginAt, ')
           ..write('lastVerifiedAt: $lastVerifiedAt, ')
           ..write('logoutAt: $logoutAt, ')
-          ..write('isOfflineSession: $isOfflineSession')
+          ..write('isOfflineSession: $isOfflineSession, ')
+          ..write('sessionCredentialJson: $sessionCredentialJson')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode => Object.hash(id, userId, authToken, isActive, loginAt,
-      lastVerifiedAt, logoutAt, isOfflineSession);
+      lastVerifiedAt, logoutAt, isOfflineSession, sessionCredentialJson);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1758,7 +1796,8 @@ class Session extends DataClass implements Insertable<Session> {
           other.loginAt == this.loginAt &&
           other.lastVerifiedAt == this.lastVerifiedAt &&
           other.logoutAt == this.logoutAt &&
-          other.isOfflineSession == this.isOfflineSession);
+          other.isOfflineSession == this.isOfflineSession &&
+          other.sessionCredentialJson == this.sessionCredentialJson);
 }
 
 class SessionsCompanion extends UpdateCompanion<Session> {
@@ -1770,6 +1809,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
   final Value<int?> lastVerifiedAt;
   final Value<int?> logoutAt;
   final Value<bool> isOfflineSession;
+  final Value<String?> sessionCredentialJson;
   const SessionsCompanion({
     this.id = const Value.absent(),
     this.userId = const Value.absent(),
@@ -1779,6 +1819,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.lastVerifiedAt = const Value.absent(),
     this.logoutAt = const Value.absent(),
     this.isOfflineSession = const Value.absent(),
+    this.sessionCredentialJson = const Value.absent(),
   });
   SessionsCompanion.insert({
     this.id = const Value.absent(),
@@ -1789,6 +1830,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.lastVerifiedAt = const Value.absent(),
     this.logoutAt = const Value.absent(),
     this.isOfflineSession = const Value.absent(),
+    this.sessionCredentialJson = const Value.absent(),
   })  : userId = Value(userId),
         loginAt = Value(loginAt);
   static Insertable<Session> custom({
@@ -1800,6 +1842,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Expression<int>? lastVerifiedAt,
     Expression<int>? logoutAt,
     Expression<bool>? isOfflineSession,
+    Expression<String>? sessionCredentialJson,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1810,6 +1853,8 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       if (lastVerifiedAt != null) 'last_verified_at': lastVerifiedAt,
       if (logoutAt != null) 'logout_at': logoutAt,
       if (isOfflineSession != null) 'is_offline_session': isOfflineSession,
+      if (sessionCredentialJson != null)
+        'session_credential_json': sessionCredentialJson,
     });
   }
 
@@ -1821,7 +1866,8 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       Value<int>? loginAt,
       Value<int?>? lastVerifiedAt,
       Value<int?>? logoutAt,
-      Value<bool>? isOfflineSession}) {
+      Value<bool>? isOfflineSession,
+      Value<String?>? sessionCredentialJson}) {
     return SessionsCompanion(
       id: id ?? this.id,
       userId: userId ?? this.userId,
@@ -1831,6 +1877,8 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       lastVerifiedAt: lastVerifiedAt ?? this.lastVerifiedAt,
       logoutAt: logoutAt ?? this.logoutAt,
       isOfflineSession: isOfflineSession ?? this.isOfflineSession,
+      sessionCredentialJson:
+          sessionCredentialJson ?? this.sessionCredentialJson,
     );
   }
 
@@ -1861,6 +1909,10 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     if (isOfflineSession.present) {
       map['is_offline_session'] = Variable<bool>(isOfflineSession.value);
     }
+    if (sessionCredentialJson.present) {
+      map['session_credential_json'] =
+          Variable<String>(sessionCredentialJson.value);
+    }
     return map;
   }
 
@@ -1874,7 +1926,8 @@ class SessionsCompanion extends UpdateCompanion<Session> {
           ..write('loginAt: $loginAt, ')
           ..write('lastVerifiedAt: $lastVerifiedAt, ')
           ..write('logoutAt: $logoutAt, ')
-          ..write('isOfflineSession: $isOfflineSession')
+          ..write('isOfflineSession: $isOfflineSession, ')
+          ..write('sessionCredentialJson: $sessionCredentialJson')
           ..write(')'))
         .toString();
   }
@@ -6400,6 +6453,7 @@ typedef $$SessionsTableCreateCompanionBuilder = SessionsCompanion Function({
   Value<int?> lastVerifiedAt,
   Value<int?> logoutAt,
   Value<bool> isOfflineSession,
+  Value<String?> sessionCredentialJson,
 });
 typedef $$SessionsTableUpdateCompanionBuilder = SessionsCompanion Function({
   Value<int> id,
@@ -6410,6 +6464,7 @@ typedef $$SessionsTableUpdateCompanionBuilder = SessionsCompanion Function({
   Value<int?> lastVerifiedAt,
   Value<int?> logoutAt,
   Value<bool> isOfflineSession,
+  Value<String?> sessionCredentialJson,
 });
 
 class $$SessionsTableTableManager extends RootTableManager<
@@ -6437,6 +6492,7 @@ class $$SessionsTableTableManager extends RootTableManager<
             Value<int?> lastVerifiedAt = const Value.absent(),
             Value<int?> logoutAt = const Value.absent(),
             Value<bool> isOfflineSession = const Value.absent(),
+            Value<String?> sessionCredentialJson = const Value.absent(),
           }) =>
               SessionsCompanion(
             id: id,
@@ -6447,6 +6503,7 @@ class $$SessionsTableTableManager extends RootTableManager<
             lastVerifiedAt: lastVerifiedAt,
             logoutAt: logoutAt,
             isOfflineSession: isOfflineSession,
+            sessionCredentialJson: sessionCredentialJson,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -6457,6 +6514,7 @@ class $$SessionsTableTableManager extends RootTableManager<
             Value<int?> lastVerifiedAt = const Value.absent(),
             Value<int?> logoutAt = const Value.absent(),
             Value<bool> isOfflineSession = const Value.absent(),
+            Value<String?> sessionCredentialJson = const Value.absent(),
           }) =>
               SessionsCompanion.insert(
             id: id,
@@ -6467,6 +6525,7 @@ class $$SessionsTableTableManager extends RootTableManager<
             lastVerifiedAt: lastVerifiedAt,
             logoutAt: logoutAt,
             isOfflineSession: isOfflineSession,
+            sessionCredentialJson: sessionCredentialJson,
           ),
         ));
 }
@@ -6506,6 +6565,11 @@ class $$SessionsTableFilterComposer
 
   ColumnFilters<bool> get isOfflineSession => $state.composableBuilder(
       column: $state.table.isOfflineSession,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<String> get sessionCredentialJson => $state.composableBuilder(
+      column: $state.table.sessionCredentialJson,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -6558,6 +6622,11 @@ class $$SessionsTableOrderingComposer
 
   ColumnOrderings<bool> get isOfflineSession => $state.composableBuilder(
       column: $state.table.isOfflineSession,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<String> get sessionCredentialJson => $state.composableBuilder(
+      column: $state.table.sessionCredentialJson,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 

@@ -533,7 +533,11 @@ class TicketService {
                 t.shiftId.equals(sid) &
                 t.isExpressCashier.equals(true),
           )
-          ..orderBy([(t) => OrderingTerm.desc(t.checkInAt)]))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.checkOutAt),
+            (t) => OrderingTerm.desc(t.checkInAt),
+            (t) => OrderingTerm.desc(t.id),
+          ]))
         .get();
     if (shiftRows.isNotEmpty) return shiftRows;
 
@@ -551,7 +555,11 @@ class TicketService {
                 t.checkInAt.isBiggerOrEqualValue(start) &
                 t.checkInAt.isSmallerThanValue(end),
           )
-          ..orderBy([(t) => OrderingTerm.desc(t.checkInAt)]))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.checkOutAt),
+            (t) => OrderingTerm.desc(t.checkInAt),
+            (t) => OrderingTerm.desc(t.id),
+          ]))
         .get();
   }
 
@@ -1082,6 +1090,7 @@ class TicketService {
     await (_db.update(_db.tickets)..where((t) => t.id.equals(tid))).write(
       TicketsCompanion(
         status: const Value('void'),
+        syncStatus: const Value('pending'),
         voidReason: trimmedReason != null && trimmedReason.isNotEmpty
             ? Value(trimmedReason)
             : const Value.absent(),
@@ -1236,27 +1245,107 @@ WHERE record_id = ? AND sync_status IN ('pending', 'failed')
   }
 
   bool _localCheckoutAwaitingServerUpload(Ticket ticket) {
+    if (ticket.isExpressCashier) return false;
     if (ticket.status != 'completed' && ticket.status != 'lost') return false;
     return ticket.checkOutAt?.trim().isNotEmpty ?? false;
   }
 
   /// Local void wins until the server transaction reflects void.
-  bool _shouldPreserveLocalVoid(
-    Ticket existing,
-    Map<String, dynamic> serverJson,
-  ) {
-    if (existing.status != 'void') return false;
-    final serverStatus = serverJson['status']?.toString() ?? '';
-    return !VoidAuditInfo.isVoidStatus(serverStatus);
+  Future<bool> _hasPendingVoidUpload(String ticketId) async {
+    final tid = ticketId.trim();
+    if (tid.isEmpty) return false;
+    final rows = await (_db.select(_db.syncQueue)..where(
+          (q) =>
+              q.recordId.equals(tid) &
+              q.queueTableName.equals('tickets') &
+              q.operation.equals('void') &
+              q.syncStatus.isIn(['pending', 'failed']),
+        ))
+        .get();
+    return rows.isNotEmpty;
   }
 
-  /// Local checkout wins while the server still shows the vehicle checked in.
-  bool _shouldPreserveLocalCheckout(
-    Ticket existing,
+  /// True when this ticket has local edits still waiting to reach the server.
+  Future<bool> _hasPendingLocalMutation(String ticketId) async {
+    final ticket = await ticketById(ticketId);
+    if (ticket == null) return false;
+    return _localHasOfflineMutation(ticket);
+  }
+
+  /// True when the device has offline changes not yet reflected on the server.
+  ///
+  /// **Standard valet:** void, plate edit, checkout (while server still checked-in).
+  /// **Express cashier:** void, or a completed sale still queued for upload (no check-in).
+  Future<bool> _localHasOfflineMutation(Ticket ticket) async {
+    if (ticket.status == 'void') return true;
+    if (ticket.pendingVoidRequest) return true;
+    if (await _hasPendingPlatePatch(ticket.id)) return true;
+    if (await _hasPendingVoidUpload(ticket.id)) return true;
+
+    if (ticket.isExpressCashier) {
+      if (ticket.syncStatus != 'synced') return true;
+      return await _hasUnsyncedQueueForTicket(ticket.id);
+    }
+
+    // Standard valet — checkout upload pending while server may still show checked-in.
+    if (await _hasPendingCheckoutUpload(ticket.id)) return true;
+    if (_localCheckoutAwaitingServerUpload(ticket) &&
+        ticket.syncStatus != 'synced') {
+      return true;
+    }
+    return await _hasUnsyncedQueueForTicket(ticket.id);
+  }
+
+  /// When server data lags behind local offline edits, only link `server_ticket_id`.
+  Future<bool> _shouldLinkOnlyFromServer({
+    required Ticket existing,
+    required Map<String, dynamic> serverJson,
+  }) async {
+    if (!await _localHasOfflineMutation(existing)) return false;
+
+    if (existing.isExpressCashier) {
+      return _serverLagsBehindExpressLocal(existing, serverJson);
+    }
+    return _serverLagsBehindStandardLocal(existing, serverJson);
+  }
+
+  /// Standard: server still checked-in (not voided, not checked-out, not edited on server).
+  static bool _serverLagsBehindStandardLocal(
+    Ticket local,
     Map<String, dynamic> serverJson,
   ) {
-    if (!_localCheckoutAwaitingServerUpload(existing)) return false;
-    return _serverTransactionStillCheckedIn(serverJson);
+    if (!_serverTransactionStillCheckedIn(serverJson)) return false;
+    if (local.status == 'void') return true;
+    if (local.pendingVoidRequest) return true;
+    if (local.status == 'completed' || local.status == 'lost') return true;
+    return local.syncStatus != 'synced';
+  }
+
+  /// Express: no check-in — sales are completed at intake; offline void or pending sale.
+  static bool _serverLagsBehindExpressLocal(
+    Ticket local,
+    Map<String, dynamic> serverJson,
+  ) {
+    final serverVoid =
+        VoidAuditInfo.isVoidStatus(serverJson['status']?.toString());
+    if (local.status == 'void' && !serverVoid) return true;
+    if (local.pendingVoidRequest && !serverVoid) return true;
+    if (local.syncStatus != 'synced' && !serverVoid) return true;
+    return false;
+  }
+
+  Future<bool> _hasPendingCheckoutUpload(String ticketId) async {
+    final tid = ticketId.trim();
+    if (tid.isEmpty) return false;
+    final rows = await (_db.select(_db.syncQueue)..where(
+          (q) =>
+              q.recordId.equals(tid) &
+              q.queueTableName.equals('tickets') &
+              q.operation.equals('checkout/finalize') &
+              q.syncStatus.isIn(['pending', 'failed']),
+        ))
+        .get();
+    return rows.isNotEmpty;
   }
 
   Future<bool> _hasPendingPlatePatch(String ticketId) async {
@@ -1755,6 +1844,7 @@ WHERE sync_status = 'pending'
     for (final ticket in rows) {
       final sid = ticket.serverTicketId?.trim() ?? '';
       if (sid.isEmpty) continue;
+      if (await _localHasOfflineMutation(ticket)) continue;
       try {
         final exists = await _verifyServerTransactionExists(
           token: token,
@@ -2091,6 +2181,17 @@ WHERE t.sync_status = 'pending'
           syncStatus: Value(await _resolvedSyncStatusForTicket(ticket.id)),
         ),
       );
+      return true;
+    }
+
+    if (await _localHasOfflineMutation(ticket)) {
+      await (_db.update(_db.tickets)..where((t) => t.id.equals(ticket.id)))
+          .write(
+        TicketsCompanion(
+          syncStatus: Value(await _resolvedSyncStatusForTicket(ticket.id)),
+        ),
+      );
+      _notifyLocalSyncQueueChanged();
       return true;
     }
 
@@ -4145,7 +4246,9 @@ WHERE shift_id = ? AND status = 'completed'
     Map<String, dynamic>? transactionJson,
     required Ticket ticket,
   }) {
-    if (transactionJson != null) {
+    final localVoided = ticket.status == 'void' || ticket.pendingVoidRequest;
+
+    if (transactionJson != null && !localVoided) {
       final hasOvernight = transactionJson.containsKey('is_overnight') ||
           transactionJson.containsKey('isOvernight');
       final hasLost = transactionJson.containsKey('ticket_lost') ||
@@ -4548,6 +4651,39 @@ WHERE shift_id = ? AND status = 'completed'
     )..where((t) => t.serverTicketId.equals(u))).getSingleOrNull();
   }
 
+  /// Resolves the local row for a server transaction payload (UUID + ticket number).
+  Future<Ticket?> _findExistingTicketForServerJson({
+    required String serverUuid,
+    required String ticketNum,
+  }) async {
+    final byServer = await _ticketByServerId(serverUuid);
+    if (byServer != null) return byServer;
+
+    final tid = ticketNum.trim();
+    if (tid.isNotEmpty) {
+      final byId = await ticketById(tid);
+      if (byId != null) return byId;
+    }
+
+    final queueMatch = await _db.customSelect(
+      '''
+SELECT t.id AS id FROM tickets t
+WHERE t.server_ticket_id = ?
+   OR t.id = ?
+LIMIT 1
+''',
+      variables: [
+        Variable.withString(serverUuid),
+        Variable.withString(tid),
+      ],
+      readsFrom: {_db.tickets},
+    ).getSingleOrNull();
+    if (queueMatch != null) {
+      return ticketById(queueMatch.read<String>('id'));
+    }
+    return null;
+  }
+
   Future<({String shiftId, String userId, String branchId})?>
   _ticketUpsertContext() async {
     final session =
@@ -4602,68 +4738,70 @@ WHERE shift_id = ? AND status = 'completed'
     final isExpress =
         markExpressCashier ?? _isExpressServerTransactionJson(json);
 
-    final existing =
-        await _ticketByServerId(serverUuid) ?? await ticketById(ticketNum);
+    final existing = await _findExistingTicketForServerJson(
+      serverUuid: serverUuid,
+      ticketNum: ticketNum,
+    );
     if (existing != null) {
-      final preserveVoid = _shouldPreserveLocalVoid(existing, json);
-      final preserveCheckout = _shouldPreserveLocalCheckout(existing, json);
-      final preservePlate = await _hasPendingPlatePatch(existing.id);
       final resolvedSync = await _resolvedSyncStatusForTicket(existing.id);
-
-      await (_db.update(
-        _db.tickets,
-      )..where((t) => t.id.equals(existing.id))).write(
-        TicketsCompanion(
-          serverTicketId: Value(serverUuid),
-          plateNumber: preservePlate
-              ? const Value.absent()
-              : Value(fields.plateNumber),
-          vehicleBrand: Value(fields.vehicleBrand),
-          vehicleColor: Value(fields.vehicleColor),
-          vehicleType: Value(fields.vehicleType),
-          cellphoneNumber: Value(fields.cellphoneNumber),
-          damageMarkers: Value(fields.damageMarkers),
-          personalBelongings: Value(fields.personalBelongings),
-          signaturePng: Value(fields.signaturePng),
-          // Keep the device-recorded check-in wall time; server UTC can drift
-          // from a slow handset clock and produce negative "parked for" values.
-          checkInAt: existing.checkInAt.trim().isNotEmpty
-              ? const Value.absent()
-              : Value(
-                  PhilippineTime.normalizeCheckInStorage(fields.checkInAt),
-                ),
-          checkOutAt: preserveCheckout
-              ? const Value.absent()
-              : Value(fields.checkOutAt),
-          fee: preserveCheckout ? const Value.absent() : Value(fields.fee),
-          status: preserveVoid
-              ? const Value('void')
-              : preserveCheckout
-                  ? Value(existing.status)
-                  : Value(fields.status),
-          driverIn: preserveVoid ? const Value.absent() : Value(fields.driverIn),
-          driverOut: preserveCheckout
-              ? const Value.absent()
-              : Value(fields.driverOut),
-          parkingInfo: preserveVoid
-              ? const Value.absent()
-              : Value(fields.parkingInfo),
-          paymentSummaryJson: paymentJson != null && !preserveCheckout
-              ? Value(paymentJson)
-              : const Value.absent(),
-          syncStatus: Value(resolvedSync),
-          vrNo: meta.vrNo,
-          voidReason: preserveVoid ? const Value.absent() : meta.voidReason,
-          voidedByJson:
-              preserveVoid ? const Value.absent() : meta.voidedByJson,
-          voidedAt: preserveVoid ? const Value.absent() : meta.voidedAt,
-          appliedRateJson: meta.appliedRateJson,
-          isOvernight: meta.isOvernight,
-          ticketLost: meta.ticketLost,
-          isExpressCashier:
-              isExpress ? const Value(true) : const Value.absent(),
-        ),
+      final linkOnly = await _shouldLinkOnlyFromServer(
+        existing: existing,
+        serverJson: json,
       );
+
+      if (linkOnly) {
+        // Server still shows check-in; offline void/edit/checkout must win until sync.
+        await (_db.update(
+          _db.tickets,
+        )..where((t) => t.id.equals(existing.id))).write(
+          TicketsCompanion(
+            serverTicketId: Value(serverUuid),
+            syncStatus: Value(resolvedSync),
+            isExpressCashier:
+                isExpress ? const Value(true) : const Value.absent(),
+          ),
+        );
+      } else {
+        await (_db.update(
+          _db.tickets,
+        )..where((t) => t.id.equals(existing.id))).write(
+          TicketsCompanion(
+            serverTicketId: Value(serverUuid),
+            plateNumber: Value(fields.plateNumber),
+            vehicleBrand: Value(fields.vehicleBrand),
+            vehicleColor: Value(fields.vehicleColor),
+            vehicleType: Value(fields.vehicleType),
+            cellphoneNumber: Value(fields.cellphoneNumber),
+            damageMarkers: Value(fields.damageMarkers),
+            personalBelongings: Value(fields.personalBelongings),
+            signaturePng: Value(fields.signaturePng),
+            checkInAt: existing.checkInAt.trim().isNotEmpty
+                ? const Value.absent()
+                : Value(
+                    PhilippineTime.normalizeCheckInStorage(fields.checkInAt),
+                  ),
+            checkOutAt: Value(fields.checkOutAt),
+            fee: Value(fields.fee),
+            status: Value(fields.status),
+            driverIn: Value(fields.driverIn),
+            driverOut: Value(fields.driverOut),
+            parkingInfo: Value(fields.parkingInfo),
+            paymentSummaryJson: paymentJson != null
+                ? Value(paymentJson)
+                : const Value.absent(),
+            syncStatus: Value(resolvedSync),
+            vrNo: meta.vrNo,
+            voidReason: meta.voidReason,
+            voidedByJson: meta.voidedByJson,
+            voidedAt: meta.voidedAt,
+            appliedRateJson: meta.appliedRateJson,
+            isOvernight: meta.isOvernight,
+            ticketLost: meta.ticketLost,
+            isExpressCashier:
+                isExpress ? const Value(true) : const Value.absent(),
+          ),
+        );
+      }
       final out = await ticketById(existing.id);
       if (out == null) {
         throw TransactionsApiException('Upsert failed after update.');
@@ -4677,8 +4815,23 @@ WHERE shift_id = ? AND status = 'completed'
         'Open a cash shift before saving a ticket from the server.',
       );
     }
+
+    final insertGuard = await _ticketByServerId(serverUuid);
+    if (insertGuard != null) {
+      return _upsertFromServerTransactionJson(
+        json,
+        paymentSummary: paymentSummary,
+        shiftIdOverride: shiftIdOverride,
+        markExpressCashier: markExpressCashier,
+      );
+    }
+
     final resolvedShiftId = shiftIdOverride?.trim() ?? ctx.shiftId;
-    final now = DateTime.now().toIso8601String();
+    final saleAt = fields.checkOutAt?.trim().isNotEmpty == true
+        ? fields.checkOutAt!.trim()
+        : fields.checkInAt.trim().isNotEmpty
+            ? fields.checkInAt.trim()
+            : DateTime.now().toIso8601String();
     await _db
         .into(_db.tickets)
         .insert(
@@ -4700,7 +4853,7 @@ WHERE shift_id = ? AND status = 'completed'
             fee: Value(fields.fee),
             status: fields.status,
             syncStatus: 'synced',
-            createdAt: now,
+            createdAt: saleAt,
             serverTicketId: Value(serverUuid),
             driverIn: Value(fields.driverIn),
             driverOut: Value(fields.driverOut),

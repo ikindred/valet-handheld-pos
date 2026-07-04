@@ -141,7 +141,7 @@ ORDER BY t.check_in_at ASC
 UPDATE sync_queue
 SET sync_status = 'synced'
 WHERE sync_status IN ('pending', 'failed')
-  AND operation != 'checkout/finalize'
+  AND operation NOT IN ('checkout/finalize', 'void', 'patch/plate')
   AND (
     (table_name = 'tickets' AND record_id IN (
       SELECT id FROM tickets WHERE sync_status = 'synced'
@@ -275,7 +275,6 @@ WHERE table_name = 'shifts'
           're-enqueued $reEnqueued orphan pending ticket(s)',
         );
       }
-      await _reconcileIdlePendingState();
       var queuePending = await (_db.select(_db.syncQueue)
             ..where((q) => q.syncStatus.equals('pending'))
             ..orderBy([(q) => OrderingTerm.asc(q.createdAt)]))

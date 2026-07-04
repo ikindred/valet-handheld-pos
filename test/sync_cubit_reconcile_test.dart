@@ -614,4 +614,66 @@ WHERE sync_status IN ('pending', 'failed')
     expect(ticket.syncStatus, 'synced');
     expect(await syncCubit.pendingCount(), 0);
   });
+
+  test('flush keeps pending void queue for server-backed void ticket', () async {
+    const serverId = 'server-uuid-void-pending';
+    await db.into(db.shifts).insert(
+          ShiftsCompanion.insert(
+            id: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            openedAt: now,
+            openingFloat: 100,
+            status: 'open',
+            syncStatus: 'synced',
+            createdAt: now,
+          ),
+        );
+    await db.into(db.tickets).insert(
+          TicketsCompanion.insert(
+            id: ticketId,
+            shiftId: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            plateNumber: 'ABC1234',
+            vehicleBrand: 'Toyota',
+            vehicleColor: 'White',
+            vehicleType: 'sedan',
+            cellphoneNumber: '09171234567',
+            damageMarkers: '[]',
+            personalBelongings: '[]',
+            checkInAt: now,
+            status: 'void',
+            syncStatus: 'pending',
+            createdAt: now,
+            serverTicketId: const Value(serverId),
+            voidReason: const Value('Wrong vehicle'),
+          ),
+        );
+    await db.into(db.syncQueue).insert(
+          SyncQueueCompanion.insert(
+            id: 'q-void-pending',
+            operation: 'void',
+            queueTableName: 'tickets',
+            recordId: ticketId,
+            payload:
+                '{"local_ticket_id":"$ticketId","server_ticket_id":"$serverId"}',
+            syncStatus: 'pending',
+            createdAt: now,
+          ),
+        );
+
+    await ticketService.reconcilePendingServerBackedTickets('fake-token');
+
+    final ticket = await (db.select(db.tickets)
+          ..where((t) => t.id.equals(ticketId)))
+        .getSingle();
+    expect(ticket.status, 'void');
+    expect(ticket.syncStatus, 'pending');
+
+    final voidRow = await (db.select(db.syncQueue)
+          ..where((q) => q.id.equals('q-void-pending')))
+        .getSingle();
+    expect(voidRow.syncStatus, 'pending');
+  });
 }

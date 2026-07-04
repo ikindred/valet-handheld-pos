@@ -11,6 +11,7 @@ import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/rate_service.dart';
 import '../../../data/services/ticket_service.dart';
 import '../../check_out/domain/checkout_pricing.dart';
+import '../../sync/state/sync_cubit.dart';
 import '../domain/reports_date_query.dart';
 import '../domain/reports_format.dart';
 import '../domain/reports_models.dart';
@@ -130,16 +131,27 @@ class ReportsCubit extends Cubit<ReportsState> {
     required TicketService ticketService,
     required TransactionsApi transactionsApi,
     required RateService rateService,
+    SyncCubit? syncCubit,
   })  : _auth = authRepository,
         _tickets = ticketService,
         _api = transactionsApi,
         _rates = rateService,
+        _sync = syncCubit,
         super(const ReportsInitial());
 
   final AuthRepository _auth;
   final TicketService _tickets;
   final TransactionsApi _api;
   final RateService _rates;
+  final SyncCubit? _sync;
+
+  Future<void> _flushPendingOfflineMutations() async {
+    final sync = _sync;
+    if (sync == null) return;
+    if (await sync.pendingCount() > 0) {
+      await sync.flush();
+    }
+  }
 
   /// Maps Reports filter labels to Swagger `status` values on
   /// `GET /api/v1/reports/transactions`.
@@ -279,6 +291,7 @@ class ReportsCubit extends Cubit<ReportsState> {
 
     if (canUseApi) {
       try {
+        await _flushPendingOfflineMutations();
         final range = query.dateRange;
         final dateBounds =
             range != null ? ReportsDateQuery.apiBounds(range) : null;

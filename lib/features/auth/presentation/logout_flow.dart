@@ -12,10 +12,7 @@ import '../../../data/services/close_cash_purge_service.dart';
 import '../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../state/auth_bloc.dart';
 
-enum LogoutChoice {
-  logoutOnly,
-  closeCashAndLogout,
-}
+enum LogoutChoice { logoutOnly, closeCashAndLogout }
 
 /// Branded dialog shell shared by logout steps.
 class _LogoutDialogShell extends StatelessWidget {
@@ -81,10 +78,7 @@ class _LogoutDialogShell extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               content,
-              if (actions != null) ...[
-                const SizedBox(height: 18),
-                actions!,
-              ],
+              if (actions != null) ...[const SizedBox(height: 18), actions!],
             ],
           ),
         ),
@@ -220,7 +214,9 @@ Future<bool> showLogoutConfirmDialog(
 
 Future<void> navigateAfterLogout(BuildContext context) async {
   context.read<AuthBloc>().add(const AuthLoggedOut());
-  await context.read<AuthBloc>().stream.firstWhere((s) => s is AuthUnauthenticated);
+  await context.read<AuthBloc>().stream.firstWhere(
+    (s) => s is AuthUnauthenticated,
+  );
   if (context.mounted) context.go('/login');
 }
 
@@ -245,8 +241,7 @@ Future<void> logoutAfterCloseCash(BuildContext context) async {
 Future<void> _logoutWithSimpleConfirm(BuildContext context) async {
   final confirmed = await showLogoutConfirmDialog(
     context,
-    message:
-        'You have no open cash session. Are you sure you want to logout?',
+    message: 'You have no open cash session. Are you sure you want to logout?',
   );
   if (!context.mounted || !confirmed) return;
   final deviceId = await DeviceIdService.getOrCreate();
@@ -259,7 +254,8 @@ Future<void> _logoutWithSimpleConfirm(BuildContext context) async {
 /// Shared logout UX from Dashboard, Open Cash, and Settings.
 Future<void> showLogoutFlow(BuildContext context) async {
   final authState = context.read<AuthBloc>().state;
-  final hasCashOpen = authState is AuthAuthenticated &&
+  final hasCashOpen =
+      authState is AuthAuthenticated &&
       authState.cashSessionStatus == CashSessionStatus.open;
 
   if (!hasCashOpen) {
@@ -295,8 +291,7 @@ Future<void> showLogoutFlow(BuildContext context) async {
               body:
                   'End this session but keep the shift open on the server. '
                   'Sign in again later to continue where you left off.',
-              onTap: () =>
-                  Navigator.of(context).pop(LogoutChoice.logoutOnly),
+              onTap: () => Navigator.of(context).pop(LogoutChoice.logoutOnly),
             ),
             const SizedBox(height: 10),
             _LogoutOptionCard(
@@ -306,15 +301,14 @@ Future<void> showLogoutFlow(BuildContext context) async {
                   'Close your shift, reconcile cash, then sign out. '
                   'Use this when you are finished for the day.',
               emphasized: true,
-              onTap: () => Navigator.of(context)
-                  .pop(LogoutChoice.closeCashAndLogout),
+              onTap: () =>
+                  Navigator.of(context).pop(LogoutChoice.closeCashAndLogout),
             ),
             const SizedBox(height: 10),
             _LogoutOptionCard(
               icon: LucideIcons.x,
               title: 'Cancel',
-              body:
-                  'Stay signed in and return without making any changes.',
+              body: 'Stay signed in and return without making any changes.',
               onTap: () => Navigator.of(context).pop(),
             ),
           ],
@@ -338,13 +332,13 @@ Future<void> showLogoutFlow(BuildContext context) async {
   if (!context.mounted || password == null || password.isEmpty) return;
 
   final ok = await context.read<AuthRepository>().verifyCurrentPassword(
-        password,
-      );
+    password,
+  );
   if (!context.mounted) return;
   if (!ok) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Incorrect password.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Incorrect password.')));
     return;
   }
 

@@ -23,12 +23,12 @@ void main() {
     late ShiftService shifts;
 
     setUp(() async {
-      SharedPreferences.setMockInitialValues({
-        PrefsKeys.deviceId: 'dev-1',
-      });
+      SharedPreferences.setMockInitialValues({PrefsKeys.deviceId: 'dev-1'});
       db = AppDatabase.memory();
       final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      await db.into(db.deviceInfo).insert(
+      await db
+          .into(db.deviceInfo)
+          .insert(
             DeviceInfoCompanion.insert(
               deviceId: 'dev-1',
               branch: const Value('Test Branch'),
@@ -72,65 +72,65 @@ void main() {
       await db.close();
     });
 
-    test('loginOnline creates active session and offline account row', () async {
-      await repo.loginOnline(
-        email: 'a@test.com',
-        password: 'secret',
-      );
-      final s = await repo.getActiveSession();
-      expect(s, isNotNull);
-      expect(s!.isActive, true);
-      expect(s.authToken, isNotEmpty);
-      final acct = await repo.offlineAccountById(s.userId);
-      expect(acct, isNotNull);
-      expect(acct!.email, 'a@test.com');
-    });
+    test(
+      'loginOnline creates active session and offline account row',
+      () async {
+        await repo.loginOnline(email: 'a@test.com', password: 'secret');
+        final s = await repo.getActiveSession();
+        expect(s, isNotNull);
+        expect(s!.isActive, true);
+        expect(s.authToken, isNotEmpty);
+        final acct = await repo.offlineAccountById(s.userId);
+        expect(acct, isNotNull);
+        expect(acct!.email, 'a@test.com');
+      },
+    );
 
-    test('logoutOnly sets is_active, logout_at, and clears auth token', () async {
-      await repo.loginOnline(
-        email: 'b@test.com',
-        password: 'secret',
-      );
-      await repo.logoutOnly(deviceId: 'dev-1');
-      expect(await repo.getActiveSession(), isNull);
-      final rows = await db.select(db.sessions).get();
-      expect(rows.length, 1);
-      expect(rows.single.isActive, false);
-      expect(rows.single.logoutAt, isNotNull);
-      expect(rows.single.authToken, isNull);
-    });
+    test(
+      'logoutOnly sets is_active, logout_at, and clears auth token',
+      () async {
+        await repo.loginOnline(email: 'b@test.com', password: 'secret');
+        await repo.logoutOnly(deviceId: 'dev-1');
+        expect(await repo.getActiveSession(), isNull);
+        final rows = await db.select(db.sessions).get();
+        expect(rows.length, 1);
+        expect(rows.single.isActive, false);
+        expect(rows.single.logoutAt, isNotNull);
+        expect(rows.single.authToken, isNull);
+      },
+    );
 
-    test('confirmCloseCash ends session; shift is closed via ShiftService', () async {
-      await repo.loginOnline(
-        email: 'c@test.com',
-        password: 'secret',
-      );
-      final session = await repo.getActiveSession();
-      expect(session, isNotNull);
-      await repo.recordOpenCash(
-        localUserId: session!.userId,
-        sessionId: session.id,
-        openingFloat: 100,
-      );
-      final uid = await shifts.shiftUserIdForLocalAccount(session.userId);
-      final openBefore = await shifts.getActiveShift(uid);
-      expect(openBefore, isNotNull);
+    test(
+      'confirmCloseCash ends session; shift is closed via ShiftService',
+      () async {
+        await repo.loginOnline(email: 'c@test.com', password: 'secret');
+        final session = await repo.getActiveSession();
+        expect(session, isNotNull);
+        await repo.recordOpenCash(
+          localUserId: session!.userId,
+          sessionId: session.id,
+          openingFloat: 100,
+        );
+        final uid = await shifts.shiftUserIdForLocalAccount(session.userId);
+        final openBefore = await shifts.getActiveShift(uid);
+        expect(openBefore, isNotNull);
 
-      await shifts.closeActiveShiftForLocalUser(session.userId, 100);
+        await shifts.closeActiveShiftForLocalUser(session.userId, 100);
 
-      await repo.confirmCloseCash(
-        localUserId: session.userId,
-        closingFloat: 100,
-      );
+        await repo.confirmCloseCash(
+          localUserId: session.userId,
+          closingFloat: 100,
+        );
 
-      expect(await shifts.getActiveShift(uid), isNull);
-      expect(await repo.getActiveSession(), isNull);
+        expect(await shifts.getActiveShift(uid), isNull);
+        expect(await repo.getActiveSession(), isNull);
 
-      final shiftRows = await db.select(db.shifts).get();
-      expect(shiftRows, isNotEmpty);
-      expect(shiftRows.single.status, 'closed');
-      expect(shiftRows.single.closingCash, closeTo(100.0, 0.001));
-    });
+        final shiftRows = await db.select(db.shifts).get();
+        expect(shiftRows, isNotEmpty);
+        expect(shiftRows.single.status, 'closed');
+        expect(shiftRows.single.closingCash, closeTo(100.0, 0.001));
+      },
+    );
 
     test('loginOffline fails when no offline account', () async {
       expect(
@@ -153,67 +153,69 @@ void main() {
         expect(route, '/cash/open');
       });
 
-      test('is_open_cash true with empty local shifts creates open shift', () async {
-        final localUserId = await seedLocalUser();
-        await (db.delete(db.shifts)).go();
+      test(
+        'is_open_cash true with empty local shifts creates open shift',
+        () async {
+          final localUserId = await seedLocalUser();
+          await (db.delete(db.shifts)).go();
 
-        await repo.applyServerOpenCashFlag(
-          localUserId: localUserId,
-          isOpenCash: true,
-        );
+          await repo.applyServerOpenCashFlag(
+            localUserId: localUserId,
+            isOpenCash: true,
+          );
 
-        final route = await repo.shiftRouteForLocalUser(localUserId);
-        expect(route, '/dashboard');
-        final uid = await shifts.shiftUserIdForLocalAccount(localUserId);
-        expect(await shifts.getActiveShift(uid), isNotNull);
-      });
+          final route = await repo.shiftRouteForLocalUser(localUserId);
+          expect(route, '/dashboard');
+          final uid = await shifts.shiftUserIdForLocalAccount(localUserId);
+          expect(await shifts.getActiveShift(uid), isNotNull);
+        },
+      );
 
-      test('is_open_cash false clears local open shift after logout-only resume',
-          () async {
-        final localUserId = await seedLocalUser();
-        await repo.recordOpenCash(
-          localUserId: localUserId,
-          sessionId: (await repo.getActiveSession())!.id,
-          openingFloat: 200,
-        );
-        expect(
-          await repo.shiftRouteForLocalUser(localUserId),
-          '/dashboard',
-        );
+      test(
+        'is_open_cash false clears local open shift after logout-only resume',
+        () async {
+          final localUserId = await seedLocalUser();
+          await repo.recordOpenCash(
+            localUserId: localUserId,
+            sessionId: (await repo.getActiveSession())!.id,
+            openingFloat: 200,
+          );
+          expect(await repo.shiftRouteForLocalUser(localUserId), '/dashboard');
 
-        await repo.applyServerOpenCashFlag(
-          localUserId: localUserId,
-          isOpenCash: false,
-        );
+          await repo.applyServerOpenCashFlag(
+            localUserId: localUserId,
+            isOpenCash: false,
+          );
 
-        expect(
-          await repo.shiftRouteForLocalUser(localUserId),
-          '/cash/open',
-        );
-      });
+          expect(await repo.shiftRouteForLocalUser(localUserId), '/cash/open');
+        },
+      );
 
-      test('is_open_cash true does not duplicate existing local open shift', () async {
-        final localUserId = await seedLocalUser();
-        await repo.recordOpenCash(
-          localUserId: localUserId,
-          sessionId: (await repo.getActiveSession())!.id,
-          openingFloat: 150,
-        );
-        final uid = await shifts.shiftUserIdForLocalAccount(localUserId);
-        final before = await shifts.getActiveShift(uid);
+      test(
+        'is_open_cash true does not duplicate existing local open shift',
+        () async {
+          final localUserId = await seedLocalUser();
+          await repo.recordOpenCash(
+            localUserId: localUserId,
+            sessionId: (await repo.getActiveSession())!.id,
+            openingFloat: 150,
+          );
+          final uid = await shifts.shiftUserIdForLocalAccount(localUserId);
+          final before = await shifts.getActiveShift(uid);
 
-        await repo.applyServerOpenCashFlag(
-          localUserId: localUserId,
-          isOpenCash: true,
-        );
+          await repo.applyServerOpenCashFlag(
+            localUserId: localUserId,
+            isOpenCash: true,
+          );
 
-        final after = await shifts.getActiveShift(uid);
-        expect(after?.id, before?.id);
-        final allOpen = await (db.select(db.shifts)
-              ..where((s) => s.status.equals('open')))
-            .get();
-        expect(allOpen, hasLength(1));
-      });
+          final after = await shifts.getActiveShift(uid);
+          expect(after?.id, before?.id);
+          final allOpen = await (db.select(
+            db.shifts,
+          )..where((s) => s.status.equals('open'))).get();
+          expect(allOpen, hasLength(1));
+        },
+      );
     });
   });
 }

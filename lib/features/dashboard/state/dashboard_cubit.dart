@@ -10,6 +10,7 @@ import '../../../data/remote/dashboard_summary.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/rate_fetch_service.dart';
 import '../../../data/services/ticket_service.dart';
+import '../../sync/state/sync_cubit.dart';
 import '../domain/dashboard_recent_format.dart';
 
 /// Parked vs checked out for recent-transaction rows (UI maps to [TransactionStatusKind]).
@@ -215,16 +216,27 @@ class DashboardCubit extends Cubit<DashboardState> {
     required TicketService ticketService,
     required DashboardApi dashboardApi,
     required RateFetchService rateFetchService,
+    SyncCubit? syncCubit,
   })  : _auth = authRepository,
         _tickets = ticketService,
         _dashboardApi = dashboardApi,
         _rateFetch = rateFetchService,
+        _sync = syncCubit,
         super(const DashboardInitial());
 
   final AuthRepository _auth;
   final TicketService _tickets;
   final DashboardApi _dashboardApi;
   final RateFetchService _rateFetch;
+  final SyncCubit? _sync;
+
+  Future<void> _flushPendingOfflineMutations() async {
+    final sync = _sync;
+    if (sync == null) return;
+    if (await sync.pendingCount() > 0) {
+      await sync.flush();
+    }
+  }
 
   /// Default slot capacity when API / area config is unavailable offline.
   static const int defaultAreaSlotCapacity = kDefaultDashboardTotalSlots;
@@ -252,6 +264,7 @@ class DashboardCubit extends Cubit<DashboardState> {
 
       if (hasInternet && !AppConfig.useStubApi && token.isNotEmpty) {
         try {
+          await _flushPendingOfflineMutations();
           final summary = await _dashboardApi.fetchSummary(bearerToken: token);
           if (summary != null) {
             final checkInsLastHour = await _checkInsLastHourForActiveShift(
@@ -269,9 +282,6 @@ class DashboardCubit extends Cubit<DashboardState> {
                   await _tickets.countActiveTicketsForShift(shiftId);
               localCheckedOut =
                   await _tickets.countCompletedCheckoutsForShift(shiftId);
-              final rawRecent =
-                  await _tickets.recentTicketsForShift(shiftId, limit: 20);
-              localRecent = rawRecent.map(_recentFromTicket).toList();
 
               final recentJson = _filteredSummaryRecent(summary, serverUserId)
                   .map((r) => r.toTransactionJson())
@@ -285,6 +295,12 @@ class DashboardCubit extends Cubit<DashboardState> {
                 shiftId: shiftId,
                 standardOnly: true,
               );
+
+              // Read local rows after server cache so offline void/checkout/plate
+              // edits preserved in Drift are what we merge against the API list.
+              final rawRecent =
+                  await _tickets.recentTicketsForShift(shiftId, limit: 20);
+              localRecent = rawRecent.map(_recentFromTicket).toList();
             }
             emit(_readyFromSummary(
               summary,

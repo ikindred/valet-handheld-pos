@@ -51,8 +51,7 @@ class DeviceIdentity extends Table {
   /// Hardware / portal serial when provided by API.
   TextColumn get serialNumber => text().withDefault(const Constant(''))();
 
-  BoolColumn get isActive =>
-      boolean().withDefault(const Constant(false))();
+  BoolColumn get isActive => boolean().withDefault(const Constant(false))();
 
   DateTimeColumn get claimedAt => dateTime().nullable()();
 }
@@ -80,12 +79,12 @@ class OfflineAccounts extends Table {
   IntColumn get updatedAt => integer()();
 
   /// JSON array from login `user.shiftSchedule` (empty when unset).
-  TextColumn get shiftScheduleJson =>
-      text().withDefault(const Constant(''))();
+  TextColumn get shiftScheduleJson => text().withDefault(const Constant(''))();
 
   /// From login `user.express_cashier` — express manual ticketing mode.
-  BoolColumn get isExpressCashier =>
-      boolean().named('is_express_cashier').withDefault(const Constant(false))();
+  BoolColumn get isExpressCashier => boolean()
+      .named('is_express_cashier')
+      .withDefault(const Constant(false))();
 }
 
 /// Auth token and session flags (`is_active`). Device id + offline mode only in prefs.
@@ -97,8 +96,7 @@ class Sessions extends Table {
 
   TextColumn get authToken => text().nullable()();
 
-  BoolColumn get isActive =>
-      boolean().withDefault(const Constant(false))();
+  BoolColumn get isActive => boolean().withDefault(const Constant(false))();
 
   IntColumn get loginAt => integer()();
 
@@ -142,8 +140,9 @@ class Shifts extends Table {
   TextColumn get createdAt => text()();
 
   /// Express cashier shift — manual ticketing, no check-out flow.
-  BoolColumn get isExpressCashier =>
-      boolean().named('is_express_cashier').withDefault(const Constant(false))();
+  BoolColumn get isExpressCashier => boolean()
+      .named('is_express_cashier')
+      .withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -196,7 +195,8 @@ class Tickets extends Table {
   TextColumn get createdAt => text()();
 
   /// Server `transactions.id` (UUID) after draft POST; local [id] stays `TKT-…`.
-  TextColumn get serverTicketId => text().named('server_ticket_id').nullable()();
+  TextColumn get serverTicketId =>
+      text().named('server_ticket_id').nullable()();
 
   /// Valet attendant who received the vehicle at check-in.
   TextColumn get driverIn => text().nullable()();
@@ -241,16 +241,18 @@ class Tickets extends Table {
   TextColumn get voidedAt => text().named('voided_at').nullable()();
 
   /// Offline void intent — queued until check-in sync sends `void_requested`.
-  BoolColumn get pendingVoidRequest =>
-      boolean().named('pending_void_request').withDefault(const Constant(false))();
+  BoolColumn get pendingVoidRequest => boolean()
+      .named('pending_void_request')
+      .withDefault(const Constant(false))();
 
   /// Reason for the offline void-at-intake request.
   TextColumn get pendingVoidReason =>
       text().named('pending_void_reason').nullable()();
 
   /// Express cashier transaction — completed at intake, no check-out.
-  BoolColumn get isExpressCashier =>
-      boolean().named('is_express_cashier').withDefault(const Constant(false))();
+  BoolColumn get isExpressCashier => boolean()
+      .named('is_express_cashier')
+      .withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -319,8 +321,8 @@ class Rates extends Table {
 
   @override
   List<Set<Column>> get uniqueKeys => [
-        {branchId, vehicleType},
-      ];
+    {branchId, vehicleType},
+  ];
 }
 
 /// Cached area parking layout (`levels[]` + slot status) for offline check-in.
@@ -364,8 +366,8 @@ class BranchConfigs extends Table {
 
   @override
   List<Set<Column>> get uniqueKeys => [
-        {branchId, configKey},
-      ];
+    {branchId, configKey},
+  ];
 }
 
 @DriftDatabase(
@@ -384,13 +386,13 @@ class BranchConfigs extends Table {
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase({bool skipDevOfflineSeed = false})
-      : _skipDevOfflineSeed = skipDevOfflineSeed,
-        super(_openConnection());
+    : _skipDevOfflineSeed = skipDevOfflineSeed,
+      super(_openConnection());
 
   /// In-memory SQLite for tests (skips dev offline seed by default).
   AppDatabase.memory({bool skipDevOfflineSeed = true})
-      : _skipDevOfflineSeed = skipDevOfflineSeed,
-        super(NativeDatabase.memory());
+    : _skipDevOfflineSeed = skipDevOfflineSeed,
+      super(NativeDatabase.memory());
 
   /// When true, dev-only offline seed is skipped (use in tests).
   final bool _skipDevOfflineSeed;
@@ -400,24 +402,24 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (Migrator m) async {
-          await m.createAll();
-          await _createIndexes();
-          // Sample dev seeders disabled — server/API deployed; data comes from backend + device setup.
-          // if (!_skipDevOfflineSeed) {
-          //   await _seedDevOfflineAccountIfAbsent();
-          //   await _seedDevBranchConfig();
-          //   if (kDebugMode) {
-          //     await RatesSeeder().seed(this);
-          //   }
-          // }
-        },
-        onUpgrade: (Migrator m, int from, int to) async {
-          if (from < 2) {
-            await m.createTable(deviceIdentity);
-          }
-          if (from < 3) {
-            await customStatement('''
+    onCreate: (Migrator m) async {
+      await m.createAll();
+      await _createIndexes();
+      // Sample dev seeders disabled — server/API deployed; data comes from backend + device setup.
+      // if (!_skipDevOfflineSeed) {
+      //   await _seedDevOfflineAccountIfAbsent();
+      //   await _seedDevBranchConfig();
+      //   if (kDebugMode) {
+      //     await RatesSeeder().seed(this);
+      //   }
+      // }
+    },
+    onUpgrade: (Migrator m, int from, int to) async {
+      if (from < 2) {
+        await m.createTable(deviceIdentity);
+      }
+      if (from < 3) {
+        await customStatement('''
 CREATE TABLE offline_accounts_new (
   id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
   server_user_id TEXT NOT NULL UNIQUE,
@@ -429,70 +431,67 @@ CREATE TABLE offline_accounts_new (
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 )''');
-            await customStatement('''
+        await customStatement('''
 INSERT INTO offline_accounts_new
   (id, server_user_id, email, password_hash, full_name, role, last_online_login, created_at, updated_at)
 SELECT id, CAST(server_user_id AS TEXT), email, password_hash, full_name, role, last_online_login, created_at, updated_at
 FROM offline_accounts''');
-            await customStatement('DROP TABLE offline_accounts');
-            await customStatement(
-              'ALTER TABLE offline_accounts_new RENAME TO offline_accounts',
-            );
-          }
-          if (from < 4) {
-            await m.addColumn(tickets, tickets.serverTicketId);
-          }
-          if (from < 5) {
-            await m.addColumn(tickets, tickets.driverIn);
-            await m.addColumn(tickets, tickets.driverOut);
-          }
-          if (from < 6) {
-            await m.addColumn(deviceIdentity, deviceIdentity.branchId);
-            await m.addColumn(deviceIdentity, deviceIdentity.areaId);
-            await m.addColumn(deviceIdentity, deviceIdentity.serialNumber);
-          }
-          if (from < 7) {
-            await m.addColumn(
-              offlineAccounts,
-              offlineAccounts.shiftScheduleJson,
-            );
-          }
-          if (from < 8) {
-            await m.addColumn(tickets, tickets.parkingInfo);
-          }
-          if (from < 9) {
-            await m.addColumn(rates, rates.overnightCutoff);
-          }
-          if (from < 10) {
-            await m.addColumn(tickets, tickets.slotId);
-          }
-          if (from < 11) {
-            await m.addColumn(tickets, tickets.paymentSummaryJson);
-          }
-          if (from < 12) {
-            await m.addColumn(tickets, tickets.vrNo);
-            await m.addColumn(tickets, tickets.isOvernight);
-            await m.addColumn(tickets, tickets.ticketLost);
-            await m.addColumn(tickets, tickets.appliedRateJson);
-            await m.addColumn(tickets, tickets.voidRequestJson);
-            await m.addColumn(tickets, tickets.pendingVoidRequest);
-            await m.addColumn(tickets, tickets.pendingVoidReason);
-          }
-          if (from < 13) {
-            await m.addColumn(tickets, tickets.voidReason);
-            await m.addColumn(tickets, tickets.voidedByJson);
-            await m.addColumn(tickets, tickets.voidedAt);
-          }
-          if (from < 14) {
-            await m.createTable(parkingAreaLayouts);
-          }
-          if (from < 15) {
-            await m.addColumn(offlineAccounts, offlineAccounts.isExpressCashier);
-            await m.addColumn(shifts, shifts.isExpressCashier);
-            await m.addColumn(tickets, tickets.isExpressCashier);
-          }
-        },
-      );
+        await customStatement('DROP TABLE offline_accounts');
+        await customStatement(
+          'ALTER TABLE offline_accounts_new RENAME TO offline_accounts',
+        );
+      }
+      if (from < 4) {
+        await m.addColumn(tickets, tickets.serverTicketId);
+      }
+      if (from < 5) {
+        await m.addColumn(tickets, tickets.driverIn);
+        await m.addColumn(tickets, tickets.driverOut);
+      }
+      if (from < 6) {
+        await m.addColumn(deviceIdentity, deviceIdentity.branchId);
+        await m.addColumn(deviceIdentity, deviceIdentity.areaId);
+        await m.addColumn(deviceIdentity, deviceIdentity.serialNumber);
+      }
+      if (from < 7) {
+        await m.addColumn(offlineAccounts, offlineAccounts.shiftScheduleJson);
+      }
+      if (from < 8) {
+        await m.addColumn(tickets, tickets.parkingInfo);
+      }
+      if (from < 9) {
+        await m.addColumn(rates, rates.overnightCutoff);
+      }
+      if (from < 10) {
+        await m.addColumn(tickets, tickets.slotId);
+      }
+      if (from < 11) {
+        await m.addColumn(tickets, tickets.paymentSummaryJson);
+      }
+      if (from < 12) {
+        await m.addColumn(tickets, tickets.vrNo);
+        await m.addColumn(tickets, tickets.isOvernight);
+        await m.addColumn(tickets, tickets.ticketLost);
+        await m.addColumn(tickets, tickets.appliedRateJson);
+        await m.addColumn(tickets, tickets.voidRequestJson);
+        await m.addColumn(tickets, tickets.pendingVoidRequest);
+        await m.addColumn(tickets, tickets.pendingVoidReason);
+      }
+      if (from < 13) {
+        await m.addColumn(tickets, tickets.voidReason);
+        await m.addColumn(tickets, tickets.voidedByJson);
+        await m.addColumn(tickets, tickets.voidedAt);
+      }
+      if (from < 14) {
+        await m.createTable(parkingAreaLayouts);
+      }
+      if (from < 15) {
+        await m.addColumn(offlineAccounts, offlineAccounts.isExpressCashier);
+        await m.addColumn(shifts, shifts.isExpressCashier);
+        await m.addColumn(tickets, tickets.isExpressCashier);
+      }
+    },
+  );
 
   Future<void> _createIndexes() async {
     await customStatement(

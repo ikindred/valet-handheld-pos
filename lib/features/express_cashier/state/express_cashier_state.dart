@@ -10,6 +10,8 @@ class ExpressCashierTransaction extends Equatable {
     required this.syncStatus,
     required this.status,
     required this.checkInAt,
+    this.checkOutAt = '',
+    required this.createdAt,
     this.vrNo,
     this.serverTicketId,
     this.driverIn,
@@ -25,6 +27,8 @@ class ExpressCashierTransaction extends Equatable {
       syncStatus: ticket.syncStatus,
       status: ticket.status,
       checkInAt: ticket.checkInAt,
+      checkOutAt: ticket.checkOutAt ?? '',
+      createdAt: ticket.createdAt,
       vrNo: ticket.vrNo,
       serverTicketId: ticket.serverTicketId,
       driverIn: ticket.driverIn,
@@ -39,6 +43,8 @@ class ExpressCashierTransaction extends Equatable {
   final String syncStatus;
   final String status;
   final String checkInAt;
+  final String checkOutAt;
+  final String createdAt;
   final String? vrNo;
   final String? serverTicketId;
   final String? driverIn;
@@ -61,6 +67,8 @@ class ExpressCashierTransaction extends Equatable {
         syncStatus,
         status,
         checkInAt,
+        checkOutAt,
+        createdAt,
         vrNo,
         serverTicketId,
         driverIn,

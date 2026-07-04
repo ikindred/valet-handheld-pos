@@ -22,15 +22,18 @@ Future<void> syncAuthBlocAndNavigate(
   final open = route != '/cash/open';
   if (!context.mounted) return;
   context.read<AuthBloc>().add(
-        AuthLoggedIn(
-          cashSessionStatus:
-              open ? CashSessionStatus.open : CashSessionStatus.closed,
-          isExpressCashier: isExpressCashier,
-          standardRates: standardRates,
-          userId: localUserId.toString(),
-          email: email,
-        ),
-      );
-  await context.read<AuthBloc>().stream.firstWhere((s) => s is AuthAuthenticated);
+    AuthLoggedIn(
+      cashSessionStatus: open
+          ? CashSessionStatus.open
+          : CashSessionStatus.closed,
+      isExpressCashier: isExpressCashier,
+      standardRates: standardRates,
+      userId: localUserId.toString(),
+      email: email,
+    ),
+  );
+  await context.read<AuthBloc>().stream.firstWhere(
+    (s) => s is AuthAuthenticated,
+  );
   if (context.mounted) context.go(route);
 }
