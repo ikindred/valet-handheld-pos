@@ -790,7 +790,7 @@ class _InputPane extends StatelessWidget {
     );
   }
 }
-class _TransactionsPane extends StatelessWidget {
+class _TransactionsPane extends StatefulWidget {
   const _TransactionsPane({
     required this.transactions,
     required this.formatPlateDisplay,
@@ -809,30 +809,45 @@ class _TransactionsPane extends StatelessWidget {
   }) pesoMoneyStyle;
   final ValueChanged<ExpressCashierTransaction> onTransactionTap;
 
+  @override
+  State<_TransactionsPane> createState() => _TransactionsPaneState();
+}
+
+class _TransactionsPaneState extends State<_TransactionsPane> {
   static const _colGap = 10.0;
   static const _ticketFlex = 5;
   static const _plateFlex = 2;
   static const _vrFlex = 2;
   static const _amountFlex = 2;
 
+  var _showClosedCash = true;
+
   /// Current-shift total: excludes voided rows and rows already counted in a
   /// prior close-cash session (`included_in_close_cash`).
-  double get _shiftTotal => transactions
+  double get _shiftTotal => widget.transactions
       .where((tx) => !tx.isVoided && !tx.includedInCloseCash)
       .fold(0.0, (sum, tx) => sum + tx.amount);
 
   /// Current-shift ticket count: same exclusions as [_shiftTotal].
-  int get _activeTicketCount => transactions
+  int get _activeTicketCount => widget.transactions
       .where((tx) => !tx.isVoided && !tx.includedInCloseCash)
       .length;
 
   /// How many rows were already counted in a prior close-cash session.
   int get _closedCashCount =>
-      transactions.where((tx) => tx.includedInCloseCash).length;
+      widget.transactions.where((tx) => tx.includedInCloseCash).length;
+
+  List<ExpressCashierTransaction> get _visibleTransactions {
+    if (_showClosedCash) return widget.transactions;
+    return widget.transactions
+        .where((tx) => !tx.includedInCloseCash)
+        .toList();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = _ExpressTheme.of(context);
+    final visible = _visibleTransactions;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: theme.card(),
@@ -848,24 +863,24 @@ class _TransactionsPane extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Expanded(
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        transactions.isEmpty
-                            ? 'TRANSACTIONS'
-                            : 'TRANSACTIONS · $_activeTicketCount',
-                        style: theme.sectionCaps(),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (_closedCashCount > 0) ...[
-                      const SizedBox(width: 8),
-                      _ClosedCashBadge(theme: theme, count: _closedCashCount),
-                    ],
-                  ],
+                child: Text(
+                  widget.transactions.isEmpty
+                      ? 'TRANSACTIONS'
+                      : 'TRANSACTIONS · $_activeTicketCount',
+                  style: theme.sectionCaps(),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (_closedCashCount > 0) ...[
+                const SizedBox(width: 8),
+                _ClosedCashVisibilityControl(
+                  theme: theme,
+                  count: _closedCashCount,
+                  showClosedCash: _showClosedCash,
+                  onToggle: (value) => setState(() => _showClosedCash = value),
+                ),
+              ],
+              const SizedBox(width: 8),
               _HeaderIconButton(
                 tooltip: 'Refresh',
                 icon: LucideIcons.refreshCw,
@@ -883,8 +898,13 @@ class _TransactionsPane extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: transactions.isEmpty
-                ? _EmptyTransactions()
+            child: visible.isEmpty
+                ? _EmptyTransactions(
+                    message: widget.transactions.isNotEmpty &&
+                            !_showClosedCash
+                        ? 'Closed cash transactions hidden'
+                        : null,
+                  )
                 : Container(
                     decoration: BoxDecoration(
                       color: theme.tableSurfaceBg,
@@ -913,20 +933,20 @@ class _TransactionsPane extends StatelessWidget {
                             color: theme.tableSurfaceBg,
                             child: ListView.separated(
                               padding: EdgeInsets.zero,
-                              itemCount: transactions.length,
+                              itemCount: visible.length,
                               separatorBuilder: (_, __) => Divider(
                                 height: 1,
                                 thickness: 1,
                                 color: theme.rowDivider,
                               ),
                               itemBuilder: (context, index) {
-                                final tx = transactions[index];
+                                final tx = visible[index];
                                 return Material(
                                   color: index.isEven
                                       ? theme.tableSurfaceBg
                                       : theme.rowAltBg,
                                   child: InkWell(
-                                    onTap: () => onTransactionTap(tx),
+                                    onTap: () => widget.onTransactionTap(tx),
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 12,
@@ -936,17 +956,20 @@ class _TransactionsPane extends StatelessWidget {
                                         theme: theme,
                                         ticketId: tx.ticketId,
                                         plateLabel:
-                                            formatPlateDisplay(tx.plateNumber),
+                                            widget.formatPlateDisplay(
+                                          tx.plateNumber,
+                                        ),
                                         vrNo: tx.vrNo?.trim().isNotEmpty == true
                                             ? tx.vrNo!.trim()
                                             : '—',
                                         vrNoMissing:
                                             tx.vrNo?.trim().isNotEmpty != true,
-                                        amountLabel: formatAmount(tx.amount),
+                                        amountLabel:
+                                            widget.formatAmount(tx.amount),
                                         isSynced: tx.isSynced,
                                         isVoided: tx.isVoided,
                                         includedInCloseCash: tx.includedInCloseCash,
-                                        pesoMoneyStyle: pesoMoneyStyle,
+                                        pesoMoneyStyle: widget.pesoMoneyStyle,
                                       ),
                                     ),
                                   ),
@@ -979,8 +1002,8 @@ class _TransactionsPane extends StatelessWidget {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                formatAmount(_shiftTotal),
-                                style: pesoMoneyStyle(
+                                widget.formatAmount(_shiftTotal),
+                                style: widget.pesoMoneyStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
                                   color: theme.orange,
@@ -1030,43 +1053,96 @@ class _HeaderIconButton extends StatelessWidget {
     );
   }
 }
-class _ClosedCashBadge extends StatelessWidget {
-  const _ClosedCashBadge({required this.theme, required this.count});
+class _ClosedCashVisibilityControl extends StatelessWidget {
+  const _ClosedCashVisibilityControl({
+    required this.theme,
+    required this.count,
+    required this.showClosedCash,
+    required this.onToggle,
+  });
 
   final _ExpressTheme theme;
   final int count;
+  final bool showClosedCash;
+  final ValueChanged<bool> onToggle;
 
   @override
   Widget build(BuildContext context) {
+    final visible = showClosedCash;
+    final accent = visible ? theme.orange : theme.textSecondary;
+
     return Tooltip(
-      message: '$count transaction${count == 1 ? '' : 's'} already in a '
-          'closed cash session (excluded from shift total)',
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: theme.headerBg,
-          border: Border.all(color: theme.cardBorder),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(LucideIcons.lock, size: 11, color: theme.textSecondary),
-            const SizedBox(width: 4),
-            Text(
-              '$count closed cash',
-              style: theme.fieldLabel().copyWith(
-                    fontSize: 10.5,
-                    color: theme.textSecondary,
-                  ),
+      message: visible
+          ? 'Hide $count prior close-cash transaction${count == 1 ? '' : 's'}'
+          : 'Show $count prior close-cash transaction${count == 1 ? '' : 's'}',
+      child: Material(
+        color: visible
+            ? theme.orange.withValues(alpha: 0.08)
+            : theme.headerBg,
+        elevation: 0,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          onTap: () => onToggle(!visible),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(8, 5, 6, 5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: visible
+                    ? theme.orange.withValues(alpha: 0.4)
+                    : theme.cardBorder,
+              ),
             ),
-          ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(LucideIcons.lock, size: 12, color: accent),
+                const SizedBox(width: 6),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '$count closed',
+                      style: theme.fieldLabel().copyWith(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            height: 1.1,
+                            color: visible
+                                ? theme.textPrimary
+                                : theme.textSecondary,
+                          ),
+                    ),
+                    Text(
+                      visible ? 'Showing' : 'Hidden',
+                      style: theme.fieldLabel().copyWith(
+                            fontSize: 9,
+                            height: 1.1,
+                            color: accent,
+                          ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 6),
+                Icon(
+                  visible ? LucideIcons.eye : LucideIcons.eyeOff,
+                  size: 14,
+                  color: accent,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 }
 class _EmptyTransactions extends StatelessWidget {
+  const _EmptyTransactions({this.message});
+
+  final String? message;
+
   @override
   Widget build(BuildContext context) {
     final theme = _ExpressTheme.of(context);
@@ -1081,14 +1157,17 @@ class _EmptyTransactions extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'No transactions yet this shift.',
+            message ?? 'No transactions yet this shift.',
             style: theme.notesHint(),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Saved tickets will appear here.',
-            style: theme.notesHint().copyWith(fontSize: 11),
-          ),
+          if (message == null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Saved tickets will appear here.',
+              style: theme.notesHint().copyWith(fontSize: 11),
+            ),
+          ],
         ],
       ),
     );
@@ -1104,22 +1183,22 @@ class _TransactionTableHeader extends StatelessWidget {
     return Row(
       children: [
         _TransactionTableCell(
-          flex: _TransactionsPane._ticketFlex,
+          flex: _TransactionsPaneState._ticketFlex,
           isLast: false,
           child: Text('Ticket', style: theme.tableHeader()),
         ),
         _TransactionTableCell(
-          flex: _TransactionsPane._plateFlex,
+          flex: _TransactionsPaneState._plateFlex,
           isLast: false,
           child: Text('Plate', style: theme.tableHeader()),
         ),
         _TransactionTableCell(
-          flex: _TransactionsPane._vrFlex,
+          flex: _TransactionsPaneState._vrFlex,
           isLast: false,
           child: Text('VR No.', style: theme.tableHeader()),
         ),
         _TransactionTableCell(
-          flex: _TransactionsPane._amountFlex,
+          flex: _TransactionsPaneState._amountFlex,
           isLast: true,
           child: Text(
             'Amount',
@@ -1148,7 +1227,7 @@ class _TransactionTableCell extends StatelessWidget {
       flex: flex,
       child: Padding(
         padding: EdgeInsets.only(
-          right: isLast ? 0 : _TransactionsPane._colGap,
+          right: isLast ? 0 : _TransactionsPaneState._colGap,
         ),
         child: child,
       ),
@@ -1200,7 +1279,7 @@ class _TransactionTableRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         _TransactionTableCell(
-          flex: _TransactionsPane._ticketFlex,
+          flex: _TransactionsPaneState._ticketFlex,
           isLast: false,
           child: Row(
             children: [
@@ -1228,7 +1307,7 @@ class _TransactionTableRow extends StatelessWidget {
           ),
         ),
         _TransactionTableCell(
-          flex: _TransactionsPane._plateFlex,
+          flex: _TransactionsPaneState._plateFlex,
           isLast: false,
           child: Align(
             alignment: Alignment.centerLeft,
@@ -1239,7 +1318,7 @@ class _TransactionTableRow extends StatelessWidget {
           ),
         ),
         _TransactionTableCell(
-          flex: _TransactionsPane._vrFlex,
+          flex: _TransactionsPaneState._vrFlex,
           isLast: false,
           child: Text(
             vrNo,
@@ -1251,7 +1330,7 @@ class _TransactionTableRow extends StatelessWidget {
           ),
         ),
         _TransactionTableCell(
-          flex: _TransactionsPane._amountFlex,
+          flex: _TransactionsPaneState._amountFlex,
           isLast: true,
           child: Text(
             amountLabel,

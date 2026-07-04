@@ -65,6 +65,38 @@ class ExpressCashierTransaction extends Equatable {
 
   bool get canVoid => !isVoided;
 
+  /// Sale time for ordering (works for offline-created and server-synced rows).
+  DateTime get saleInstant {
+    for (final raw in [checkOutAt, checkInAt, createdAt]) {
+      final parsed = DateTime.tryParse(raw.trim());
+      if (parsed != null) return parsed;
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  /// Current-shift rows first (newest first), then prior close-cash rows
+  /// (newest first). Safe for offline-only and mixed online/offline lists.
+  static List<ExpressCashierTransaction> sortedForDisplay(
+    Iterable<ExpressCashierTransaction> rows,
+  ) {
+    final list = rows.toList();
+    list.sort(_compareDisplayOrder);
+    return list;
+  }
+
+  static int _compareDisplayOrder(
+    ExpressCashierTransaction a,
+    ExpressCashierTransaction b,
+  ) {
+    final aClosed = a.includedInCloseCash ? 1 : 0;
+    final bClosed = b.includedInCloseCash ? 1 : 0;
+    if (aClosed != bClosed) return aClosed.compareTo(bClosed);
+
+    final byTime = b.saleInstant.compareTo(a.saleInstant);
+    if (byTime != 0) return byTime;
+    return b.ticketId.compareTo(a.ticketId);
+  }
+
   @override
   List<Object?> get props => [
         ticketId,
