@@ -17,6 +17,7 @@ class ExpressCashierTransaction extends Equatable {
     this.driverIn,
     this.driverOut,
     this.voidReason,
+    this.includedInCloseCash = false,
   });
 
   factory ExpressCashierTransaction.fromTicket(Ticket ticket) {
@@ -34,6 +35,7 @@ class ExpressCashierTransaction extends Equatable {
       driverIn: ticket.driverIn,
       driverOut: ticket.driverOut,
       voidReason: ticket.voidReason,
+      includedInCloseCash: ticket.includedInCloseCash,
     );
   }
 
@@ -50,6 +52,10 @@ class ExpressCashierTransaction extends Equatable {
   final String? driverIn;
   final String? driverOut;
   final String? voidReason;
+
+  /// True when the server already counted this row in a prior close-cash
+  /// session — shown in the list but excluded from the current shift total.
+  final bool includedInCloseCash;
 
   bool get isSynced => syncStatus == 'synced';
 
@@ -74,6 +80,7 @@ class ExpressCashierTransaction extends Equatable {
         driverIn,
         driverOut,
         voidReason,
+        includedInCloseCash,
       ];
 }
 

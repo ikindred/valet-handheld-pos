@@ -94,5 +94,6 @@ Ticket ticketFromSyncQueuePayload(Map<String, dynamic> p) {
     driverOut: _optionalTrimmedStr(p['driver_out']),
     pendingVoidRequest: false,
     isExpressCashier: p['is_express_cashier'] == true,
+    includedInCloseCash: p['included_in_close_cash'] == true,
   );
 }

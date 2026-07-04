@@ -79,6 +79,14 @@ abstract final class ReportsTicketRowMapper {
     final valetTypeLabel = ValetTypeFormat.labelIfPresent(
       ValetTypeFormat.rawFromTransaction(json),
     );
+    final includedInCloseCash =
+        json['included_in_close_cash'] == true ||
+        json['includedInCloseCash'] == true;
+    final isExpress =
+        json['is_express'] == true ||
+        json['isExpress'] == true ||
+        json['is_express_cashier'] == true ||
+        json['isExpressCashier'] == true;
 
     return ReportsTicketRow(
       ticketId: ticketNumber.isEmpty ? '—' : ticketNumber,
@@ -100,6 +108,8 @@ abstract final class ReportsTicketRowMapper {
           VoidAuditInfo.isVoidStatus(statusRaw) || voidAudit?.isPopulated == true,
       cashierId: cashierIdRaw.isEmpty ? null : cashierIdRaw,
       valetTypeLabel: valetTypeLabel,
+      includedInCloseCash: includedInCloseCash,
+      isExpress: isExpress,
     );
   }
 

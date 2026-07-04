@@ -693,6 +693,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       pendingVoidRequest: base.pendingVoidRequest,
       pendingVoidReason: base.pendingVoidReason,
       isExpressCashier: base.isExpressCashier,
+      includedInCloseCash: base.includedInCloseCash,
     );
   }
 
@@ -731,6 +732,7 @@ class CheckOutCubit extends Cubit<CheckOutState> {
       driverIn: pt.valetIn,
       pendingVoidRequest: false,
       isExpressCashier: false,
+      includedInCloseCash: false,
     );
   }
 

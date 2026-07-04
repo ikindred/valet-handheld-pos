@@ -24,6 +24,8 @@ class ReportsTicketRow extends Equatable {
     this.cashierId,
     this.valetTypeLabel,
     this.isSynced = true,
+    this.includedInCloseCash = false,
+    this.isExpress = false,
   });
 
   /// Display ticket number (e.g. `TKT-0123`).
@@ -71,6 +73,13 @@ class ReportsTicketRow extends Equatable {
   /// False when the row is still queued for server upload.
   final bool isSynced;
 
+  /// True when the server already counted this row in a prior close-cash
+  /// session (`included_in_close_cash`).
+  final bool includedInCloseCash;
+
+  /// True for express cashier sales (`is_express` on the API row).
+  final bool isExpress;
+
   /// Route / detail key: server id when available, else local ticket number.
   String get detailId {
     final sid = serverTransactionId?.trim() ?? '';
@@ -114,6 +123,8 @@ class ReportsTicketRow extends Equatable {
         cashierId,
         valetTypeLabel,
         isSynced,
+        includedInCloseCash,
+        isExpress,
       ];
 }
 

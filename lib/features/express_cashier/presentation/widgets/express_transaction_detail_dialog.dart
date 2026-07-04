@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../../core/connectivity/internet_reachability.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../data/services/ticket_service.dart' show driverOutNameFromColumn;
 import '../../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../../state/express_cashier_state.dart';
 
@@ -108,6 +109,7 @@ class _ExpressTransactionDetailDialogState
   Widget build(BuildContext context) {
     final tx = widget.transaction;
     final tc = AppThemeColors.of(context);
+    final driverOutLabel = driverOutNameFromColumn(tx.driverOut);
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -165,8 +167,8 @@ class _ExpressTransactionDetailDialogState
               ),
               if (tx.driverIn?.trim().isNotEmpty == true)
                 _DetailRow(label: 'Driver in', value: tx.driverIn!.trim()),
-              if (tx.driverOut?.trim().isNotEmpty == true)
-                _DetailRow(label: 'Driver out', value: tx.driverOut!.trim()),
+              if (driverOutLabel != null && driverOutLabel.isNotEmpty)
+                _DetailRow(label: 'Driver out', value: driverOutLabel),
               _DetailRow(
                 label: 'Status',
                 value: tx.isVoided ? 'Voided' : 'Active',

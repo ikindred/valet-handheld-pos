@@ -1510,12 +1510,6 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("is_offline_session" IN (0, 1))'),
       defaultValue: const Constant(false));
-  static const VerificationMeta _sessionCredentialJsonMeta =
-      const VerificationMeta('sessionCredentialJson');
-  @override
-  late final GeneratedColumn<String> sessionCredentialJson =
-      GeneratedColumn<String>('session_credential_json', aliasedName, true,
-          type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -1525,8 +1519,7 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         loginAt,
         lastVerifiedAt,
         logoutAt,
-        isOfflineSession,
-        sessionCredentialJson
+        isOfflineSession
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1577,12 +1570,6 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
           isOfflineSession.isAcceptableOrUnknown(
               data['is_offline_session']!, _isOfflineSessionMeta));
     }
-    if (data.containsKey('session_credential_json')) {
-      context.handle(
-          _sessionCredentialJsonMeta,
-          sessionCredentialJson.isAcceptableOrUnknown(
-              data['session_credential_json']!, _sessionCredentialJsonMeta));
-    }
     return context;
   }
 
@@ -1608,9 +1595,6 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
           .read(DriftSqlType.int, data['${effectivePrefix}logout_at']),
       isOfflineSession: attachedDatabase.typeMapping.read(
           DriftSqlType.bool, data['${effectivePrefix}is_offline_session'])!,
-      sessionCredentialJson: attachedDatabase.typeMapping.read(
-          DriftSqlType.string,
-          data['${effectivePrefix}session_credential_json']),
     );
   }
 
@@ -1631,9 +1615,6 @@ class Session extends DataClass implements Insertable<Session> {
   final int? lastVerifiedAt;
   final int? logoutAt;
   final bool isOfflineSession;
-
-  /// JSON `{email,password}` for silent online re-login after offline sessions.
-  final String? sessionCredentialJson;
   const Session(
       {required this.id,
       required this.userId,
@@ -1642,8 +1623,7 @@ class Session extends DataClass implements Insertable<Session> {
       required this.loginAt,
       this.lastVerifiedAt,
       this.logoutAt,
-      required this.isOfflineSession,
-      this.sessionCredentialJson});
+      required this.isOfflineSession});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1661,9 +1641,6 @@ class Session extends DataClass implements Insertable<Session> {
       map['logout_at'] = Variable<int>(logoutAt);
     }
     map['is_offline_session'] = Variable<bool>(isOfflineSession);
-    if (!nullToAbsent || sessionCredentialJson != null) {
-      map['session_credential_json'] = Variable<String>(sessionCredentialJson);
-    }
     return map;
   }
 
@@ -1683,9 +1660,6 @@ class Session extends DataClass implements Insertable<Session> {
           ? const Value.absent()
           : Value(logoutAt),
       isOfflineSession: Value(isOfflineSession),
-      sessionCredentialJson: sessionCredentialJson == null && nullToAbsent
-          ? const Value.absent()
-          : Value(sessionCredentialJson),
     );
   }
 
@@ -1701,8 +1675,6 @@ class Session extends DataClass implements Insertable<Session> {
       lastVerifiedAt: serializer.fromJson<int?>(json['lastVerifiedAt']),
       logoutAt: serializer.fromJson<int?>(json['logoutAt']),
       isOfflineSession: serializer.fromJson<bool>(json['isOfflineSession']),
-      sessionCredentialJson:
-          serializer.fromJson<String?>(json['sessionCredentialJson']),
     );
   }
   @override
@@ -1717,8 +1689,6 @@ class Session extends DataClass implements Insertable<Session> {
       'lastVerifiedAt': serializer.toJson<int?>(lastVerifiedAt),
       'logoutAt': serializer.toJson<int?>(logoutAt),
       'isOfflineSession': serializer.toJson<bool>(isOfflineSession),
-      'sessionCredentialJson':
-          serializer.toJson<String?>(sessionCredentialJson),
     };
   }
 
@@ -1730,8 +1700,7 @@ class Session extends DataClass implements Insertable<Session> {
           int? loginAt,
           Value<int?> lastVerifiedAt = const Value.absent(),
           Value<int?> logoutAt = const Value.absent(),
-          bool? isOfflineSession,
-          Value<String?> sessionCredentialJson = const Value.absent()}) =>
+          bool? isOfflineSession}) =>
       Session(
         id: id ?? this.id,
         userId: userId ?? this.userId,
@@ -1742,9 +1711,6 @@ class Session extends DataClass implements Insertable<Session> {
             lastVerifiedAt.present ? lastVerifiedAt.value : this.lastVerifiedAt,
         logoutAt: logoutAt.present ? logoutAt.value : this.logoutAt,
         isOfflineSession: isOfflineSession ?? this.isOfflineSession,
-        sessionCredentialJson: sessionCredentialJson.present
-            ? sessionCredentialJson.value
-            : this.sessionCredentialJson,
       );
   Session copyWithCompanion(SessionsCompanion data) {
     return Session(
@@ -1760,9 +1726,6 @@ class Session extends DataClass implements Insertable<Session> {
       isOfflineSession: data.isOfflineSession.present
           ? data.isOfflineSession.value
           : this.isOfflineSession,
-      sessionCredentialJson: data.sessionCredentialJson.present
-          ? data.sessionCredentialJson.value
-          : this.sessionCredentialJson,
     );
   }
 
@@ -1776,15 +1739,14 @@ class Session extends DataClass implements Insertable<Session> {
           ..write('loginAt: $loginAt, ')
           ..write('lastVerifiedAt: $lastVerifiedAt, ')
           ..write('logoutAt: $logoutAt, ')
-          ..write('isOfflineSession: $isOfflineSession, ')
-          ..write('sessionCredentialJson: $sessionCredentialJson')
+          ..write('isOfflineSession: $isOfflineSession')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode => Object.hash(id, userId, authToken, isActive, loginAt,
-      lastVerifiedAt, logoutAt, isOfflineSession, sessionCredentialJson);
+      lastVerifiedAt, logoutAt, isOfflineSession);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1796,8 +1758,7 @@ class Session extends DataClass implements Insertable<Session> {
           other.loginAt == this.loginAt &&
           other.lastVerifiedAt == this.lastVerifiedAt &&
           other.logoutAt == this.logoutAt &&
-          other.isOfflineSession == this.isOfflineSession &&
-          other.sessionCredentialJson == this.sessionCredentialJson);
+          other.isOfflineSession == this.isOfflineSession);
 }
 
 class SessionsCompanion extends UpdateCompanion<Session> {
@@ -1809,7 +1770,6 @@ class SessionsCompanion extends UpdateCompanion<Session> {
   final Value<int?> lastVerifiedAt;
   final Value<int?> logoutAt;
   final Value<bool> isOfflineSession;
-  final Value<String?> sessionCredentialJson;
   const SessionsCompanion({
     this.id = const Value.absent(),
     this.userId = const Value.absent(),
@@ -1819,7 +1779,6 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.lastVerifiedAt = const Value.absent(),
     this.logoutAt = const Value.absent(),
     this.isOfflineSession = const Value.absent(),
-    this.sessionCredentialJson = const Value.absent(),
   });
   SessionsCompanion.insert({
     this.id = const Value.absent(),
@@ -1830,7 +1789,6 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.lastVerifiedAt = const Value.absent(),
     this.logoutAt = const Value.absent(),
     this.isOfflineSession = const Value.absent(),
-    this.sessionCredentialJson = const Value.absent(),
   })  : userId = Value(userId),
         loginAt = Value(loginAt);
   static Insertable<Session> custom({
@@ -1842,7 +1800,6 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Expression<int>? lastVerifiedAt,
     Expression<int>? logoutAt,
     Expression<bool>? isOfflineSession,
-    Expression<String>? sessionCredentialJson,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1853,8 +1810,6 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       if (lastVerifiedAt != null) 'last_verified_at': lastVerifiedAt,
       if (logoutAt != null) 'logout_at': logoutAt,
       if (isOfflineSession != null) 'is_offline_session': isOfflineSession,
-      if (sessionCredentialJson != null)
-        'session_credential_json': sessionCredentialJson,
     });
   }
 
@@ -1866,8 +1821,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       Value<int>? loginAt,
       Value<int?>? lastVerifiedAt,
       Value<int?>? logoutAt,
-      Value<bool>? isOfflineSession,
-      Value<String?>? sessionCredentialJson}) {
+      Value<bool>? isOfflineSession}) {
     return SessionsCompanion(
       id: id ?? this.id,
       userId: userId ?? this.userId,
@@ -1877,8 +1831,6 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       lastVerifiedAt: lastVerifiedAt ?? this.lastVerifiedAt,
       logoutAt: logoutAt ?? this.logoutAt,
       isOfflineSession: isOfflineSession ?? this.isOfflineSession,
-      sessionCredentialJson:
-          sessionCredentialJson ?? this.sessionCredentialJson,
     );
   }
 
@@ -1909,10 +1861,6 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     if (isOfflineSession.present) {
       map['is_offline_session'] = Variable<bool>(isOfflineSession.value);
     }
-    if (sessionCredentialJson.present) {
-      map['session_credential_json'] =
-          Variable<String>(sessionCredentialJson.value);
-    }
     return map;
   }
 
@@ -1926,8 +1874,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
           ..write('loginAt: $loginAt, ')
           ..write('lastVerifiedAt: $lastVerifiedAt, ')
           ..write('logoutAt: $logoutAt, ')
-          ..write('isOfflineSession: $isOfflineSession, ')
-          ..write('sessionCredentialJson: $sessionCredentialJson')
+          ..write('isOfflineSession: $isOfflineSession')
           ..write(')'))
         .toString();
   }
@@ -2740,6 +2687,16 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("is_express_cashier" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _includedInCloseCashMeta =
+      const VerificationMeta('includedInCloseCash');
+  @override
+  late final GeneratedColumn<bool> includedInCloseCash = GeneratedColumn<bool>(
+      'included_in_close_cash', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("included_in_close_cash" IN (0, 1))'),
+      defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -2776,7 +2733,8 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
         voidedAt,
         pendingVoidRequest,
         pendingVoidReason,
-        isExpressCashier
+        isExpressCashier,
+        includedInCloseCash
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3003,6 +2961,12 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
           isExpressCashier.isAcceptableOrUnknown(
               data['is_express_cashier']!, _isExpressCashierMeta));
     }
+    if (data.containsKey('included_in_close_cash')) {
+      context.handle(
+          _includedInCloseCashMeta,
+          includedInCloseCash.isAcceptableOrUnknown(
+              data['included_in_close_cash']!, _includedInCloseCashMeta));
+    }
     return context;
   }
 
@@ -3082,6 +3046,8 @@ class $TicketsTable extends Tickets with TableInfo<$TicketsTable, Ticket> {
           DriftSqlType.string, data['${effectivePrefix}pending_void_reason']),
       isExpressCashier: attachedDatabase.typeMapping.read(
           DriftSqlType.bool, data['${effectivePrefix}is_express_cashier'])!,
+      includedInCloseCash: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}included_in_close_cash'])!,
     );
   }
 
@@ -3171,6 +3137,11 @@ class Ticket extends DataClass implements Insertable<Ticket> {
 
   /// Express cashier transaction — completed at intake, no check-out.
   final bool isExpressCashier;
+
+  /// Whether the server has already counted this row in a prior close-cash
+  /// session (`included_in_close_cash`). Such rows are shown in the list but
+  /// excluded from the current shift's ticket count and shift total.
+  final bool includedInCloseCash;
   const Ticket(
       {required this.id,
       required this.shiftId,
@@ -3206,7 +3177,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       this.voidedAt,
       required this.pendingVoidRequest,
       this.pendingVoidReason,
-      required this.isExpressCashier});
+      required this.isExpressCashier,
+      required this.includedInCloseCash});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -3281,6 +3253,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       map['pending_void_reason'] = Variable<String>(pendingVoidReason);
     }
     map['is_express_cashier'] = Variable<bool>(isExpressCashier);
+    map['included_in_close_cash'] = Variable<bool>(includedInCloseCash);
     return map;
   }
 
@@ -3352,6 +3325,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           ? const Value.absent()
           : Value(pendingVoidReason),
       isExpressCashier: Value(isExpressCashier),
+      includedInCloseCash: Value(includedInCloseCash),
     );
   }
 
@@ -3397,6 +3371,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       pendingVoidReason:
           serializer.fromJson<String?>(json['pendingVoidReason']),
       isExpressCashier: serializer.fromJson<bool>(json['isExpressCashier']),
+      includedInCloseCash:
+          serializer.fromJson<bool>(json['includedInCloseCash']),
     );
   }
   @override
@@ -3438,6 +3414,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       'pendingVoidRequest': serializer.toJson<bool>(pendingVoidRequest),
       'pendingVoidReason': serializer.toJson<String?>(pendingVoidReason),
       'isExpressCashier': serializer.toJson<bool>(isExpressCashier),
+      'includedInCloseCash': serializer.toJson<bool>(includedInCloseCash),
     };
   }
 
@@ -3476,7 +3453,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           Value<String?> voidedAt = const Value.absent(),
           bool? pendingVoidRequest,
           Value<String?> pendingVoidReason = const Value.absent(),
-          bool? isExpressCashier}) =>
+          bool? isExpressCashier,
+          bool? includedInCloseCash}) =>
       Ticket(
         id: id ?? this.id,
         shiftId: shiftId ?? this.shiftId,
@@ -3524,6 +3502,7 @@ class Ticket extends DataClass implements Insertable<Ticket> {
             ? pendingVoidReason.value
             : this.pendingVoidReason,
         isExpressCashier: isExpressCashier ?? this.isExpressCashier,
+        includedInCloseCash: includedInCloseCash ?? this.includedInCloseCash,
       );
   Ticket copyWithCompanion(TicketsCompanion data) {
     return Ticket(
@@ -3598,6 +3577,9 @@ class Ticket extends DataClass implements Insertable<Ticket> {
       isExpressCashier: data.isExpressCashier.present
           ? data.isExpressCashier.value
           : this.isExpressCashier,
+      includedInCloseCash: data.includedInCloseCash.present
+          ? data.includedInCloseCash.value
+          : this.includedInCloseCash,
     );
   }
 
@@ -3638,7 +3620,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           ..write('voidedAt: $voidedAt, ')
           ..write('pendingVoidRequest: $pendingVoidRequest, ')
           ..write('pendingVoidReason: $pendingVoidReason, ')
-          ..write('isExpressCashier: $isExpressCashier')
+          ..write('isExpressCashier: $isExpressCashier, ')
+          ..write('includedInCloseCash: $includedInCloseCash')
           ..write(')'))
         .toString();
   }
@@ -3679,7 +3662,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
         voidedAt,
         pendingVoidRequest,
         pendingVoidReason,
-        isExpressCashier
+        isExpressCashier,
+        includedInCloseCash
       ]);
   @override
   bool operator ==(Object other) =>
@@ -3719,7 +3703,8 @@ class Ticket extends DataClass implements Insertable<Ticket> {
           other.voidedAt == this.voidedAt &&
           other.pendingVoidRequest == this.pendingVoidRequest &&
           other.pendingVoidReason == this.pendingVoidReason &&
-          other.isExpressCashier == this.isExpressCashier);
+          other.isExpressCashier == this.isExpressCashier &&
+          other.includedInCloseCash == this.includedInCloseCash);
 }
 
 class TicketsCompanion extends UpdateCompanion<Ticket> {
@@ -3758,6 +3743,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
   final Value<bool> pendingVoidRequest;
   final Value<String?> pendingVoidReason;
   final Value<bool> isExpressCashier;
+  final Value<bool> includedInCloseCash;
   final Value<int> rowid;
   const TicketsCompanion({
     this.id = const Value.absent(),
@@ -3795,6 +3781,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     this.pendingVoidRequest = const Value.absent(),
     this.pendingVoidReason = const Value.absent(),
     this.isExpressCashier = const Value.absent(),
+    this.includedInCloseCash = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TicketsCompanion.insert({
@@ -3833,6 +3820,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     this.pendingVoidRequest = const Value.absent(),
     this.pendingVoidReason = const Value.absent(),
     this.isExpressCashier = const Value.absent(),
+    this.includedInCloseCash = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         shiftId = Value(shiftId),
@@ -3885,6 +3873,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     Expression<bool>? pendingVoidRequest,
     Expression<String>? pendingVoidReason,
     Expression<bool>? isExpressCashier,
+    Expression<bool>? includedInCloseCash,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3925,6 +3914,8 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
         'pending_void_request': pendingVoidRequest,
       if (pendingVoidReason != null) 'pending_void_reason': pendingVoidReason,
       if (isExpressCashier != null) 'is_express_cashier': isExpressCashier,
+      if (includedInCloseCash != null)
+        'included_in_close_cash': includedInCloseCash,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3965,6 +3956,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       Value<bool>? pendingVoidRequest,
       Value<String?>? pendingVoidReason,
       Value<bool>? isExpressCashier,
+      Value<bool>? includedInCloseCash,
       Value<int>? rowid}) {
     return TicketsCompanion(
       id: id ?? this.id,
@@ -4002,6 +3994,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
       pendingVoidRequest: pendingVoidRequest ?? this.pendingVoidRequest,
       pendingVoidReason: pendingVoidReason ?? this.pendingVoidReason,
       isExpressCashier: isExpressCashier ?? this.isExpressCashier,
+      includedInCloseCash: includedInCloseCash ?? this.includedInCloseCash,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4114,6 +4107,9 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
     if (isExpressCashier.present) {
       map['is_express_cashier'] = Variable<bool>(isExpressCashier.value);
     }
+    if (includedInCloseCash.present) {
+      map['included_in_close_cash'] = Variable<bool>(includedInCloseCash.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4158,6 +4154,7 @@ class TicketsCompanion extends UpdateCompanion<Ticket> {
           ..write('pendingVoidRequest: $pendingVoidRequest, ')
           ..write('pendingVoidReason: $pendingVoidReason, ')
           ..write('isExpressCashier: $isExpressCashier, ')
+          ..write('includedInCloseCash: $includedInCloseCash, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6453,7 +6450,6 @@ typedef $$SessionsTableCreateCompanionBuilder = SessionsCompanion Function({
   Value<int?> lastVerifiedAt,
   Value<int?> logoutAt,
   Value<bool> isOfflineSession,
-  Value<String?> sessionCredentialJson,
 });
 typedef $$SessionsTableUpdateCompanionBuilder = SessionsCompanion Function({
   Value<int> id,
@@ -6464,7 +6460,6 @@ typedef $$SessionsTableUpdateCompanionBuilder = SessionsCompanion Function({
   Value<int?> lastVerifiedAt,
   Value<int?> logoutAt,
   Value<bool> isOfflineSession,
-  Value<String?> sessionCredentialJson,
 });
 
 class $$SessionsTableTableManager extends RootTableManager<
@@ -6492,7 +6487,6 @@ class $$SessionsTableTableManager extends RootTableManager<
             Value<int?> lastVerifiedAt = const Value.absent(),
             Value<int?> logoutAt = const Value.absent(),
             Value<bool> isOfflineSession = const Value.absent(),
-            Value<String?> sessionCredentialJson = const Value.absent(),
           }) =>
               SessionsCompanion(
             id: id,
@@ -6503,7 +6497,6 @@ class $$SessionsTableTableManager extends RootTableManager<
             lastVerifiedAt: lastVerifiedAt,
             logoutAt: logoutAt,
             isOfflineSession: isOfflineSession,
-            sessionCredentialJson: sessionCredentialJson,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -6514,7 +6507,6 @@ class $$SessionsTableTableManager extends RootTableManager<
             Value<int?> lastVerifiedAt = const Value.absent(),
             Value<int?> logoutAt = const Value.absent(),
             Value<bool> isOfflineSession = const Value.absent(),
-            Value<String?> sessionCredentialJson = const Value.absent(),
           }) =>
               SessionsCompanion.insert(
             id: id,
@@ -6525,7 +6517,6 @@ class $$SessionsTableTableManager extends RootTableManager<
             lastVerifiedAt: lastVerifiedAt,
             logoutAt: logoutAt,
             isOfflineSession: isOfflineSession,
-            sessionCredentialJson: sessionCredentialJson,
           ),
         ));
 }
@@ -6565,11 +6556,6 @@ class $$SessionsTableFilterComposer
 
   ColumnFilters<bool> get isOfflineSession => $state.composableBuilder(
       column: $state.table.isOfflineSession,
-      builder: (column, joinBuilders) =>
-          ColumnFilters(column, joinBuilders: joinBuilders));
-
-  ColumnFilters<String> get sessionCredentialJson => $state.composableBuilder(
-      column: $state.table.sessionCredentialJson,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -6622,11 +6608,6 @@ class $$SessionsTableOrderingComposer
 
   ColumnOrderings<bool> get isOfflineSession => $state.composableBuilder(
       column: $state.table.isOfflineSession,
-      builder: (column, joinBuilders) =>
-          ColumnOrderings(column, joinBuilders: joinBuilders));
-
-  ColumnOrderings<String> get sessionCredentialJson => $state.composableBuilder(
-      column: $state.table.sessionCredentialJson,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
@@ -6915,6 +6896,7 @@ typedef $$TicketsTableCreateCompanionBuilder = TicketsCompanion Function({
   Value<bool> pendingVoidRequest,
   Value<String?> pendingVoidReason,
   Value<bool> isExpressCashier,
+  Value<bool> includedInCloseCash,
   Value<int> rowid,
 });
 typedef $$TicketsTableUpdateCompanionBuilder = TicketsCompanion Function({
@@ -6953,6 +6935,7 @@ typedef $$TicketsTableUpdateCompanionBuilder = TicketsCompanion Function({
   Value<bool> pendingVoidRequest,
   Value<String?> pendingVoidReason,
   Value<bool> isExpressCashier,
+  Value<bool> includedInCloseCash,
   Value<int> rowid,
 });
 
@@ -7008,6 +6991,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             Value<bool> pendingVoidRequest = const Value.absent(),
             Value<String?> pendingVoidReason = const Value.absent(),
             Value<bool> isExpressCashier = const Value.absent(),
+            Value<bool> includedInCloseCash = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TicketsCompanion(
@@ -7046,6 +7030,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             pendingVoidRequest: pendingVoidRequest,
             pendingVoidReason: pendingVoidReason,
             isExpressCashier: isExpressCashier,
+            includedInCloseCash: includedInCloseCash,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -7084,6 +7069,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             Value<bool> pendingVoidRequest = const Value.absent(),
             Value<String?> pendingVoidReason = const Value.absent(),
             Value<bool> isExpressCashier = const Value.absent(),
+            Value<bool> includedInCloseCash = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TicketsCompanion.insert(
@@ -7122,6 +7108,7 @@ class $$TicketsTableTableManager extends RootTableManager<
             pendingVoidRequest: pendingVoidRequest,
             pendingVoidReason: pendingVoidReason,
             isExpressCashier: isExpressCashier,
+            includedInCloseCash: includedInCloseCash,
             rowid: rowid,
           ),
         ));
@@ -7297,6 +7284,11 @@ class $$TicketsTableFilterComposer
 
   ColumnFilters<bool> get isExpressCashier => $state.composableBuilder(
       column: $state.table.isExpressCashier,
+      builder: (column, joinBuilders) =>
+          ColumnFilters(column, joinBuilders: joinBuilders));
+
+  ColumnFilters<bool> get includedInCloseCash => $state.composableBuilder(
+      column: $state.table.includedInCloseCash,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
@@ -7483,6 +7475,11 @@ class $$TicketsTableOrderingComposer
 
   ColumnOrderings<bool> get isExpressCashier => $state.composableBuilder(
       column: $state.table.isExpressCashier,
+      builder: (column, joinBuilders) =>
+          ColumnOrderings(column, joinBuilders: joinBuilders));
+
+  ColumnOrderings<bool> get includedInCloseCash => $state.composableBuilder(
+      column: $state.table.includedInCloseCash,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 

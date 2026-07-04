@@ -281,4 +281,75 @@ void main() {
     expect(row.voidReason, 'Duplicate sale');
     expect(row.syncStatus, 'pending');
   });
+
+  test('expressOnly cache skips standard valet rows from API', () async {
+    final now = PhilippineTime.now().toIso8601String();
+    final ts = DateTime.now().millisecondsSinceEpoch;
+
+    final acctId = await db.into(db.offlineAccounts).insert(
+          OfflineAccountsCompanion.insert(
+            serverUserId: 'user-1',
+            email: 'cashier@test.com',
+            passwordHash: 'hash',
+            fullName: 'Cashier',
+            role: 'cashier',
+            lastOnlineLogin: ts,
+            createdAt: ts,
+            updatedAt: ts,
+          ),
+        );
+    await db.into(db.sessions).insert(
+          SessionsCompanion.insert(
+            userId: acctId,
+            loginAt: ts,
+            authToken: const Value('token'),
+            isActive: const Value(true),
+          ),
+        );
+
+    await db.into(db.shifts).insert(
+          ShiftsCompanion.insert(
+            id: shiftId,
+            userId: 'user-1',
+            branchId: 'branch-1',
+            openedAt: now,
+            openingFloat: 100,
+            status: 'open',
+            syncStatus: 'synced',
+            createdAt: now,
+          ),
+        );
+
+    final cached = await tickets.cacheTransactionsFromServerJsonList(
+      shiftId: shiftId,
+      expressOnly: true,
+      trustServerDateScope: true,
+      rows: [
+        {
+          'id': 'std-uuid-1',
+          'ticket_number': 'TKT-STD-1',
+          'status': 'completed',
+          'time_in': now,
+          'time_out': now,
+          'valet_type': 'standard_valet',
+          'vehicle': {'plate_number': 'ABC1234'},
+        },
+        {
+          'id': 'exp-uuid-1',
+          'ticket_number': 'TKT-EXP-1',
+          'status': 'completed',
+          'time_in': now,
+          'time_out': now,
+          'is_express_cashier': true,
+          'vehicle': {'plate_number': 'XYZ9999'},
+        },
+      ],
+    );
+
+    expect(cached, 1);
+    expect(await tickets.ticketById('TKT-STD-1'), isNull);
+    final express = await tickets.ticketById('TKT-EXP-1');
+    expect(express, isNotNull);
+    expect(express!.isExpressCashier, isTrue);
+  });
 }

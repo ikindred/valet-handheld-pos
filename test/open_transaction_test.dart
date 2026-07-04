@@ -98,5 +98,6 @@ Ticket _ticket({
     parkingInfo: parkingInfo,
     pendingVoidRequest: false,
     isExpressCashier: false,
+    includedInCloseCash: false,
   );
 }

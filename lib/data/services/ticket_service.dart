@@ -520,18 +520,23 @@ class TicketService {
 
   /// Express cashier tickets for [shiftId], newest first (includes voided).
   ///
-  /// When the shift-scoped query is empty, also includes today's express rows for
-  /// [userId] (e.g. after resume cash or server sync with a prior local shift id).
+  /// Limited to **today (PH)** so the list matches web admin date filters.
   Future<List<Ticket>> expressTicketsForShift(
     String shiftId, {
     String? userId,
   }) async {
+    final ph = PhilippineTime.now();
+    final start = DateTime(ph.year, ph.month, ph.day).toIso8601String();
+    final end = DateTime(ph.year, ph.month, ph.day + 1).toIso8601String();
+
     final sid = shiftId.trim();
     final shiftRows = await (_db.select(_db.tickets)
           ..where(
             (t) =>
                 t.shiftId.equals(sid) &
-                t.isExpressCashier.equals(true),
+                t.isExpressCashier.equals(true) &
+                t.checkInAt.isBiggerOrEqualValue(start) &
+                t.checkInAt.isSmallerThanValue(end),
           )
           ..orderBy([
             (t) => OrderingTerm.desc(t.checkOutAt),
@@ -544,9 +549,6 @@ class TicketService {
     final uid = userId?.trim() ?? '';
     if (uid.isEmpty) return shiftRows;
 
-    final ph = PhilippineTime.now();
-    final start = DateTime(ph.year, ph.month, ph.day).toIso8601String();
-    final end = DateTime(ph.year, ph.month, ph.day + 1).toIso8601String();
     return (_db.select(_db.tickets)
           ..where(
             (t) =>
@@ -563,7 +565,12 @@ class TicketService {
         .get();
   }
 
-  /// Syncs express shift rows from server (multi-source fallback chain).
+  /// Syncs today's express rows scoped strictly to the current PH day.
+  ///
+  /// `GET /reports/today` supplies the KPI cross-check (and rows if the backend
+  /// ever includes them). `GET /reports/transactions?date_from=today&date_to=today`
+  /// supplies the actual transaction rows. Both are today-only — historical
+  /// shifts are never pulled in — so an empty table is valid for a fresh shift.
   Future<void> syncExpressTransactionsForToday({
     required String token,
     required String shiftId,
@@ -576,7 +583,7 @@ class TicketService {
       } catch (e, st) {
         ValetLog.error(
           'TicketService.syncExpressTransactionsForToday',
-          'reports/today prefetch failed',
+          'reports/today failed',
           e,
           st,
         );
@@ -596,16 +603,6 @@ class TicketService {
       expressOnly: true,
       serverShiftId: today?.shiftId,
     );
-    cached += await cacheTodayServerTransactionsForShift(
-      token: token,
-      shiftId: shiftId,
-      expressOnly: true,
-    );
-    cached += await cacheTodayDashboardRecentForShift(
-      token: token,
-      shiftId: shiftId,
-      expressOnly: true,
-    );
 
     final driftCount = (await expressTicketsForShift(
       shiftId,
@@ -615,16 +612,16 @@ class TicketService {
     final serverTotal = today?.totalTransactions;
     ValetLog.debug(
       'TicketService.syncExpressTransactionsForToday',
-      'cached $cached express row(s) for shift=$shiftId; '
+      'today-only cached $cached express row(s) for shift=$shiftId; '
       'drift=$driftCount'
       '${serverTotal != null ? '; server total_transactions=$serverTotal' : ''}',
     );
     if ((serverTotal ?? 0) > 0 && driftCount == 0) {
-      ValetLog.warning(
+      ValetLog.debug(
         'TicketService.syncExpressTransactionsForToday',
-        'server reports $serverTotal transaction(s) but list APIs returned '
-        'no rows — backend may not expose express completed sales on '
-        'reports/transactions, /transactions, or dashboard/summary',
+        'server total_transactions=$serverTotal but no today rows returned — '
+        'reports/transactions may not be date-scoped server-side, or the sale '
+        'is only saved locally on another device',
       );
     }
   }
@@ -657,10 +654,7 @@ class TicketService {
 
       final rows = [
         for (final raw in sourceRows)
-          ReportsTodayRowMapper.toServerCacheJson(
-            raw,
-            markExpress: expressOnly,
-          ),
+          ReportsTodayRowMapper.toServerCacheJson(raw),
       ];
       final cached = await cacheTransactionsFromServerJsonList(
         rows: rows,
@@ -702,6 +696,7 @@ class TicketService {
       final rows = await _fetchReportsTransactionsWithFallbacks(
         token: token,
         serverShiftId: serverShiftId,
+        todayOnly: expressOnly,
       );
       if (rows.isEmpty) {
         ValetLog.debug(
@@ -713,10 +708,7 @@ class TicketService {
 
       final cacheRows = [
         for (final row in rows)
-          ReportsRowCacheMapper.fromReportsRow(
-            row,
-            markExpress: expressOnly,
-          ),
+          ReportsRowCacheMapper.fromReportsRow(row),
       ];
       final cached = await cacheTransactionsFromServerJsonList(
         rows: cacheRows,
@@ -747,47 +739,73 @@ class TicketService {
   Future<List<ReportsTicketRow>> _fetchReportsTransactionsWithFallbacks({
     required String token,
     String? serverShiftId,
+    bool todayOnly = false,
   }) async {
     final today = ReportsDateQuery.isoDate(PhilippineTime.now());
+    // Server treats `date_to` as EXCLUSIVE, so today-only is [today, tomorrow).
+    final tomorrow = ReportsDateQuery.isoDate(
+      PhilippineTime.now().add(const Duration(days: 1)),
+    );
     final sid = serverShiftId?.trim() ?? '';
 
     final attempts = <({String label, Future<List<ReportsTicketRow>> Function() run})>[
-      (
-        label: 'shift-scoped (no date)',
-        run: () => _transactionsApi.fetchAllReportsTransactions(token: token),
-      ),
-      if (sid.isNotEmpty)
+      if (todayOnly) ...[
         (
-          label: 'shift_id=$sid',
+          label: 'date=[$today,$tomorrow)',
           run: () => _transactionsApi.fetchAllReportsTransactions(
             token: token,
-            shiftId: sid,
+            dateFrom: today,
+            dateTo: tomorrow,
           ),
         ),
-      (
-        label: 'date=$today',
-        run: () => _transactionsApi.fetchAllReportsTransactions(
-          token: token,
-          dateFrom: today,
-          dateTo: today,
+        if (sid.isNotEmpty)
+          (
+            label: 'shift_id=$sid date=[$today,$tomorrow)',
+            run: () => _transactionsApi.fetchAllReportsTransactions(
+              token: token,
+              shiftId: sid,
+              dateFrom: today,
+              dateTo: tomorrow,
+            ),
+          ),
+      ] else ...[
+        (
+          label: 'shift-scoped (no date)',
+          run: () => _transactionsApi.fetchAllReportsTransactions(token: token),
         ),
-      ),
-      (
-        label: 'date=$today status=completed',
-        run: () => _transactionsApi.fetchAllReportsTransactions(
-          token: token,
-          dateFrom: today,
-          dateTo: today,
-          status: 'completed',
+        if (sid.isNotEmpty)
+          (
+            label: 'shift_id=$sid',
+            run: () => _transactionsApi.fetchAllReportsTransactions(
+              token: token,
+              shiftId: sid,
+            ),
+          ),
+        (
+          label: 'date=$today',
+          run: () => _transactionsApi.fetchAllReportsTransactions(
+            token: token,
+            dateFrom: today,
+            dateTo: today,
+          ),
         ),
-      ),
-      (
-        label: 'status=completed',
-        run: () => _transactionsApi.fetchAllReportsTransactions(
-          token: token,
-          status: 'completed',
+        (
+          label: 'date=$today status=completed',
+          run: () => _transactionsApi.fetchAllReportsTransactions(
+            token: token,
+            dateFrom: today,
+            dateTo: today,
+            status: 'completed',
+          ),
         ),
-      ),
+        (
+          label: 'status=completed',
+          run: () => _transactionsApi.fetchAllReportsTransactions(
+            token: token,
+            status: 'completed',
+          ),
+        ),
+      ],
     ];
 
     for (final attempt in attempts) {
@@ -811,7 +829,10 @@ class TicketService {
     if (AppConfig.useStubApi) return 0;
     if (!await InternetReachability.hasInternet()) return 0;
 
-    final rows = await _fetchTodayServerTransactions(token);
+    final rows = await _fetchTodayServerTransactions(
+      token,
+      todayOnly: expressOnly,
+    );
     if (rows.isEmpty) return 0;
     final cached = await cacheTransactionsFromServerJsonList(
       rows: rows,
@@ -886,8 +907,7 @@ class TicketService {
     if (rows.isEmpty) return 0;
     var cached = 0;
     for (final row in rows) {
-      final isExpress =
-          expressOnly || _isExpressServerTransactionJson(row);
+      final isExpress = _isExpressServerTransactionJson(row);
       if (expressOnly && !isExpress) continue;
       if (standardOnly && isExpress) continue;
       if (!trustServerDateScope && !_isTransactionToday(row)) continue;
@@ -2011,36 +2031,39 @@ WHERE t.sync_status = 'pending'
   }
 
   Future<List<Map<String, dynamic>>> _fetchTodayServerTransactions(
-    String token,
-  ) async {
+    String token, {
+    bool todayOnly = false,
+  }) async {
     final all = <Map<String, dynamic>>[];
 
-    for (var page = 1; page <= 5; page++) {
-      try {
-        final rows = await _transactionsApi.fetchTransactionsForOpenShift(
-          token: token,
-          limit: 200,
-          page: page,
-        );
-        if (rows.isEmpty) break;
-        all.addAll(rows);
-        if (rows.length < 200) break;
-      } catch (e, st) {
-        ValetLog.error(
-          'TicketService._fetchTodayServerTransactions',
-          'shift-scoped page=$page',
-          e,
-          st,
-        );
-        break;
+    if (!todayOnly) {
+      for (var page = 1; page <= 5; page++) {
+        try {
+          final rows = await _transactionsApi.fetchTransactionsForOpenShift(
+            token: token,
+            limit: 200,
+            page: page,
+          );
+          if (rows.isEmpty) break;
+          all.addAll(rows);
+          if (rows.length < 200) break;
+        } catch (e, st) {
+          ValetLog.error(
+            'TicketService._fetchTodayServerTransactions',
+            'shift-scoped page=$page',
+            e,
+            st,
+          );
+          break;
+        }
       }
-    }
-    if (all.isNotEmpty) {
-      ValetLog.debug(
-        'TicketService._fetchTodayServerTransactions',
-        'shift-scoped GET /transactions: ${all.length} row(s)',
-      );
-      return all;
+      if (all.isNotEmpty) {
+        ValetLog.debug(
+          'TicketService._fetchTodayServerTransactions',
+          'shift-scoped GET /transactions: ${all.length} row(s)',
+        );
+        return all;
+      }
     }
 
     final now = PhilippineTime.now();
@@ -4369,6 +4392,11 @@ WHERE shift_id = ? AND status = 'completed'
             json.containsKey('ticketLost')
         ? TransactionPaymentFields.isTicketLostFrom(json)
         : null;
+    final includedInCloseCash = json.containsKey('included_in_close_cash') ||
+            json.containsKey('includedInCloseCash')
+        ? (json['included_in_close_cash'] == true ||
+            json['includedInCloseCash'] == true)
+        : null;
 
     return TicketsCompanion(
       vrNo: vr != null && vr.isNotEmpty ? Value(vr) : const Value.absent(),
@@ -4383,6 +4411,9 @@ WHERE shift_id = ? AND status = 'completed'
           : const Value.absent(),
       ticketLost: ticketLost != null
           ? Value(ticketLost)
+          : const Value.absent(),
+      includedInCloseCash: includedInCloseCash != null
+          ? Value(includedInCloseCash)
           : const Value.absent(),
     );
   }
@@ -4797,6 +4828,7 @@ LIMIT 1
             appliedRateJson: meta.appliedRateJson,
             isOvernight: meta.isOvernight,
             ticketLost: meta.ticketLost,
+            includedInCloseCash: meta.includedInCloseCash,
             isExpressCashier:
                 isExpress ? const Value(true) : const Value.absent(),
           ),
@@ -4868,6 +4900,8 @@ LIMIT 1
             appliedRateJson: meta.appliedRateJson,
             isOvernight: meta.isOvernight,
             ticketLost: meta.ticketLost,
+            includedInCloseCash:
+                meta.includedInCloseCash.present ? meta.includedInCloseCash : const Value(false),
             isExpressCashier: Value(isExpress),
           ),
         );

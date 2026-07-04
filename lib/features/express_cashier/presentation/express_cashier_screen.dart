@@ -815,12 +815,20 @@ class _TransactionsPane extends StatelessWidget {
   static const _vrFlex = 2;
   static const _amountFlex = 2;
 
+  /// Current-shift total: excludes voided rows and rows already counted in a
+  /// prior close-cash session (`included_in_close_cash`).
   double get _shiftTotal => transactions
-      .where((tx) => !tx.isVoided)
+      .where((tx) => !tx.isVoided && !tx.includedInCloseCash)
       .fold(0.0, (sum, tx) => sum + tx.amount);
 
-  int get _activeTicketCount =>
-      transactions.where((tx) => !tx.isVoided).length;
+  /// Current-shift ticket count: same exclusions as [_shiftTotal].
+  int get _activeTicketCount => transactions
+      .where((tx) => !tx.isVoided && !tx.includedInCloseCash)
+      .length;
+
+  /// How many rows were already counted in a prior close-cash session.
+  int get _closedCashCount =>
+      transactions.where((tx) => tx.includedInCloseCash).length;
 
   @override
   Widget build(BuildContext context) {
@@ -840,11 +848,22 @@ class _TransactionsPane extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Expanded(
-                child: Text(
-                  transactions.isEmpty
-                      ? 'TRANSACTIONS'
-                      : 'TRANSACTIONS · ${transactions.length}',
-                  style: theme.sectionCaps(),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        transactions.isEmpty
+                            ? 'TRANSACTIONS'
+                            : 'TRANSACTIONS · ${transactions.length}',
+                        style: theme.sectionCaps(),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (_closedCashCount > 0) ...[
+                      const SizedBox(width: 8),
+                      _ClosedCashBadge(theme: theme, count: _closedCashCount),
+                    ],
+                  ],
                 ),
               ),
               _HeaderIconButton(
@@ -926,6 +945,7 @@ class _TransactionsPane extends StatelessWidget {
                                         amountLabel: formatAmount(tx.amount),
                                         isSynced: tx.isSynced,
                                         isVoided: tx.isVoided,
+                                        includedInCloseCash: tx.includedInCloseCash,
                                         pesoMoneyStyle: pesoMoneyStyle,
                                       ),
                                     ),
@@ -1005,6 +1025,42 @@ class _HeaderIconButton extends StatelessWidget {
             height: 32,
             child: Icon(icon, size: 16, color: theme.textSecondary),
           ),
+        ),
+      ),
+    );
+  }
+}
+class _ClosedCashBadge extends StatelessWidget {
+  const _ClosedCashBadge({required this.theme, required this.count});
+
+  final _ExpressTheme theme;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: '$count transaction${count == 1 ? '' : 's'} already in a '
+          'closed cash session (excluded from shift total)',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: theme.headerBg,
+          border: Border.all(color: theme.cardBorder),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(LucideIcons.lock, size: 11, color: theme.textSecondary),
+            const SizedBox(width: 4),
+            Text(
+              '$count closed cash',
+              style: theme.fieldLabel().copyWith(
+                    fontSize: 10.5,
+                    color: theme.textSecondary,
+                  ),
+            ),
+          ],
         ),
       ),
     );
@@ -1109,6 +1165,7 @@ class _TransactionTableRow extends StatelessWidget {
     required this.amountLabel,
     required this.isSynced,
     required this.isVoided,
+    required this.includedInCloseCash,
     required this.pesoMoneyStyle,
   });
 
@@ -1120,6 +1177,7 @@ class _TransactionTableRow extends StatelessWidget {
   final String amountLabel;
   final bool isSynced;
   final bool isVoided;
+  final bool includedInCloseCash;
   final TextStyle Function({
     double fontSize,
     FontWeight fontWeight,
@@ -1128,7 +1186,8 @@ class _TransactionTableRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final muted = isVoided ? theme.textSecondary : theme.textPrimary;
+    final rowMuted = isVoided || includedInCloseCash;
+    final muted = rowMuted ? theme.textSecondary : theme.textPrimary;
     final valueStyle = theme.fieldValue().copyWith(
       fontSize: 11,
       fontWeight: FontWeight.w500,
@@ -1145,12 +1204,16 @@ class _TransactionTableRow extends StatelessWidget {
           isLast: false,
           child: Row(
             children: [
-              if (!isSynced && !isVoided) ...[
+              if (!isSynced && !isVoided && !includedInCloseCash) ...[
                 const UnsyncedCloudIcon(),
                 const SizedBox(width: 5),
               ],
               if (isVoided) ...[
                 const _VoidedBadge(),
+                const SizedBox(width: 5),
+              ],
+              if (includedInCloseCash && !isVoided) ...[
+                _ClosedCashRowIcon(theme: theme),
                 const SizedBox(width: 5),
               ],
               Expanded(
@@ -1170,7 +1233,7 @@ class _TransactionTableRow extends StatelessWidget {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Opacity(
-              opacity: isVoided ? 0.55 : 1,
+              opacity: rowMuted ? 0.55 : 1,
               child: _PlateBadge(label: plateLabel, theme: theme),
             ),
           ),
@@ -1230,6 +1293,24 @@ class _VoidedBadge extends StatelessWidget {
           color: const Color(0xFFDC2626),
           height: 1.1,
         ),
+      ),
+    );
+  }
+}
+
+class _ClosedCashRowIcon extends StatelessWidget {
+  const _ClosedCashRowIcon({required this.theme});
+
+  final _ExpressTheme theme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Already counted in a closed cash session',
+      child: Icon(
+        LucideIcons.lock,
+        size: 13,
+        color: theme.textSecondary.withValues(alpha: 0.85),
       ),
     );
   }

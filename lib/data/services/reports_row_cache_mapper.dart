@@ -39,11 +39,12 @@ abstract final class ReportsRowCacheMapper {
       if (vr.isNotEmpty && vr != '—') 'vr_no': vr,
       if (row.slot.trim().isNotEmpty && row.slot != '—')
         'slot': row.slot.trim(),
+      'included_in_close_cash': row.includedInCloseCash,
     };
 
     return ReportsTodayRowMapper.toServerCacheJson(
       raw,
-      markExpress: markExpress,
+      markExpress: markExpress || row.isExpress,
     );
   }
 }

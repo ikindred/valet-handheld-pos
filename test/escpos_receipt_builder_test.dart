@@ -31,6 +31,7 @@ void main() {
       createdAt: DateTime.now().toIso8601String(),
       pendingVoidRequest: false,
       isExpressCashier: false,
+      includedInCloseCash: false,
     );
 
     final bytes = builder.buildCheckInReceipt(

@@ -254,6 +254,13 @@ class Tickets extends Table {
       .named('is_express_cashier')
       .withDefault(const Constant(false))();
 
+  /// Whether the server has already counted this row in a prior close-cash
+  /// session (`included_in_close_cash`). Such rows are shown in the list but
+  /// excluded from the current shift's ticket count and shift total.
+  BoolColumn get includedInCloseCash => boolean()
+      .named('included_in_close_cash')
+      .withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -398,7 +405,7 @@ class AppDatabase extends _$AppDatabase {
   final bool _skipDevOfflineSeed;
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -489,6 +496,9 @@ FROM offline_accounts''');
         await m.addColumn(offlineAccounts, offlineAccounts.isExpressCashier);
         await m.addColumn(shifts, shifts.isExpressCashier);
         await m.addColumn(tickets, tickets.isExpressCashier);
+      }
+      if (from < 16) {
+        await m.addColumn(tickets, tickets.includedInCloseCash);
       }
     },
   );
