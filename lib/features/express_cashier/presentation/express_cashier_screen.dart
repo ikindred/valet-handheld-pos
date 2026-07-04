@@ -1097,7 +1097,7 @@ class _ClosedCashVisibilityControl extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(LucideIcons.lock, size: 12, color: accent),
+                Icon(LucideIcons.checkCircle2, size: 12, color: accent),
                 const SizedBox(width: 6),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1387,7 +1387,7 @@ class _ClosedCashRowIcon extends StatelessWidget {
     return Tooltip(
       message: 'Already counted in a closed cash session',
       child: Icon(
-        LucideIcons.lock,
+        LucideIcons.checkCircle2,
         size: 13,
         color: theme.textSecondary.withValues(alpha: 0.85),
       ),
