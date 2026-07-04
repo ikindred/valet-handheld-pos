@@ -338,6 +338,18 @@ WHERE table_name = 'shifts'
             await _reconcileOrphanQueueEntries();
           }
 
+          final shiftCreateRows = queuePending
+              .where(
+                (r) =>
+                    r.queueTableName == 'shifts' && r.operation == 'create',
+              )
+              .toList();
+          final shiftUpdateRows = queuePending
+              .where(
+                (r) =>
+                    r.queueTableName == 'shifts' && r.operation != 'create',
+              )
+              .toList();
           final checkInRows = queuePending
               .where(
                 (r) =>
@@ -360,12 +372,28 @@ WHERE table_name = 'shifts'
           final otherRows = queuePending
               .where(
                 (r) =>
-                    r.queueTableName != 'tickets' ||
-                    (r.operation != 'checkin' &&
-                        r.operation != 'checkout/finalize' &&
-                        r.operation != 'void'),
+                    r.queueTableName != 'tickets' &&
+                    r.queueTableName != 'shifts',
               )
               .toList();
+
+          for (final row in shiftCreateRows) {
+            try {
+              await _syncQueueRow(
+                row: row,
+                token: token,
+                onSynced: () => syncedThisRun++,
+              );
+            } catch (e, st) {
+              ValetLog.error(
+                'SyncCubit.flush',
+                'shift create failed queueId=${row.id} recordId=${row.recordId}',
+                e,
+                st,
+              );
+              await _markQueueFailed(row);
+            }
+          }
 
           if (checkInRows.isNotEmpty) {
             try {
@@ -478,7 +506,7 @@ WHERE table_name = 'shifts'
             }
           }
 
-          for (final row in otherRows) {
+          for (final row in [...shiftUpdateRows, ...otherRows]) {
             try {
               await _syncQueueRow(
                 row: row,

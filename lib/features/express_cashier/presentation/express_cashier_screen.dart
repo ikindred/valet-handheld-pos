@@ -854,7 +854,7 @@ class _TransactionsPane extends StatelessWidget {
                       child: Text(
                         transactions.isEmpty
                             ? 'TRANSACTIONS'
-                            : 'TRANSACTIONS · ${transactions.length}',
+                            : 'TRANSACTIONS · $_activeTicketCount',
                         style: theme.sectionCaps(),
                         overflow: TextOverflow.ellipsis,
                       ),

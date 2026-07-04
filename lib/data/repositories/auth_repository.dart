@@ -12,6 +12,8 @@ import '../../core/logging/valet_log.dart';
 import '../../core/services/device_id_service.dart';
 import '../../core/storage/device_site_ids.dart';
 import '../../core/storage/device_site_prefs.dart';
+import '../../core/storage/login_credential_store.dart';
+import '../../core/storage/offline_mode_prefs.dart';
 import '../../core/storage/prefs_keys.dart';
 import '../../core/storage/site_display_name.dart';
 import '../../core/routing/router_refresh_notifier.dart';
@@ -446,6 +448,7 @@ class AuthRepository {
       );
     }
 
+    await LoginCredentialStore.save(email: email, password: password);
     _refresh.notifyAuthChanged();
     await _syncRatesForCurrentBranch(res.standardRates);
     ValetLog.debug(
@@ -514,6 +517,7 @@ class AuthRepository {
           );
     });
 
+    await LoginCredentialStore.save(email: normalizedEmail, password: password);
     _refresh.notifyAuthChanged();
     await hydrateLocalRatesIfEmpty();
     ValetLog.debug(
@@ -521,6 +525,43 @@ class AuthRepository {
       'success localUserId=${row.id}',
     );
     return null;
+  }
+
+  /// Silent online login when [getActiveSession] is an offline session and
+  /// [LoginCredentialStore] has credentials from a prior login on this device.
+  ///
+  /// Returns `null` when there is no offline session or no stored credentials.
+  /// Throws [LoginApiFailure] / [DioException] when the server rejects login.
+  Future<StandardParkingRates?> upgradeOfflineSessionToOnline() async {
+    final session = await getActiveSession();
+    if (session == null || !session.isOfflineSession) {
+      return null;
+    }
+
+    final creds = await LoginCredentialStore.read();
+    if (creds == null) {
+      ValetLog.warning(
+        'AuthRepository.upgradeOfflineSessionToOnline',
+        'no stored credentials — cannot auto online login',
+      );
+      return null;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final serverDeviceId = prefs.getString(PrefsKeys.deviceIdentityKey);
+
+    ValetLog.debug(
+      'AuthRepository.upgradeOfflineSessionToOnline',
+      'begin email=${creds.email}',
+    );
+    final rates = await loginOnline(
+      email: creds.email,
+      password: creds.password,
+      serverDeviceId: serverDeviceId,
+    );
+    await OfflineModePrefs.write(prefs, false);
+    ValetLog.debug('AuthRepository.upgradeOfflineSessionToOnline', 'success');
+    return rates;
   }
 
   /// `UPDATE sessions SET last_verified_at = ?, auth_token = ? WHERE id = ?`
@@ -685,6 +726,7 @@ class AuthRepository {
     if (!BCrypt.checkpw(password, row.passwordHash)) {
       throw StateError('BAD_PASSWORD');
     }
+    await LoginCredentialStore.save(email: row.email, password: password);
     _refresh.notifyAuthChanged();
   }
 
@@ -827,12 +869,16 @@ WHERE shift_id = ? AND status = 'completed'
   }
 
   /// Express cashier tickets on [shiftId] (matches Manual Ticketing list).
+  /// Excludes rows already counted in a prior close-cash session.
   Future<int> countExpressCompletedForShift(String shiftId) async {
     final row = await _db
         .customSelect(
           '''
 SELECT COUNT(*) AS c FROM tickets
-WHERE shift_id = ? AND status = 'completed' AND is_express_cashier = 1
+WHERE shift_id = ?
+  AND status = 'completed'
+  AND is_express_cashier = 1
+  AND included_in_close_cash = 0
 ''',
           variables: [Variable<String>(shiftId)],
           readsFrom: {_db.tickets},
@@ -846,7 +892,10 @@ WHERE shift_id = ? AND status = 'completed' AND is_express_cashier = 1
         .customSelect(
           '''
 SELECT COALESCE(SUM(fee), 0) AS s FROM tickets
-WHERE shift_id = ? AND status = 'completed' AND is_express_cashier = 1
+WHERE shift_id = ?
+  AND status = 'completed'
+  AND is_express_cashier = 1
+  AND included_in_close_cash = 0
 ''',
           variables: [Variable<String>(shiftId)],
           readsFrom: {_db.tickets},
@@ -975,6 +1024,7 @@ WHERE user_id = ? AND check_in_at >= ? AND status != 'draft'
 SELECT COUNT(*) AS c FROM tickets
 WHERE user_id = ?
   AND status IN ('completed', 'lost')
+  AND included_in_close_cash = 0
   AND (
     shift_id = ?
     OR (check_out_at IS NOT NULL AND check_out_at >= ?)
@@ -1016,6 +1066,7 @@ WHERE shift_id = ? AND status = 'active'
 SELECT COALESCE(SUM(fee), 0) AS s FROM tickets
 WHERE user_id = ?
   AND status IN ('completed', 'lost')
+  AND included_in_close_cash = 0
   AND (
     shift_id = ?
     OR (check_out_at IS NOT NULL AND check_out_at >= ?)
@@ -1043,6 +1094,7 @@ WHERE user_id = ?
 SELECT vehicle_type AS vt, COUNT(*) AS c FROM tickets
 WHERE user_id = ?
   AND status IN ('completed', 'lost')
+  AND included_in_close_cash = 0
   AND (
     shift_id = ?
     OR (check_out_at IS NOT NULL AND check_out_at >= ?)
@@ -1225,6 +1277,7 @@ GROUP BY vehicle_type
     if (deviceId != null && token != null && token.isNotEmpty) {
       unawaited(_api.logout(token: token, deviceId: deviceId));
     }
+    await LoginCredentialStore.clear();
     _refresh.notifyAuthChanged();
   }
 
@@ -1287,6 +1340,15 @@ GROUP BY vehicle_type
         // Race: shift opened concurrently.
       }
     } else {
+      final uid = await _shifts.shiftUserIdForLocalAccount(localUserId);
+      final open = await _shifts.getActiveShift(uid);
+      if (open != null && open.syncStatus == 'pending') {
+        ValetLog.debug(
+          'AuthRepository.applyServerOpenCashFlag',
+          'skip close — local open shift pending sync',
+        );
+        return;
+      }
       await _shifts.closeActiveShiftForLocalUser(localUserId, 0);
     }
   }

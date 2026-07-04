@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,12 +18,15 @@ import 'package:valet_handheld_pos/data/services/shift_service.dart';
 import 'package:valet_handheld_pos/data/services/ticket_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('AuthRepository', () {
     late AppDatabase db;
     late AuthRepository repo;
     late ShiftService shifts;
 
     setUp(() async {
+      FlutterSecureStorage.setMockInitialValues({});
       SharedPreferences.setMockInitialValues({PrefsKeys.deviceId: 'dev-1'});
       db = AppDatabase.memory();
       final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
@@ -188,6 +192,38 @@ void main() {
           );
 
           expect(await repo.shiftRouteForLocalUser(localUserId), '/cash/open');
+        },
+      );
+
+      test(
+        'is_open_cash false preserves pending local open shift (offline open cash)',
+        () async {
+          final localUserId = await seedLocalUser();
+          final uid = await shifts.shiftUserIdForLocalAccount(localUserId);
+          const pendingShiftId = 'offline-open-shift';
+          const now = '2026-07-04T06:06:39.000Z';
+          await db.into(db.shifts).insert(
+                ShiftsCompanion.insert(
+                  id: pendingShiftId,
+                  userId: uid,
+                  branchId: 'branch-1',
+                  openedAt: now,
+                  openingFloat: 1000,
+                  status: 'open',
+                  syncStatus: 'pending',
+                  createdAt: now,
+                ),
+              );
+
+          await repo.applyServerOpenCashFlag(
+            localUserId: localUserId,
+            isOpenCash: false,
+          );
+
+          final open = await shifts.getActiveShift(uid);
+          expect(open?.id, pendingShiftId);
+          expect(open?.syncStatus, 'pending');
+          expect(await repo.shiftRouteForLocalUser(localUserId), '/dashboard');
         },
       );
 

@@ -138,6 +138,7 @@ class AppProviders extends StatelessWidget {
         ),
         Provider<ConnectivityService>(
           create: (c) => ConnectivityService(
+            authRepository: c.read<AuthRepository>(),
             branchConfig: c.read<BranchConfigService>(),
             syncCubit: c.read<SyncCubit>(),
           ),
